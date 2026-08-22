@@ -1,1119 +1,774 @@
 # SPEC
 
-**What this document owns.** The implementation substrate — language, editor,
-persistence, orchestration, transport — and the detail that depends on it. The two are
-one document deliberately: held apart, every persistence question got answered twice
-and reconciled by hand.
-
-It does not define vocabulary, restate requirements, or decide composition. Where it
-appears to define a domain term, that is a defect here.
-
----
+**Owns:** implementation substrate, persistence, model orchestration, transport, verification.
+**Does not own:** purpose and principles (VISION), vocabulary (CONTEXT), author requirements
+(PRD), composition and presentation (UX_DESIGN).
+**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. Everything here is subordinate to
+the documents above it; where this document appears to decide product behaviour, it is
+recording what the behaviour above it forces.
 
 ## What forces most of this
 
-Four standing commitments do nearly all the constraining:
-
 | Commitment | Consequence |
 |---|---|
-| Local app, localhost models | Single process serving a browser UI. No accounts, no cloud, no build-time services. |
-| Plain files, human-readable, schema-tolerant | Files are the record. No database as source of truth. |
-| OpenAI-compatible, provider-agnostic, per-role endpoints | One thin model client, configured per role, no vendor SDK beyond that shape. |
-| No orchestration framework | Write the turn loop by hand. |
+| Local app, usable offline | One process serving a browser UI. No accounts, no cloud dependency, no build-time services. |
+| Plain files, human-readable | Files are the record. No database as source of truth. |
+| Provider-agnostic endpoints, assignable per participant | Model access is configured per participant behind one internal interface. |
+| The application owns the AI layer only | Conventional prose editing comes from a mature editor and is not reimplemented. |
 
-Three more come from the interaction rather than the runtime:
+Three properties of the interaction do the rest of the constraining.
 
-- Prose carries provenance and remarks anchor into it. **This is the hardest technical
-  requirement in the project.** See *The prose surface*.
-- Asking the room is several slow parallel calls the author must not block on. This is
-  the likeliest quiet failure, and it is an infrastructure fact before it is a UX one.
-  See *The scheduler is load-bearing*.
-- **Blindness is context construction.** It is a property of what goes into a call, not
-  of what a prompt asks for, and it is the one seam where a plausible-looking
-  implementation defeats the product's central bet without any symptom. See *Context
-  construction*.
+**Independence is context compilation.** No specialist's context may contain another
+specialist's response from the round being formed. This is a property of what goes into a
+call, not of what a prompt asks for, and it is the one seam where a plausible implementation
+defeats the product's central bet with no symptom.
+
+**Asking the room is several slow calls the author must not block on.** They are issued one at a
+time against one local model, so a round costs the sum of its calls. This is an infrastructure
+fact before it is an interface one.
+
+**Applying a recommendation is interpretation, not replay.** It reads the current manuscript
+and produces the next one; nothing stored describes the edit in advance.
 
 ---
 
 ## Substrate
 
-### Language and shell
+**TypeScript end to end. One Node process. Vite and React for the client.** Artifact shapes
+are the contract between orchestration and interface, and one language means one definition
+rather than two that drift.
 
-**TypeScript end to end. One Node process. Vite + React for the client.**
+The server serves the built client, exposes a local HTTP API, owns the filesystem, and owns
+model access and scheduling. The client owns the editor, the conversation surface, and its own
+projection of round state.
 
-The artifact schemas are the contract between orchestration and interface; a single
-language means one definition of a remark or a board rather than two that drift. Python
-would win only if orchestration were the hard part — it is not; the prose surface is,
-and that is unavoidably TypeScript.
+**Not Electron** — a localhost URL is sufficient, and packaging is a cost with no return here.
+**No database** — everything a piece needs is in the piece's directory. Established UI and
+styling libraries are ordinary dependency choices, subject only to the same test as any other:
+that they reduce machinery this project would otherwise own.
 
-- **Server** — Node, and Bun is acceptable since nothing depends on the choice. Serves
-  the built client, exposes a local HTTP API, owns the filesystem and the model
-  scheduler.
-- **Client** — React via Vite, TypeScript throughout.
-- **Not Electron.** It buys a window and costs a packaging pipeline. A localhost URL is
-  sufficient.
-- **No database.** Files are the record, and nothing in the model needs an index:
-  meanings come from a shipped lexicon, and everything else a piece needs is in the
-  piece's own directory.
-- **Styling** — plain CSS with custom properties, light and dark from one token set. No
-  component library. The elastic-room thesis is CSS Grid plus transitions, and the prose
-  surface is hand-written typography either way.
-- **Client state** — a small event-fed store. Not a request/response cache library: this
-  is a local event-stream application, and modelling it as remote data fetching would be
-  a category error.
+Client state is a small event-fed store. This is a local event-stream application; modelling
+it as remote data fetching would be a category error.
 
-### Transport
-
-**SSE for server→client room events. Plain POST for client→server**, including the board
-refresh, which is an author action with one response and needs no event stream.
-
-**The event set is closed, and every event corresponds to a call that produced something
-or to a frame around one:**
-
-| Event | Carries |
-|---|---|
-| `turn.opened` | Scope, cast, the author's question verbatim |
-| `seat.state` | Seat, its state, queue position where it is queued |
-| `seat.settled` | Seat, its remarks, or the failure |
-| `synthesis` | The Showrunner's response, or its failure |
-| `turn.closed` | How it ended — settled or abandoned |
-| `error` | What broke, in the terms the author needs to act |
-
-**No token-level streaming.** Nothing renders a partially formed take, and a partial
-take is not a thing the domain has — a remark arrives whole because its claim,
-elaboration, reasoning, terms and anchor come from one response. Streaming tokens would
-invent a state the model does not define and invite the interface to show it.
-
-`seat.state` exists because *queued behind two others* is the honest answer a lot of the
-time. Its states are the five the domain names and nothing more.
-
-**One stream per open piece, not one per turn.** The client's subscription outlives any
-turn, and `turn.opened` already frames one. Each event carries the id of the turn it
-belongs to and a sequence number within that turn, and **on reconnect the server re-emits
-the current turn's landed events** from the sequence the client last saw. Turns are
-in-memory and one at a time, so there is at most one to re-emit.
-
-**Re-emission puts one requirement on the receiver: the projection is idempotent per
-`(turnId, sequence)`.** A client that folds a re-emitted event twice duplicates every landed
-remark in the gutter, which is the quiet kind of failure a dropped connection must not cause.
-See *The client's projection is a pure reducer*.
-
-**This is reconnection hygiene and not a log.** The ids and sequence numbers live as long
-as the turn does; nothing is written, nothing is replayable after the process exits, and
-there is no snapshot endpoint. A snapshot would be a second representation of room state
-to keep honest, when the closed event set already describes everything the client renders.
-
-**`error` carries a room failure that belongs to no seat and to no synthesis** — a turn that
-could not start at all — in a closed set matching the closed event set:
-`provider-unreachable`, `provider-error`, `parse-failed`, `room-error`. Each carries one
-plain sentence.
-
-**One channel per thing that can fail, so nothing is reported twice.** A seat's failure rides
-its own `seat.settled`; the Showrunner's rides `synthesis`; a failed drafting stage rides the
-drafting seat's `seat.settled` and no critics run, which is what makes it one failure rather
-than five. The other two failures the runtime has are not room events and must not arrive as
-one:
-
-- **Invalid shipped data is a startup failure**, not something a turn discovers. See
-  *Configuration is split by ownership*.
-- **A failed write belongs to the path that attempted it.** See *Write semantics*.
-
-**The HTTP surface is a thin adapter with no logic of its own** — every route maps to one
-call on the room or the store, and a route that needs a decision in it means the decision
-belongs behind a seam instead:
-
-```
-GET    /pieces                        title, mode, modified
-POST   /pieces                        title + mode; seats the descriptor's cast
-GET    /pieces/:id                    every artifact in one response
-PUT    /pieces/:id/draft              prose plus provenance
-PUT    /pieces/:id/board              entries and notes
-PUT    /pieces/:id/brief
-PUT    /pieces/:id/voice
-PATCH  /pieces/:id                    title, mode, status, model overrides
-POST   /pieces/:id/casting            the casting rationale
-POST   /pieces/:id/turns              question + scope; returns the turn id
-POST   /pieces/:id/turns/:tid/abandon
-POST   /pieces/:id/board/refresh
-POST   /pieces/:id/brief/exchange
-GET    /pieces/:id/events             SSE
-```
-
-**`POST /pieces` makes no model call.** It writes the piece directory and seats the cast the
-mode descriptor names, so a piece is creatable and writable with an unreachable provider —
-which *start from almost nothing* requires. `POST /pieces/:id/casting` returns the rationale
-separately, and its failure costs the author an explanation and nothing else.
-
-**`POST /pieces/:id/turns` and `POST /pieces/:id/board/refresh` require the draft on disk to
-be current.** See *The draft the room reads*.
-
-**One route per mutation the author can actually make**, rather than a generic
-`PUT /pieces/:id/:artifact`. The glossary has no write route at all: entries accrue from
-remarks and the author cannot replace glossary state, so an endpoint offering to is an
-impossible state in the API. This is not about protecting the process from a caller — it
-is about the transport not describing operations the domain does not have.
-
----
-
-## Modules and seams
-
-**Four seams, and each exists because a second implementation is required rather than
-imagined.** A seam with one implementation forever is an interface that costs maintenance
-and returns nothing; the test is whether the second one is a requirement somewhere else in
-this document.
-
-| Seam | Interface | Why it is real |
-|---|---|---|
-| **provider** | one call in, a parsed response or a failure out | live `openai` per role, and record/replay — both required |
-| **store** | `open(pieceId) → PieceHandle`, one typed accessor per artifact | in-memory for tests; concentrates atomic writes, unknown-field preservation, the version read path and the sidecar rule |
-| **room** | `ask(question, scope) → AsyncIterable<RoomEvent>` | the closed event set is already the client's contract, so tests and the client cross the same seam |
-| **draft** | the ProseMirror document — insert, accept, resolve, read provenance, serialize | every provenance rule is a property of a transaction and needs no DOM |
-
-Behind those interfaces, the turn loop, the fan-out, the scheduler, per-call abort, the
-tolerant parser and the role registry are **internal**. Each would have one implementation
-forever, and lifting them to seams would enlarge the interface without adding anywhere to
-stand.
-
-**Four seams, and five modules that are not seams.** `buildContext`, `resolve`, `stack`,
-`project` and `UndoStack` each have one implementation forever, so none of them earns a seam —
-but each holds a rule that would otherwise only be observable through a browser, so each is
-named, small, and tested at its own interface. The sections below define them.
-
-**The handle is named for what it is.** `PieceHandle` and `PieceStore`, never `Piece` — a
-piece is a domain concept and a handle onto its files is not it. The handle keeps the
-interface small while each artifact keeps its own schema, migration chain and write. Writes
-stay per-artifact and atomic, because a cross-file transaction is forbidden and the
-interface must not imply one. `list()` is a directory scan.
-
-### Context construction is a pure module
-
-**A module, and it is a function:**
-
-```
-buildContext(rulings, seat, ownPriorRemarks) → Context
-```
-
-Blindness has to be asserted against the constructed object, and inside the room that test
-would reach past the room's interface. As a pure function it is an ordinary interface test —
-and because no other seat's take is among the parameters, **the rule is a type constraint
-before it is a test**. The Showrunner calls the same function and takes this turn's takes as
-a separate argument, which is the one asymmetry the design has.
-
-### One resolver, and the draft owns positions
-
-```
-resolve(quote, prefix, suffix, paragraphs) → { index, offset } | orphaned
-```
-
-Two sites resolve quotes — remarks in the client, and board-refresh quotes on the server
-where no editor document exists. Text in, index out is what makes *one resolver, one
-contract* literally true, and it keeps the resolver free of any ProseMirror dependency.
-Turning an index into a live position is the draft module's job, because only it holds the
-document. A shared pure utility, not a seam.
-
-### The gutter's placement is a pure function
-
-Remarks stand beside the paragraphs they anchor to and **must never push the prose apart**,
-so the remark column does not participate in row sizing at all: it is positioned absolutely
-and each group sits at its anchor's measured offset, pushed down only as far as the group
-above it requires.
-
-```
-stack(groups: { anchorTop, height }[], gap) → tops
-```
-
-Measured numbers in, positions out, no DOM — so the arithmetic that decides whether a
-fifteen-line take shoves the next group off its paragraph is testable headless, with the
-measuring, the re-measure schedule and the `ResizeObserver` left in the component around it.
-Three properties hold: no group sits above its own anchor, no group overlaps the one before
-it, and the pass terminates under a standing cap.
-
-The trap this shape exists to close: a spanning grid item whose measured height sizes the
-rows it spans moves the anchors, which changes the measurement, which is an unbounded loop.
-
-**Bodies clip to a fixed depth with the remainder on demand**, which is what bounds the input
-rather than a nicety on top of it. Without a clip, one long take pushes later groups hundreds
-of pixels below the prose they concern — the same failure by a different route. Clipping is
-CSS and happens before measurement, so `stack` never knows about it.
-
-### The client's projection is a pure reducer
-
-```
-project(state, event) → state
-```
-
-The client state is a fold of the closed event set, and a surprising number of load-bearing
-rules live in it rather than in the room: seats are seeded **in cast order on `turn.opened`**,
-before any of them has landed, so an empty band reads as a seat thinking rather than a seat
-missing; a new turn preserves earlier turns' remarks; abandonment keeps what landed and adds
-no synthesis; a failed synthesis projects to a different state than a withheld one; and
-replaying a `(turnId, sequence)` already seen is a no-op.
-
-**Several alternatives for one line group in the projection.** Remarks from one seat against
-one anchor become one group carrying one accept each, because three cards would read as three
-seats disagreeing about a sentence one seat was asked to rewrite.
-
-A pure function over the same event sequences the room's tests already produce, so the client
-and the tests cross the room's seam identically. Not a fifth seam: it has one implementation
-forever.
-
-### Where prose lives, and where remark state lives
-
-**The `EditorState` is the sole authority on the draft, and the store holds no copy of
-prose.** Two authorities is the one trap this design cannot survive: provenance, anchors
-and undo all key off document positions, and a mirror of the text in the store would have
-to be reconciled with them on every keystroke.
-
-**Three holdings, and they do not overlap.** `PieceStore` holds the durable artifacts on
-disk — the board and its notes, the brief, the voice spec, the glossary, and `piece.json`.
-The client's projection holds the transient room — remark state, seat state, the open turn.
-The theme is author configuration and belongs to neither. The draft module emits what the
-gutter needs — resolved positions, provenance changes — rather than the store mirroring the
-document.
-
-**Remark state is one collection keyed by remark id**, because the gutter is a projection of
-it. A stored remark holds its anchor as quote-plus-context and never as a position.
-
-**The draft module holds `remarkId → current range`**, established once by the resolver and
-thereafter **mapped through every transaction** by `Transform.mapping`. This is the whole
-reason ProseMirror was chosen and it must not be given back: re-resolving the quote from
-text on each render would orphan a remark the moment the author edited the very sentence it
-anchors to, which is the most likely edit there is. Resolution is an entry point, not a
-render step. The store still never knows a position.
-
-### The draft the room reads
-
-The room and the board refresh run server-side and read `draft.md` from disk, while the
-authoritative draft is an `EditorState` in the client and autosave is debounced. **So the
-client flushes before it asks:** `PUT /pieces/:id/draft` completes before
-`POST /pieces/:id/turns` or `POST /pieces/:id/board/refresh` is issued.
-
-**That the draft on disk is current is a precondition of `room.ask` and of the refresh, and
-the client is the one module responsible for satisfying it.** An ordering constraint stated in
-the interface, because the alternatives are worse: passing prose in the request body gives the
-server two ways to know the draft, and an in-memory server copy reintroduces the mirror this
-design exists to avoid. Disk stays the only read path, which is what keeps *the artifacts are
-the record* literally true.
-
-Two consequences worth naming. A turn costs one forced local write, which is cheap and atomic.
-And **the turn holds the paragraphs it was built from**, so anything resolving server-side
-during that turn — a returned quote, a glossary term — resolves against a stable copy rather
-than against whatever the file says by the time a slow seat lands.
-
-### The scheduler
-
-**Internal to the room. One queue per `baseURL`, one `AbortController` per turn feeding
-per-call signals.** Keying by endpoint rather than by role is what makes two roles sharing
-one endpoint share its limit without anyone configuring it, and one controller per turn is
-what makes abandonment drop queued work as well as in-flight work.
-
----
+**One piece is open at a time, and the application state is singular** — one draft, one current
+conversation, one operation. Switching pieces replaces that state rather than accumulating
+alongside it, and abandons whatever operation is in flight, which keeps whatever landed. Nothing is
+ordinarily held unsaved, so ordinarily nothing is at risk in that replacement. A switch is refused
+only while a draft write remains unwritten after a failure, having first retried it: prose the
+author typed is the one thing a piece switch may never discard.
 
 ## The prose surface
 
-### ProseMirror
+**TipTap, over ProseMirror.** The selection criterion is which choice supplies a polished
+conventional prose editor while requiring the least application-owned editor machinery, and
+TipTap ships history, keymaps, selection behaviour, input rules and a maintained extension set
+over exactly the document model this needs. ProseMirror remains underneath, so transaction-
+level control is available where the application genuinely needs it.
 
-**Decided: ProseMirror.** This is the most consequential technical choice in the
-project, and it survives the simplified provenance model on the strength of the anchors
-alone.
+**The document schema is constrained to what round-trips through Markdown semantically.** The
+manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them, and
+thematic breaks where a piece marks a scene division. Lists, tables, block quotes, links, images,
+inline code, raw HTML and front matter are not in the schema, and Markdown source offering one of
+them is read as the prose it contains rather than refused — a story the author brought from
+elsewhere opens.
+Perfect preservation of every syntactically equivalent Markdown spelling is not a requirement;
+preserving meaning is.
 
-| Requirement | Mechanism |
-|---|---|
-| Provenance per paragraph | A **node attribute** on the paragraph. |
-| Remarks anchored to sentences and paragraphs | **Decorations** — they never enter the document, so critique cannot pollute the artifact. |
-| Anchors survive rewriting elsewhere | `Transform.mapping` rebases every position through every edit. The single largest reason for the choice. |
-| Proposed replacements shown without being in the draft | Decoration widgets. Nothing enters the document until acceptance. |
-| Undo | Invertible steps — see *Undo*. |
-| Prose set as prose, paragraph granularity | Document model is block/inline, not lines. |
+**Markdown fidelity is validated before it is depended on.** TipTap's Markdown support is the
+one part of this choice that has to be proven rather than assumed, so it is exercised against
+the real schema early. If it proves inadequate, a serializer and parser pair over the same
+constrained schema replaces that extension without disturbing anything else.
 
-Hand-rolling position rebasing over a `contenteditable` is the standard way a project of
-this shape stalls, and it is entirely upstream of the design work that matters.
+**The rendered view and the Markdown source view are two editing views over the same
+manuscript.** How representation switching is implemented is left to the editor integration;
+what must hold is that the manuscript's meaning survives a switch in either direction and that
+Markdown is what reaches disk.
 
-**Rejected:** CodeMirror 6 — excellent, but line-oriented, so it fights the prohibition
-on code-editor idioms at every turn. Lexical — capable at editing, weaker at the position
-mapping the anchors depend on. Raw `contenteditable` — no.
+**The reading view suppresses application chrome and disables editing**, and must be entered
+and left in one action each way with the author's reading position intact. Holding one editor
+instance is the cheapest way to get that and is the expected implementation; any integration
+that delivers it as cheaply is equally acceptable.
 
-TipTap is acceptable as an ergonomic wrapper, but the plugins that matter here are written
-against ProseMirror directly regardless, so it is a convenience call and not a substrate
-decision.
+**History belongs to the editor.** The application installs no history of its own and keeps no
+undo stack. Applying a recommendation is performed through the editor's ordinary mutation
+mechanism as a single transaction so that it participates in undo and redo as one action. Where
+the editor makes it trivial to place a history boundary between an application and adjacent
+typing, do so; it is not worth custom machinery.
 
-### Provenance is a paragraph attribute
+**Nothing application-specific enters the document.** No node attributes carrying application
+state, no marks for recommendations, no decorations tracking responses.
 
-Two states exist and canon is the default, so the attribute is one boolean-shaped flag:
-`unreviewed`, absent meaning canon.
+## Files
 
-Because the paragraph is the unit, there is no mark to split, no adjacency to merge and
-no span arithmetic. Three rules in one `appendTransaction` plugin:
+**A workspace directory the author chooses, one directory per piece.** Listing pieces is a
+directory scan. No registry and no index: a registry would be a second authority on which
+pieces exist and would be wrong the first time the author moved a directory, which is exactly
+what plain files exist to allow.
 
-- A transaction that inserts generated paragraphs sets the flag on those paragraphs.
-- A transaction whose author is the user and which touches a flagged paragraph clears
-  that paragraph's flag, and no other's.
-- A paragraph split inherits the flag on both halves; a join clears it if either half was
-  canon, because a paragraph containing author text is the author's.
-
-**Pasted text is author canon**, including text copied from an unreviewed paragraph of
-the same draft. Pasting is a deliberate author insertion, and marking it unreviewed would
-tint the author's own notes as the machine's — the lie in the direction that matters most.
-
-### Anchors are in-session only
-
-An anchor is a quote plus prefix and suffix context. In session it resolves to
-ProseMirror positions, mapped through every transaction. **Nothing writes an anchor to
-disk**, because remarks are session material and a note carries quoted text rather than a
-location.
-
-**One resolver, one contract:** the quote plus its context matches exactly one location
-and the remark is anchored, or it matches zero or several and the remark is orphaned.
-Whitespace and typographic normalization are permitted before matching; ranked guessing,
-best-match selection and confidence scores are not. There is no third return value to
-write a branch for.
-
-The resolver sits on the critical path of every turn regardless, because
-agents return quotes rather than offsets.
-
-### Clean reading is a presentation state
-
-**One `EditorView`, with decorations and provenance tint suppressed and editing disabled.**
-Not a second view instance, not a second document, and not a serialization round trip.
-
-What the requirement asks for is that the prose look untouched and that leaving return the
-author to the character they were on — and holding one view is what makes the second part
-nearly free, because selection and scroll are never torn down. A second view would have to
-capture and restore both across a mount, which is how *exactly where they were* becomes
-*approximately where they were*. A second view is warranted only if ProseMirror mechanics
-force it, and nothing here does.
-
-### Undo
-
-**One stack, in memory, session-scoped, author actions only.**
+**With no workspace configured, nothing else in the application is reachable.** A directory is
+the only fact the software cannot infer, so it is the only thing asked, once.
 
 ```
-UndoStack — push(entry), undo(), redo()
+<workspace>/
+  the-cups/
+    draft.md                 the manuscript — clean prose, no tool artifacts
+    piece.yaml               title, mode, status, enabled cast
+    story-context.yaml
+    conversations/
+      <conversation-id>.json
+    changes/
+      <change-id>.json      the passages one application changed, before and after
 ```
 
-Two stacks would need a policy for which one a keystroke hits based on focus — more code
-and more surprise — and, worse, they cannot honour interleaving. The author edits a
-paragraph, edits a board row, edits the paragraph again; undo has to walk those in the order
-they happened, and only one ordered stack can. ProseMirror steps invert natively
-(`step.invert(doc)`); non-prose actions store their prior value and are pushed as inverse
-closures. That covers editing a board row, keeping or deleting a note, editing the brief or
-the voice spec, refreshing the board, and accepting a suggestion.
+Author configuration lives in a conventional per-user location: endpoints, model assignment,
+workspace path, interface preferences, and `author-context.yaml`. Author context generalizes
+across pieces and is a property of the author rather than of any story, so it does not live in
+a piece. Model assignment is likewise a property of the author's hardware and endpoints rather
+than of any story: a participant is pointed at a different endpoint once, and every piece it
+works on uses it.
 
-**`prosemirror-history` is not installed.** It would bring a second stack that decides
-grouping for itself, so it could disagree with the application's stack about how many entries
-a burst of typing produced — and undo would then skip or repeat a step. The application stack
-owns prose entries directly, holding their inverted steps.
+Shipped data travels with the application: mode descriptors and role definitions. A role
+definition carries the participant's display name and its single-token handle, which are
+different things — a display name of more than one word cannot be recovered from a message.
+Conflating
+shipped data with author configuration means an upgrade either clobbers the author's endpoints
+or fails to deliver a corrected role definition. Shipped data is validated at startup and
+invalid shipped data is a startup failure, because a descriptor that parses partially would
+enable the wrong cast.
 
-**An action that touches more than one artifact pushes one entry.** Applying a structural
-suggestion that changes prose and a board row is one undo, and there is exactly one such
-case; anything else is a single-artifact edit.
+**The piece directory is the piece's identity.** Its name derives from the title, slugified,
+with collisions disambiguated at creation, and it is what the application addresses a piece by.
+A renamed or copied directory is simply a piece at a new path, which is what plain files are
+for. `piece.yaml` carries the display title; nothing carries a second identifier. Retitling a
+piece therefore does not rename its directory, and the two drift apart permanently — which is
+cheaper than either a rename that invalidates every path or an identifier that recreates the
+registry.
 
-**Undo reverts provenance with the edit.** Provenance is a property of a paragraph, so
-undoing the edit that created it removes it — nothing to reconcile.
+Conversation identifiers are a different matter and are real: a piece has several
+conversations, and each needs to be named independently of its file's position on disk.
 
-**Reversibility ends when the piece closes**, so the stack needs no durable representation.
-Version history is a different thing the product deliberately does not have, and there is
-no inspector, no list of past actions, and no surface over the stack — undo and redo are
-keystrokes, plus the reversal that sits beside every acceptance.
+**A directory is a piece when it holds a `piece.yaml`**, and nothing else about it is required: a
+piece with no draft, no story context and no conversations is a piece the author has only named. A
+piece with no conversations is opened by starting one, which is also what deleting the last one
+leaves behind. A piece's modified time is its draft's, and a conversation's last activity is its last
+round's, so both are facts about the files rather than counters the application maintains.
 
-**The keystrokes are the platform's** — `⌘Z` and `⇧⌘Z` on macOS, `Ctrl+Z` and
-`Ctrl+Shift+Z` elsewhere — and they reach every author action, not only prose. The handler
-is application-wide but **not unconditional**: a focused native control keeps its own
-editing behaviour, so a keystroke in a board row the author is typing into undoes the
-typing in that row. The application's stack owns everything outside a focused field.
+### Formats and shapes
 
-The only fiddly part is coalescing: what counts as one undoable prose action. Copy
-ProseMirror's grouping heuristic — a time window plus adjacency — rather than inventing one.
+**Durable context and piece metadata are YAML.** The author hand-edits both, and context
+capture proposes changes against identified entries, so the format has to be readable and
+structured at once.
 
----
+**Conversations are JSON, one file per conversation**, holding the chronological record the
+conversation surface is rebuilt from: each round's author message, which participants were
+addressed, each participant's outcome including recorded no-comment outcomes and failures, and
+each application with the constraint the author supplied and the identifier of the change it
+produced.
 
-## Workspace and files
+**A conversation holds no manuscript state, and what an application changed is held beside the
+conversation rather than in it.** An application writes the passages it changed, before and after,
+to its own file under a short generated identifier, and the conversation carries only that
+identifier. The file is read to show the author what happened and for nothing else: context
+compilation never opens it, which is what keeps an accumulating record of prose out of every
+participant's context without a filter someone has to remember to apply. A file that is missing
+degrades to the application shown without its change, and is never an error, because nothing may be
+derived from it in order to be true. Deleting a conversation deletes the change files its
+applications name.
 
-### Layout
+**Schemas are declared once and derived from**, with types and the schemas used for structured
+model output coming from the same definitions. Structured files are validated on read;
+hand-edited context is read tolerantly where a reasonable reading exists; nothing the author
+wrote is silently discarded. There is one representation, so it carries no version and no
+compatibility layer. Preserving fields the current schema does not know is worth doing where
+the parser makes it free and is not worth machinery.
 
-**A workspace directory the author chooses, one directory per piece.** Listing pieces is
-a directory scan.
-
-**With no workspace configured, nothing else in the application is reachable.** The server
-starts, the client renders one field, and every route that touches a piece returns the
-not-configured state rather than an empty list. A directory is the only fact the software
-cannot infer, so it is the only thing asked, once, and never again.
-
-**No registry file and no index.** A registry would be a second authority on which pieces
-exist, and it would be wrong the first time the author moved a directory — which is
-exactly what plain files exist to allow.
-
-Directory names derive from the title at creation, slugified, collisions disambiguated.
-**The directory name is ergonomic metadata, not identity.**
-
-Each piece directory:
-
-```
-the-cups/
-  draft.md              clean prose — no tool artifacts of any kind
-  draft.provenance.json which paragraphs are unreviewed
-  board.yaml            the Story Board, mode-shaped, plus notes
-  brief.md              the author's statement of intent
-  voice.md
-  glossary.md           terms this piece produced, each against the prose it named
-  piece.json            id, title, mode, status, cast, model overrides
-```
-
-**Seven files, and every one of them corresponds to something the author would notice
-missing.** Nothing here records what the room said, what the author declined, or what the
-system used to think.
-
-### Piece identity and status
-
-**`piece.json` carries a UUID generated at creation, never displayed.** Both the title and
-the directory name can change, so neither can be identity. Nothing human-meaningful is
-used, because anything human-meaningful invites being treated as the name and then being
-corrected.
-
-Copying a piece directory duplicates its ID, and the piece list will then show two entries
-claiming one identity. **Detect and report that; never silently repair it.**
-
-**Status is `drafting`, `finished` or `abandoned`, with a `statusChangedAt`.** Named for
-the transition rather than for finishing, because abandonment needs the same treatment.
-Finishing changes nothing else: the piece stays openable and editable.
-
-### Configuration is split by ownership
-
-**Shipped data travels with the application** — the role registry, mode descriptors, and
-the craft lexicon.
-
-**Author configuration is one plain file in a conventional user config location** —
-endpoints, model assignment, workspace path, and the theme. The theme is a property of the
-author's eyes and their room, not of a story, so it does not live in a piece.
-
-Conflating them means an upgrade either clobbers the author's endpoints or fails to deliver
-a corrected role definition. There is no third location and no per-piece copy of shipped
-data.
-
-**Shipped data is YAML, Zod-validated at startup, and invalid shipped data is a hard startup
-failure.** Author configuration is read tolerantly because the author edits it by hand;
-shipped data is ours, so a malformed descriptor is a build defect. The failure mode that
-justifies refusing to start is specific: a descriptor that parses partially would seat the
-wrong cast, and a piece written against the wrong cast is not recoverable by fixing the file
-later. It is stated at the process level and never as a room event, because no turn caused it
-and no author action can clear it.
-
-**Model assignment is global, with an optional per-piece override.** Assignment is a
-property of the author's hardware and not of the story, so a new piece must never require
-configuring five roles before it can be written. The override exists solely to move one
-role to a stronger endpoint and diagnose weak differentiation without disturbing anything
-else. A piece copied to another machine still opens, using that machine's endpoints.
-
-**No in-product role editor.** Roles are declarative files and nothing prevents editing
-them on disk. An in-product editor would invite fixing weak differentiation by rewriting
-prompts, when whether differentiation works at all is the project's first open question.
-That belongs in the diagnostic path — the registry on disk, the per-role endpoint, the
-replay harness — not in the studio the author writes in.
+**Piece metadata and both durable contexts are read when a piece is opened and again when a model
+call is compiled.** Nothing watches the filesystem and nothing polls: a context file the author
+edited by hand is picked up by the next call that uses it, which is the only moment its content
+matters. Re-reading at compilation is what stops an external edit from being ignored for a whole
+session; holding no watcher is what stops one from arriving underneath the author's own state. The
+manuscript is exempt because the client is its writer and carries it in the request.
 
 ### Write semantics
 
-**Every durable artifact is written atomically**, temp-then-rename, without exception.
-There is no snapshot layer beneath this, so per-artifact reasoning about which writes
-matter is how one gets missed.
+**Every durable artifact is written atomically**, temp-then-rename, without exception. Writes
+are per-artifact; there is no cross-file transaction, no journal, and no snapshot layer. The
+manuscript is diffable under version control and that is the only history the product has.
 
-**No cross-file transaction, no journal, and no snapshot of `draft.md` beyond version
-control.** A manifest recording write intent would be an authority over the artifacts that
-has to be replayed to be trusted, which is the direction *the artifacts are the record*
-forbids. The prose is diffable under git by requirement, and that is the only history the
-product has.
+**Autosave of the manuscript is debounced and is a local write only.** No model call is on the
+save path.
 
-**No write ordering makes the draft and its sidecar consistent across a crash, and none is
-claimed.** They are two independently atomic files, and either order loses in one
-direction: sidecar first, and a crash after the author edits an unreviewed paragraph loads
-the untouched generated prose as canon; draft first, and a crash after generation loads new
-generated prose as canon. **The narrow inconsistency is accepted and not engineered
-around** — the loss is a tint, in a local single-user application, in the window between a
-debounced save of one file and the next. A journal or a paired-generation check would be
-more machinery than the failure is worth.
+**The client is the only writer of `draft.md`.** No model operation writes the manuscript: an
+operation receives the current text in the request that starts it, and an application returns prose
+the client applies to the editor and then saves by the ordinary autosave path. This is what makes a
+failed or abandoned application change nothing — the room has no path to the manuscript to leave
+half-written — and it means the one artifact where two writers would silently lose prose has one.
 
-**Autosave is debounced and is a local write only.** No model call is on the save path.
+**One draft write is in flight at a time.** Text the author produces while a write is in flight
+accumulates and goes out with the next one. An atomic rename makes a write indivisible, not ordered:
+two in flight can complete oldest-last and restore prose the author has already replaced, and
+nothing about a single logical writer prevents that on its own. Serializing at that writer is what
+removes the whole class, and is why no write generation or stale-write rejection appears anywhere.
 
-**A write that fails is never reported as a write that succeeded.** The failure belongs to
-the save path that attempted it and not to the room's event stream — no turn caused it, and
-routing it through `error` would put it in the one channel the author reads as *the room
-broke*. The rule in full: the editor stays usable, the unwritten state stays in memory, the
-failure is stated where the author can see it and stays stated until it clears, the next
-ordinary write retries it, and nothing resolves it optimistically. Silence has to mean saved,
-or it means nothing. **No modal**, because continuing does not destroy work — the work is
-still in hand, which is precisely what the persistent statement is claiming.
+**Starting an operation flushes any pending draft write and does not wait on it.** The current text
+travels in the request either way, so the model never works from prose the author has already
+changed and no operation depends on a write having succeeded.
 
-### Provenance lives in the sidecar
+**A write that fails is never reported as a write that succeeded.** The editor stays usable,
+the unwritten state stays in memory, the failure is stated where the author can see it and
+stays stated until it clears, the next ordinary write retries it, and nothing resolves it
+optimistically.
 
-`draft.md` is clean prose. No HTML comments, no `==marks==`, no fenced metadata. A
-Markdown file that must be stripped before it reads as a story fails the requirement that
-the draft be publishable as it sits.
+## Model access
 
-Proposed replacement text is **not** in `draft.md` either. It belongs to the remark that
-proposes it and enters the draft only on acceptance, as canon.
+**One narrow internal interface for every model call**, and every call in the product goes
+through it: a specialist's response, the Story Editor's response, an application, and context
+capture.
 
-`draft.provenance.json` lists, for each unreviewed paragraph, a hash of its text and its
-ordinal. **The hash identifies the paragraph and the ordinal only disambiguates.** On load,
-an entry whose hash matches exactly one paragraph in the draft marks that paragraph,
-wherever it now sits — so editing the draft in another editor, including inserting
-paragraphs above an unreviewed one, preserves provenance. Where a hash matches several
-paragraphs the ordinal decides, and where it decides nothing the entries resolve to canon.
+What the interface must cover, because each is otherwise rebuilt at every call site: endpoint and
+model selection per call site, structured responses with tolerant parsing, a timeout,
+cancellation, retry on transport failure, and retry on a response that parsed but did not conform.
 
-**Degradation rule: anything unmatched, ambiguous, missing or unparseable resolves to
-author canon.** That is the safe direction for *protection* — canon is the state protected
-from silent modification, so losing the sidecar loses a tint rather than the hard line.
-Hashing is what makes the failure bounded: a stale entry does not mislabel a paragraph, it
-simply stops applying.
+**A call takes a prompt, a schema and an abort signal, and returns a parsed object or a failure.**
+Nothing else. The caller learns nothing about endpoints from it: the room maps a call to the
+participant that owns it and publishes participant state, and never learns which endpoint anything
+ran against.
 
-### Schemas
+**Context-window management is not in the interface.** At flash length a call's whole payload —
+both contexts, the draft, the conversation — is a few thousand tokens against the smallest context
+window worth loading, so there is no window awareness, no chunking and no excerpting anywhere. An
+input a model cannot accept is an ordinary stated failure. A longer mode is where this becomes a
+real question, and it is cheaper to answer it there than to carry unexercised machinery until then.
 
-**Zod is the single source of truth for every artifact shape**, with TypeScript types
-derived from it and JSON Schema emitted from it for constrained decoding. One definition,
-three uses.
+**The Vercel AI SDK implements that interface.** Provider coverage is machinery with no product
+content, and the local-runtime defects this application would otherwise absorb are the SDK's
+configuration rather than anyone's code: an OpenAI-compatible provider per endpoint carries the
+base URL, whether the endpoint enforces a JSON schema, and any request-body transform a particular
+runtime needs to reach its own constrained decoding; a model wrapped in reasoning-extraction
+middleware has its thinking tags removed from the text, including where the runtime omitted the
+opening tag. **Where the abstraction covers something, the abstraction covers it** — the standing
+preference is to adapt this application's expectations to what the library provides rather than to
+own the difference.
 
-Schema-tolerant and strongly typed are not in tension, resolved this way:
+A Python service behind a sidecar or proxy is not eligible: one process and one schema definition
+are what make the artifact shapes a single contract. What must not happen is a dependency imposing
+its own agent-conversation topology — only the single-call surface is used, and no agent loop, tool
+loop or conversation abstraction from the library appears in this application — because the
+product's essential rule, that specialists form current-round judgments independently and then the
+Story Editor may see them, has to remain visible and testable in this application's own code.
 
-- Every file carries a **schema version**. Migrations are explicit and forward only.
-  **A per-artifact chain, run on read inside the store, and written back on the next
-  ordinary write** — no migration command, no upgrade pass, and no separate step to
-  forget. The store is the only thing that reads files, so it is the only place a version
-  check can be missed; and a lazy chain means an artifact nothing touches is never
-  rewritten.
-- **The board's mode-dependent fields are data, not code.** A mode ships a descriptor and
-  the renderer is generic over it.
-- **Unknown fields are preserved on read and written back untouched**, so a build cannot
-  silently strip data it does not recognize.
+**Endpoints are assigned per participant, and applying and capturing are assigned the same way
+without being participants.** Each has its own prompt and its own context compilation, so each
+carries its own configuration. An assignment names the endpoint, the model, and the middleware that
+model needs — reasoning extraction is per model rather than per endpoint, because one endpoint
+serves models that differ in whether they think aloud. Nothing falls back to another assignment: an operation with no
+endpoint assigned is unconfigured and reports itself as unavailable, because a silent substitution
+would let the author believe a model they never chose was the one doing the work.
 
-**Typed schemas exist for durable artifacts only.** Remarks, takes and syntheses are
-validated at the model boundary because tolerant parsing has to happen there anyway, and
-then they are ordinary in-memory objects with no persisted shape to version.
+**Timeout and retry are infrastructure and produce no author-facing concepts.** A call that fails
+or times out is retried up to the configured count, and is then a failure — a failed participant
+on its settled event, a failed application in the response to the request that attempted it. The
+author is never asked whether to retry, and no interface state exists for an attempt in progress
+beneath a call. A call that succeeds and returns something incoherent is not a failure and is not
+retried: it is an ordinary response the author answers with an ordinary message.
 
-**Non-destructive mode change falls out of the preservation rule.** Board content whose
-field identity the new descriptor lacks is retained in `board.yaml` and excluded
-everywhere it would otherwise be read: not rendered and not put in any context. **Field
-identity is what makes that safe** — a descriptor names each field with a stable id, so
-returning to an earlier mode restores content to the field it came from rather than to
-whatever now occupies that position.
+**Retry is two mechanisms, because the library only provides one.** Transport failure — a refused
+connection, a 5xx, a timeout — is the library's retry and is configured there. A response that
+arrived and parsed but did not conform to the schema is not retried by the library, and with local
+models it is the more common failure, so the interface retries it: re-issue the call, to the same
+configured count, and fail after that. Nothing distinguishes the two to the author, and neither is
+a state the interface shows.
 
-**A mode descriptor holds its name, its cast, which seat drafts, its board fields with
-their ids, its per-role defect criteria, and its structural concepts** — and nothing
-universal. Notes are standing board content in every mode, so no descriptor declares them.
-Anything every mode would have to repeat is machinery, and letting a descriptor restate it
-is letting it get machinery wrong.
+**Structured output, tolerantly.** Request constrained decoding where the endpoint supports it,
+always behind a tolerant parser, always with a failure path. Local models return malformed and
+incoherent output routinely; a participant returning garbage is a normal outcome the runtime
+reports plainly.
 
-**Mode is an enumerated set of named modes, one descriptor file each.** Composing
-dimensions now would be designing a combinator against a sample size of one. The escape
-stays cheap because every consumer reads descriptors rather than dimensions, so composition
-can later become a *producer* of descriptors with no consumer changing.
+**Schemas are as small as the call allows, because that is what makes constrained decoding hold.**
+A specialist's response is two fields — its declared outcome and its prose — and a local model
+holds that reliably where it falls apart on a nested structure. Where a call would need a large
+schema, several small calls are the better shape: context capture returning many proposals is the
+one case, and SPEC already declines to fix its call count. Shrinking the schema is always preferred
+to adding machinery that repairs what a larger one returned.
 
----
+**A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
+one, and so does the Story Editor on a round where nothing substantive landed. Declaring it is then a
+response that parsed but did not conform, and takes the ordinary re-issue path before becoming a
+failure. This is what makes an owed answer enforceable without inspecting what a response says —
+judging the content would take a second model call to do badly, and a model willing to declare
+silence on a direct question is common enough that the guarantee has to hold against it.
 
-## The artifacts
+**There is no scheduler.** Calls are issued one at a time and no runtime is ever asked to hold more
+than one. Local capacity is bounded by the loaded model, so concurrent calls against it are
+substantially serialized anyway and buy too little wall-clock to be worth the concurrency limits,
+queue positions and cancellation-of-queued-work they would add — and a runtime given more
+simultaneous calls than it is configured for fails rather than queues. A round therefore costs the
+sum of its calls, which is the standing cost concern arriving as an infrastructure fact and is why
+writing through a round is load-bearing rather than a nicety.
 
-### The board
-
-`board.yaml`. **Board entries are an extensible typed union**, `text` and `timeline` to
-begin with:
-
-- A **`text`** entry holds a short reading, optionally located.
-- A **`timeline`** entry holds ordered events on named tracks, each anchored to a
-  paragraph position.
-
-The descriptor names concrete instances; the renderer switches on the union. **Resist a
-third kind until a mode needs one.** The temptation will be a `list` kind for *want and
-need*, and a `text` entry holding two sentences is sufficient — and does not invite the
-author to maintain a list.
-
-**An entry carries no ownership metadata and no metadata of any other kind.** A refresh
-replaces the board, so there is nothing for provenance on an entry to decide. An author
-edit is an ordinary write to the file.
-
-Locations are paragraph references resolved at read time, and an unresolvable one simply
-drops. A board that has drifted from the prose is fixed by refreshing it, not by repairing
-locations.
-
-**Notes live in `board.yaml`** under their own key, since they are standing content of every
-board. A note holds its text, its quoted prose where it has any, and its originating seat
-where it had one. Nothing else.
-
-### The glossary
-
-`glossary.md`, append-only in practice: one entry per term the author's work produced,
-holding the term and the moment in the author's prose it was attached to — the sentence the
-remark quoted. **No definitions are stored, and nothing an agent said is stored.** A remark is session material, so recording its claim
-here would put room speech across the durable boundary by default; quoting the story is
-also the better artifact, because the concept stays fixed to the author's own writing.
-
-Meanings come from the shipped craft lexicon when the glossary is read. A term the lexicon
-does not hold is still recorded against its moment in the prose, and shows without a
-meaning; the reasoning behind it was expandable in the room when it was declared.
-
-**A curated craft lexicon ships with the application** — craft terms, one line of meaning
-each. Reference data, never a surface.
-
-**Entries accrue on `seat.settled`, from anchored remarks only.** For each term a settled
-remark declares that the glossary does not already hold, one entry is written against that
-remark's anchor quote. **A whole-piece remark writes nothing** — it has no sentence to
-record, and an entry whose moment is *the whole story* records no moment. Some terms
-therefore never accrue; that is the cheaper loss, because the entry is worth having only
-while the concept stays fixed to one thing the author wrote.
-
-**Resolution is the gate, and the server decides.** The room runs the ordinary resolver
-against the paragraphs the turn was built from, and a remark whose quote does not resolve
-uniquely accrues nothing — it is orphaned, not anchored. That is what keeps an invented quote
-out of a durable artifact, which matters because local models misquote routinely and
-`glossary.md` is supposed to hold the author's own prose.
-
-The client resolves the same remark independently for the gutter and may orphan it later, once
-the author has edited that sentence. **The divergence is harmless and needs no reconciliation**:
-an entry holds the term and the quoted text and carries no location, so there is nothing in it
-that a later edit can make wrong.
-
-**The first occurrence wins, silently.** One term, one entry, and nothing updates it. There
-is no author write path: the glossary is a side effect of the room and not a document the
-author edits.
-
-**A remark declares the terms it used**, as a field of the response that produced it, so
-term handling costs no call. Rendering a term in place is a **string match** for those
-declared terms in the remark's own text. Nothing notifies, and nothing asks a model which
-terms were used.
-
-### The brief and the voice spec
-
-`brief.md` and `voice.md`, one each per piece, both plain prose, both edited directly by the
-author. The voice spec is seeded by copying from anything the author points at, including
-another piece's spec; seeding samples are not stored.
-
-**Only an explicit author action mutates either file** — accepting a restatement into the
-brief, editing either directly. Neither is changed by inference, by a background pass, or by
-any system action: no proposal path and no candidate mechanism exists.
-
----
-
-## The room
-
-### Scope
-
-| Case | Points at |
-|---|---|
-| `wholePiece` | The piece |
-| `anchor` | A span of prose |
-| `artifactRef` | A board entry, a note, or the brief |
-
-`artifactRef` rather than an enumerated list of askable things, so *tell me more about this*
-works on any durable item the author can see — including board fields a later mode
-introduces — without extending an enum.
-
-**A remark is not an `artifactRef`, and the omission is load-bearing.** Scoping a turn to a
-remark would oblige `buildContext` to put one seat's opinion into every other seat's
-context, which is the leak blindness exists to prevent, arriving through the scope enum
-rather than through the context builder. Pushing back is an ordinary turn in the author's
-own words; a claim the author wants the room to engage with reaches it by being **kept**,
-as a note, which is a ruling.
-
-**There is no Character entity.** *Ask about this character* is a whole-piece question or a
-board entry (*want and need*). Inventing a domain entity to host it would add a thing the
-model does not have.
-
-**One turn at a time per piece.** Asking again while one is in flight
-**offers to abandon** the current one. It never silently discards it and never queues it —
-queueing would make the author wait for an answer they may no longer want, and abandonment
-already keeps the remarks that landed.
-
-A turn is an in-memory object with an id used by the event stream and nothing else. No
-counter is persisted, because nothing durable refers to a turn.
-
-### Context construction
+## Context compilation
 
 **This is the seam the central bet lives in.** Everything else in the orchestration is
-plumbing; this is the part where a reasonable-looking implementation quietly destroys the
-product.
+plumbing.
 
-**A seat sees the author's rulings and never another seat's opinions.**
-
-Standing context, given to every seat every time:
-
-- The whole draft.
-- The board, including notes.
-- The brief.
-- The voice spec.
-- The glossary's terms for this piece.
-- Its own prior remarks from this session.
-
-Never given to a seat, under any circumstance:
-
-- Another seat's remarks or take — **from this turn or any earlier one**.
-- The Showrunner's synthesis of anything.
-
-**The whole draft goes in, unexcerpted.** At flash length a whole draft is cheaper to
-include than any excerpting scheme is to specify, and excerpting would make a seat's
-blindness depend on what an excerpter chose, putting a second inference in the context path.
-
-**The voice spec and the notes go in unconditionally.** They are the author's standing
-rulings — how the prose should sound, and what they have already settled or ruled out. A
-seat that cannot see them argues with something already decided.
-
-**The Showrunner is not exempt.** It receives the standing context plus every cast seat's
-take from *this* turn and no seat's take from any earlier one — exempting it would
-recreate the leak through the one seat that talks to everyone.
-
-**Blindness is testable at this seam, and must be tested here.** The assertion is a property
-of the constructed context object, not of a prompt: no cast seat's context contains any
-other seat's remark. A test that inspects prompts for instructions is testing the wrong
-thing.
-
-### The turn loop
-
-Hand-written. No orchestration framework.
+A call is assembled from three things the runtime holds, none of which is an intrinsic property
+of the participant:
 
 ```
-Turn = { question, scope, cast[] }
-  1. per cast seat: construct context independently
-  2. fan out, AbortController per call, settle independently
-  3. stream each seat's events to the client as they land
-  4. Showrunner call over whatever settled
+role definition + model configuration + selected context compilation policy → participant call
 ```
 
-The order is the content here — a fan-out that has not settled cannot be synthesized.
-
-**The Showrunner is not a member of `cast[]`.** It is called once, after the cast settles,
-and it is never asked for a blind take. Keeping it out of the cast array is what stops that
-ambiguity from becoming a double call in code.
-
-**A cast of one skips the Showrunner call** and costs one call.
-
-Every reason to want a framework is a reason not to have one here:
-
-- **Blindness is context construction, not conversation topology.** A framework that owns
-  message passing buries the exact seam that most needs to be inspectable and testable.
-- **Abandonment needs per-call abort** and useful partial results. Frameworks that model a
-  run as one unit make both awkward.
-- **Roles are declarative registry entries**, each with its own model, endpoint, focus and
-  context recipe. That registry plus the mode descriptor *is* the orchestration
-  configuration.
-
-**The registry does not decide applicability or criteria — the mode descriptor does.** A
-role entry carries identity, focus, context recipe and model assignment. Which roles are
-seated, and what each treats as a defect at that scale, is read from the mode. One
-authority, no merge step, and no possibility of a role and a mode disagreeing at
-construction time.
-
-### The sequenced drafting turn
-
-The one place the loop is not a single fan-out:
-
 ```
-  1. drafting seat call — candidate prose, from the brief and the voice spec
-  2. insert as unreviewed paragraphs
-  3. fan out the remaining cast over the new draft, blind to each other
-  4. Showrunner call over those takes
+compileContext(call, piece, conversation, policy) → Context
+
+  call = a participant, with the round's input
+       | an application, with the recommendation and the author's constraint
+       | a context capture
 ```
 
-Stage 3 is the ordinary fan-out with the drafting seat absent from it, so the critics are
-independent of each other and none of them is the author of the prose. Which seat drafts
-comes from the mode descriptor.
+A pure function, so the invariant is asserted against the constructed object rather than
+inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
+has its own prompt and its own compilation, and the independence invariant is asserted over the
+participant kinds, which are the ones the bet lives in.
 
-**The drafting seat's call returns prose, not a take.** Do not model the generated
-paragraphs as a `Take` — the takes of a drafting turn are the critiques that follow, which
-is why the synthesis is over the critics. The paragraphs enter the draft as unreviewed
-before stage 3 begins, so the critics read the draft like every other seat rather than a
-payload passed around inside the turn.
+Every participant call receives the author context, the story context, the current draft
+whole and unexcerpted, and the current author message. At flash length a whole draft is
+cheaper to include than any excerpting scheme is to specify, and excerpting would put a second
+inference in the context path.
 
-**The one-shot draft is the same path with a thin premise and no brief.**
+**Conversation history is supplied by policy.** Two policies exist and the seam is the whole of
+the difference between them.
 
-Cost: one call per cast seat plus one for the Showrunner, sequenced rather than fully
-parallel. Nothing else about drafting is special-cased.
+**Shared history is the default.** A specialist sees the conversation as it happened: author
+messages, prior rounds' participant responses, and the applications that changed the
+manuscript.
 
-### Brief formulation is a Showrunner-only exchange
+**Stricter independence is the alternative** and filters other specialists' historical
+responses that the author did not act on, leaving author messages, applied recommendations and
+the participant's own prior responses. Which policy produces better collaboration is an
+empirical question, and switching between them must remain a configuration change rather than
+a redesign.
 
-**One call. No cast, no blind pass, no synthesis.** There is nothing yet for specialist
-disagreement to illuminate, and one call rather than five matters for something that happens
-per piece and again on every reframe.
+**Under every policy, the invariant holds: no specialist's context contains any other
+specialist's response from the round being formed.** It is enforced by construction: every eligible
+specialist's context is compiled before the round's first call is issued, so no specialist response
+from the round exists at the moment any specialist context is built.
 
-**Intent restatement is a field of whatever call the author's words already triggered.** A
-brief exchange returns it as a field; a question to the room is restated as a field of the
-synthesis. If the author reframes without triggering any call, there is no restatement, and
-nothing generates one to fill the gap.
+Sequential execution is why that has to be stated rather than assumed. With calls issued one after
+another, an earlier specialist's response is sitting there when a later call is made, and the only
+thing keeping it out is that the later call's context was already closed. Compiling up front is the
+difference between an invariant and a habit.
 
-### Casting
+**The Story Editor is compiled by the same function** with the round's settled substantive
+specialist responses supplied as an additional input. That is the one asymmetry in the design,
+and it is what the Story Editor's function requires.
 
-**The mode descriptor seats the cast; the Showrunner explains it.** The descriptor is the sole
-authority on applicability, so the call produces the rationale in craft terms and not the
-membership — which is also why the author, and only the author, may seat a role the descriptor
-does not consider applicable.
+**No model call receives operational state.** No-comment outcomes and failed calls are recorded
+in the conversation and are not evidence, so they do not reach the Story Editor's context. The
+failure this prevents: *a generalist reasoning about who spoke instead of about the story* —
+counting agreement, inferring consensus from silence, or reporting the room's own behaviour back
+to the author.
 
-**Casting costs one Showrunner call per piece, and it gates nothing.** Creating a piece is a
-filesystem operation: the descriptor's cast is seated, the draft opens empty and focused, and
-the rationale arrives afterwards in the room panel where transient things belong. A failed
-casting call therefore costs the author a paragraph of craft explanation, not a piece. The
-rationale is agent speech and stays out of `piece.json`; the cast itself is durable, so seat
-changes survive a restart. Changing mode re-opens it.
+## Operation state
 
-The author may add a seat the descriptor does not consider applicable. **Two facts stay
-separate and both stay visible:** the descriptor says the seat is not normally applicable
-here, and the author explicitly overrode that. Collapsing them would corrupt mode semantics
-and tell the author less.
+One author-initiated model operation runs at a time, so the application's interaction state is
+small enough to name exhaustively and is what the client's controls observe.
 
-### Failure, silence and abandonment
+```
+idle
+  ├─ send a message, or ask a participant for a concrete change ─→ roundInFlight ─→ idle
+  ├─ apply a recommendation ────────────────────────────────────→ applying      ─→ idle
+  └─ capture context ───────────────────────────────────────────→ capturing     ─→ reviewing ─→ idle
+```
 
-**All of these are ordinary operating conditions.**
+Manuscript editing is permitted in every state except `applying`. Abandonment applies to
+`roundInFlight`, `applying` and `capturing`, returning to `idle` with whatever landed kept.
+`reviewing` holds capture proposals with nothing in flight, and approving writes context files
+without a model call.
 
-- **A seat fails.** Reported plainly, with what came back. *Ask again*, *empty the seat*,
-  *leave it*. Nothing looks authoritative merely because it was generated.
-- **A seat is silent.** A seated seat with nothing material is a signal. It is always
-  present, one line, with *ask anyway*.
-- **The Showrunner call fails.** Presented as a **failure, never as withheld.** Withheld is a
-  judgement it made and is information; failure is the machine breaking and is not.
-  Conflating them teaches the author to read competence as breakage, or breakage as
-  competence. A failed synthesis degrades the turn to a set of independent readings
-  rather than breaking it — the comparison does not depend on the synthesis existing.
-- **The drafting stage fails.** No prose is inserted and stage 3 does not run, because there
-  is nothing to critique. Reported as one failure rather than five.
-- **Abandonment.** In-flight calls cancel and queued calls drop. **The remarks that landed
-  stand in the gutter as ordinary remarks**; no synthesis is attempted, and none is offered
-  — the author stopped caring, and asking for one more call is the wrong question at that
-  moment.
-- **The author edits a paragraph mid-flight.** The edit lands and anchors rebase through
-  `Transform.mapping`. A response anchoring into text that no longer exists becomes an
-  orphaned remark, which is already a defined state. Locking the draft would break the
-  premise that the author writes while the room works.
+**The room holds this state and refuses to start an operation unless it is idle.** The client
+disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
+because the guard on the manuscript has to be where the state is, not in the surface that draws the
+buttons. A refused start is reported as an `error` and is never a question put to the author —
+nothing asks which of two operations to keep. Reading the piece reports whatever operation is in
+flight, so a client that reloaded knows what it is looking at without any new event.
 
----
+**The operation in flight has an identifier, and a result belonging to any other is discarded.** A
+completion arriving late from an operation the author abandoned cannot settle, close or mutate the
+one that replaced it. With a single operation at a time the identifier costs nothing, and it is the
+whole of what keeps an abandoned call from arriving as a live one.
 
-## The board refresh
+**Serialization is a simplification, not a principle.** Local capacity is bounded by the loaded
+model, so overlapping operations buy little wall-clock while multiplying the states the interface
+has to compose. Nothing is built to make concurrency impossible; there is no requirement for it.
 
-**One call, and only when the author asks for it.** It runs on the refresh action and on
-nothing else — no turn completion, no debounced edit pause, no background inference,
-nothing on the writing path. The board goes stale between refreshes, and that is the
-trade: the author refreshes it in one action when they want it current, and never pays
-for inference they did not ask for.
+## The round
 
-**It reads the entire draft** and returns an entry per field the descriptor declares, with
-a quote for each field that carries a location. Whole-piece reading is affordable at this
-length and dramatically simpler than incremental reconciliation — no dirty-region tracking,
-no partial merge, no question of which half of the board is stale.
+```
+Round = { message, addressed[] }
+  eligible = addressed, or the enabled cast when nothing was addressed
+  compile every eligible participant's context, before any call is issued
+  call them one at a time, in the cast's order, one abort signal per call
+  stream each participant's state and settled response as it lands
+  if nothing was addressed: call the Story Editor over the substantive responses, however few
+```
 
-**It reads unreviewed prose too.** The board reports what the draft currently says, and
-generated prose the author has not reviewed is part of what it says. Provenance governs
-attribution, not visibility.
+The order is the content: readings that have not settled cannot be evaluated as evidence, which is
+why the Story Editor's call is last and not merely later.
 
-**Applying the result is one rule: replace the board.** Every entry, including any the
-author edited — nothing is preserved, nothing is merged, and no entry carries ownership to
-consult. Returned quotes resolve through the ordinary two-outcome resolver, and a quote that
-does not resolve yields an entry with no location rather than no entry.
+**Where nothing was addressed, the Story Editor belongs to the round's participant set from the
+moment it opens** — last in the order, and waiting for its call exactly as an unreached specialist
+is. The author has no use for the fact that a different condition gates it, so `participant.state`
+needs no third value for it, and the guarantee that the readings precede the judgment is carried by
+its position rather than asserted in a label. An addressed round that did not name it does not
+include it at all.
 
-**The refresh is a single author-initiated action on the undo stack.** No notice, no diff,
-no rejection path, no per-entry negotiation — the previous board is one undo away, which is
-the same affordance as every other author action.
+**The cast's order is the order calls are issued**, so responses land in a stable order the author
+sees fill in. That the order is now observable changes nothing about independence — every context
+was closed before the first call — and it costs the presentation nothing, because the order was
+already required to be stable and independent of who answered first.
 
-**This is the one scale-bound decision in the document.** Long-form needs a different
-strategy, and that is noted rather than designed around.
+**Addressing is parsed out of the author's message by the room, and it is the only thing the
+message is parsed for.** A sigil counts where it begins the message or follows whitespace — so
+`mail@shape.com` and the second sigil of `@@shape` address nobody — and the letters following it are
+lowercased and prefix-matched against the participants' lowercased handles, so `@comp` reaches
+Compression. A token matching exactly one handle addresses that participant; a token matching none,
+or more than one, is ignored and stays ordinary text. Typo tolerance and fuzzy matching are not
+required, and an autocompletion package is acceptable only if adopting it costs nothing. The message
+itself reaches every call verbatim, sigils included.
 
----
+**The room is the only parser, and a round that names its target is not parsed at all.** Replying to
+a participant and asking one for a concrete change each aim at a single participant without the
+author typing a sigil, so those rounds carry an explicit target instead, and a supplied target is the
+whole of the addressing. A client that parsed and posted its own participant list could open a round
+whose addressing contradicted the words about to reach the model; synthesizing a sigil into the
+author's text would put words in the conversation they never wrote.
 
-## Models
+**Addressing a specialist that is not enabled enables it** before the round opens — the same
+durable write to `piece.yaml` as enabling it directly. The alternative is participation with an
+expiry, which is new domain machinery for something the author reverses in one action.
 
-### Client
+**The Story Editor is not a member of the eligible set.** Keeping it out is what stops the
+ambiguity from becoming a double call. An addressed round does not call it unless it was
+addressed; a round addressed to the Story Editor alone is one call.
 
-**The `openai` SDK, instantiated per role** with that role's `baseURL` and model name,
-driven by the registry. Nothing else. LM Studio is the default target and full offline
-operation must work; any endpoint speaking the same shape is interchangeable, including a
-remote one for prose quality.
+**An unaddressed round always calls the Story Editor**, including one where every specialist
+returned no comment and one where every specialist call failed. A round is opened by an author
+message, and an author message is owed an answer; the Story Editor's endpoint is assigned
+independently, so specialist failure is not its failure. With no substantive readings it is a
+generalist reading the story against the author's intent, which is its objective anyway.
 
-Per-role endpoints are not a nicety — weak agent differentiation must be diagnosable as a
-design problem rather than confounded with model capacity, and that requires moving one role
-to a stronger endpoint without touching anything else.
+**Asking a participant for a concrete change is an ordinary round with no author message.** Its
+record carries the response it was asked about and the author's clarification where they gave one.
+The instruction that makes it concrete is deterministic call instruction and is never displayed, for
+the same reason a synthesized sigil is not. Its answer is a response like any other and lands where
+responses land.
 
-### Structured output, tolerantly
+A round is an in-memory object while it runs and a record in the conversation file once it has
+settled or been abandoned.
 
-Request `response_format: json_schema` where the server supports constrained decoding — LM
-Studio does — with the schema emitted from the Zod definition.
+**Failure, silence and abandonment are ordinary.**
 
-**Always behind a tolerant parser, and always with a failure path.** Local models produce
-malformed and incoherent output routinely; a role returning garbage is a normal outcome the
-runtime reports plainly and the author discards.
+A participant fails: reported plainly with what came back, once the model layer's retries are
+exhausted, and there is no per-participant re-ask. A participant has nothing material: its
+no-comment outcome is recorded and is not shown, and it is never re-run under an obligation to
+speak. The Story Editor fails: the round degrades to whatever readings landed rather than
+breaking, because the readings do not depend on it — and where nothing landed either, the round
+produced no answer and says so. Abandonment: the call in flight cancels, the calls not yet issued
+are never issued, landed responses stand as ordinary responses, and no Story Editor call is
+attempted — asking for one more call is the wrong question at the moment the author stopped caring.
 
-### The scheduler is load-bearing
+**The author edits the manuscript mid-round.** The edit lands. Responses in flight were
+compiled against the draft as it was when the round opened, and nothing reconciles that;
+locking the manuscript for a round would break the premise that the author writes while the room
+thinks.
 
-**A per-endpoint concurrency-limited queue, from the start.**
+## Applying a recommendation
 
-Parallel fan-out across roles is not free: capacity on a local server is bounded by the
-loaded model and available VRAM, so four "parallel" roles against one local model are
-substantially serialized. That is *a room too expensive to consult stops being consulted*,
-arriving as an infrastructure fact before anyone has designed a screen.
+**One call.** Its input is the current draft, the conversation through the recommendation being
+applied, the recommendation itself, both durable contexts, and the author's constraint where
+they supplied one. Its output is the manuscript embodying it.
 
-Consequences that belong in the substrate rather than a later pass:
+**The manuscript is read-only for the duration of that call.** An application reads the draft at
+one instant and returns the next state of it; an edit landing in between would leave a rewrite to
+be merged against prose it never saw, and no merge rule for semantic prose surgery is worth
+having. The lock is held only while the call is in flight and releases on settlement, failure or
+abandonment. It is what makes the input stable and grants nothing beyond that.
 
-- Concurrency limits declared **per endpoint**, not globally.
-- Roles distributable across several endpoints, so a cast can be spread.
-- Queue position and in-flight state **observable**.
-- **Cancellation propagates to the queue**, not only to in-flight calls — abandoning must
-  drop work that had not started.
+**The result is prose the client applies**, not a write the room performs. The room reads the draft
+from the request and returns the applied manuscript; nothing reaches disk until the author's own
+editor holds it.
 
----
+**The application changes only what embodying the recommendation and the constraint requires.**
+Stable input does not imply restrained output: a model asked to cut one sentence will otherwise
+renormalize punctuation, reflow paragraphs and revise prose nobody asked about.
 
-## The call budget
+**The representation the model returns is an implementation choice** — revised Markdown,
+replacement ranges, or structured operations — and the author experience does not depend on it.
+Two requirements bound it: the result is applied to the editor as a single transaction, and the
+application computes the before-and-after presented to the author from the manuscript states
+rather than trusting the model to describe its own edit. That before-and-after is the changed
+passages with a little prose around them and no positions of any kind — enough to show what
+happened, not enough to reapply it anywhere — and where the change is unbounded it is the statement
+that the piece was rewritten whole rather than a second copy of the story.
 
-**Asking the room costs one call per cast seat plus one for the Showrunner. Nothing on
-screen adds to that.**
+**An application is abandonable on the same terms as a round.** In-flight call cancelled, lock
+released, manuscript untouched, recommendation still applicable. With the timeout in the model
+layer, an endpoint that never answers releases the manuscript without the author acting.
 
-The interface displays a great deal of short text — a take's one-line claim, the craft terms
-in it, the dimension a disagreement runs along, how many takes are in. Each could plausibly
-be produced by its own small call. **None of them may be.**
+**Nothing is stored that would let an application be replayed.** A recommendation is
+interpreted afresh against whatever the manuscript is at the moment it is applied, which is
+what makes an old recommendation applicable at all.
 
-**Every string on screen is either a field of a call already being made, or it is computed.**
-Restated as the thing to refuse: no summarization pass over output already in hand, and no
-interstitial status generated by a model.
+**A failed application changes nothing.** No partial write, no half-applied manuscript, and the
+recommendation stays applicable.
 
-This is why interface work lands in the **schemas** rather than in a prompt chain, and it is
-invisible in a design — a headline-first take is free as a `claim` field and costs one call
-per seat as a post-hoc summary, and the two render identically. Consequences:
+## Context capture
 
-- **A seat returns, in one response:** one or more remarks, each with its claim,
-  elaboration, reasoning, the quote it is talking about, its weight, its replacement text
-  where it has one, and the craft terms it declared. **Several alternatives for one line are
-  several remarks against one anchor, not a remark holding a list** — the schema keeps one
-  replacement, and each alternative is accepted or dismissed on its own. So *why?* and *show me in the text* are instant and free — the difference between
-  an affordance the author uses repeatedly and one they click once.
-- **The Showrunner returns, in one response:** the characterization, the restatement of the
-  author's question in craft terms, which seats are in conflict with which, its own remarks
-  where it has any, and — when it applies — the dimension in dispute and where each take sits
-  on it.
-- **Craft-term handling is never a pass.** Terms are a field; rendering a term in place is a
-  string match.
-- **Interim state while results land is templated**, never generated. *2 of 4 in* is a count.
-- **The board refresh is one call**, and produces the whole board.
+**One author-triggered operation.** Its input is the draft, the current conversation whole, and
+both existing contexts, as they stand when the author invokes it. The author keeps writing while
+it runs: the analysis holds no lock, and editing afterwards neither cancels it nor is reconciled
+against its proposals, which are advisory and individually approved. Its output is a set of
+proposals, each carrying its
+destination context, the operation it performs — add, revise, replace, remove — the entry it
+concerns where it concerns an existing one, and the proposed text.
 
-**The full accounting of calls in the product:** one per cast seat, one for the Showrunner,
-one per board refresh, one per brief exchange, one per casting. There is no sixth kind.
+**One call is the normal case and is not a contract.** Where a single call would need a schema large
+enough to defeat constrained decoding, the operation may issue several sequential calls instead —
+which is the reason the count is not fixed, the material's size having ceased to be one. Nothing in
+the interface encodes how many calls it took.
 
-**One exception, deliberately paid for.** A seat with nothing to say still costs its call.
-Silence is only a signal if the specialist was genuinely asked — filtering a seat out by
-registry rule before calling it would be cheaper and would make the silence a fabrication.
-The mode decides who is *seated*; only the model decides whether a seated specialist has
-anything material.
+**Only approved proposals are written**, as an ordinary atomic write to the destination context
+file. Nothing is written on the author's behalf, and no proposal is retained after the review
+closes. Proposals exist for the life of the review and nowhere else, so a reload during it discards
+them and the author invokes the analysis again — which is cheaper than a durable queue of pending
+items, and is the one thing the product refuses to keep.
 
-**The smell to watch for:** a second, shorter phrasing of text already on screen. Constrain
-the original to serve both places, or truncate deterministically. Never re-phrase with a
-model.
+**Each destination is its own write, and a review closes only once its writes have succeeded.** A
+review approving proposals against both contexts performs two writes with no transaction over them;
+where one fails, the review stays open with the failure stated and its proposals still approved, and
+retrying writes only the destination that failed. Otherwise the author closes a review believing they
+approved something that half exists.
 
----
+## Transport
 
-## What the interface owes the model
+**Server-sent events for round activity, plain POST for author actions.** One stream, for the
+open piece, outliving any round.
 
-**The gutter is a projection of remark state**, not its own collection with its own
-retention. Active and orphaned are outstanding, resolved is collapsed-with-reversal,
-discarded is gone; the session boundary takes the whole gutter with it. Nothing else writes
-to the gutter and nothing prunes it on a schedule.
+**The event set is closed, and every event corresponds to a call that produced something or to
+a frame around one.**
 
-**No staleness detector.** A new turn does not touch earlier remarks, and
-nothing asks a model whether a remark has gone stale.
+| Event | Carries |
+|---|---|
+| `round.opened` | The conversation, the author's message verbatim, the participants called |
+| `participant.state` | Participant, and whether it is waiting for its call or working |
+| `participant.settled` | Participant, its response and outcome, or its failure |
+| `round.closed` | How it ended — settled or abandoned |
+| `error` | A room failure belonging to no participant, in terms the author can act on |
 
-**The piece list shows title, mode, and last-modified time**, from `piece.json` and the
-filesystem. No progress indicator and no word count — *finished* is a status the author sets
-and not a measure, so any progress display would be inventing one.
+**No token-level streaming.** A response arrives whole because its content comes from one
+model response, and streaming tokens would invent a state the domain does not have and invite
+the interface to show it.
 
----
+**A dropped connection is ordinary and is not a protocol problem.** Reconnecting must not
+produce a duplicate visible response and must not corrupt the durable conversation. The
+conversation is durable, so the simplest sufficient mechanism is the right one — reloading the
+conversation and whatever operation is in flight is enough. Sequence numbers, watermark replay and
+a re-emission protocol are not required, and are worth adding only if a simpler approach
+demonstrably fails.
 
-## Fixture and replay provider
+**What the piece reports about an operation in flight is what the surface needs in order to draw
+it**: which operation it is, its identifier, and for a round the participants it will call, their
+states, and the responses and failures that have already landed. A participant that settled while the
+client was disconnected is in that report, because the conversation file is not written until the
+round settles.
 
-**Required infrastructure, not test scaffolding.**
+**A dropped connection during an application or a capture is an ordinary failure.** Those results
+reach the client on the response to the request that started them, so a connection that dropped lost
+the result: the state returns to what it was, the manuscript is editable, the recommendation stays
+applicable, and nothing reissues the call on the author's behalf. A local connection dropping is rare
+enough that a delivery mechanism built to survive it would cost more than the loss does.
 
-Record real turns to disk and replay them deterministically behind the same
-OpenAI-compatible interface. Iterating on interface states at thirty seconds a call against a
-local model is not viable.
+**One channel per thing that can fail, so nothing is reported twice.** A participant's failure
+rides its own settled event. An application's failure and a capture failure belong to the
+responses of the requests that attempted them. A failed write belongs to the save path.
+Invalid shipped data is a startup failure and never a room event.
 
-Maintain a deliberately pathological fixture set, because no layout should be believed until
-it has been seen under uneven load:
+**The HTTP surface is a thin adapter with no logic of its own** — every route maps to one call
+on the room or the store, and a route that needs a decision in it means the decision belongs
+behind a seam instead.
 
-- One three-line take beside one fifteen-line take.
-- A take that is incoherent, and one whose generation failed outright.
-- A silent seat.
-- A take carrying only an observation, with nothing to accept.
-- A three-way conflict, and two simultaneous unrelated disputes.
-- Two conflicting takes anchored to distant paragraphs, which no positional device can join.
-- A synthesis with no dimension in dispute, and a withheld synthesis.
-- A failed synthesis, which must not render as a withheld one.
-- A remark quoting text that appears twice in the draft, and one quoting text that is not in
-  the draft at all.
-- A drafting turn whose drafting stage failed, and one whose critics disagree about the
-  prose it produced.
-- A board refresh whose located entries cite quotes that do not resolve.
-- A draft with three turns' worth of accumulated remarks, some resolved, some orphaned.
-- A board the author has edited by hand, then refreshed.
-- A draft whose provenance sidecar was written against an older version of the prose.
+```
+GET    /pieces                                     title, mode, status, modified
+POST   /pieces                                     title + mode; enables the mode's default cast
+GET    /pieces/:id                                 metadata, draft, story context, conversation index,
+                                                   the operation in flight if there is one
+PATCH  /pieces/:id                                 title, status, enabled cast
+PUT    /pieces/:id/draft
+PUT    /pieces/:id/story-context
+GET    /pieces/:id/conversations/:cid
+POST   /pieces/:id/conversations                   returns the new conversation
+DELETE /pieces/:id/conversations/:cid
+POST   /pieces/:id/conversations/:cid/rounds       the author's message, or a target and any
+                                                   clarification
+POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
+POST   /pieces/:id/abandon                        whatever operation is in flight
+POST   /pieces/:id/capture                         returns proposals
+POST   /pieces/:id/capture/approve                 writes the approved proposals
+GET    /pieces/:id/events                          SSE
+PUT    /author-context
+```
 
-This doubles as the differentiation harness — comparing takes across model assignments needs
-reproducible input.
+**Creating a piece makes no model call.** It writes the piece directory and enables the mode's
+default cast, so a piece is creatable and writable with every endpoint unreachable.
 
----
+**Every model operation receives the manuscript as it currently stands**, carried in the request
+that starts it — a round, an application, a capture. `draft.md` remains the sole durable
+representation of the manuscript, and the room never reads it from disk to serve an operation. What
+this prevents is the room working from prose the author has already changed, and it is why model use
+does not depend on a write having succeeded: the author keeps writing through a failed save, and the
+room keeps seeing what they wrote.
+
+## Local exposure
+
+There is no authentication, because there is no second user. There is still a second website: a
+localhost server with the author's filesystem behind it is reachable by any page open in the same
+browser, and that is what these exclude.
+
+**The server binds loopback only**, so the surface is narrowed by construction rather than by policy.
+
+**A request carrying an origin the server did not serve is refused**, which is what stops a page the
+author has open in another tab from posting to a write route while they are elsewhere.
+
+**Every path is resolved before it is used and rejected unless it lands inside the workspace
+directory**, and a symlink leaving the workspace is not followed. The failure this prevents is a
+route writing prose somewhere the author never chose.
+
+**YAML is parsed against a schema rather than into arbitrary objects**, and model output and Markdown
+are rendered as prose rather than as markup. A model returning a script tag is ordinary malformed
+output, and the manuscript is the last surface in the product that may become executable.
+
+## Seams
+
+**A boundary earns its place by carrying a guarantee that cannot be asserted anywhere else.**
+Two are load-bearing and the rest of the orchestration is internal.
+
+| Boundary | Interface | Why it is real |
+|---|---|---|
+| **context** | compile a participant's call input | current-round independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
+| **model** | a prompt, a schema and an abort signal in, a parsed object or a failure out | live endpoints per participant, and a fixture implementation for tests — two real adapters |
+
+Two further interfaces are expected and useful without being doctrine. A **store** boundary
+concentrates atomic writes and artifact access, and gives tests an in-memory implementation. A
+**room** boundary owns the operations the author starts — start one, abandon the current one,
+subscribe to its events — which is already the client's contract, so tests and the client cross the
+same surface.
+
+**The room owns all three operations rather than the round alone.** A round, an application and a
+capture share one state machine, one lock on the manuscript and one abandonment path, and a module
+each would leave three shallow modules agreeing about state none of them owns — the shape that
+produces a capture starting during an application. It is also what keeps every route a one-line
+adapter, since a route that decided whether an operation may start would be a route with a decision
+in it.
+
+Behind those, the round loop, the application call, the capture call, the lock, the state machine,
+per-call abort, the tolerant parser and the role registry are internal, with one implementation
+each.
+
+**The client's projection of round events is a pure reducer** — not a boundary, since it has
+one implementation, but named and tested at its own interface because several load-bearing
+rules live in it: participants are seeded in a stable order when the round opens, so an empty
+place reads as waiting or thinking rather than missing; a new round preserves earlier rounds; abandonment
+keeps what landed and adds nothing; a failed participant is distinct from a no-comment one; and
+a response that arrives twice appears once.
+
+## Test fixtures
+
+**A fixture implementation of the model interface, for tests only.** A test that needs a model call
+declares the outputs that call returns — including a failure, a malformed response, a nonconforming
+response, a timeout, or a failure followed by a success on retry. Delays are declarable the same
+way, which is how a round's progression through its calls gets exercised.
+
+**No shared library of default outputs, and nothing fake outside a test.** Every fixture belongs to
+the test that needs it. There is no dev mode, no demo mode, and no seeded example content: with no
+endpoints configured, the manuscript opens and is writable and the room says it is unavailable. A
+default response would be accepted as evidence that something ought to be there, and would then
+satisfy a check that was meant to catch its absence.
 
 ## Verification
 
-**Vitest.** The same transform pipeline as Vite, so there is no second config, and the draft
-module's tests run headless against an `EditorState` with no DOM.
+**Vitest**, sharing the client's transform pipeline so there is no second configuration, with
+the editor's document tested headless.
 
-**The seams are the test surface.** Each property below is asserted at exactly one of them,
-and nowhere twice — a rule asserted at two levels is a rule that will be changed at one.
+**The boundaries are the test surface.** Each property is asserted at exactly one of them, and
+nowhere twice — a rule asserted at two levels is a rule that will be changed at one.
 
-| Seam | What must hold |
+| Boundary | What must hold |
 |---|---|
-| **buildContext** | no cast seat's context contains another seat's remark, from this turn or any earlier one; the Showrunner's contains this turn's takes and no earlier turn's; no scope value admits a remark |
-| **resolver** | a unique match anchors; zero matches and several matches both return `orphaned`. A duplicated passage and an invented quote are the same outcome |
-| **stack** | no group sits above its anchor; no group overlaps the one before it; a tall group, several tall groups in sequence, reversed anchors and an empty gutter all terminate under the pass cap |
-| **project** | `turn.opened` seeds every seat in cast order and preserves earlier turns' remarks; abandonment keeps landed remarks and adds no synthesis; a failed synthesis is distinct from a withheld one; a re-emitted `(turnId, sequence)` is a no-op; one seat's remarks against one anchor group as one |
-| **draft** | every provenance transaction rule — insertion flags, an author edit clears the touched paragraph and no other, a split inherits on both halves, a join clears if either half was canon, paste is canon |
-| **draft** | a resolved anchor range **maps correctly through transactions**: unrelated edits elsewhere, edits inside the anchored text itself, splits and joins around it. Not repeated textual re-resolution — the point is that resolution happened once |
-| **store** | sidecar degradation resolves unmatched, ambiguous, missing and unparseable to canon; unknown fields survive a read/write round trip; a duplicate piece id is reported and never repaired |
-| **room** | abandonment drops queued work as well as in-flight; a cast of one skips the Showrunner; a failed drafting stage runs no critics; a failed synthesis does not render as withheld |
-| **undo** | every author action round-trips to its prior value; a multi-artifact action is one entry |
-| **provider** | replay is deterministic across runs |
+| **context** | no specialist's compiled context contains another specialist's response from the round being formed, under either history policy; every specialist context is compiled before the round's first call is issued; the Story Editor's contains the round's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
+| **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
+| **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and is re-read when a call is compiled; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
+| **model** | a malformed response parses to a failure rather than an exception; a response that parses but does not conform to the schema is re-issued to the configured count and then fails; a call failing at the transport is retried to the configured count and then fails; a call that exceeds the timeout fails; cancellation reaches a call in flight |
+| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; the reading view preserves position |
+| **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
 
-**The pathological fixture set is the corpus for both.** One set drives the behavioural tests
-and the interface work — two sets means the states the layout is judged against drift from
-the states the behaviour is asserted against, and the drift is invisible until a real turn
-produces one of them.
+**A small number of browser tests over the fixture implementation**, and the count is a ceiling on
+purpose. Several guarantees live at the integration of editor, state and interface where no
+single seam can prove them: that typing stays possible while a round lands, that the manuscript
+is read-only while an application is in flight and editable the moment it settles, that applying
+a recommendation changes the visible manuscript, that the editor's undo restores it, that
+switching between the rendered and Markdown views preserves the manuscript, that the reading
+view restores position, and that abandoning a round updates the conversation.
 
-**Five to eight browser tests, over the replay provider.** Playwright, and the count is a
-ceiling on purpose. Several of the product's load-bearing guarantees live at the integration
-of editor, state and interface, where no single seam can prove them: that typing stays
-possible while a turn lands, that accepting a suggestion changes the visible draft, that undo
-restores it, that gutter remarks stay beside their prose after edits, that clean reading
-preserves cursor and scroll, that abandonment updates the room, and that a board refresh and
-its undo work end to end. That is the list.
-
-**No screenshot regression farm and no browser test per card state.** Layout under uneven
-load is judged by eye against the fixture set, which is what the fixture provider exists for.
-
----
+**No screenshot regression farm and no browser test per response state.** How the interface composes
+under lopsided and late responses is design work judged against the mockup, not a thing tests
+assert.
 
 ## Deliberately out
 
-Stated so they don't accrete.
+Stated so they do not accrete.
 
-- **No orchestration framework.**
-- **No database as source of truth.**
+- **No database as source of truth**, and no index or registry of pieces.
+- **No piece identifier apart from the piece's directory**, and no duplicate-identity handling.
 - **No Electron.**
-- **No component library or CSS framework.**
 - **No token-level streaming.**
-- **No journal, manifest, or replayable log of state**, and no cross-file transaction to
-  make the draft and its sidecar crash-consistent.
-- **No persisted anchors, and no cross-session recovery of critique.**
-- **No durable event log and no room-state snapshot endpoint.** Turn ids and event sequence
-  numbers live as long as the turn.
-- **No migration command and no upgrade pass.** Migrations run on read.
-- **No author write path to the glossary**, and no endpoint offering one.
-- **No second editor view.** Clean reading is a presentation state over the one view.
-- **No `prosemirror-history`**, and no second undo stack of any kind.
-- **No model call on the piece-creation path**, and no remark as a scope target.
-- **No board entry ownership**, and nothing preserved through a refresh.
-- **No agent speech in a durable artifact.** The glossary quotes the author's prose.
-- **No durable record of what the author declined**, and no re-proposal detection: no
-  similarity scoring, no embeddings, no semantic duplicate check.
+- **No journal, manifest, or replayable log of state**, and no cross-file transaction.
+- **No durable event log and no room-state snapshot endpoint.**
+- **No event sequencing or re-emission protocol**, and no schema version, migration chain or
+  compatibility layer.
+- **No per-piece model configuration.** A participant's endpoint is the author's, not the
+  story's.
+- **No application undo stack, no second editor history, and no inverse-closure machinery.**
+- **No manuscript snapshots, no version history, and no manuscript state in a conversation
+  file.**
+- **No application state in the editor document**, and no application marks in the manuscript.
+- **Nothing stored that could replay an application's edit.** The passages it changed are kept for
+  display, without positions of any kind, and nothing reapplies them or reconstructs a manuscript
+  from them.
+- **No staleness detection** of any kind — no similarity scoring, no embeddings, no semantic
+  duplicate check, and nothing that decides a recommendation has expired.
+- **No durable record of what the author declined.**
+- **No queue of author-initiated operations**, and no dialog asking which of two to keep.
+- **No scheduler and no concurrency limits.** Calls are issued one at a time, and a participant's
+  place in the round is its place in the cast's order rather than a position in a queue anything
+  maintains.
+- **No context-window awareness, no chunking, and no excerpting** of anything sent to a model.
+- **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its
+  single-call surface is used.
+- **No per-participant re-ask**, and no attempt history inside a settled response.
+- **No temporary participation.** A participant is enabled or it is not.
+- **No dev mode, no demo mode, no seeded content, and no default model output.** Nothing fake exists
+  outside a test, and no configuration falls back to another assignment: a default is accepted as
+  evidence that something belongs there and then hides the absence it was meant to reveal.
+- **No second writer of the manuscript.** The client writes `draft.md` and nothing else does.
+- **No recorder of model traffic**, and no durable store of model inputs and outputs.
+- **No validation of a declared outcome against a response's content**, which would take a second
+  model call to do badly.
 - **No background inference.** Every model call is traceable to an author action.
-- **No in-product role editor.**
+- **No model call on the piece-creation path.**
+- **No in-product role editor.** Role definitions are files, and rewriting prompts to fix weak
+  differentiation belongs in the diagnostic path rather than in the studio the author writes in.
 - **No auth, sync, multi-user, or presence.**
-- **No analytics, crash reporting, or phone-home of any kind.** Offline operation is a
-  requirement and a local single-user tool has no one to report to. Operational state is not
-  telemetry and is required.
-- **No vendor-specific model features.** Anything that does not exist behind an
-  OpenAI-compatible endpoint cannot be depended on.
+- **No analytics, crash reporting, or phone-home of any kind.**
+- **No vendor-specific model features.** Anything that does not exist behind a
+  provider-agnostic endpoint cannot be depended on.

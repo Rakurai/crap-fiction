@@ -1,363 +1,171 @@
 # VISION
 
-**What this document owns.** Purpose, the bet, and the principles that settle
-tradeoffs. It states what the product is for and what it refuses. It does not
-define vocabulary, requirements, composition, or implementation.
-
-**Authority.** Five documents describe this software, and where they appear to
-conflict the earlier one governs:
-
-`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `SPEC.md`
-
-`CONTEXT.md` is the authoritative vocabulary. Where a term is defined there,
-nothing else defines it again — not this document, not the requirements, not the
-interface, not the code.
-
-Nothing here describes a system that exists. It is what is to be built.
+**Owns:** purpose, the product bet, principles, standing constraints, refusals.
+**Does not own:** vocabulary (CONTEXT), author behaviour and requirements (PRD), composition
+and presentation (UX_DESIGN), implementation (SPEC).
+**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. Where a downstream document
+conflicts with this one, this one governs.
 
 ## What this is
 
-A local, single-user studio for writing fiction with a team of specialized
-agents.
+A local, single-user studio for writing fiction in conversation with a room of specialized
+AI collaborators. The author writes flash fiction — roughly 500–1,500 words. Longer forms
+extend the same design without changing it.
 
-The implemented form is **flash fiction** (roughly 500–1,500 words). Longer forms
-extend the same architecture. **Mode — the form and scale of a piece — is the one
-axis along which this software is scoped.** Everything else is designed complete.
+The purpose is **finished pieces**. The studio exists so the author writes stories they
+would not otherwise complete.
 
-The primary purpose is **producing finished pieces**. The system exists to help
-the author write stories they would not otherwise finish.
-
-A second, deliberate effect is that the author acquires the vocabulary and
-structural concepts of fiction craft — not by being taught, but by doing the work
-alongside collaborators who name what is happening. The author begins without
-formal education in narrative craft and wants to end up able to say precisely
-what they want. Teaching is therefore designed as a **byproduct of real work**,
-never as the work itself.
-
-**This hierarchy governs tradeoffs.** Where pedagogy and productive writing
-conflict, productive writing wins. A studio that teaches beautifully and finishes
-nothing has failed. Learning must ride along on work the author would do anyway;
-it never earns the right to slow that work down.
+A deliberate second effect is that the author acquires the vocabulary of fiction craft:
+collaborators name what is happening in the author's own story, in the ordinary course of
+discussing it. Where craft education and productive writing conflict, productive writing
+wins. A studio that teaches beautifully and finishes nothing has failed.
 
 This is a permanent creative tool, not scaffolding to be outgrown.
 
 ## The bet
 
-That a room of specialized agents who reason differently about the same piece —
-and who visibly disagree — is more useful than a single writing assistant, and
-that watching those disagreements is how craft vocabulary becomes real.
+That a room of collaborators who reason differently about the same piece — and who
+sometimes genuinely disagree — is more useful than one writing assistant, and that
+natural conversation is a better control surface for that room than any arrangement of
+buttons.
 
-The author acts roughly as creator and executive producer. A Showrunner
-facilitates. Specialists hold distinct areas of responsibility and are expected
-to conflict: a proposed revelation may simultaneously be structurally useful,
-damaging to character motivation, premature for the form, and thematically
-interesting. Making those tensions visible is the point.
+The author acts as author and final authority. Specialists hold distinct craft
+responsibilities and are expected to conflict: a proposed revelation may be structurally
+useful, damaging to motivation, premature for the form, and thematically interesting at
+once. A generalist story editor weighs those readings against what the piece as a whole is
+trying to be.
 
-Two things follow from taking the bet seriously:
+Two things follow from taking the bet seriously.
 
-- **Specialization must be substantive, not cosmetic.** Different personalities
-  saying the same thing in different registers is failure. Each role must apply
-  genuinely different evaluation criteria and reach genuinely different
-  conclusions.
-- **Disagreement must be discovered, not manufactured.** Synthetic conflict is
-  worse than agreement, because it trains the author to discount the room.
+**Specialization must be substantive.** Different personalities saying the same thing in
+different registers is failure. Each role applies genuinely different criteria and reaches
+genuinely different conclusions.
 
-## Independence is architecture
+**Disagreement must be discovered.** Manufactured conflict is worse than agreement, because
+it teaches the author to discount the room.
 
-Agents form their positions in **blind independent passes**. No agent sees
-another's position, in this turn or any earlier one. Each works
-from a context built for its specialty.
+## The shape of the work
 
-This is architecture, not prompting. A sequential visible conversation over a
-shared model converges — later speakers agree with earlier ones, and the room
-collapses into one voice. Blindness is the cheapest structural defense against
-that anchoring, and it has to hold across the session as well as within a single
-turn: otherwise every turn looks independent while the room quietly
-settles on whichever voice spoke first, which is the failure mode hardest to
-notice from outside.
+The author talks to the room about the story. Specialists respond independently. The
+generalist weighs what came back against the piece as a whole. The author continues the
+discussion, edits the prose directly, or accepts a recommendation and continues from the
+resulting prose.
 
-The Showrunner may compare and synthesize positions; **only the author adjudicates
-them or turns them into changes to the work.** An agent sees what the author has
-ruled — the prose, the shared understanding of the story, the author's notes and
-intent. It never sees another agent's opinion.
+Manual writing is always available and sometimes the right move, but collaboration is the
+primary way work gets done. Discussion is not a detour from writing; it is where the
+writing gets decided.
 
-Independence is necessary but not sufficient. What survives a blind pass is a
-**candidate** disagreement, not a guaranteed real one — it may equally be a
-misreading of the piece, stochastic variation between samples, or one agent
-simply analyzing badly. Telling genuine craft tension apart from noise, and
-saying which it is, is the Showrunner's job. Confusion is never dressed as
-debate, and no devil's-advocate seat is assigned.
+The room acts only when the author addresses it. There is no standing critique loop, no
+background analysis, and no unsolicited opinion.
 
-## Form-dependent operation
+## Principles
 
-The studio is not organized around one universal fiction structure. The selected
-form and scale determine which roles, structural concepts, board fields and
-critique criteria are materially useful. A structural concept that is
-load-bearing in one form may be meaningless in another; the machinery must treat
-that as ordinary.
+These settle tradeoffs when a decision could go either way.
 
-Concretely, mode influences:
+**The prose is the primary artifact.** Everything else is a reading of it, a statement of
+what the author is reaching for, or a record of how they got there.
 
-- **Casting** — which roles are seated, and with what brief.
-- **The shared understanding's fields** — which earn their place and which are noise.
-- **Critique criteria** — what each role considers a defect at this scale.
-- **Structural vocabulary** — which concepts are even applicable.
-- **Workflow emphasis** — how much design precedes prose, and at what grain
-  revision happens.
+**The author is the final authority.** Collaborators recommend. The author decides, and
+nothing recommends its way past that.
 
-Nothing in the core may assume a particular length regime or a particular theory
-of narrative structure.
+**The author keeps writing while the room thinks.** Consulting the room never costs the
+author the prose: a room too expensive to consult stops being consulted, and that is the
+likeliest way this product fails quietly. Accepting a recommendation is the one exception —
+prose the author has asked a collaborator to rewrite holds still while it is rewritten,
+because an edit landing underneath an incoming rewrite corrupts both.
 
-## Core loop
+**Recommendations are semantic, not mechanical.** A collaborator says what the story needs
+in the language of craft. Turning that into prose is a separate, explicit act.
 
-The draft is the primary artifact. Everything else is a reading of it or a
-statement of what the author is reaching for.
+**Accepting a recommendation is the only way a collaborator changes the manuscript.**
+Ordinary discussion never touches the prose.
 
-```text
-write
-  ↓
-ask the room
-  ↓
-independent specialist readings
-  ↓
-compare the disagreement
-  ↓
-the Showrunner names the useful tension
-  ↓
-revise the prose
-  ↓
-repeat
-```
+**Independence is a property of the moment a judgment is formed.** No specialist sees
+another specialist's response while forming its own. What a specialist may see of the
+conversation's history afterwards is a policy choice, not a foundation.
 
-At flash length, very little design precedes prose: having 800 imperfect words to
-react to is usually the fastest route to knowing what the story is. Intent may
-run ahead of the prose, and that is expected — what is ruled out is design the
-prose is *obligated* to conform to. When the writing disagrees with the plan, the
-plan gives way.
+**Silence is a legitimate result.** A specialist with nothing material to say says nothing,
+and is never re-run under an obligation to speak. Forced participation manufactures
+criticism, which is the failure mode most damaging to the room's credibility.
 
-## Three surfaces
+**The generalist evaluates rather than reconciles.** It may endorse one reading, reject
+another, name a tradeoff, or offer a framing no specialist supplied. It is not a
+consensus mechanism and not a summarizer.
 
-The studio has three standing responsibilities. Their visual arrangement can
-evolve; the separation must not.
+**Durable understanding of the story changes only when the author says so.** Conversation
+is exploratory — the author speculates, reverses, tests, and leaves things unresolved.
+Continuous interpretation of that would make every exchange prematurely consequential.
 
-- **The Room** — where the author asks. They propose ideas, describe effects
-  without knowing their names, set story problems, challenge recommendations, and
-  ask why a choice matters.
-- **The Draft** — the prose itself, directly editable, annotatable in place.
-- **The Story Board** — a compact current understanding of the story, small
-  enough to take in at a glance.
+**The software owns the AI-writing layer and nothing else.** Text editing is a solved
+problem with mature implementations. Reimplementing selection, history, keyboard
+conventions or Markdown handling is machinery this project cannot afford and would do
+worse.
 
-The board is a reading, not a plan and not a ledger. It stays small, its fields
-are mode-dependent, and it must not harden one theory of fiction into the ontology
-of all stories. **The author never maintains it as bookkeeping** — one action re-reads
-the draft and produces the board afresh, wholesale — and the author may correct it
-directly whenever the room has misread the piece.
+**Plain Markdown is the manuscript.** Application concepts never enter it.
 
-## Who writes the prose
+**Local-model failure, silence and uneven latency are ordinary operating conditions**, not
+edge cases. A design that treats them as exceptions is wrong about how this software runs.
 
-The room drafts from a **brief the author writes**.
+**The author maintains nothing.** No artifact requires upkeep, no list requires pruning,
+and nothing must be kept in sync with anything else.
 
-The room may help **formulate** that brief. Early on the author will not have the
-vocabulary to specify what they want, and refusing to help would make the studio
-unusable precisely when it is most needed. So the room may translate plain-language
-intent into craft terms, ask clarifying questions, and offer candidate phrasings —
-but the intent itself is authored or explicitly accepted by the author.
-Collaborative formulation is supported; ownership of intent is not transferred.
-This translation is also the main site of the learning byproduct.
-
-A complete rough draft may also be generated from a thin premise with no brief,
-because a blank page is a worse problem than a bad draft. Its output is **raw
-material to react to, not a deliverable** — unreviewed by definition, and
-immediately the object of critique.
-
-### Prose provenance
-
-The author must always know whose words they are reading, and the system must never
-have to hedge:
-
-- **Acceptance is what makes prose the author's; generating it does not.**
-- **Ownership is never partial.** A paragraph is wholly the author's or wholly not
-  yet read.
-
-Against the author's own prose, agents propose and never apply. Generated text not
-yet read carries no such protection, which is what makes fast rough drafting safe.
-
-## Voice
-
-The system keeps an explicit, editable **voice spec**: diction, sentence rhythm,
-tone, level of interiority, tolerance for figurative language, and an anti-pattern
-list of tics to avoid.
-
-It is seeded from samples the author supplies, edited by the author directly, and
-read by the room when drafting and when critiquing prose. Nothing infers it,
-evolves it, or watches the author's revisions to update it — that would create a
-second authority over the prose. Naming one's own preferences is itself vocabulary
-practice, which is why the spec is explicit rather than an invisible learned model.
-
-## The room
-
-Agent roles are **declarative definitions in a registry**, not a hardcoded set.
-Each role declares its focus, the context it needs, and its model. Where a role
-applies and what it treats as a defect there belong to the mode, not to the role —
-one authority, so a mode shift is a change in one place.
-
-**Casting is a per-piece decision.** The Showrunner proposes a cast and states why
-in craft terms — "at this length I am not seating a structural architect; I am
-seating a compression editor." The author adds and empties seats. The casting
-rationale is free vocabulary exposure before a word is written.
-
-### The Showrunner
-
-Always present, and not one of the specialists. It facilitates rather than rules:
-it translates the author's plain language into craft terms, and after the
-specialists have answered it says what is actually in dispute, separates genuine
-tension from noise, and makes the disagreement actionable. Every seated specialist
-is asked, so the Showrunner does not decide who speaks — silence is the
-specialist's own answer and is itself information.
-
-It is explicitly **not the final authority**. The author decides.
-
-### What the specialists must cover
-
-Which specialties are material is a function of form. The registry holds all of
-them; the mode decides who sits down. In flash mode, structural attention is
-scoped to the piece's real shape — entry point, the turn, the inevitability of the
-close. **Line-level craft is a founding member, not a late-phase polisher**: at
-this length, word choice and omission are not finish applied over structure, they
-*are* the structure. Reader experience deserves a distinct voice — implication,
-negative space, what is withheld and for how long. Character interiority and
-thematic meaning remain worth seating, scoped to what a page can achieve.
-
-### The room is fallible, and asking is expensive
-
-Both are ordinary operating conditions, not edge cases.
-
-Local models produce incoherent readings, misread the piece, and fail outright. A
-specialist that is useless on a particular story is a normal outcome. The author
-must be able to discard a reading, ask again, or empty a seat without ceremony,
-and nothing may look authoritative merely because it was produced.
-
-Asking the room is several model calls in parallel, which on local hardware may
-mean a substantial wait. This is the most likely way the core bet fails in
-practice: **a room too expensive to consult stops being consulted.** So the author
-never blocks on the room — writing continues while it thinks, the request can be
-abandoned, and partial results are useful on their own. Reducing the cost of
-asking is a standing design concern.
-
-## How vocabulary transfers
-
-**Intent restatement.** When the author expresses something in plain language, the
-responding agent names it in craft terms as part of its answer: *"You're asking for
-dramatic irony — here's how I'd stage it."* The author repeatedly sees their own
-thought translated. This is the direct mechanism for learning to express intent
-precisely, and it costs nothing extra — it is a field of a response the room was
-already going to produce, never a separate step and never a gate the answer waits
-behind.
-
-**Craft terms in place.** Terms appear where they are used, attached to the
-author's own story, and expand on demand into the reasoning behind the claim: the
-concept invoked, what it usually does, what this piece does instead. Pull-based, so
-depth arrives when curiosity does.
-
-**A curated craft lexicon ships with the software** and supplies meanings. The
-author never browses it; what they see is the terms their own fiction produced.
-
-Concepts are **named after the author reaches for them**, never front-loaded.
-Agents label decisions already being made; they do not lecture on concepts not yet
-needed. There is no tracking, grading, streak, or nudge to practice.
-
-## What is durable
-
-**The author's work is durable. The room's activity is session material.**
-
-Durable: the draft, the shared understanding of the story, the brief, the voice
-spec, notes the author deliberately kept, and the piece's own configuration.
-
-Transient: the room. Readings, disagreements, syntheses and the order things were
-said in are how the author got somewhere, not the somewhere. A useful reading is
-useful now; if the author wants it to keep mattering, they keep it as a note, and
-that is a deliberate act rather than a default.
-
-This is a hard constraint, not a storage preference. The moment the conversation
-becomes load-bearing, the author is operating a records system instead of writing.
-
-## Change mechanics
-
-**Everything the author did is reversible**, in session, without resorting to the
-filesystem. A studio the author is afraid to click in is a studio that gets used
-timidly. Reversibility is what makes low-friction acceptance safe to offer; the two
-are one design rather than a feature and a safety net. Reversibility is not version
-history, which this product deliberately does not have.
-
-**Friction scales with consequence.** A change to the shape of the story is worth a
-recommendation and its reasoning; a better verb is worth a keystroke. A formal card
-for "cut this adverb" would teach the author to stop reading the cards, and that
-single failure would take most of the room's value with it.
-
-**Everything an agent says is the same kind of object.** There is no separate class
-of annotations, and no separate class of proposals — building them as several
-systems produces competing lists of agent opinion with no defined relationship.
+**Implementation follows the intended author experience**, never the reverse.
 
 ## Standing commitments
 
-Not implementation choices — the constraints any implementation has to satisfy.
+Constraints any implementation must satisfy.
 
-**Local and offline.** The tool runs on the author's machine against models on the
-author's machine. Full offline operation must work. No accounts, no cloud
-dependency to open one's own stories.
+**Local, and fully usable offline.** The tool runs on the author's machine, with no accounts
+and no service to sign in to. Nothing about opening, reading or writing one's own stories
+requires a network. Models on the author's machine are the expected arrangement; pointing a
+participant at a hosted endpoint is a configuration choice rather than a different
+architecture.
 
-**A rich text surface.** Selection over prose, critique in place, alternatives
-rendered against the text, clickable terms, draft beside board — this needs a
-graphical surface. It is cheap in a browser and painful in a terminal.
+**Plain files, authoritative.** The prose outlives any rewrite of this tool, is readable and
+editable in any editor, and is diffable under version control. The files are the record;
+nothing is derived from a history in order to be true.
 
-**Provider-agnostic models, per role.** Any role may be pointed at a different
-endpoint, so prose quality is not capped by local hardware — and so weak agent
-differentiation can be diagnosed as a design problem rather than confounded with
-model capacity. That diagnostic ability is the reason, not a convenience.
+**Provider-agnostic models, assignable per collaborator.** Any participant may be pointed at
+a different endpoint, so prose quality is not capped by local hardware and weak
+differentiation between roles can be diagnosed as a design problem rather than confounded
+with model capacity.
 
-**Plain files, authoritative.** The author's prose must outlive any rewrite of this
-tool, be readable and editable in any editor, and be diffable under version
-control. The files are the record; nothing is derived from a history in order to be
-true. Because board fields are mode-dependent, persistence must tolerate schema
-change rather than assume a frozen shape.
+**A capable prose editing surface.** Judging rhythm and sound requires prose set as prose,
+with the editing conventions the author already knows, in both a rendered view and a
+Markdown view.
 
-## Anti-goals
+## What this refuses
 
-**Hard line:** the room never silently modifies the author's prose. Any change to
-author-written or author-accepted text is a visible, dismissible suggestion —
-including during any polish pass.
+**The room never silently modifies the manuscript.** Any change to the prose is either the
+author's own editing or the direct consequence of the author accepting a recommendation.
 
-Strong preferences, not prohibitions:
+**No semantic project management.** The system keeps no records the author is responsible
+for, reconciles no artifacts against each other, and asks nothing to be kept current.
 
-- Not a story vending machine. Drafting proceeds from authored intent, with
-  one-shot generation framed as scratch material.
-- No gamification of learning. Nothing should feel like homework in a production
-  tool.
-- No format lock-in. Plain files, offline reading, no cloud dependency.
-- No universal narrative ontology. Nothing in the core assumes one theory of
-  structure or one length regime.
-- **No semantic project management.** The system does not maintain records of what
-  it once thought, reconcile artifacts against each other, or ask the author to
-  keep anything in sync. Direct manipulation of prose and a few meaningful
-  artifacts, always.
+**No version history of the manuscript.** The manuscript is what it currently is. The
+editor's history reverses recent mistakes; plain text under version control serves anything
+longer-lived.
+
+**No manuscript branching.** Conversation does not own, version, or restore prose. A
+discussion may describe an earlier state of the story; that is ordinary and is never
+reconciled or repaired.
+
+**No story vending machine.** Drafting proceeds from the author's intent, expressed in
+their own words.
+
+**No gamification.** No scores, grades, streaks, progress measures or prompts to practice.
+
+**No universal narrative ontology.** Nothing assumes one theory of structure or one length
+regime.
 
 ## Success
 
-The project works if:
+The studio works if the author finishes pieces they would not have finished alone, the
+prose reads as the author's rather than the model's, and within weeks the author asks for
+what they want in craft terms without needing it translated first.
 
-- The author finishes pieces they would not have finished alone.
-- The prose reads as the author's, not the model's.
-- Within weeks, the author writes briefs in craft terms **without the room having
-  to translate first**.
-
-The first two test the primary purpose; the third tests the byproduct. All three
-are observable without instrumentation, over weeks rather than in a single session.
-
-Secondary questions worth watching:
-
-- Do the agents produce meaningfully differentiated perspectives, or one voice in
-  several costumes?
-- Does the Showrunner improve signal, or is it an unnecessary intermediary?
-- Are the disagreements useful, or merely synthetic?
-- Does the board stay legible as a piece evolves?
-- Is it still enjoyable after an extended session?
+Questions worth watching as it is used: whether the specialists produce meaningfully
+different perspectives or one voice in several costumes; whether the generalist improves
+signal or is an unnecessary intermediary; whether disagreement is useful or merely
+synthetic; whether the room stays cheap enough to consult freely; and whether it is still
+enjoyable after an extended session.

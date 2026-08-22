@@ -1,519 +1,344 @@
 # UX DESIGN
 
-**What this document owns.** What the interface looks like and how it behaves —
-composition, arrangement, prominence, register, and the states every composition must
-survive. Where it names a composition, that composition is the decision, not a
-candidate. Where something is genuinely unresolved, *Still to design* says so.
-
-It does not define vocabulary, restate requirements, or settle implementation.
-
----
+**Owns:** composition, prominence, interaction presentation, degraded and absent visual states.
+**Does not own:** purpose and principles (VISION), vocabulary (CONTEXT), what the author must
+be able to do (PRD), implementation (SPEC).
+**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. Where this document describes an
+interaction the PRD requires, it is describing its presentation and not restating the
+requirement.
 
 ## Design thesis
 
-> **The interface is stable around prose, and elastic around thinking.**
+> **Two surfaces are always present: the prose, and the conversation about it.**
 
-The draft stays put. Room activity expands when comparison matters, then collapses out
-of the way. The board, glossary, cast, voice and machinery are reachable when useful
-and never permanently compete with the writing surface.
+The manuscript is where the story lives and the conversation is where the work gets decided,
+so both are permanent and adjacent. Everything else — choosing a conversation, editing the
+room, reviewing context proposals, configuration — arrives when the author reaches for it
+and leaves without disturbing either.
 
-Every other decision here is downstream of that sentence.
+**One piece is open at a time.** Both permanent surfaces belong to one story, and opening another
+piece replaces both with nothing to save and nothing to confirm, because everything the author has
+written is already on disk. The exception is the one state where it isn't: while a save is failing,
+leaving is refused rather than confirmed, and the refusal names the prose it is protecting.
 
-The interface's job, in priority order:
+The interface's job, in priority order: get prose written and revised; make the room's
+readings legible and actionable; keep the cost of consulting the room low enough that the
+author consults it freely. Where these conflict, the earlier wins.
 
-1. Get prose written and revised.
-2. Make the room's disagreements legible and actionable.
-3. Let craft vocabulary accrete without interrupting either of the above.
+## The manuscript surface
 
-When these conflict, the earlier one wins.
+**It behaves like a capable prose editor, not a custom text box.** The author's expectations
+from mature editors hold: selection, clipboard, cursor and keyboard conventions, search,
+history, common formatting, Markdown handling. Nothing the application adds may take those
+away or make them behave unusually.
 
-## Prose is the constant
+**Set prose like prose.** The author is judging rhythm and sound, so the reading surface
+serves that above all. Prose is addressed at the granularity the author thinks in —
+paragraphs and sentences — and no code-editor idioms appear in the rendered view.
 
-The draft is the only thing permanently present. Across every state it holds the same
-size, the same weight, the same colour and the same side of the screen.
+**The prose never shrinks to make room for thinking.** Its measure may narrow when another
+surface needs space and the prose re-wraps, but it holds its place, its weight and its type
+size in every state. The author must never experience the manuscript as demoted.
 
-**Prose never shrinks to make room for thinking.** The measure may narrow when the
-room needs space, and the prose re-wraps; the type does not get smaller. The author
-must never experience the draft as having been demoted.
+**Nothing the application knows about is marked in the manuscript.** No recommendation
+markers, no conversation links, no scope indicators, no traces of an application. What is on
+screen is the story as it currently stands, and the moment that stops being true the author
+cannot trust what they are reading.
 
-Set prose like prose. The author is judging rhythm and sound, so the reading surface
-serves that above all — and no editor idioms. **No line numbers, no gutters of the kind
-code editors use.** Prose is addressed at the granularity the author thinks in, which
-is paragraphs and sentences.
+**Three ways to see it.** A rendered prose view for ordinary writing, a Markdown source view
+for direct control, and a reading view with the application's chrome gone. The rendered and
+source views are ways of editing the same manuscript, switched in one action. The reading
+view is a state the author enters and leaves in one action each way, with reading position
+preserved — cheap enough that they do it on impulse, mid-paragraph, without deciding to. It
+reads as the same manuscript with the application gone, not as a separate place.
 
-Prose is the brightest thing on screen in dark and the darkest in light. Everything
-else steps back.
+## The conversation
+
+### Where the author speaks
+
+**One input, carrying the author's own words and nothing else.** No verb selection, no mode,
+no scope control, and no buttons naming particular jobs. *Read this and tell me what you
+think*, *what isn't working about the ending*, *write the next paragraph* and *@Shape does the
+opening earn its length* are the same act of typing a message.
+
+**Participants are addressed inside the message, by handle behind a sigil**, as in any chat
+room the author already uses — `@shape`, `@comp`. A message that names no one goes to the
+enabled cast. Addressing a specialist that is not in the room brings it in, and the room shows
+that it now holds one more specialist, so the change is never something the author discovers
+later.
+
+### A round in flight
+
+**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing
+about a round in flight is modal, blocking, or a reason to stop typing.
+
+**Every participant the round will call is visible from the moment it opens**, in a stable order
+fixed before the first of them is called, with the Story Editor last where the round will reach it
+and absent where it will not. An empty place reads as a participant waiting or thinking rather than
+a participant missing, and the Story Editor waiting in its place is how the author sees that the
+readings come before the judgment.
+
+**In flight, the round states only what is true**, as states and counts rather than composed
+sentences: which participant is working, which are waiting their turn, how long it has been.
+Because the room asks one participant at a time, the round fills in that order, and the interface
+says which participant is being asked rather than implying they are all at work. Nothing is
+attributed to a participant that has not answered, and no response is shown before it is complete.
+
+**Filling in order must not read as a chain.** Each participant was asked the author's question,
+not the previous answer, and nothing in the composition may suggest otherwise — no connective
+framing, no visual thread between adjacent responses, no arrangement in which a later response
+appears to take up an earlier one. Sequential arrival makes this easier to get wrong than
+simultaneous arrival did, and it is the same guarantee.
+
+### A settled round
+
+**Responses stand as the participants' own.** Nothing frames one as answering another,
+subordinates the specialists to the Story Editor, or presents the Story Editor as a verdict
+over them. The Story Editor's response is distinguishable as its own contribution and carries
+the same actions as any other.
+
+**A no-comment response occupies no space.** It is not a row, not a line, not a dimmed
+placeholder. It is recorded and absent. What the author sees is that the round settled, not a
+census of who declined to speak.
+
+**A response that was directly addressed always appears**, including when its substance is
+that the participant sees no material issue.
+
+**The conversation accumulates.** Earlier rounds stay where they were, scrollable, with their
+responses and their actions intact. Nothing collapses, resolves or evicts an earlier round
+when a new one opens.
+
+## Participant responses
+
+**A response is one kind of thing** — a participant's contribution to a round — presented the
+same way whether it reads the story or recommends a change. Nothing about a response that
+offers no action looks diminished for it; frequently it is the most useful thing in the
+conversation.
+
+Every visible response carries the participant's identity, what it said, and its actions.
+Identity is identity only: it never encodes agreement, severity or confidence.
+
+### Actions on a response
+
+**One small text field serves every action on the response**, and is optional for all of
+them. Its content is carried verbatim as the author's words.
+
+**Apply** — on a response that recommends something concrete. Empty, it applies the
+recommendation as written; with text, it applies the recommendation under that additional
+constraint.
+
+**Ask for a concrete change** — on a response that offered a reading without an action. Empty,
+it asks that participant to show what it would change; with text, it asks the same with the
+author's clarification.
+
+**Reply** — on any response. Empty, it addresses that participant in the main input and
+focuses it, leaving the author composing; with text, it sends that text to that participant
+immediately.
+
+Both applying and asking for a concrete change are model calls that take real time, and each shows
+that work is under way in the same register as a round in flight — but not in the same place.
+Applying shows it on the response being applied, because that response is where the before-and-after
+will land. Asking shows it where its answer will appear, at the foot of the conversation with the
+response it was asked about named, because an answer that arrived beside a response scrolled far up
+the conversation is an answer the author has to go looking for.
+
+### Applying, and seeing what it did
+
+**Applying changes the manuscript immediately.** There is no second acceptance step, no
+preview to confirm, and no staged state in the editor.
+
+**The response that caused the change shows what changed**, as a before-and-after the
+application computed from the manuscript itself. The participant is not asked to describe its
+own edit, and the manuscript carries no marks of the change.
+
+**Reversal is the editor's own history**, reached by the keystroke the author already uses.
+An application counts as one history action however many places it touched.
+
+**Nothing responds to an application.** The room stays silent until the author speaks. Asking
+the room to look at what just changed is available as an ordinary message the author does not
+have to compose.
+
+## An operation in flight
+
+Three things the author starts take real model time: a round, an application, and capturing
+context. One of them runs at a time.
+
+**Controls that would start another are disabled while one runs.** Nothing queues, warns, or asks
+the author to choose between the operation they started and the one they are starting, because
+the state that would need explaining is unreachable.
+
+**Abandoning is available for as long as an operation is in flight**, and is not offered once it
+has produced its result — a round that came back is not one the author is abandoning.
+
+**The three share one register for work under way and are not one state.** During a round and
+during a capture the prose is fully editable and a live cursor stays in it. During an application
+the prose is visibly read-only, and reads as the manuscript being held for a moment rather than
+as the application being busy. One undifferentiated *something is happening* treatment would tell
+the author to stop typing when they do not have to.
+
+**A locked manuscript is accounted for by the response being applied**, so what the author cannot
+type into is explained by something they just did.
 
 ## The room
 
-### It is not a conversation
+**Enabling and disabling specialists is a short list of the piece's specialists with their
+static role descriptions**, reached in one action and left in one action. No rationale is
+generated, no lifecycle is presented, and disabling explains nothing to the author beyond
+what the role description already says.
 
-The room does two things — several specialists answer independently, then one
-characterizes the disagreement — and neither is dialogue. Chat-shaped UI would
-misrepresent both. There is no thread, no reply, and no mechanism by which one seat
-answers another.
+The change takes effect on the next unaddressed round. Nothing in the conversation is
+altered by it, and a specialist re-enabled after several rounds simply appears again.
 
-Two compositions carry the whole of it: **the room panel**, where the author asks and
-compares, and **the resting state**, where remarks stand against the prose they
-concern. The panel has two states, in flight and settled; the transition between them
-is design work in its own right.
+## Conversations
 
-### Where the author asks
+**Opening a piece lands in its most recent conversation**, with the manuscript and the
+discussion where the author left them.
 
-**One input, at the foot of the draft**, carrying the author's own words, a scope
-control, and **two verbs: *ask* and *draft*.** The scope control names what the question is
-about — the whole piece, a selection of prose, or a durable item. They are two operations over the same
-sentence — put this to the room, or write this — and sharing the input is what keeps the
-second from accumulating as a row of bespoke buttons naming particular jobs. A button
-that says *draft the close* is a button that will be joined by four more.
+**A lightweight listing offers the piece's conversations**, each recognizable by the author's own
+opening words, truncated, and when it was last active — ordered by last activity, which is also
+the order that decides which one opening the piece lands in. Nothing else appears in the listing:
+no round counts, no participant rosters, no sizes. Starting a new conversation and deleting one
+are available from the same place. It is not a project-management surface: no titles to maintain,
+no organization, no metadata to curate.
 
-Nothing else lives here, and no configuration reaches it.
+**A resumed conversation is presented exactly as it was said.** Nothing marks a passage as
+having been written against earlier prose, nothing warns that the manuscript has moved on, and
+nothing offers to reconcile them.
 
-### The room panel
+## Capture context
 
-Two columns: the draft on the left, unchanged and **still writable with a live
-cursor** — not blocking the author is the entire point — and the room in a panel on
-the right.
+**One action starts it, and it is always the author's.** Nothing suggests it, prompts for it,
+or runs it on a schedule.
 
-**The head of the panel belongs to the Showrunner**, which is where its different job
-becomes visible without a word of explanation. Below it, **one band per cast seat, all
-open, no expand affordance** — scanning cost must not depend on how much a seat wrote.
-The Showrunner is not one of the bands.
+**The proposals arrive in a temporary review surface** that leaves the manuscript in place —
+a short list of granular changes, each stating what it would change and which durable context
+it belongs to, each approved or ignored on its own. Approving is per proposal and ignoring is
+the default: closing the review writes only what was approved.
 
-**Bands sit in cast order from the moment the question is asked.** Never arrival order.
-That is what makes an empty band read as a seat thinking rather than a seat missing,
-and it is the presentation half of blindness.
-
-Each band carries the seat's mark and name, its state, a one-line claim, the
-elaboration beneath it, and its actions: *accept* or *apply* where it has something to
-apply, then *why?*, *show me in the text*, *keep*, *discard*. A band whose suggestion
-has been accepted collapses to a single line saying so, with *undo* immediately beside
-it.
-
-***Show me in the text* belongs to the panel and not to the gutter.** A remark standing
-beside its own paragraph has already answered the question, so the action would occupy a
-slot to do nothing.
-
-**Several alternatives for one line read as one group.** A seat offering three
-replacements for the same sentence produces three remarks, and they sit under a single
-seat identity with one accept each — never three separate cards, which would read as three
-seats disagreeing about a sentence one seat was asked to rewrite.
-
-**A drafting request uses the same composition.** The prose appears in the draft as
-unreviewed, tinted, the moment it arrives — the author reads it in place, not in the
-panel. The drafting seat's band says it wrote the prose and nothing more; the other
-bands hold the critique of it and fill in as they land. Nothing about the arrangement
-makes the prose look like an answer the room agreed on.
-
-The panel header carries the author's question in their own words and elapsed time. **In
-flight it carries *abandon*; settled it carries *close*** — a turn that came back is not one
-the author is abandoning, and offering the same verb for both would say it was.
-
-**In flight, the head is operational and nothing else.** It states what is true —
-*2 of 4 in*, a seat queued behind two others — as a count, never as a composed
-sentence, and **the Showrunner does not speak before a Showrunner call has produced
-output.** Attributing interim commentary to a synthesis that does not exist yet is the
-one dishonesty this composition must not commit.
-
-**Settled, the head is the synthesis.** The characterization is a short, prominent
-sentence — more emphasis than anything else the system says, because it is the one
-thing the author may read instead of everything else. Beneath it, optionally, **the
-dimension in dispute**: a small axis with each take placed on it and its two poles
-named in craft terms, labelled as a claim rather than a measurement, with takes that
-sit off the axis said to.
-
-**This settled state is the core moment of the product.** Every take is readable
-without an interaction per take, the synthesis is sufficient on its own to understand
-the disagreement, and neither is subordinated to the other.
-
-Any suggestion the Showrunner makes appears as a remark in the head, in the same form
-as a specialist's, with the same actions. It is never a separate class of card and
-never a set of buttons the author must choose between.
-
-Seats that were silent are stated, one line each, never omitted.
-
-**Closing a settled panel migrates the turn into the resting state.** The bands become
-remarks in the gutter at their anchors; orphans and whole-piece remarks drop into the
-unanchored region; the characterization becomes a Showrunner card — a bracket where the
-remarks it relates are positionally adjacent, unanchored where they are not. Earlier turns'
-remarks reappear beside them, untouched. Nothing is lost on the way out and no new device is
-invented for the journey, because the resting state already holds every shape the turn
-produced. This is the panel obeying *owns the screen while it matters, then recedes*
-literally: the room's material does not end when the panel does.
-
-### Scope governs how much screen the room may take
-
-A remark about a particular paragraph must keep that paragraph legible while it is being
-read — obscuring the prose under discussion is the one thing the room must not do. For an
-exchange scoped to a selection of prose the panel docks beside the paragraph, held at full size and
-marked as under discussion, with a line stating plainly that **nothing here has been
-applied yet**. A whole-piece exchange has nothing specific to stay beside and may take
-more of the screen — but never the whole of it, because prose and critique stay
-adjacent without exception.
-
-### The resting state
-
-**Where the author spends most of a session.** The panel has collapsed; remarks stand
-against the prose they concern.
-
-The draft holds the widest measure and the largest presence it has anywhere. A
-narrower gutter carries remarks positioned beside the paragraphs they anchor to, which
-makes scope spatial and traversal free.
-
-Each remark carries its seat's identity, a compact label naming the paragraph and how
-much prose the remark covers, then claim, elaboration and actions. An accepted item
-collapses in place to one line naming what changed — *Compression Editor's cut is in your
-prose.* — with *undo* immediately beside it.
-
-**That label is computed from the anchor, never supplied.** Part of a sentence reads as a
-phrase, one sentence as a sentence, a whole paragraph as a paragraph, and no anchor as the
-whole piece. It is derived deterministically at render time from what the anchor covers,
-so no seat is asked to describe its own scope and no stored property can disagree with the
-prose.
-
-**The gutter holds what is outstanding, and a resolved remark stops being outstanding
-without disappearing** — it collapses in place and keeps its reversal beside it. **A
-new turn never clears it**: remarks from earlier turns stand until the author
-acts on them. When the session ends the gutter is empty, and what the author wanted to
-keep is a note.
-
-**A remark that proposes nothing carries no accept affordance.** Its actions are
-*why?*, *keep*, *discard*. Nothing about it should look diminished for having nothing
-to apply — it is frequently the most useful thing in the gutter.
-
-**When two anchored remarks conflict, a Showrunner bracket ties them together:** a rule
-spanning both, and a card stating that they conflict, that they were formed separately,
-and whether they are reconcilable.
-
-The bracket is how the rule *only the Showrunner may relate takes* becomes visible
-rather than merely true. It is the most important device in the room, and **no remark
-may ever refer to another in its own voice.**
-
-Orphaned remarks sit in the gutter's unanchored region alongside whole-piece remarks,
-undistinguished from them.
-
-### Layout can break blindness
-
-Independence is enforced when the room is asked, and can be undone entirely by
-presentation. A composition that makes takes appear to reply to, reference or thread
-with one another reintroduces exactly the anchoring effect blind passes exist to
-prevent.
-
-Two traps, both closed by the compositions above:
-
-- **Arrival order.** Stacking by return order implies sequence. Honest while results
-  are landing, misleading the moment they complete. Cast order everywhere.
-- **Spatial adjacency.** Two takes beside each other read as conversation. Only the
-  Showrunner bracket may assert a relationship, and it is visibly the Showrunner
-  speaking.
-
-**Blindness is not annotated, it is composed.** A caption asserting that takes were
-independent cannot repair a layout that says otherwise — and where the composition is
-right, labels explaining it are unnecessary.
-
-**No take ever looks like a reply, because none is.** There is no exception to compose
-for.
-
-## The Story Board
-
-One panel, one height wherever possible, readable at a glance.
-
-**One kind of content and one line per field:** the field's label and the current
-reading. Where the reading has a location, a chip names the paragraph and goes there.
-That is the whole row. There are no columns, no tabs, no struck-through history and no
-second tier of content — the board says what the story currently is.
-
-Above the rows, the **knowledge timeline**: two tracks — reader and character — across
-the length of the piece, with markers for what the prose delivers. At flash length who
-knows what and when *is* the structure, so it leads rather than being filed as a field.
-
-**Notes** sit at the foot, dimmed, each with the prose it quotes where it came from prose and
-the seat it came from where it came from one. They are the durable part of the panel and read
-as the author's, not the system's.
-
-**A note is written by typing and deleted by clearing.** The notes end in one empty row
-that becomes a note the moment the author types into it, and emptying a row removes it.
-Both are ordinary author actions and both are reversible. There is no *add note* control,
-no dialog, no note editor and no kind to choose — a note is a line of text the author
-wanted, and any machinery around that is machinery the author has to operate.
-
-**A row or a note can be put to the room**, since both are durable items and scope reaches
-them. The affordance sets the scope of the ordinary ask rather than opening a second place to
-ask, and nothing else about the turn differs.
-
-**Every row is editable in place.** There is no negotiating with the room to fix a
-misreading, and a row the author wrote **reads as an ordinary row** — not badged, not
-accented, not distinguished in any way. Nothing in the panel shows where a row came
-from, because nothing behaves differently on account of it.
-
-**One control refreshes the board**, sitting in the panel's own chrome and doing
-nothing else. It re-reads the draft and replaces the rows. It is an author action like
-any other: reversible, and never a notice, a negotiation, or an offered alternative.
-**Nothing refreshes the board while the author is writing.**
-
-The board's fields are mode data and are expected to change, so the composition must
-tolerate rows appearing, disappearing and being relabelled without redesign. **No
-chrome may assume act structure, a fixed set of beats, or any one theory of narrative.**
-
-## Marks
-
-The two provenance states, distinguishable at a glance and without interaction:
-
-| Author canon | Unmarked |
-|---|---|
-| **Unreviewed** | A quiet tint behind the paragraph |
-
-The tint is deliberately quiet. Unreviewed is the normal state of a fresh draft, and
-marking it loudly would make the rough pass unpleasant to read, which is the one thing
-it must not be. **The paragraph is the unit** — a paragraph always reads as wholly the
-author's or wholly not yet read.
-
-Two things get marked that are **not** states of the prose, and the distinction has to
-be felt rather than explained:
-
-- **Text that has been proposed and not accepted is not in the draft.** It is shown
-  against the prose it would replace — the existing text stays legible and the
-  alternative sits with it. This must never read as a third kind of prose the author
-  now owns some of; the draft on screen is the story as it currently stands, and the
-  moment that stops being true the author cannot trust what they are reading.
-- **A craft term** — a faint dotted underline, expandable. A property of a word, not a
-  claim about who wrote it.
-
-A remark's seat is identified by its own mark and name, never by a category the author
-assigned. Which seat spoke *is* the category, so no filing affordance exists.
-
-## Vocabulary in the flow of work
-
-Craft terms appear where they are used — in remarks, at the moment they apply, to the
-author's own story — expandable on demand. Incidental, never instructional.
-
-Because the reasoning behind a claim arrives with the remark, *why?* opens immediately.
-An expansion that takes twenty seconds is one the author clicks once, so instant
-expansion is a design requirement rather than a performance detail.
-
-The glossary is a **consequence** of that accretion, not a surface the author works in.
-Craft vocabulary must never become a destination, because that is the textbook
-interface this project rejects.
-
-**Intent restatement** — the room echoing the author's plain language back in craft
-terms — is the primary learning mechanism, and it is **not confined to briefing.** It
-happens wherever the author reframes what they want. Legible, skippable, never a gate.
-
-## Prominence budget
-
-The instrument that keeps the interface from giving every capability its own panel, its
-own nav entry and two ways to reach it until the screen has no focal point. Derived
-from how often the author actually does each thing.
-
-**Permanent and effortless** — the prose surface; critique adjacent to its text; accept
-and dismiss and their reversal; intent restatement.
-
-**Owns the screen while it matters, then recedes** — the comparison and the synthesis;
-the brief exchange; the room working, and abandonable.
-
-**One keystroke away** — clean reading. Low frequency, but tied so directly to judging
-the prose that it must feel like a glance rather than a destination.
-
-**One click away** — the board, the knowledge timeline, notes; discarding a take;
-refreshing the board.
-
-**A place the author goes** — glossary, voice spec, model assignment, other pieces.
-
-**Nearly invisible** — model status, autosave, mode after it is set, cast after it is
-cast.
-
-Three consequences worth stating plainly:
-
-- **Nothing needs two paths to it.** A permanent surface does not also need a
-  navigation entry.
-- **Transient beats permanent for the room.** Its most important interactions happen a
-  handful of times a session and are over. Better to take the screen and give it back
-  than to live in a narrow column that is cramped when it matters and dead weight when
-  it isn't.
-- **Consequential is not the same as frequent.** Mode, cast and voice shape everything
-  and are decided almost never. They deserve prominence *while being decided* and none
-  afterwards.
-
-## What must be visible
-
-- **How a take was formed** — independently, rather than in response to another seat.
-- **The cost of asking** — the author keeps writing while the room thinks and can
-  abandon at any moment. Lowering the felt cost of asking is a standing concern.
-- **Whether the room is still working** — as a count, never as a task surface.
-- **That nothing is authoritative merely because it was generated.**
-- **What has not been applied yet** — wherever proposed prose is on screen.
-
-## Degraded and absent states
-
-**These are the normal case, not exceptions.** Local models are slow, uneven and
-frequently wrong, so every composition above must be shown and judged in these
-conditions before it is believed.
-
-**Nothing in yet.** The head is a count and the bands are empty in cast order. No
-prose is attributed to a Showrunner that has not been called.
-
-**No axis.** The dimension in dispute is the hardest thing the Showrunner is asked for,
-and it will often be absent or wrong. The settled panel renders without it. **If a
-composition only works with the axis, the axis is load-bearing and must be removed.**
-
-**Withheld synthesis.** The Showrunner says what it is waiting for, or why it has
-nothing — *two takes isn't a disagreement yet.* The takes stand on their own. This must
-read as competence, not as a broken screen.
-
-**No disagreement.** The Showrunner says so plainly, and may direct the author's
-attention — *read this one, ignore the volume.*
-
-**A failed generation.** Plainly stating what came back, with *ask again*, *empty the
-seat*, *leave it*. Ordinary housekeeping, not error recovery.
-
-**A failed synthesis is not a withheld one.** Withheld is a judgement the Showrunner
-made and is information; failure is the machine breaking and is not. They render
-differently, always, because conflating them teaches the author to read competence as
-breakage or breakage as competence.
-
-**A silent seat.** Always present, one line, with *ask anyway* as an override. Omitting
-it would make the silence invisible; a full card would make it look like an outcome.
-
-**Conflicting takes anchored far apart.** The bracket is positional and cannot join
-distant paragraphs. The same Showrunner card appears **unanchored**, naming the
-conflict. A disagreement must never be invisible merely because the prose it concerns
-is not adjacent.
-
-**Three-way disagreement, or two simultaneous unrelated disputes.** No new positional
-device. The axis and the bracket both assume one dispute with two sides; the fallback
-is the unanchored Showrunner card.
-
-**A remark that lost its anchor.** It keeps its text and loses its location, which is an
-ordinary remark with no location rather than an error.
-
-**A save that failed.** The one degraded state that is not about the room. The author
-keeps writing and keeps their work — nothing is discarded and nothing is rolled back — and
-the failure is stated quietly and persistently where the writing surface can be seen,
-clearing itself when a later write succeeds. **It is not a modal**, because interrupting
-the author to tell them the disk is unhappy costs them more than the failure does; a modal
-is warranted only where continuing would destroy work. And it never resolves itself
-optimistically: silence has to mean saved, or it means nothing.
-
-**Long and uneven content.** One seat writes three lines and another writes fifteen.
-Claims align so the row stays scannable, bodies clip to a fixed depth with the remainder
-on demand, and **nothing stretches to match its neighbour.** Compositions tuned to short
-remarks of similar length — fixed columns, absolute positions, aligned margin
-offsets — fail on the real thing.
-
-**An empty board.** On an empty draft the board shows its fields with nothing in them,
-which is the shape of the piece: the questions the mode thinks matter.
+**The review is where the distinction between the two contexts is visible**, because the
+destination is the consequential part of a proposal.
 
 ## Registers
 
-Three distinct voices on screen, and the author must be able to feel which is which
-without thinking about it:
+Three kinds of text are on screen and the author must feel which is which without thinking
+about it: **the prose**, which is the work; **what the room says about the work**; and **facts
+about the machine** — participant state, elapsed time, counts, the story's
+length, model identity. Keeping the third in its own register is what stops an operational
+number from reading as content, and is why a length the author glances at constantly does not
+read as a score.
 
-- **The prose** — the work itself.
-- **The chrome** — what the system says about the work. Quiet, and smaller.
-- **Facts about the work** — how a take was formed, seat state, counts, elapsed time,
-  paragraph locations. Its own register, reserved. This is what keeps a paragraph
-  reference from reading as content.
+The visual language carrying that distinction is a matter of typography and colour rather
+than of composition, and is settled in the design itself.
 
-Beyond that:
+## Prominence
 
-- **The ground is warm, not white.** Sessions run for hours.
-- **Two typefaces, split by kind.** A serif for the draft — Spectral — and a humanist
-  sans for everything the room says and every control — Public Sans. The split is the
-  cheapest way the author can tell their own prose from the tool's, at a glance and
-  before reading a word.
-- **One accent, and affirmative action owns it.** Accept, apply, keep. Nothing
-  informational is accented, so an accent on screen always means *this does something.*
-- **Each seat has an identity mark, used only for identity.** Never to encode
-  agreement, severity or confidence. **The role declares its own mark, from a palette that
-  ships with the software**, so a role looks the same in every mode it is seated in — marks
-  are not assigned per piece, and never by position in the cast.
-- **Light and dark are one design with two settings**, not two designs. That is the only
-  way both stay maintained. Prose is the extreme value in each and everything else steps
-  back. Neither is primary; dark is where a warm palette earns its keep.
+Derived from how often the author does each thing.
+
+**Permanently present** — the manuscript; the conversation; the input; the actions on a
+response.
+
+**One action away** — the reading view; the Markdown view; choosing or starting a
+conversation; editing the room; capture context.
+
+**Owns the screen while it is being exercised, then gone** — reviewing context proposals.
+
+**A place the author goes** — model assignment, the workspace, other pieces.
+
+**Nearly invisible** — model status, saving, the mode once it is set.
+
+Three consequences: nothing needs two paths to it, unless one of them is the author's own
+sentence — addressing an absent specialist enables it, because typing to a collaborator is a
+worse moment to be sent to a settings surface; a surface exercised a few times a session
+is better as something that arrives and leaves than as a permanent column that is cramped
+when it matters and dead weight when it doesn't; and consequential is not frequent — the room
+and the models shape everything and are decided almost never.
+
+## Degraded and absent states
+
+**These are the normal case.** Local models are slow, uneven and frequently wrong, so every
+composition here must be judged in these conditions before it is believed.
+
+**Nothing back yet.** The round shows who was called, which one is being asked, and which are
+waiting their turn. Nothing is attributed to a participant that has not answered.
+
+**A long round.** Because the room asks one participant at a time, a full cast and the Story Editor
+are five calls and a round can run for minutes. The round stays legible for its whole duration, the
+author is writing throughout, and nothing about the wait is presented as a problem to resolve or as
+a reason to stop typing.
+
+**Uneven latency.** One participant answers in seconds and another after a minute. The round
+remains readable throughout and settles without rearranging what the author was already
+reading.
+
+**Long and uneven responses.** One participant writes three lines and another fifteen. The
+conversation stays scannable, nothing stretches to match its neighbour, and a composition
+tuned to short responses of similar length has not been tested.
+
+**A failed call.** Stated plainly with what came back. Never presented as silence, and never as
+something authoritative. The author's next move is an ordinary message, not a repair action.
+
+**A quiet round.** Every specialist had nothing material, and the Story Editor answered the
+author anyway. The round is legibly settled, the outcome reads as information rather than as
+breakage, and nothing suggests the author's question was at fault.
+
+**Every specialist call failed.** The failures are stated and the Story Editor's answer stands
+beside them as an ordinary response. A round with nothing in it at all is what happens when that
+call fails too, and it says so.
+
+**A failed application.** The manuscript is unchanged, editable again, and says so. Nothing is
+half-applied, and the recommendation remains applicable.
+
+**An abandoned application.** Identical to the author's eye: the manuscript is as they left it,
+editable again, and the recommendation is still there to apply.
+
+**A failed save.** The author keeps writing and keeps their work — nothing is discarded and
+nothing is rolled back. The failure is stated quietly and persistently where the writing
+surface can be seen, clears itself when a later write succeeds, and never resolves
+optimistically: silence has to mean saved, or it means nothing. Not a modal, because
+interrupting the author to say the disk is unhappy costs them more than the failure does. Leaving
+for another piece is the one thing unavailable in this state, and it is unavailable rather than
+confirmed: an author asked whether to discard their own prose has been asked the wrong question.
+
+**Models unreachable.** The manuscript opens, is writable, and stays writable. Only the room
+is unavailable, and it says so where the author would otherwise address it.
 
 ## Guardrails
 
-- **No number rates the work or the author**, and **no volume metric appears on a
-  remark** — that one reappears in new units, so the rule is the unit-independent one.
-  **Operational state is the opposite case and belongs on screen**: elapsed time, who is
-  working, queue position, takes in, model identity, length. The room becomes
-  untrustworthy if it hides what it is doing.
-- **Every `accept` carries its reversal in the same place.** An acceptance affordance
-  without a way back makes the author cautious exactly where the design depends on them
-  being casual. **The board refresh is included**: once it has run, its reversal sits in
-  the panel chrome beside the control that ran it. It is the one author action whose
-  consequence is large, whose undo was asserted, and which had nowhere to reach it.
-- **Undo is the platform's keystroke** — `⌘Z` and `⇧⌘Z`, `Ctrl+Z` and `Ctrl+Shift+Z` — and
-  it reaches every author action, not only prose. It does not preempt ordinary text
-  editing inside a focused field: a keystroke in a row the author is typing into behaves
-  the way that field behaves, and the application's stack owns everything else.
-- **No chrome that explains its own implementation.** A label asserting that seats are
-  in cast order, or that takes were independent, is a caption apologising for a
-  composition. Compose it correctly and delete the label.
-- **Prose and critique stay adjacent.** The author never chooses between seeing their
-  draft and seeing what the room said about it.
-- **No progress bars, streaks, levels or practice prompts.** Learning is a byproduct of
-  real work.
-- **One authoritative location per thing.** No duplicate paths to the same surface.
-- **Don't flatten unlike things into peers.** Persistent surfaces, reference artifacts
-  and configuration differ in kind. Configuration does not belong in the piece header.
-- **One notion of time.** There is the session and there is the story's length. No
-  revision, phase, or save-state notion competes with them, and nothing on screen
-  implies a history the product does not keep.
-- **Nothing on screen is a shortened re-phrasing of something else on screen.** If a
-  slot needs shorter text, constrain the original to fit both places or let it truncate.
-  Interim status is countable rather than composed — *two of four in* is a count; a
-  sentence saying the same thing has to be written every time.
-- **No surface exists whose purpose is administering the system's records.** No queue of
-  pending items, no review list, no reconciliation prompt.
+**Nothing on screen rates the work or the author**, and no measure of how much a participant
+produced appears anywhere. Operational state is the opposite case and belongs on screen: the
+room becomes untrustworthy if it hides what it is doing.
 
-## Constraints
+**No chrome explains its own implementation.** A label asserting that participants answered
+independently is a caption apologising for a composition. Compose it correctly and delete the
+label.
 
-Two that shape composition rather than principle: **long sessions on one short piece**,
-so the surface has to be comfortable for hours of reading and writing; and **anything
-presented as authoritative corresponds to something on disk.**
+**Independence is composed, not annotated.** Stable order everywhere, no arrangement in which
+one response reads as a reply to another, and no device that relates two specialists' readings
+except the Story Editor's own words.
 
-## Before a piece is open
+**Prose and conversation stay adjacent.** The author never chooses between seeing the
+manuscript and seeing what the room said about it.
 
-Two compositions precede the writing surface, and both are deliberately thin.
+**Manuscript reversal is the editor's.** No application-specific undo affordance, no second
+history, and no notion of a past manuscript state anywhere on screen.
 
-**The first run asks one thing: where the work lives.** One field, on screen alone, and
-nothing else in the application reachable until it is answered. Not the first step of a
-sequence, not a welcome screen, and not a settings surface — a directory is the only fact
-the software cannot infer, so it is the only thing asked.
+**No model call restates text the interface already has.** Nothing on screen is a generated
+summary, label or status line for content already present. If a slot needs shorter text,
+constrain the original or shorten it deterministically. Interim status is a count, never a
+composed sentence.
 
-**Creating a piece asks for a title and a form**, and nothing else. Neither is story
-planning, so this does not contradict starting from almost nothing. Where only one form is
-implemented, the form is **shown rather than asked** — presenting a choice with one option
-teaches the author that the interface will waste their time. Casting follows, and then the
-draft opens empty and focused.
+**No standing administrative or reconciliation surface.** No queue of pending items, no
+inbox of things to resolve, no prompt to bring artifacts into agreement. A review surface that
+arrives on the author's action, does its work and leaves is not one of these.
 
-What happens *in* that empty draft is cold start, which is open.
+**One authoritative location per thing**, and configuration is not one of the things the piece
+header holds.
 
-## Still to design
+## Constraints on composition
 
-Three arrangements are open. Each arrives with its constraints fixed; what is open is
-the composition, and that is prototype work rather than something to reason out here.
+**Long sessions on one short piece**, so the surface must be comfortable for hours of reading
+and writing.
 
-- **Cold start.** No draft, a thin premise, nothing to react to. **Settled:** the prose
-  surface exists and is writable from the first moment — the draft's space holds the
-  draft, empty and focused, never a form. Choosing the form, meeting the room and the
-  brief exchange all happen in the room panel, where transient things belong. Open: how
-  that setup material is arranged.
-- **Re-entry after days away.** **Settled:** it is derived exclusively from durable
-  state — the draft, the board, the notes, the brief, the voice spec — and appears
-  transiently around the unchanged draft. **Do not assume it is cold start with material
-  in it.** The two jobs are near opposites: cold start removes friction so something gets
-  written, re-entry compresses existing state so mental context is restored. Open: the
-  composition.
-- **A whole-piece structural suggestion.** **Settled:** *prose and critique stay
-  adjacent* has no exception for whole-piece scope, and flash length makes a split
-  composition plausible. Open: how much room it takes and where it sits.
-
-Each is composed independently. They share components rather than a single frame, and a
-treatment right for one will be wrong for another.
-
-**Clean reading is not open.** It is a keyboard **toggle** in, `Esc` or the same
-shortcut out, with cursor and scroll restored exactly. A hold-to-peek gesture may exist
-in addition, and may not be the only way in — a held key is right for a two-second
-glance and wrong for reading nine hundred words.
+**Durable author state shown as current corresponds to what is on disk.** Operational and
+in-flight state — participant state, elapsed time, a round being formed — is
+transient by nature and reads as transient.

@@ -1,463 +1,260 @@
 # CONTEXT
 
-**What this document owns.** The domain model and the authoritative vocabulary for
-this project. **Where a term is defined here, nothing else defines it again** — not
-the requirements, not the interface design, not the spec, not a comment in the code.
+**Owns:** domain vocabulary and semantics.
+**Does not own:** purpose and principles (VISION), author behaviour and requirements (PRD),
+composition and presentation (UX_DESIGN), implementation (SPEC).
+**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. A downstream document restates a
+term only to use it, never to redefine it.
 
-It does not state requirements, compositions, or implementation detail. It names the
-things that exist and says how they behave.
+The domain model and the authoritative vocabulary. Where a term is defined here, this is
+what it means everywhere — in requirements, in interface design, in the implementation, and
+in conversation between the author and an agent working on this software.
 
-Two distinctions are worth reading before writing any code, because they are
-near-synonyms in ordinary English and different things here:
+Four pairs are near-synonyms in ordinary English and different things here.
 
-- A **remark** is what an agent says. A **note** is what the author kept. One is
-  session material; the other is part of the piece.
-- **Provenance** is a property of paragraphs of prose, and of nothing else.
+- **Author context** generalizes across every piece. **Story context** belongs to one piece.
+- **Commentary** is a reading. An **applicable suggestion** is something the manuscript can
+  be made to embody.
+- The **Story Editor** is a collaborator in the room. The **prose editor** is the text
+  editing surface.
+- A **round** is one exchange. A **conversation** is a durable sequence of them.
 
 ---
 
+## Author
+
+The person writing. Single user, working locally, in long sittings.
+
+## Workspace
+
+The directory holding the author's pieces. Chosen once. Pieces are independent within it,
+listable, and openable in any order.
+
+## Author context
+
+Durable information about the author that generalizes beyond any single piece: recurring
+stylistic preferences, prose tendencies, patterns they dislike, collaboration preferences,
+default voice tendencies that genuinely hold across stories.
+
+It changes rarely. A choice that worked in one story is not thereby an author-level
+preference.
+
+Author context is read by every participant on every call.
+
 ## Piece
 
-One story. The unit of work, and the unit of a project directory. A piece has a
-title, a mode, a cast, a draft, a board, a brief, notes, a voice spec, a glossary,
-and a status.
+One story. The unit of work. A piece has a title, a mode, a status, a room, a draft, a
+story context, and conversations.
 
-The author has many pieces. Nothing may assume there is only one.
-
-**Status** is `drafting`, `finished`, or `abandoned`. Finishing changes nothing but
-the status: the piece stays openable and editable.
+**Status** is `drafting`, `finished`, or `abandoned`. Status is the whole of the lifecycle:
+a finished piece stays openable and editable, and nothing is gated on it.
 
 ## Mode
 
-The form and scale of a piece. A mode is **data**, not code: a descriptor naming
-which roles are applicable, which board fields exist, what each seated role treats
-as a defect at this scale, and which structural concepts are in play.
+The form and scale of a piece, expressed as data rather than code. A mode supplies the
+default cast for a new piece and the criteria each specialist applies at that scale.
 
-**The mode descriptor is the sole authority on applicability and criteria.** A role
-does not independently declare where it applies or what counts as a defect. One
-place decides, so there is no merge rule and nowhere to look second.
+Mode is the one axis along which this software is scoped. Nothing in the core assumes a
+particular length regime.
 
-Board fields have **stable identities** given by the descriptor. Changing a piece's
-mode re-opens its casting and changes the board's fields; content belonging to a
-field the new mode does not have is retained under its identity and stops being
-shown or read. Nothing is deleted and nothing carried forward is reinterpreted as a
-different field.
+## Draft
 
-## Role, seat and cast
+The manuscript: the current prose of the piece, in Markdown, and the only durable
+representation of it. There is one draft per piece and no history of past drafts inside the
+application.
 
-A **role** is a specialist, defined declaratively: its identity and focus, the
-context it needs, and its model assignment. Roles live in a registry, which holds
-every role for every mode and says nothing about where any of them applies.
+The draft is authoritative and publishable as it sits. Application concepts — participant
+responses, conversation links, scope markers, change visualization — never enter it.
 
-A **seat** is a role instantiated on a particular piece.
+## Story context
 
-**The cast is the specialist seats, and the Showrunner is not one of them.** The
-distinction is the difference between two lifecycles:
+Durable information about this piece: its premise, the author's intent for it, the story's
+voice, point of view and tense, established character facts, what the reader knows against
+what the characters know, constraints, structural intentions, decisions ruled in or out, and
+durable notes.
 
-| | Specialist seats | The Showrunner |
-|---|---|---|
-| Membership | Cast per piece, by applicability | Always present, every piece |
-| Author may empty it | Yes | No |
-| In a turn | Produces a blind take | Synthesizes over the takes |
-| Called | Once | Once, after the cast settles |
+Story context may change considerably as a piece develops, but never without the author
+saying so. Ordinary discussion and ordinary editing do not rewrite it.
 
-Where these documents say *cast*, they mean the specialists.
+Story context is read by every participant on every call.
 
-Casting is proposed by the Showrunner with rationale stated in craft terms. The
-author may add or empty a seat. Cast is decided once per piece and revisited rarely.
+## Room
 
-A seat has a state while the room is working: **queued**, **thinking**, **in**,
-**silent**, or **failed**. All five are ordinary, and all five apply to the Showrunner
-too. **A queued seat carries its position**, because *queued behind two others* is the
-honest answer a great deal of the time and a seat that has not started is not the same
-as a seat that is working.
+The participants engaged on a piece: its specialists and the Story Editor.
 
-The five are execution states and nothing else. What a seat produced is a separate
-question — the seat that drafts returns candidate prose rather than a take, and it is
-**in** like any other seat that came back.
+**Cast** means the specialists. The Story Editor is always present and is not one of them.
 
-### The Showrunner
+The cast is a filter over which specialists are called on a round that names no one. A new
+piece begins with its mode's default cast; the author enables and disables specialists at any
+time, either directly or by addressing a specialist that is not enabled, which enables it.
+There is no joining or leaving lifecycle and no temporary presence: a specialist disabled for
+several rounds and re-enabled later simply becomes eligible again, and historical conversation
+is untouched.
 
-A role with a distinct function, always present, not subject to applicability. It
-has two responsibilities, both facilitation:
+## Participant
 
-- **Translate.** Restate the author's plain-language intent in craft terms.
-- **Synthesize.** Say what is actually in dispute among the cast's takes,
-  separate genuine tension from noise, and make it actionable.
+A collaborator that can be addressed and can respond: a specialist, or the Story Editor.
 
-It never decides, and it never drafts prose — it is the one seat whose output is
-*about* the others.
+Each participant has a static role description explaining what it contributes.
 
-## Turn
+### Specialist
 
-One exercise of the room. A **turn** has a question in the author's words, a
-**scope**, and a cast. It proceeds in two movements:
+A participant holding one craft responsibility, reasoning narrowly and deliberately within
+it.
 
-1. **Blind independent takes.** Each cast member forms its position without
-   seeing any other's. Enforced by context construction, not by instruction.
-2. **Synthesis.** The Showrunner characterizes what came back.
+A specialist forms its response without seeing any other specialist's response from the
+same round.
 
-Then the author acts — revises the prose, applies a suggestion, keeps a note, or
-asks again informed by what they learned. There is no third movement in which the
-room argues with itself.
+### Story Editor
 
-A turn may be **abandoned** at any point. Remarks that landed remain usable.
+The generalist participant, always present. Its objective is its own and holistic:
+evaluate the current story against the author's story context and author context, using the
+specialists' readings as evidence, and recommend what best serves the piece as a whole.
 
-**Scope** is one of: the whole piece, a selection of prose, or a durable item — a
-board entry, a note, or the brief. Scope is a property of the question, not a state
-the application enters.
+It receives the round's substantive specialist responses only after those responses have been
+independently formed. Silences and failures are not readings and do not reach it, so its
+reasoning is about the story rather than about the room.
 
-**A remark is not a scope target.** Asking the room about what a seat said would put one
-seat's opinion into every other seat's context. An author who wants the room to engage
-with a remark **keeps** it, which makes a note, and asks about the note — a claim crosses
-into shared ground as the author's ruling or not at all.
+It may endorse a specialist strongly, reject a specialist's concern, name a genuine tradeoff,
+or supply a better framing than any specialist offered. It may also have nothing to add, where
+specialists have already given the author something substantive; where they have not, the
+answer the round owes the author is the Story Editor's. It is not a summarizer, not a consensus
+mechanism, and not an authority over the author.
 
-**A turn's cast may be one seat.** Asking a single specialist is not a different
-kind of interaction. Nothing is left to synthesize, so the Showrunner is not called.
+## Conversation
 
-A turn exists for as long as the running system needs it. Nothing durable refers to
-one.
+A durable, resumable, multi-turn discussion about a piece. A piece may have several.
 
-### Drafting
+Opening a piece resumes its most recent conversation. The author may start a new
+conversation, resume a prior one, or delete one.
 
-Prose generated from a brief comes from a cast seat, in a **sequenced drafting turn**:
+**Conversation history and manuscript state are independent.** A conversation does not
+version, own, or restore the draft. Where a discussion occurred against earlier prose and
+the draft has since changed, the historical discussion stands as it was said, and any new
+call receives the current draft. The earlier prose is not restored or reconstructed, and
+nothing attempts to reconcile the conversation with it.
 
-1. The **drafting seat** produces candidate prose.
-2. The other applicable cast seats critique that prose, independently of each other.
-3. The Showrunner synthesizes.
+## Round
 
-**The drafting seat contributes candidate prose rather than a take**; the takes are the
-independent critiques that follow, which is why the synthesis is over the critics and not
-over the drafting call. Generated prose therefore arrives already argued with rather than
-as an oracle's output.
-Which seat drafts is a property of the mode's cast, like every other applicability
-question. There is no drafting role outside the cast, and the Showrunner does not
-draft.
-
-A **one-shot draft** is the same path from a thin premise with no brief. Prose any
-drafting produces is unreviewed.
-
-## Take and synthesis
-
-A **take** is one seat's contribution to one turn: its state and the remarks it
-produced. Most takes at flash length produce exactly one remark.
-
-A take never references another. Only the Showrunner may relate takes to each
-other — this is a property of the model, not a presentation choice, and it is what
-blind passes exist to protect.
-
-A **synthesis** is the Showrunner's output over the takes. It contains:
-
-- A **characterization** of what is actually in dispute, if anything.
-- **Which takes are in conflict with which**, where any are.
-- Optionally, the **dimension in dispute**: a named axis and where each take
-  sits on it, including which sit off the axis entirely. This is a claim, never a
-  measurement.
-- Zero or more **remarks of its own**, which are remarks like any other. A course
-  of action the Showrunner recommends is not a separate kind of object.
-- A **withheld** state. The Showrunner may decline to synthesize — because too few
-  takes are in, because the disagreement is noise, because a take is
-  incoherent, or because there is nothing in dispute. Saying so is a valid and
-  expected outcome. Confusion is never dressed as debate.
-
-## Blindness
+One exchange within a conversation, opened by an author action and settled when every
+participant it called has settled. Ordinarily that action is a message. Asking one participant
+for a concrete change opens a round with no message, because the author supplied none, and
+nothing attributes words to them that they did not write.
 
-**A seat sees the author's rulings and never another seat's opinions.** One rule, and it
-is the central bet of the product. The Showrunner may compare and synthesize positions —
-that is its function — but **only the author adjudicates them or turns them into changes
-to the work**, so anything that lets positions merge among the specialists defeats it.
+A round that names no participant calls the enabled cast, then calls the Story Editor over
+what the specialists returned. A round that names participants calls only those, and does
+not call the Story Editor unless it was named.
 
-The line falls between two kinds of thing:
+Rounds do not overlap. A conversation has at most one round in flight.
 
-- **Rulings** are the author's and are shared ground. The draft, the board, the
-  notes, the brief, the voice spec, the glossary. Every seat sees all of it.
-- **Opinions** are a seat's own. Its remarks and its takes. No other seat sees
-  them, ever.
+## Addressing
 
-**The rule holds across turns, not only within one**, and this is the most dangerous
-mistake available here: carrying an earlier take from another seat into a seat's
-context would leave every individual turn looking blind while the room quietly
-converged, over a session, on whichever voice spoke first. A seat may see **its own**
-prior remarks and no others'.
+Naming participants in an author message so that only those are called. An unaddressed
+message goes to the enabled cast.
 
-**The Showrunner is not exempt.** It sees every cast seat's take from *this* turn —
-that is its function — and no seat's take from any earlier one. Exempting it would
-recreate the leak through the one seat that talks to everyone.
-
-**There is no exception to blindness.** No mechanism exists by which one seat
-responds to another.
-
-The cost of this rule is a room that can raise the same concern twice, an hour apart,
-because the seat that raised it cannot see that it did. That cost is accepted, and it
-is smaller than it looks: a concern that mattered usually became a note or a change to
-the prose, and both of those are rulings, so the room does see it — in the author's
-words rather than the seat's.
+Addressing is expressed in the author's message itself, so directing a question at one
+collaborator is an ordinary message rather than a different kind of interaction.
 
-## Remark
+A round the author opened from a particular response — replying to it, or asking it for a concrete
+change — is addressed to that participant by the act rather than by the words. Where a round is
+addressed that way, the message is not read for addressing at all: the author aimed it by pointing,
+and a second authority on who was called could disagree with the words the participants receive.
 
-**Everything an agent says is a remark.** One kind of object, varying along two
-orthogonal axes:
+## Response
 
-- **Scope** — a phrase, a sentence, a paragraph, or the whole piece. A remark scoped to
-  anything narrower than the whole piece carries an **anchor**; a whole-piece remark does
-  not.
-- **Weight** — what acting on the remark would cost the author.
+What one participant returned for one round. Every response settles as exactly one of three
+outcomes, declared by the participant itself. The declaration is what the outcome is; nothing
+weighs it against the content of the response.
 
-The axes are independent. A whole-piece remark may be a trivial observation; a
-single-sentence remark may raise a structural question.
+**No comment** — the participant has nothing material to contribute. Recorded in the
+conversation, and absent from the settled discussion. A participant that was addressed
+directly owes the author a visible answer instead, even when that answer is that it sees no
+material issue.
 
-**Not every remark proposes a change**, and a model that forces one is wrong about
-what specialists are for. *This withheld detail is currently doing the work of three
-paragraphs of setup* proposes nothing; it tells the author something true about their
-story. Most of what makes the room worth consulting is a reading, not an edit.
+**Commentary** — an assessment, interpretation, diagnosis or observation, without an action
+concrete enough to act on. The author's natural follow-up is to ask the participant what it
+would change.
 
-**There is no separate class of annotations, and no separate class of proposals.** An
-anchored critique, a suggested sentence and a position stated in the room are the same
-object at different scopes and weights. Modeling them separately produces competing
-lists of agent opinion with no defined relationship.
+**Applicable suggestion** — a recommendation concrete enough that the manuscript can be made
+to embody it.
 
-A remark carries: its authoring seat, its scope, its anchor if any, a **claim** (one
-line), an **elaboration**, its **reasoning** (the material behind "why?"), the **craft
-terms** it used, and its replacement text where it has one. Every one of those is
-returned by the seat in a single response. None is derived by a later call.
+No participant is ever obliged to produce an applicable suggestion so that an action exists
+to offer. Most of what makes the room worth consulting is a reading rather than an edit.
 
-**A remark carries at most one replacement.** Several alternatives for the same line are
-several remarks from one seat against the same anchor, each accepted or dismissed on its
-own. A remark holding a list of candidates would make the author choose between options
-inside an object that everywhere else means one thing to do.
+## Recommendation
 
-### Weight
+The content of an applicable suggestion, stated in natural language as craft rather than as
+a mechanically executable edit. *The last paragraph explains the realization twice — remove
+the explanation and let the unopened letter carry it* is a recommendation.
 
-| | Structural suggestion | Line suggestion | Observation |
-|---|---|---|---|
-| Concerns | The shape of the piece | A phrase or sentence of prose | Anything at any scope |
-| Carries | Rationale, and prose where it has any | The replacement text | A reading, and nothing to apply |
-| Author actions | Apply / dismiss / ask why / keep | Accept / dismiss / ask why | Discard / ask why / keep |
-| Reversible | Yes | Yes | Nothing to reverse |
+A recommendation carries no required executable location, replacement field or patch. It may
+quote the manuscript and propose prose naturally as part of what it says — *change "walked
+slowly" to "crept"*, or three candidate endings when the author asked for three — and that
+prose is part of an ordinary response rather than a stored edit to be executed.
 
-A formal card for "cut this adverb" would teach the author to stop reading the cards.
-That is the entire reason weight exists as an axis.
+**A recommendation is implementable as it stands**: one change, or a small set of related
+changes that address the concern together. Where a response does offer alternatives — including
+the options the author asked for — choosing between them is the author's, expressed as the
+constraint supplied with the Apply.
 
-**Every weight carries *ask why*.** The reasoning arrives with the remark, so withholding
-it at the cheapest weight would save nothing and would teach the author that the smallest
-suggestions are the ones that cannot be explained.
+## Apply
 
-**An observation has no accept affordance**, because there is nothing to accept —
-offering one would manufacture a decision out of a thing the author was told.
+Semantic acceptance of a recommendation: make the current manuscript embody it.
 
-### Remarks are session material
+Apply interprets the recommendation against the draft as it stands at the moment the author
+applies it, together with the conversation up to that recommendation and any constraint the
+author supplies. It does not replay a stored edit.
 
-**A remark lives as long as it is useful and no longer.** It stands against the prose
-it concerns for the rest of the session, survives later turns — a new turn never
-resolves or evicts an earlier remark, which would delete takes the author had not
-reached — and is gone when the piece is closed.
+**Apply is the author's approval.** Prose that arrives through Apply is ordinary manuscript
+prose immediately, with no further acceptance state.
 
-Nothing reconstructs a past remark, and nothing is lost by that. The author's work is
-what persists.
+**A recommendation never expires.** The author may apply one long after the manuscript has
+moved on. Nothing disables it, detects staleness, reconstructs the prose it was written
+against, or judges whether applying it remains wise. That judgment is the author's.
 
-A remark's states, all moved by the author: **active** (outstanding), **resolved**
-(accepted or dismissed; collapsed, still reversible), **orphaned** (it lost its
-location; still active, still a reading), **discarded** (gone, at no cost).
+**Apply is silent.** The manuscript changes, the conversation records that it happened, and
+no participant responds to it unless the author asks.
 
-If the author wants a remark to keep mattering, they **keep** it, which makes a note.
+**What an application changed is kept, and is not a version of the story.** The passages it altered,
+before and after, stay available so that the author returning to a conversation still sees what an
+application did. They carry no positions, nothing reapplies them, and no manuscript is reconstructed
+from them: a record of a change is not a state the story can be returned to.
 
-## Anchor
+**Constraint** — optional author text supplied with an Apply, carried verbatim as an
+additional instruction. *Keep the opening image intact.*
 
-A remark's location in the prose, expressed as the quoted text plus enough
-surrounding context to find it. Anchors are in-session only.
+## Review change
 
-Anchors survive editing elsewhere in the draft.
+An ordinary round whose message asks the room to evaluate the current prose in light of a
+change just made. A convenience for something the author could type; not a distinct mode of
+reasoning.
 
-**Resolution has exactly two outcomes.** A unique match anchors the remark. Zero
-matches or several leave it **orphaned**: it keeps its text and loses its location,
-which is an ordinary remark with no location rather than an error.
+## Capture context
 
-There is no third outcome and no confidence score. Duplicate passages and quotes an
-agent invented are both ordinary — a page of prose repeats phrases, and local models
-misquote routinely — and in both cases the honest answer is that the location is not
-known. Guessing which of two identical sentences was meant would put a remark against
-prose it is not about.
+An author-invoked analysis that proposes changes to the durable contexts, reading the
+current draft, the current conversation, and both existing contexts.
 
-**Grain is derived, never declared.** What the anchor covers gives the remark's grain:
-part of a sentence is a **phrase**, one sentence is a **sentence**, a whole paragraph is a
-**paragraph**, and a remark with no anchor is the **whole piece**. Grain is computed from
-the anchor wherever a remark is shown, so no seat describes its own scope and no stored
-property can disagree with the prose.
+It produces **proposals**: granular, individually approvable changes, each identifying
+whether it belongs to story context or author context. A proposal may add, revise, replace a
+statement that no longer holds, or remove something no longer true. The question it answers
+is what should change, not what was mentioned.
 
-Traversal must work in both directions — remark to prose, prose to remarks — at the
-granularity the author thinks in, which is paragraphs and sentences.
+The author approves or ignores each proposal individually. Nothing is written that the
+author did not approve.
 
-## Prose provenance
+The threshold differs by destination. Story context is appropriate where information appears
+settled or intentionally preserved about this piece. Author context requires substantially
+stronger evidence that a preference generalizes beyond it, so author-context proposals are
+rare.
 
-**Every paragraph of the draft is in exactly one of two states:**
+## Durable state
 
-- **Author canon** — written by the author, or generated and then accepted.
-- **Unreviewed** — generated and not yet looked at.
+Everything the application keeps: author context, and per piece its metadata, draft, story
+context, and conversations.
 
-**The paragraph is the unit.** There is no finer grain, and no paragraph is ever part
-one and part the other.
+Each artifact is authoritative in itself. Nothing is derived from a log in order to be true,
+and no state is rebuilt by replay — a file edited in another editor is the truth when the
+application next reads it.
 
-Four rules, and they are the whole model:
-
-- The author writes a paragraph → canon.
-- Generation produces a paragraph → unreviewed.
-- The author edits anywhere in an unreviewed paragraph → that paragraph becomes
-  canon. Editing *is* acceptance of what remains.
-- The author explicitly accepts generated prose → canon.
-
-**Proposed text is not in the draft.** An alternative to existing prose is carried by
-the remark that proposes it — its anchor says what it would replace and it holds the
-replacement text. It becomes part of the draft only on acceptance, as canon. Until
-then it is shown against the prose without being in it. This is what keeps *proposed*
-from being a third provenance state, and what makes the draft file the publishable
-story as it sits.
-
-Against author canon, agents propose and never apply. Unreviewed text carries no such
-protection and may be regenerated or discarded freely, which is what makes fast rough
-drafting safe.
-
-## Story Board
-
-**A compact current understanding of the story.** A reading of the draft as it
-stands — not a plan the draft must satisfy, and not a record of what was decided. Its
-fields come from the mode descriptor, and it must stay small enough to take in at a
-glance.
-
-Each entry is a short reading of one field, with a **location** in the prose wherever
-one is known.
-
-**The board is produced by re-reading the draft**, on a single cheap author action and
-on nothing else. It is never maintained by hand, entry by entry, and no author action
-is required to keep it current beyond that one. It goes stale between refreshes, and
-refreshing is one action.
-
-**The author may edit any entry directly**, without negotiating with the room. An edit
-says what the author wants the board to say now. **A re-read replaces the board.** That
-is the whole rule: entries carry no ownership, nothing is preserved through a re-read,
-and there is no pinning ceremony, no offered alternative, no negotiation and no
-suppression. The re-read is one deliberate author action and is reversible, so nothing
-is lost by surprise. Anything the author wants to survive a re-read is a note or the
-brief, not hidden state inside the board.
-
-**Notes are standing content of every board**, not a field a mode descriptor declares.
-
-## Note
-
-**The thing the author kept.** A short piece of durable text belonging to the piece:
-something to remember, something ruled out, a reading worth holding on to, a question
-parked rather than answered now.
-
-A note carries its text, the prose it quotes where it came from prose, and the seat it
-came from where it came from a remark. It has no kind, no lifecycle, and no anchor —
-the quote is text, so a note cannot be orphaned.
-
-Notes arise two ways: the author writes one, or the author keeps a remark, which
-carries its claim across **unchanged** rather than rewording it.
-
-**Only the author closes a note**, by deleting it. Nothing infers that a note has been
-satisfied, and nothing closes one on the author's behalf.
-
-Notes are the whole of what carries deliberate context forward. *Things I've ruled out*
-is notes. *What I want to remember about the ending* is notes. There is no separate
-record of rejected ideas, no lifecycle over them, and no mechanism that guarantees the
-room never re-raises something — if it does, the author dismisses it in one action, and
-what they ruled out is in the room's context because notes are.
-
-## Brief
-
-The author's statement of intent for the piece, in craft terms, that the room drafts
-from. One per piece, durable, editable directly.
-
-The room may help formulate one; the author authors or explicitly accepts it. A
-request for a particular passage carries its own instruction and does not become a
-second brief.
-
-**A one-shot draft is generated with no brief at all.** Its output is unreviewed by
-definition.
-
-## Voice spec
-
-An explicit, editable statement of the piece's voice: diction, sentence rhythm, tone,
-level of interiority, tolerance for figurative language, and an anti-pattern list of
-tics to avoid.
-
-Seeded from samples the author supplies, and **edited by the author and no one else**.
-Read by every seat, so drafting and prose critique work with it rather than against
-it. Nothing infers it, diffs drafts to find it, or proposes changes to it — the room
-can remark on the prose's voice like anything else, and the author decides whether
-that changes the spec.
-
-Naming one's own preferences is itself vocabulary practice, which is why the spec is
-explicit rather than an invisible learned model.
-
-## Glossary and craft lexicon
-
-A **craft lexicon** ships with the software: craft terms, each with one line of
-meaning. It is reference data and never a surface — the author does not browse it,
-because a glossary the author browses is the textbook interface this project rejects.
-
-A remark **declares the terms it used**. A declared term renders as a term in place
-and expands on demand, into the lexicon's meaning where the lexicon has one and into
-the remark's own reasoning otherwise.
-
-The **glossary** is the terms the author's own work produced: the term, and the moment
-in the author's prose it was attached to. **Nothing an agent said is kept.** A remark is
-session material, and a glossary entry that quoted one would be room speech crossing the
-durable boundary by default. Quoting the story instead is also the stronger version of
-the idea — *dramatic irony: "She already had the second key"* — because the concept
-becomes memorable by being fixed to the author's own writing.
-
-**A term accrues from an anchored remark and from nothing else.** The moment is the prose
-that remark quoted. A whole-piece remark's terms render and expand in the room like any
-other and never reach the glossary: an entry whose moment is the whole story records no
-moment, and the entry is worth having only because the concept stays fixed to one
-sentence the author wrote. Some terms therefore never accrue, and that is the cheaper
-loss — a glossary of vague encounters would be worth less than a short one of sharp ones.
-
-**The first occurrence wins.** One term, one moment, and nothing updates an entry once it
-is written. Recording every time a term came up would turn the glossary into a history of
-the room, which is the one thing it must not become.
-
-It accretes as a side effect of work and has no lifecycle — no provisional tier, no
-authority rules, no supersession. Meanings come from the lexicon when the glossary is
-read. A term the lexicon does not hold is still recorded against its moment in the prose;
-its reasoning was available in the room when it was declared and is not preserved.
-
-Glossability is not mode-scoped. A mode governs what specialists reason with; it has
-no say over what the author may learn.
-
-Note the collision: a *glossary entry* is a craft term explained to the **author**,
-accrued from their own fiction. It is a product feature. This file is the **project's**
-vocabulary, for whoever builds the software. They are unrelated.
-
-## Durable and transient
-
-**Durable** — the draft, the board, the notes, the brief, the voice spec, the
-glossary, the cast, the mode, and the piece's title and status.
-
-**Transient** — the room. Turns, takes, remarks, syntheses, and the order things
-were said in.
-
-**Re-entry after time away is built from durable state.** There is no transcript to
-build it from, and that is the design rather than a limitation of it: the goal is to
-restore the author's mental model of the story, not to reconstruct every interaction
-that happened before the application closed.
-
-**The artifacts are the record.** Each durable artifact is authoritative in itself.
-Nothing is derived from a history in order to be true, and no state is rebuilt by
-replay. If the artifacts were a projection of a log, a file edited in another editor
-would be a lie the next replay corrects, and "readable in any editor" would mean
-readable but not writable.
-
-## Session
-
-**A session is one continuous period of the piece being open in a running system.** It
-ends when the piece is closed or the system stops.
-
-It is not a durable object, has no identity, is not named, and is never administered
-by the author. It bounds two things: reversibility, and the life of the room's
-material. *In session* means since the piece was opened.
-
-Reversibility therefore does not survive a restart, and that is the intended guarantee
-rather than a limitation of it. Undo is for the mistake the author noticed — not a
-version history, which is a different thing the product deliberately does not have.
+Reversal of recent manuscript editing belongs to the prose editor's own history and is not a
+durable concept.
