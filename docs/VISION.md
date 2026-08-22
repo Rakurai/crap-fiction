@@ -1,13 +1,29 @@
 # VISION
 
-## 1. What this is
+**Authority.** Read in this order, and where they appear to conflict, the earlier
+one governs:
+
+1. **`VISION.md`** — purpose, the bet, and the principles that settle tradeoffs.
+2. **`CONTEXT.md`** — the domain model, and the authoritative vocabulary. Where a
+   term is defined there, nothing else defines it again.
+3. **`PRD.md`** — the author, mode scoping, the flash mode descriptor, required
+   behaviour, and the guarantees.
+4. **`UX_DESIGN.md`** — interaction and composition.
+5. **`SPEC.md`** — the settled implementation substrate and the detail that depends on
+   it, consistent with all four above.
+
+Nothing here is a description of a system that exists. It is what is to be built.
+
+## What this is
 
 A local, single-user studio for writing fiction with a team of specialized
 agents.
 
-The first implemented form is **flash fiction** (roughly 500–1,500 words), with
-the expectation that later forms — short story, novella, and beyond — are
-supported by the same architecture rather than by rebuilding it.
+The implemented form is **flash fiction** (roughly 500–1,500 words). Later forms —
+short story, novella, and beyond — extend the same architecture rather than
+requiring a rebuild of it. That is a claim about the concepts surviving, not a
+promise that no strategy chosen for a page of prose ever needs replacing at
+length.
 
 The primary purpose is **producing finished pieces**. The system exists to help
 the author write stories they would not otherwise finish.
@@ -26,7 +42,7 @@ do anyway; it never earns the right to slow that work down.
 
 This is intended as a permanent creative tool, not scaffolding to be outgrown.
 
-## 2. The bet
+## The bet
 
 That a room of specialized agents who reason differently about the same piece —
 and who visibly disagree — is more useful than a single writing assistant, and
@@ -47,14 +63,14 @@ Two things follow from taking the bet seriously:
 - **Disagreement must be discovered, not manufactured.** Synthetic conflict is
   worse than agreement, because it trains the author to discount the room.
 
-## 3. Form-dependent operation
+## Form-dependent operation
 
 The studio is not organized around one universal fiction structure. The selected
 form and scale determine which roles, structural concepts, Story Board fields,
 critique criteria, and analytical lenses are materially useful. The system should
 shift modes accordingly rather than forcing every piece through the same
-machinery. **Flash fiction is the first implemented mode, not the architectural
-default for all future forms.**
+machinery. **Flash fiction is the implemented mode, not the architectural default
+for all future forms.**
 
 This is a governing principle, not a feature. Concretely, a form/mode selection
 influences:
@@ -74,7 +90,7 @@ narrative structure.
 Where this document describes specifics, they are the **flash-fiction mode's**
 choices unless stated otherwise.
 
-## 4. Core loop
+## Core loop
 
 The draft is the primary artifact. Design is a reading of the draft rather than a
 blueprint the draft must satisfy. How much design precedes prose is itself
@@ -107,7 +123,7 @@ revision cycles ──┐
    produces sharper, less generic analysis than reacting to an outline.
 4. **Revision.** Cycles of proposal, decision, and rewriting.
 
-## 5. Three surfaces
+## Three surfaces
 
 The studio has three persistent responsibilities. Their visual arrangement can
 evolve; the separation must not.
@@ -122,38 +138,23 @@ evolve; the separation must not.
 
 ### The Story Board
 
-The board holds two kinds of content, and must visibly distinguish them:
+The board records both what the draft currently expresses and what the author has
+decided and not yet written. Without that distinction it degrades in one of two
+directions: a pure reading of the draft cannot record a decision made but not yet
+written, while a pure record of decisions drifts into a prescriptive blueprint that
+no longer describes the piece. The gap between the two is useful information — it
+is the revision agenda.
 
-- **Observed** — what the current draft actually expresses. A reading of the
-  prose as it stands, kept in sync with it.
-- **Intended** — accepted decisions and intent not yet realized in the prose.
-  Things the author has decided and the draft has not caught up to. Intended
-  entries carry a location wherever one is known — the passage that would have to
-  change — so the gap is navigable rather than merely noted.
+**The board maintains itself.** The author never keeps it in sync by hand, which means the
+system re-reads the prose after it changes, unasked and at the cost of inference. Two
+constraints follow: re-reading must never interrupt writing, and a refreshed reading must be
+noticeable and rejectable rather than silent.
 
-Without that distinction the board degrades in one of two directions: a pure
-reading of the draft cannot record a decision made but not yet written, while a
-pure record of decisions drifts into a prescriptive blueprint that no longer
-describes the piece. The gap between observed and intended is useful
-information — it is the revision agenda.
+Two standing constraints on its contents: it must stay small enough to take in at a
+glance, and its schema stays flexible and mode-dependent. It must not harden one
+theory of fiction into the ontology of all stories.
 
-**The board maintains itself.** The author never keeps it in sync by hand. That
-means the system re-reads the prose after it changes, which costs inference and
-happens without being asked. Two constraints follow: re-reading must never
-interrupt writing, and the observed board changing under the author must be
-noticeable rather than silent — they should be able to tell that a reading was
-refreshed, and reject it if it misread them.
-
-The board must stay small enough to take in at a glance. Candidate contents in
-flash mode: premise and reader promise; POV and tone; what the reader knows
-versus what the characters know, and when; the turn; entry point and close;
-setups and payoffs; character want and need; thematic question; open questions;
-accepted decisions and their rationale.
-
-The schema stays flexible and mode-dependent. It should not harden one theory of
-fiction into the ontology of all stories.
-
-## 6. Who writes the prose
+## Who writes the prose
 
 The room drafts from a **brief the author writes**.
 
@@ -167,24 +168,15 @@ transferred. This translation is also the main site of the learning byproduct.
 
 ### Prose provenance
 
-Every span of prose is in one of three states:
+The author must always know whose words they are reading, and the system must never
+have to hedge. Two commitments carry that:
 
-1. **Author canon** — written by the author, or generated and then accepted.
-2. **Unreviewed** — generated and not yet looked at.
-3. **Proposed** — an alternative to existing text, awaiting a decision.
+- **Acceptance is what makes prose the author's; generating it does not.**
+- **Ownership is never partial.** No passage is ever presented as part the
+  author's and part the machine's.
 
-**Acceptance is what makes prose canon; generating it does not.** Acceptance
-happens three ways, all equivalent in effect:
-
-- The author writes the text.
-- The author edits generated text in place — editing *is* acceptance of what
-  remains, so a touched passage becomes author canon in whole. There is no
-  partial or mixed ownership within a span.
-- The author explicitly accepts a suggestion or a generated passage.
-
-Against author canon, agents may propose alternatives but never apply them.
-Unreviewed text has no such protection — it can be regenerated or discarded
-freely, which is what makes fast rough drafting safe.
+Against the author's own prose, agents propose and never apply. Generated text not yet read
+carries no such protection, which is what makes fast rough drafting safe.
 
 ### The one-shot exception
 
@@ -197,7 +189,7 @@ definition, and immediately the object of critique and rewriting. The system is
 not a story vending machine, but neither does it withhold a fast provocation when
 nothing exists yet.
 
-## 7. Voice
+## Voice
 
 The system maintains an explicit, editable **Voice spec**: diction, sentence
 rhythm, tone, level of interiority, tolerance for figurative language, and an
@@ -205,31 +197,32 @@ anti-pattern list of tics to avoid.
 
 - Seeded from samples the author supplies.
 - Drafted and critiqued against by the prose-focused role.
-- **Auto-updated by proposal**: when the system notices patterns in how the
-  author revises its drafts, it proposes additions to the spec. Style changes
-  are proposals like any other, never silent.
+- **Updated by proposal.** Style changes are proposals like any other, never silent. And
+  nothing watches the author's revision history to find them, because keeping one would
+  create a second authority over the prose.
 
 Naming one's own preferences is itself vocabulary practice, which is why the
 spec is explicit rather than an invisible learned model.
 
-## 8. The room
+## The room
 
 Agent roles are **declarative definitions in a registry**, not a hardcoded set.
-Each role declares its focus, its evaluation criteria, the context it needs, its
-applicability (form, length, phase), and its model.
+Each role declares its focus, the context it needs, and its model. Where a role
+applies and what it treats as a defect there belong to the mode, not to the role —
+one authority, so a mode shift is a change in one place.
 
 **Casting is a per-piece decision.** The Showrunner proposes a cast and states
 why in craft terms — "at this length I am not seating a structural architect; I
 am seating a compression editor." The author can add, remove, and lock seats. The
 casting rationale is free vocabulary exposure before a word is written.
 
-Because applicability is declared per role, changing the form of a piece
-re-opens casting. Mode shift is expressed through the registry rather than
-special-cased.
+Because applicability is mode data, changing the form of a piece re-opens casting.
+Mode shift is expressed through data rather than special-cased.
 
 ### The Showrunner
 
-Facilitates rather than rules. Decides who has something material to contribute,
+Always present, and not one of the specialists. Facilitates rather than rules.
+Decides who has something material to contribute,
 identifies the actual decision under discussion, summarizes disagreements,
 prevents circular conversation, and turns discussion into candidate proposals.
 It is explicitly **not the final authority** — the author decides.
@@ -263,13 +256,21 @@ Agents form their positions in **blind independent passes**. No agent sees
 another's take while forming its own, and each works from a context window built
 for its specialty.
 
-The Showrunner then examines the results, surfaces conflicts, and may give
-conflicting agents one round to respond to each other.
+The Showrunner then examines the results and surfaces conflicts. The author may
+ask conflicting agents for one round at each other, after which the Showrunner
+reads the room again — the round is something the author calls for, never something
+the room decides to hold.
 
 This is architecture, not prompting. A sequential visible conversation over a
 shared model converges — later speakers agree with earlier ones, and the room
 collapses into one voice. Blind-first is the cheapest structural defense against
 that anchoring.
+
+**Blindness is about opinions, and it holds across turns as well as within one.** An agent
+sees what the author has ruled and its own earlier remarks, never another agent's. Without
+the across-turns half the same convergence happens on a slower clock — each turn looks
+independent while the room settles, over a session, on whichever voice spoke first — and that
+is the failure mode hardest to notice from the outside.
 
 Independence is necessary but not sufficient. What survives a blind pass is a
 **candidate** substantive disagreement, not a guaranteed real one — it may
@@ -295,13 +296,18 @@ the author never blocks on the room — writing continues while it thinks, a tur
 can be abandoned, and partial results are useful on their own. Reducing the cost
 of asking is a standing design concern, not an optimization for later.
 
-## 9. How vocabulary transfers
+## How vocabulary transfers
 
-**Intent restatement.** When the author expresses something in plain language,
-the responding agent restates it in craft terms before answering: *"You're
-asking for dramatic irony — here's how I'd stage it."* The author repeatedly
-sees their own thought translated. This is the direct mechanism for the goal of
-learning to express intent precisely, and it costs nothing extra.
+**Intent restatement.** When the author expresses something in plain language, the
+responding agent names it in craft terms as part of its answer: *"You're asking for
+dramatic irony — here's how I'd stage it."* The author repeatedly sees their own thought
+translated. This is the direct mechanism for the goal of learning to express intent
+precisely, and it costs nothing extra — it is a field of a response the room was already
+going to produce, never a separate step or a separate call.
+
+Restatement is therefore not a gate the answer waits behind. An agent that had to
+translate *before* answering would make the cheapest and most frequent learning moment
+in the product into a round trip, and the author would learn to route around it.
 
 **Accreting glossary.** Every concept named that way is pinned to a glossary
 entry anchored to the exact moment in the author's own story that produced it.
@@ -320,83 +326,56 @@ for using the studio.
 There is no tracking, grading, streak, or nudge to practice. Learning stays a
 byproduct of real work.
 
-## 10. Change mechanics
+## Change mechanics
 
-Story information has four states:
+**Everything the author did is reversible**, in session, without resorting to the
+filesystem. A studio the author is afraid to click in is a studio that gets used
+timidly. Reversibility is what makes low-friction acceptance safe to offer, and the
+two are one design rather than a feature and a safety net.
 
-1. **Canon** — the accepted current state of the piece.
-2. **Proposal** — a suggested change awaiting decision.
-3. **Rejected** — considered and deliberately discarded.
-4. **Open question** — an unresolved choice.
+The system's own actions are a different case: they are rejectable rather than
+undoable, because undo means *un-do what I did*.
 
-Rejected alternatives are retained cheaply enough that the room does not
-repeatedly rediscover ideas already considered.
+**Friction scales with consequence.** A change to the shape of the story is worth a
+proposal, its rationale and a recorded reason; a better verb is worth a keystroke. A
+formal card for "cut this adverb" would teach the author to stop reading the cards,
+and that single failure would take most of the room's value with it.
 
-**Everything is reversible.** Accepting a suggestion, accepting a proposal, and
-the system's own re-reading of the draft are all undoable, in session, without
-resorting to the filesystem. A studio the author is afraid to click in is a
-studio that gets used timidly. Reversibility is what makes low-friction
-acceptance (§10, line tier) safe to offer.
+**Everything an agent says is the same kind of object: a remark.** There is no separate class
+of "annotations" — building them as two systems produces two competing lists of agent opinion
+with no defined relationship, which is a failure of modeling rather than of layout.
 
-Friction scales with consequence, in two tiers:
+Ideas the author turns down are retained, so the room does not repeatedly rediscover
+what has already been considered and refused — and so the author never maintains a
+list to prevent that.
 
-| | Structural / Story Board | Line-level prose |
-|---|---|---|
-| Form | Full proposal card | Inline suggestion |
-| Carries | Rationale, affected elements | The change itself |
-| Actions | Accept / Reject / Discuss | Accept / Dismiss |
-| Logged | Yes, in the decision log | Only if promoted |
+Conversation is transient; the work is durable. The transcript can be summarized or
+discarded without losing the design of the piece.
 
-A formal card for "cut this adverb" would teach the author to stop reading the
-cards.
+## Standing commitments
 
-### One kind of remark, two independent axes
+Not implementation choices — the constraints any implementation has to satisfy.
 
-Everything an agent says is the same kind of object: **a remark**. Remarks differ
-along two axes that must not be conflated:
+**Local and offline.** The tool runs on the author's machine against models on the
+author's machine. Full offline operation must work. No accounts, no cloud
+dependency to open one's own stories.
 
-- **Scope** — what it concerns: a phrase, a passage, or the whole piece. A remark
-  with a location can be anchored to prose; one without cannot.
-- **Weight** — what acting on it costs: a line suggestion or a structural
-  proposal, which determines the tier above.
+**A rich text surface.** The interaction — selection over prose, critique in place,
+proposals rendered against the text, clickable terms, draft beside board — needs a
+graphical surface. It is cheap in a browser and painful in a terminal.
 
-These are orthogonal. A whole-piece remark can be a trivial observation; a
-single-sentence remark can demand a structural decision. **There is no separate
-class of "annotations" distinct from what agents say in the room** — an anchored
-critique and a take are the same object seen at different scopes. Building them
-as two systems produces two competing lists of agent opinion with no defined
-relationship, which is a failure of modeling, not of layout.
+**Provider-agnostic models, per role.** Any role may be pointed at a different
+endpoint, so prose quality is not capped by local hardware — and so weak agent
+differentiation can be diagnosed as a design problem rather than confounded with
+model capacity. That diagnostic ability is the reason, not a convenience.
 
-The decision log records **the author's** accepted choices and why. Conversation
-is transient; the draft, board, decisions, glossary, and voice spec are durable.
-The transcript can be summarized or discarded without losing the design.
+**Plain files, authoritative.** The author's prose must outlive any rewrite of this
+tool, be readable and editable in any editor, and be diffable under version
+control. The files are the record; nothing is derived from a history in order to be
+true. And because board schemas are mode-dependent and expected to evolve,
+persistence must tolerate schema change rather than assume a frozen shape.
 
-## 11. Runtime and storage
-
-**Form.** A local web app served on localhost, talking to model endpoints on
-localhost. Chosen because the interaction — text selection over prose, inline
-annotation, rendered proposal diffs, clickable glossary terms, draft beside
-board — is cheap in a browser and painful in a terminal.
-
-**Models.** Provider-agnostic by design. Everything speaks an OpenAI-compatible
-interface. LM Studio is the default and full offline operation must work. Roles
-may use different models, the same model may instantiate several roles, and each
-role gets its own system prompt and independently constructed context. Any role
-may be pointed at a different endpoint, so prose quality is not capped by local
-hardware — and so weak agent differentiation can be diagnosed as a design
-problem rather than confounded with model capacity.
-
-Orchestration framework choice is deliberately deferred until the interaction
-architecture is stable.
-
-**Storage.** One plain-file directory per project: the draft as Markdown, the
-Story Board, glossary, decision log, and voice spec in human-readable structured
-files. The author's prose must outlive any rewrite of this tool, be editable in
-any editor, and be diffable under version control. Because board schemas are
-mode-dependent and expected to evolve, persistence must tolerate schema change
-rather than assume a frozen shape.
-
-## 12. Anti-goals
+## Anti-goals
 
 **Hard line:** the room never silently modifies the author's prose. Any change
 to author-written or author-accepted text is a visible, dismissible suggestion —
@@ -417,7 +396,7 @@ Out of scope for now, without prejudice: adversarial revision loops, automated
 experiments on story variants, large libraries of narrative frameworks, and
 autonomous story generation as a product rather than a provocation.
 
-## 13. Success
+## Success
 
 The project works if:
 
@@ -440,7 +419,7 @@ Secondary questions worth watching:
 - Does the Story Board stay legible as a piece evolves?
 - Is it still enjoyable after an extended session?
 
-## 14. Build posture
+## Build posture
 
 **Architecture first.** The role registry, casting mechanism, mode/form
 selection, provider abstraction, blind-pass orchestration, and **persistence
@@ -454,38 +433,41 @@ those are mode-dependent and deliberately still open.
 Accepting a slower path to the first finished story in exchange for a foundation
 that does not need to be torn out.
 
-## 15. Open questions
+## Open questions
 
 Deliberately unresolved; to be settled in the PRD or by use.
 
-1. **Structural lenses.** Whether to project one piece through multiple
-   interpretive frameworks — treating three-act, scene/sequel, arc models and
-   the rest as analytical lenses rather than competing schemas, so the author
-   learns that frameworks emphasize different properties of the same story. The
-   aspiration holds. Which lenses are offered is mode-dependent; the
-   flash-relevant set is its own thing (the turn, reader-knowledge timeline,
-   image system, density map). Deferred.
-2. **Story Board fields per mode.** Which fields earn their place in a given
-   form. The constraint is fixed even if the contents are not: readable at a
-   glance.
-3. **Granularity of mode.** Whether form is a small enumerated set (flash, short
-   story, novella) or a set of dimensions (length, POV density, structural
-   ambition) that composes. The latter is more honest and more machinery.
-4. **Glossary scope.** Per-project or global across all pieces. Plain-file
-   storage without an index makes a cross-project glossary awkward; a
-   rebuildable index may be warranted.
-5. **Structural visualization.** A timeline or shape diagram annotated by agents
-   (escalation plateaus, revelations, reversals) with switchable lenses. Clearly
-   desirable eventually; its meaning at 900 words is unclear.
-6. **Life beyond one piece.** A library of finished and abandoned work, carrying
-   material from an old piece into a new one, and whether the glossary and Voice
-   spec are per-piece or shared. Deliberately thin for now — the first concern is
-   finishing one story — but the answer to §15.4 depends on it.
+- **Structural lenses.** Whether to project one piece through multiple
+  interpretive frameworks — treating three-act, scene/sequel, arc models and
+  the rest as analytical lenses rather than competing schemas, so the author
+  learns that frameworks emphasize different properties of the same story. The
+  aspiration holds. Which lenses are offered is mode-dependent; the
+  flash-relevant set is its own thing (the turn, reader-knowledge timeline,
+  image system, density map). Deferred.
+- **Story Board fields per mode.** Which fields earn their place in a given
+  form. The constraint is fixed even if the contents are not: readable at a
+  glance.
+- **Structural visualization.** A timeline or shape diagram annotated by agents
+  (escalation plateaus, revelations, reversals) with switchable lenses. Clearly
+  desirable eventually; its meaning at 900 words is unclear.
+- **Life beyond one piece.** A library of finished and abandoned work, and carrying
+  material from an old piece into a new one. Deliberately thin for now — the first
+  concern is finishing one story. What remains open is only the speculative case of
+  carrying a premise or a line across; listing, opening and reading are required and
+  specified.
 
 ### Resolved
 
-- **Workshop mode.** Earlier open: whether the studio needs a distinct mode for
-  pointing the whole room at one object. It does not. Asking about a selection —
-  a passage, a character, an unresolved question — is an ordinary ask with a
-  scope attached, not a separate mode. Scope is a property of a question, not a
-  state the application enters.
+Kept as a record of what was asked and closed. The answers themselves live downstream.
+
+- **Workshop mode.** Not needed. Asking about a selection — a passage, a character, an
+  unresolved question — is an ordinary ask with a scope attached. Scope is a property of a
+  question, not a state the application enters.
+- **Granularity of mode.** An enumerated set of named modes, one descriptor file each, rather
+  than composed dimensions. Composition can later become a *producer* of descriptors without
+  a consumer changing, so the escape stays cheap.
+- **Glossary scope.** Per-piece storage, aggregated on read, with meanings from an app-level
+  craft lexicon — so no index is needed.
+- **Whether the Voice spec is per-piece or the author's.** Per-piece. A comic flash and a
+  close-third grief piece are not one voice, and copying rather than sharing makes divergence
+  free and drift impossible.
