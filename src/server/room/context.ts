@@ -1,8 +1,18 @@
 import type { Charter } from '../model/charter.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { Conversation, RoundRecord } from '../../shared/conversationViews.js'
+import { substantiveResponse, type Conversation, type RoundRecord } from '../../shared/conversationViews.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
+
+/**
+ * SPEC "Context compilation": "Shared history is the default", and which policy
+ * produces better collaboration is an empirical question, so switching must stay
+ * a configuration change rather than a redesign. It is stated here, once, and
+ * carried to the room by the composition root — not as a parameter default,
+ * which would let a caller that named no policy silently get this one
+ * (CODING_STANDARDS "No defaults and no placeholders").
+ */
+export const SHIPPED_HISTORY_POLICY: HistoryPolicy = 'shared'
 
 export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
@@ -10,6 +20,7 @@ export type HistoryEntry =
 
 export type ParticipantEvidence = Readonly<{ participantId: string; claim: string; note: string | undefined }>
 
+/** Everything a call's context is built from that does not depend on whose call it is. */
 export type ContextInput = Readonly<{
   role: RoleDefinition
   owesAnswer: boolean
@@ -19,12 +30,6 @@ export type ContextInput = Readonly<{
   draft: string
   conversation: Conversation | undefined
   policy: HistoryPolicy
-  /**
-   * SPEC "Context compilation": the one asymmetry — supplied only for the
-   * Story Editor's call, with the round's settled substantive specialist
-   * responses from the round being formed, once they have all settled.
-   */
-  evidence?: readonly ParticipantEvidence[]
 }>
 
 export type Context = Readonly<{
@@ -39,12 +44,11 @@ export type Context = Readonly<{
 }>
 
 function substantiveResponses(round: RoundRecord): readonly HistoryEntry[] {
-  return round.participants
-    .filter((record) => record.result.kind === 'response' && record.result.outcome !== 'noComment')
-    .map((record) => {
-      const result = record.result as Extract<typeof record.result, { kind: 'response'; outcome: 'commentary' | 'applicableSuggestion' }>
-      return { kind: 'response', participantId: record.participantId, claim: result.claim, note: result.note }
-    })
+  return round.participants.flatMap((record) => {
+    const response = substantiveResponse(record.result)
+    if (response === undefined) return []
+    return [{ kind: 'response', participantId: record.participantId, claim: response.claim, note: response.note } as const]
+  })
 }
 
 /**
@@ -66,7 +70,11 @@ function deriveHistory(conversation: Conversation | undefined, policy: HistoryPo
 
   const entries: HistoryEntry[] = []
   for (const round of conversation.rounds) {
-    if (round.outcome !== 'settled') continue
+    // Every round the record holds counts, abandoned ones included: SPEC "The
+    // round" has landed responses standing as ordinary responses when the
+    // author stops a round, and the message that opened it was still said.
+    // Skipping them here would delete the author's own words from every later
+    // call, which reads to a participant as a conversation that never happened.
     if (round.message !== undefined) entries.push({ kind: 'message', text: round.message })
 
     const responses = substantiveResponses(round)
@@ -81,7 +89,7 @@ function deriveHistory(conversation: Conversation | undefined, policy: HistoryPo
  * so the independence invariant is asserted against the object it
  * constructs rather than inferred from a rendered prompt.
  */
-export function compileContext(input: ContextInput): Context {
+function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
   return {
     role: input.role,
     owesAnswer: input.owesAnswer,
@@ -90,8 +98,32 @@ export function compileContext(input: ContextInput): Context {
     storyContext: input.storyContext,
     draft: input.draft,
     history: deriveHistory(input.conversation, input.policy, input.role.id),
-    evidence: input.evidence ?? [],
+    evidence,
   }
+}
+
+/**
+ * A specialist's call. SPEC "Context compilation" makes the independence
+ * invariant hold by construction, and this is where the construction is: there
+ * is no parameter through which the round's other readings could arrive, so a
+ * specialist context carrying one is not a mistake a caller can make. The
+ * ordering rule the room follows — compile every specialist before issuing the
+ * first call — is then a second guarantee rather than the only one.
+ */
+export function compileSpecialistContext(input: ContextInput): Context {
+  return contextFrom(input, [])
+}
+
+/**
+ * The Story Editor's call, and the one asymmetry SPEC "Context compilation"
+ * names: it alone weighs the round's own readings. `evidence` is required
+ * rather than optional because the Story Editor's whole reason to be called
+ * last is that it has them — an absent one would mean the round reached here
+ * without settling anything, which is a different call the room makes
+ * deliberately by passing an empty list.
+ */
+export function compileStoryEditorContext(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
+  return contextFrom(input, evidence)
 }
 
 function section(heading: string, body: string | undefined): string {

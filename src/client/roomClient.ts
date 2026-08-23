@@ -13,6 +13,15 @@ import type { RoundEvent } from './roundProjection.js'
 
 export type RoomEvent = RoundEvent | Readonly<{ type: 'error'; data: RoomErrorEvent }>
 
+/** A frame that is not JSON at all is refused the same way one that is JSON of the wrong shape is. */
+function readJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
 export type ActionResult = { readonly ok: true } | { readonly ok: false; readonly message: string }
 
 export async function createConversation(pieceId: string, signal?: AbortSignal): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
@@ -62,14 +71,27 @@ export async function startRound(pieceId: string, conversationId: string, messag
  * before anything downstream trusts it — the same seam discipline every
  * other client adapter applies to a JSON response.
  */
-export function subscribeToRoom(pieceId: string, onEvent: (event: RoomEvent) => void): () => void {
+export function subscribeToRoom(
+  pieceId: string,
+  onEvent: (event: RoomEvent) => void,
+  onMalformedFrame: (message: string) => void,
+): () => void {
   const source = new EventSource(`/pieces/${encodeURIComponent(pieceId)}/events`)
 
   function listen<T>(name: string, schema: z.ZodType<T>, wrap: (data: T) => RoomEvent): void {
     source.addEventListener(name, (event) => {
       if (!(event instanceof MessageEvent)) return
-      const parsed = schema.safeParse(JSON.parse(event.data as string))
-      if (parsed.success) onEvent(wrap(parsed.data))
+      // A frame's payload is a string or the stream is not the one this adapter
+      // subscribed to, so the shape is checked rather than asserted. A frame the
+      // schema refuses is reported and not applied: dropping it silently would
+      // leave the author watching a round that stopped moving with nothing said.
+      const frame: unknown = event.data
+      const parsed = typeof frame === 'string' ? schema.safeParse(readJson(frame)) : { success: false as const }
+      if (!parsed.success) {
+        onMalformedFrame(`malformed "${name}" event from the studio`)
+        return
+      }
+      onEvent(wrap(parsed.data))
     })
   }
 

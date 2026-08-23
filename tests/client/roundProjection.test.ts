@@ -8,7 +8,7 @@ import {
   type RoundEvent,
 } from '../../src/client/roundProjection.js'
 import type { RoundRecord } from '../../src/shared/conversationViews.js'
-import type { RoundSnapshot } from '../../src/shared/roundEvents.js'
+import type { RoundClosedEvent, RoundSnapshot } from '../../src/shared/roundEvents.js'
 
 function opened(roundId: string, participants: readonly string[], message?: string): RoundEvent {
   return { type: 'round.opened', data: { roundId, conversationId: 'c1', message, participants } }
@@ -22,7 +22,8 @@ function settled(roundId: string, participantId: string, result: RoundRecord['pa
   return { type: 'participant.settled', data: { roundId, participantId, result } }
 }
 
-function closed(roundId: string, outcome: 'settled' | 'abandoned'): RoundEvent {
+/** The outcome comes from the event's own closed set rather than being retyped here. */
+function closed(roundId: string, outcome: RoundClosedEvent['outcome']): RoundEvent {
   return { type: 'round.closed', data: { roundId, outcome } }
 }
 
@@ -77,6 +78,22 @@ describe('projectRoundEvent', () => {
 
     expect(projection.rounds[0]?.outcome).toBe('abandoned')
     expect(projection.rounds[0]?.participants.map((p) => p.participantId)).toEqual(['shape', 'compression'])
+    expect(projection.rounds[0]?.participants.find((p) => p.participantId === 'compression')?.result).toBeUndefined()
+  })
+
+  it('a round the room failed is drawn as ended, not as still running, with what landed before the failure kept', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'response', outcome: 'commentary', claim: 'landed' }))
+    projection = projectRoundEvent(projection, closed('r1', 'failed'))
+
+    // The room's own failure is not a participant's, so nothing is invented for
+    // the participants the round never reached — but the round is over.
+    expect(projection.rounds[0]?.outcome).toBe('failed')
+    expect(projection.rounds[0]?.participants.find((p) => p.participantId === 'shape')?.result).toEqual({
+      kind: 'response',
+      outcome: 'commentary',
+      claim: 'landed',
+    })
     expect(projection.rounds[0]?.participants.find((p) => p.participantId === 'compression')?.result).toBeUndefined()
   })
 

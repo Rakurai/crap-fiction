@@ -18,7 +18,13 @@ export type ProjectedParticipant = Readonly<{
 export type ProjectedRound = Readonly<{
   roundId: string
   message: string | undefined
-  outcome: 'inFlight' | 'settled' | 'abandoned'
+  /**
+   * `failed` is the room's own failure rather than any participant's, and it is
+   * separate from `inFlight` because a round that stopped is not a round still
+   * running — the surface draws it as ended, whatever each participant had
+   * reached when it ended.
+   */
+  outcome: 'inFlight' | 'settled' | 'abandoned' | 'failed'
   participants: readonly ProjectedParticipant[]
 }>
 

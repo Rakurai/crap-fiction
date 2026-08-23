@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadCharter } from '../../../src/server/model/charter.js'
-import { compileContext, renderPrompt } from '../../../src/server/room/context.js'
+import { compileSpecialistContext, renderPrompt } from '../../../src/server/room/context.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
 const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
@@ -8,7 +8,7 @@ const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shap
 describe('loadCharter', () => {
   it('parses and validates the charter shipped with the application, and every field of it reaches its own section of a rendered prompt', () => {
     const charter = loadCharter()
-    const context = compileContext({
+    const context = compileSpecialistContext({
       role: shape,
       owesAnswer: true,
       message: undefined,

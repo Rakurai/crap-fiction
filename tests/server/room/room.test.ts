@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -7,7 +7,7 @@ import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
 import { readConversation, readPiece, writePieceCast } from '../../../src/server/store/index.js'
 import { conversationSchema } from '../../../src/shared/conversationViews.js'
-import { Room, RoomBusyError } from '../../../src/server/room/room.js'
+import { Room, RoomBusyError, type RoomEvent } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
 
@@ -68,6 +68,83 @@ describe('Room', () => {
     adapter.release('story-editor')
   })
 
+  it('SPEC "Model access": refuses a round for a second piece while one is in flight, since no runtime holds more than one call', async () => {
+    const cups = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, cups.id, 'c1', 'a message', 'draft text')
+
+    // The refusal names the piece holding the round rather than the one asked
+    // for, because that is the one the author has to finish or abandon.
+    await expect(room.startRound(workspaceDir, other.id, 'c2', 'a message', 'draft text')).rejects.toThrowError(
+      new RoomBusyError(cups.id),
+    )
+    expect(room.snapshot(other.id)).toBeUndefined()
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('CONTEXT "Round": opens a round with no author message, reading nothing for addressing and calling the enabled cast', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text')
+    await settlementOf(room, piece.id)
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.rounds[0]?.message).toBeUndefined()
+    expect(conversation?.rounds[0]?.addressed).toEqual([])
+    expect(conversation?.rounds[0]?.participants).toHaveLength(3)
+    // No message means no "Author's message" section reached any participant —
+    // nothing composes words the author did not write.
+    expect(adapter.promptFor('shape')).not.toContain("Author's message")
+  })
+
+  it('closes the round as failed, naming the failure, when the conversation on disk cannot be read', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    // The one artifact the round reads before it does anything, hand-broken:
+    // a conversation file the store will refuse rather than parse.
+    mkdirSync(path.join(workspaceDir, piece.id, 'conversations'), { recursive: true })
+    writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'c1.json'), '{ "id": 7 }', 'utf8')
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    // No settlement to wait on: the record is the first thing the round reads,
+    // so this round opens and closes before the call that started it returns.
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+
+    // The author is told what happened in the product's own vocabulary, and the
+    // round stops being in flight — a failure that closed nothing would leave it
+    // drawn as running for the rest of the session.
+    expect(events.map((event) => event.type)).toEqual(['round.opened', 'error', 'round.closed'])
+    const failure = events.find((event) => event.type === 'error')
+    expect(failure?.data).toMatchObject({ code: 'CONVERSATION_UNREADABLE' })
+    const closed = events.find((event) => event.type === 'round.closed')
+    expect(closed?.data).toMatchObject({ outcome: 'failed' })
+
+    // Nothing was called and nothing was written: the round never ran against a
+    // record the studio would then have overwritten.
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
   it('creates the conversation file only once the first round has settled, not before', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom({
@@ -77,12 +154,13 @@ describe('Room', () => {
     })
 
     const { conversationId, roundId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
     expect(readConversation(workspaceDir, piece.id, conversationId, conversationSchema)).toBeUndefined()
 
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
-    await waitForIdle(room, piece.id)
+    await settled
 
     const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
     expect(conversation?.id).toBe('c1')
@@ -108,6 +186,7 @@ describe('Room', () => {
     })
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
     // The room announces the round's full roster at open — the cast's own
     // call order is the round's fact and is proven there, not here.
     expect(events[0]).toBe('opened:shape,compression,story-editor')
@@ -115,7 +194,7 @@ describe('Room', () => {
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
-    await waitForIdle(room, piece.id)
+    await settled
 
     expect(events[events.length - 1]).toBe('closed:settled')
     for (const participantId of ['shape', 'compression', 'story-editor']) {
@@ -132,8 +211,9 @@ describe('Room', () => {
     })
 
     await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
+    const settled = settlementOf(room, piece.id)
     adapter.release('shape')
-    await waitForIdle(room, piece.id)
+    await settled
 
     const updated = readPiece(workspaceDir, piece.id)
     expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
@@ -153,7 +233,7 @@ describe('Room', () => {
     })
 
     const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
-    await waitForIdle(room, piece.id)
+    await settlementOf(room, piece.id)
 
     // Nothing landed anywhere in the round, and that reads as information at
     // the boundary the author actually sees: a settled round, never the
@@ -161,9 +241,12 @@ describe('Room', () => {
     expect(events).not.toContain('error')
     expect(events[events.length - 1]).toBe('round.closed')
 
+    // What each participant's record holds is the round's own fact, proven at
+    // `round.test.ts`; this asserts the room writes such a round rather than
+    // treating an empty one as nothing worth persisting.
     const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
     expect(conversation?.rounds[0]?.outcome).toBe('settled')
-    expect(conversation?.rounds[0]?.participants.map((p) => p.result.kind)).toEqual(['failed', 'failed', 'failed'])
+    expect(conversation?.rounds[0]?.participants).toHaveLength(3)
   })
 
   it('persists an abandoned round to the conversation file rather than skipping the write', async () => {
@@ -175,8 +258,9 @@ describe('Room', () => {
     })
 
     const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
     room.abandon(piece.id)
-    await waitForIdle(room, piece.id)
+    await settled
 
     // What an abandoned round keeps is the round's own fact, proven at
     // `round.test.ts`; this asserts only that the room writes the record at
@@ -186,11 +270,14 @@ describe('Room', () => {
   })
 })
 
-/** Room settles asynchronously in the background; poll its own snapshot rather than the test reaching into private state. */
-async function waitForIdle(room: Room, pieceId: string): Promise<void> {
-  for (let i = 0; i < 100; i++) {
-    if (room.snapshot(pieceId) === undefined) return
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
-  throw new Error('room never settled')
+/**
+ * A round settles after the call that started it has already returned, so a test
+ * that asserts on what the round left behind waits on the room's own settlement
+ * rather than polling for the round's absence. An absent one means the round was
+ * never in flight, which is the test's own failure to start it.
+ */
+function settlementOf(room: Room, pieceId: string): Promise<void> {
+  const settlement = room.settlement(pieceId)
+  if (settlement === undefined) throw new Error(`no round in flight for "${pieceId}"`)
+  return settlement
 }

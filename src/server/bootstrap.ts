@@ -2,14 +2,13 @@ import type { Hono } from 'hono'
 import { createApp } from './app.js'
 import { loadEnv, type StudioEnv } from './env.js'
 import { createLogger, type Logger } from './logger.js'
-import { getAssignment } from './model/assignments.js'
 import { callSites } from './model/callSites.js'
 import { loadCharter, type Charter } from './model/charter.js'
-import { LMStudioAdapter } from './model/lmStudioAdapter.js'
-import { ModelAccess } from './model/modelAccess.js'
+import type { ModelAccess } from './model/modelAccess.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
 import { DraftWriter } from './pieces.js'
+import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { Room } from './room/room.js'
 import { WorkspaceRegistry } from './workspace.js'
 
@@ -33,8 +32,16 @@ export type Studio = {
  * colliding with an operation site is a startup failure, not something a
  * request should discover — and produces the one `sites` value the app is
  * built with, so it is constructed here once rather than again inside it.
+ *
+ * How the studio reaches models is the caller's to supply, because SPEC
+ * "Verification" needs a studio answering from the fixture model implementation
+ * and the deployment the author runs must have no way to ask for one. It is a
+ * parameter rather than a variable or a flag: the four STUDIO_* variables are a
+ * closed set, and a fifth would put the fixture within reach of the studio the
+ * author writes in. It takes the environment because the runtime's address is
+ * read here and only here.
  */
-export function bootstrap(): Studio {
+export function bootstrap(makeModelAccess: (env: StudioEnv) => ModelAccess): Studio {
   const env = loadEnv()
   const logger = createLogger(env.logLevel)
   logger.info({ port: env.port }, 'studio starting')
@@ -45,9 +52,8 @@ export function bootstrap(): Studio {
   const charter = loadCharter()
   const sites = callSites(roles)
   const draftWriter = new DraftWriter()
-  const modelAdapter = new LMStudioAdapter(env.modelRuntimeUrl)
-  const modelAccess = new ModelAccess(modelAdapter, (site) => getAssignment(env.dataRoot, site))
-  const room = new Room(modelAccess, roles, charter, mode)
+  const modelAccess = makeModelAccess(env)
+  const room = new Room(modelAccess, roles, charter, mode, SHIPPED_HISTORY_POLICY)
   const app = createApp(env, workspace, mode, draftWriter, sites, modelAccess, room)
   return { app, env, logger, workspace, mode, charter, roles }
 }

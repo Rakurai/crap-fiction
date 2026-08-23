@@ -60,19 +60,27 @@ export function useConversation(
         })
     }
 
-    const unsubscribe = subscribeToRoom(pieceId, (event) => {
-      if (!active) return
-      if (event.type === 'error') {
-        setError(event.data.message)
-        return
-      }
-      if (event.type === 'round.opened') {
-        conversationIdRef.current = event.data.conversationId
-        setBusy(true)
-      }
-      if (event.type === 'round.closed') setBusy(false)
-      setProjection((prev) => projectRoundEvent(prev, event))
-    })
+    const unsubscribe = subscribeToRoom(
+      pieceId,
+      (event) => {
+        if (!active) return
+        if (event.type === 'error') {
+          // The room states its own failures and always closes the round after
+          // one, so nothing here has to guess whether the round is still running.
+          setError(event.data.message)
+          return
+        }
+        if (event.type === 'round.opened') {
+          conversationIdRef.current = event.data.conversationId
+          setBusy(true)
+        }
+        if (event.type === 'round.closed') setBusy(false)
+        setProjection((prev) => projectRoundEvent(prev, event))
+      },
+      (message) => {
+        if (active) setError(message)
+      },
+    )
 
     return () => {
       active = false

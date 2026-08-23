@@ -10,9 +10,7 @@ import type { Room } from '../../src/server/room/room.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
-import { buildTestRoom, DEFAULT_MODE, DEFAULT_ROLES } from './room.js'
-
-const DEFAULT_RUNTIME_STATUS: RuntimeStatus = { reachable: true, models: [] }
+import { buildTestRoom, MODE_FIXTURE, ROLES_FIXTURE } from './room.js'
 
 export type HarnessOverrides = Readonly<{
   mode?: ModeDescriptor
@@ -29,16 +27,16 @@ export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
  * roles, the runtime status the `/models` route reports, and the room are
  * named overrides for the test that cares what one of them says. Nothing
  * here fabricates a response, an assignment or a model for a room a test
- * never overrides — that default room's own model access cannot resolve a
- * call at all (`buildTestRoom`'s default). The harness's own model access
- * answers `/models` with `runtimeStatus`, which is the whole of what any
- * route reaches it for; `invoke` is scripted for no site, so a call that
- * somehow reached it would fail loudly rather than hand back a value nobody
- * scripted.
+ * never overrides — that room's own model access cannot resolve a call at all.
+ * The harness's own model access answers `/models` with `runtimeStatus`, which
+ * is the whole of what any route reaches it for, and a test that never says what
+ * the runtime reports gets a `/models` that fails rather than a reachable
+ * runtime nobody scripted; `invoke` is scripted for no site, so a call that
+ * somehow reached it would fail the same way.
  */
 export function buildTestApp(dataRoot: string, overrides: HarnessOverrides = {}): TestApp {
-  const mode = overrides.mode ?? DEFAULT_MODE
-  const roles = overrides.roles ?? DEFAULT_ROLES
+  const mode = overrides.mode ?? MODE_FIXTURE
+  const roles = overrides.roles ?? ROLES_FIXTURE
   const room = overrides.room ?? buildTestRoom({ mode, roles })
 
   const env: StudioEnv = Object.freeze({
@@ -52,7 +50,7 @@ export function buildTestApp(dataRoot: string, overrides: HarnessOverrides = {})
   workspace.load()
 
   const modelAccess = new ModelAccess(
-    FixtureModelAdapter.bySite({}, overrides.runtimeStatus ?? DEFAULT_RUNTIME_STATUS),
+    FixtureModelAdapter.bySite({}, overrides.runtimeStatus),
     () => undefined,
   )
 

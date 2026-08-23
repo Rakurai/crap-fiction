@@ -22,7 +22,9 @@ export type FixtureBehavior = Readonly<{
  * a fixture with nothing configured has nothing to return, and an
  * assignment absent from a per-site map is a test's own failure to script
  * it, reported as such rather than silently falling back to some other
- * site's behavior.
+ * site's behavior. A runtime status is scriptable as absent for the same
+ * reason — a test that never says what the runtime reports must not be handed
+ * a reachable one, so asking then fails loudly instead.
  *
  * A declared value is recovered through the caller's own schema at `invoke`,
  * the same way `LMStudioAdapter` recovers one, so no assertion stands in for
@@ -33,7 +35,7 @@ export type FixtureBehavior = Readonly<{
  */
 export class FixtureModelAdapter implements ModelAdapter {
   readonly #behaviorFor: (assignment: string) => FixtureBehavior
-  readonly #runtimeStatus: RuntimeStatus
+  readonly #runtimeStatus: RuntimeStatus | undefined
   readonly #onInvoke: ((assignment: string) => void) | undefined
   readonly #prompts = new Map<string, string>()
   readonly #released = new Set<string>()
@@ -41,7 +43,7 @@ export class FixtureModelAdapter implements ModelAdapter {
 
   private constructor(
     behaviorFor: (assignment: string) => FixtureBehavior,
-    runtimeStatus: RuntimeStatus,
+    runtimeStatus: RuntimeStatus | undefined,
     onInvoke: ((assignment: string) => void) | undefined,
   ) {
     this.#behaviorFor = behaviorFor
@@ -50,14 +52,14 @@ export class FixtureModelAdapter implements ModelAdapter {
   }
 
   /** One behavior every assignment shares. */
-  static uniform(behavior: FixtureBehavior, runtimeStatus: RuntimeStatus): FixtureModelAdapter {
+  static uniform(behavior: FixtureBehavior, runtimeStatus: RuntimeStatus | undefined): FixtureModelAdapter {
     return new FixtureModelAdapter(() => behavior, runtimeStatus, undefined)
   }
 
   /** A behavior scripted per assignment; a call to one absent from `behaviors` is the test's own failure to script it. */
   static bySite(
     behaviors: Readonly<Record<string, FixtureBehavior>>,
-    runtimeStatus: RuntimeStatus,
+    runtimeStatus: RuntimeStatus | undefined,
     onInvoke?: (assignment: string) => void,
   ): FixtureModelAdapter {
     return new FixtureModelAdapter(
@@ -110,7 +112,9 @@ export class FixtureModelAdapter implements ModelAdapter {
   }
 
   async status(): Promise<RuntimeStatus> {
-    return this.#runtimeStatus
+    const status = this.#runtimeStatus
+    if (status === undefined) throw new Error('no runtime status scripted for this fixture adapter')
+    return status
   }
 
   #awaitRelease(assignment: string, signal: AbortSignal): Promise<void> {

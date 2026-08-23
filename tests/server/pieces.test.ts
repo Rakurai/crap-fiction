@@ -90,7 +90,7 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
-    const opened = getPiece(workspaceDir, created.id)
+    const opened = getPiece(workspaceDir, created.id, null)
     expect(opened).toEqual({ ...created, draft: '', currentConversationId: null, roundInFlight: null })
   })
 
@@ -98,16 +98,16 @@ describe('pieces', () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
 
-    const opened = getPiece(workspaceDir, created.id)
+    const opened = getPiece(workspaceDir, created.id, null)
     expect(opened.draft).toBe('Two small words.')
   })
 
   it('reports a missing piece as a stated PieceNotFoundError', () => {
-    expect(() => getPiece(workspaceDir, 'nothing-here')).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, 'nothing-here', null)).toThrowError(PieceNotFoundError)
   })
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
-    expect(() => getPiece(workspaceDir, '../../etc')).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, '../../etc', null)).toThrowError(PieceNotFoundError)
   })
 })
 

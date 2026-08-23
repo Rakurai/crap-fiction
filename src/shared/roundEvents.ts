@@ -13,9 +13,10 @@ export const participantRoundStateSchema = z.enum(['waiting', 'preparing', 'work
 export type ParticipantRoundState = z.infer<typeof participantRoundStateSchema>
 
 /**
- * SPEC "Transport": the closed SSE event set, one payload shape per event.
- * Every payload carries the round it belongs to, so a client can discard an
- * event delivered for a round that is no longer the one it is watching.
+ * SPEC "Transport": the frame around a round — every participant it will call,
+ * in the order it will call them, before any of them has been reached. Like
+ * every payload below it, it carries the round it belongs to, so a client can
+ * discard an event delivered for a round it is no longer watching.
  */
 export const roundOpenedEventSchema = z.object({
   conversationId: z.string().min(1),
@@ -42,14 +43,30 @@ export const participantSettledEventSchema = z.object({
 
 export type ParticipantSettledEvent = z.infer<typeof participantSettledEventSchema>
 
+/**
+ * A round leaves flight exactly once, and `failed` is why the set is three
+ * rather than two: a round can end without settling and without the author
+ * having abandoned it, and a client that knew only the other two outcomes
+ * would have to leave such a round drawn as still running forever.
+ */
 export const roundClosedEventSchema = z.object({
   roundId: z.string().min(1),
-  outcome: z.enum(['settled', 'abandoned']),
+  outcome: z.enum(['settled', 'abandoned', 'failed']),
 })
 
 export type RoundClosedEvent = z.infer<typeof roundClosedEventSchema>
 
-export const roomErrorEventSchema = z.object({ code: z.string(), message: z.string() })
+/**
+ * The room's own failures, named in the product's vocabulary rather than in
+ * the vocabulary of whatever threw. The set is closed because a client draws a
+ * different notice for each, and an open string would let a message the author
+ * cannot act on arrive where a code belongs.
+ */
+export const roomFailureCodeSchema = z.enum(['CONVERSATION_UNREADABLE', 'CONVERSATION_NOT_WRITTEN'])
+
+export type RoomFailureCode = z.infer<typeof roomFailureCodeSchema>
+
+export const roomErrorEventSchema = z.object({ code: roomFailureCodeSchema, message: z.string() })
 
 export type RoomErrorEvent = z.infer<typeof roomErrorEventSchema>
 

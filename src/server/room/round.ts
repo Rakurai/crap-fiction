@@ -1,9 +1,21 @@
 import type { Charter } from '../model/charter.js'
 import type { ModelAccess } from '../model/modelAccess.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { Conversation, ParticipantResult, RoundParticipantRecord } from '../../shared/conversationViews.js'
+import {
+  substantiveResponse,
+  type Conversation,
+  type ParticipantResult,
+  type RoundParticipantRecord,
+} from '../../shared/conversationViews.js'
 import { responseValueSchema, type EligibleResponseValue, type OwedResponseValue } from '../../shared/participantResponse.js'
-import { compileContext, renderPrompt, type HistoryPolicy, type ParticipantEvidence } from './context.js'
+import {
+  compileSpecialistContext,
+  compileStoryEditorContext,
+  renderPrompt,
+  type ContextInput,
+  type HistoryPolicy,
+  type ParticipantEvidence,
+} from './context.js'
 
 export type RoundPlan = Readonly<{
   roundId: string
@@ -40,15 +52,22 @@ export type RoundResult = Readonly<{
 }>
 
 /**
- * Narrows what `responseValueSchema`'s `.refine` already proved at parse
- * time — a response that says anything states a claim — into the
- * discriminated shape the conversation record and every reader of it use.
+ * Carries a parsed response into the discriminated shape the conversation
+ * record and every reader of it use.
+ *
+ * The claim-absent branch is unreachable by contract:
+ * `eligibleResponseValueSchema` refuses a claimless response that says
+ * something, and the owed schema types the claim as present. It is still
+ * written, because SPEC "Model access" keeps that schema three flat fields for
+ * constrained decoding's sake rather than a union, so the guarantee lives in a
+ * `.refine` the inferred type cannot express. Reaching it would mean the schema
+ * and its refinement had come apart — which is a response that does not conform,
+ * and `nonconforming` is what the model boundary already calls that. A claim
+ * invented here instead would be prose the author never received.
  */
 function toParticipantResult(value: EligibleResponseValue | OwedResponseValue): ParticipantResult {
   if (value.outcome === 'noComment') return { kind: 'response', outcome: 'noComment' }
-  if (value.claim === undefined) {
-    throw new Error('invariant violated: a response conformed to its schema without a claim')
-  }
+  if (value.claim === undefined) return { kind: 'failed', reason: 'nonconforming' }
   return { kind: 'response', outcome: value.outcome, claim: value.claim, note: value.note }
 }
 
@@ -74,12 +93,11 @@ async function callParticipant(
 }
 
 function evidenceFrom(records: readonly RoundParticipantRecord[]): readonly ParticipantEvidence[] {
-  return records
-    .filter((record) => record.result.kind === 'response' && record.result.outcome !== 'noComment')
-    .map((record) => {
-      const result = record.result as Extract<typeof record.result, { kind: 'response'; outcome: 'commentary' | 'applicableSuggestion' }>
-      return { participantId: record.participantId, claim: result.claim, note: result.note }
-    })
+  return records.flatMap((record) => {
+    const response = substantiveResponse(record.result)
+    if (response === undefined) return []
+    return [{ participantId: record.participantId, claim: response.claim, note: response.note }]
+  })
 }
 
 /**
@@ -93,39 +111,32 @@ function evidenceFrom(records: readonly RoundParticipantRecord[]): readonly Part
 export async function runRound(input: RunRoundInput): Promise<RoundResult> {
   const { plan, draft, authorContext, storyContext, conversation, policy, charter, modelAccess, signal, callbacks } = input
 
-  const specialistPrompts = new Map(
-    plan.specialists.map((role) => {
-      const owesAnswer = plan.addressedIds.includes(role.id)
-      const context = compileContext({
-        role,
-        owesAnswer,
-        message: plan.message,
-        authorContext,
-        storyContext,
-        draft,
-        conversation,
-        policy,
-      })
-      return [role.id, { prompt: renderPrompt(context, charter), owesAnswer }] as const
-    }),
-  )
+  const shared = { message: plan.message, authorContext, storyContext, draft, conversation, policy }
+  const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({ ...shared, role, owesAnswer })
+
+  // Every specialist's prompt, complete, before the first call goes out. The
+  // list is built rather than a map keyed by id so that iterating it needs no
+  // lookup and therefore no branch for a lookup that missed — a `continue` on
+  // an absent prompt would silently drop a specialist from the round.
+  const calls = plan.specialists.map((role) => {
+    const owesAnswer = plan.addressedIds.includes(role.id)
+    return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), charter) }
+  })
 
   const records: RoundParticipantRecord[] = []
   let abandoned = false
 
-  for (const role of plan.specialists) {
+  for (const call of calls) {
     if (signal.aborted) {
       abandoned = true
       break
     }
-    const compiled = specialistPrompts.get(role.id)
-    if (compiled === undefined) continue
 
-    const record = await callParticipant(role, compiled.prompt, compiled.owesAnswer, modelAccess, signal, (state) =>
-      callbacks.onState(role.id, state),
+    const record = await callParticipant(call.role, call.prompt, call.owesAnswer, modelAccess, signal, (state) =>
+      callbacks.onState(call.role.id, state),
     )
     records.push(record)
-    callbacks.onSettled(role.id, record)
+    callbacks.onSettled(call.role.id, record)
     if (record.result.kind === 'abandoned') {
       abandoned = true
       break
@@ -138,19 +149,13 @@ export async function runRound(input: RunRoundInput): Promise<RoundResult> {
       abandoned = true
     } else {
       const evidence = evidenceFrom(records)
+      // Addressed directly, it owes an answer for the ordinary reason. With no
+      // readings to weigh it owes one too: SPEC "The round" has the round that
+      // produced no answer saying so, and a Story Editor free to return no
+      // comment on a quiet round would leave the author with a round that
+      // reported nothing and explained nothing.
       const owesAnswer = plan.addressedIds.includes(storyEditor.id) || evidence.length === 0
-      const context = compileContext({
-        role: storyEditor,
-        owesAnswer,
-        message: plan.message,
-        authorContext,
-        storyContext,
-        draft,
-        conversation,
-        policy,
-        evidence,
-      })
-      const prompt = renderPrompt(context, charter)
+      const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence), charter)
       const record = await callParticipant(storyEditor, prompt, owesAnswer, modelAccess, signal, (state) => callbacks.onState(storyEditor.id, state))
       records.push(record)
       callbacks.onSettled(storyEditor.id, record)

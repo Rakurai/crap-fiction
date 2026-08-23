@@ -2,15 +2,29 @@ import { mkdtempSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import {
   mostRecentConversationId,
   readConversation,
   writeConversation,
   writePieceMetadata,
 } from '../../../src/server/store/index.js'
+import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
 
-const conversationSchema = z.object({ id: z.string(), rounds: z.array(z.object({ id: z.string() })) })
+// The record the store is asked to carry is the product's own, declared once and
+// imported: a shape retyped here would stop noticing the day the real one grows
+// a field.
+const oneRound: Conversation = {
+  id: 'c1',
+  rounds: [
+    {
+      id: 'r1',
+      message: 'does the opening earn its length',
+      addressed: [],
+      outcome: 'settled',
+      participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
+    },
+  ],
+}
 
 describe('conversations', () => {
   let workspaceDir: string
@@ -29,8 +43,8 @@ describe('conversations', () => {
   })
 
   it('writes a conversation and reads it back', async () => {
-    await writeConversation(workspaceDir, 'cups', 'c1', { id: 'c1', rounds: [{ id: 'r1' }] })
-    expect(readConversation(workspaceDir, 'cups', 'c1', conversationSchema)).toEqual({ id: 'c1', rounds: [{ id: 'r1' }] })
+    await writeConversation(workspaceDir, 'cups', 'c1', oneRound)
+    expect(readConversation(workspaceDir, 'cups', 'c1', conversationSchema)).toEqual(oneRound)
   })
 
   it('reports no most-recent conversation when none has ever been written', () => {

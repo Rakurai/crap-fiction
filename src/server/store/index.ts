@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { z } from 'zod'
+import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import { resolveWithinRoot } from './containment.js'
 import {
@@ -220,7 +221,7 @@ export async function writeConversation(
   workspaceDir: string,
   pieceId: string,
   conversationId: string,
-  value: unknown,
+  value: Conversation,
 ): Promise<void> {
   const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
   await writeJsonArtifact(conversationFile(pieceDir, conversationId), value)

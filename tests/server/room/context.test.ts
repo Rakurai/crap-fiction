@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { compileContext, renderPrompt } from '../../../src/server/room/context.js'
+import {
+  compileSpecialistContext,
+  compileStoryEditorContext,
+  renderPrompt,
+  type ContextInput,
+  type HistoryPolicy,
+} from '../../../src/server/room/context.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { Conversation } from '../../../src/shared/conversationViews.js'
 import { CHARTER_FIXTURE } from '../../support/charter.js'
@@ -9,18 +15,53 @@ const compression: RoleDefinition = { id: 'compression', handle: 'compression', 
 
 const charter = CHARTER_FIXTURE
 
-describe('compileContext', () => {
+/**
+ * Everything a call is compiled from, with only what a test is about left to
+ * name. Written out rather than defaulted anywhere in the product: this is the
+ * test's own value, and the fields it does not name are named here as absent
+ * rather than absent by omission.
+ */
+function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition }): ContextInput {
+  return {
+    owesAnswer: false,
+    message: undefined,
+    authorContext: undefined,
+    storyContext: undefined,
+    draft: 'text',
+    conversation: undefined,
+    policy: 'shared',
+    ...overrides,
+  }
+}
+
+const conversationWithMixedHistory: Conversation = {
+  id: 'c1',
+  rounds: [
+    {
+      id: 'r1',
+      message: 'first question',
+      addressed: [],
+      outcome: 'settled',
+      participants: [
+        { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } },
+        { participantId: 'compression', result: { kind: 'response', outcome: 'noComment' } },
+      ],
+    },
+  ],
+}
+
+describe('compileSpecialistContext', () => {
   it('carries the draft, the message and both durable contexts through untouched', () => {
-    const context = compileContext({
-      role: shape,
-      owesAnswer: true,
-      message: 'does the opening earn its length',
-      authorContext: 'prefers short sentences',
-      storyContext: 'a flash piece about a breakup',
-      draft: 'The cups sat where she left them.',
-      conversation: undefined,
-      policy: 'shared',
-    })
+    const context = compileSpecialistContext(
+      contextInput({
+        role: shape,
+        owesAnswer: true,
+        message: 'does the opening earn its length',
+        authorContext: 'prefers short sentences',
+        storyContext: 'a flash piece about a breakup',
+        draft: 'The cups sat where she left them.',
+      }),
+    )
 
     expect(context.role).toBe(shape)
     expect(context.owesAnswer).toBe(true)
@@ -31,63 +72,22 @@ describe('compileContext', () => {
   })
 
   it('carries no author or story context when neither has been written', () => {
-    const context = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: undefined,
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: undefined,
-      policy: 'shared',
-    })
+    const context = compileSpecialistContext(contextInput({ role: shape }))
 
     expect(context.authorContext).toBeUndefined()
     expect(context.storyContext).toBeUndefined()
   })
 
   it('is empty of history for the first round of a conversation', () => {
-    const context = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: 'a message',
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: undefined,
-      policy: 'shared',
-    })
+    const context = compileSpecialistContext(contextInput({ role: shape, message: 'a message' }))
 
     expect(context.history).toEqual([])
   })
 
-  const conversationWithMixedHistory: Conversation = {
-    id: 'c1',
-    rounds: [
-      {
-        id: 'r1',
-        message: 'first question',
-        addressed: [],
-        outcome: 'settled',
-        participants: [
-          { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } },
-          { participantId: 'compression', result: { kind: 'response', outcome: 'noComment' } },
-        ],
-      },
-    ],
-  }
-
   it('shared history includes every prior message and every substantive response, regardless of who gave it', () => {
-    const context = compileContext({
-      role: compression,
-      owesAnswer: false,
-      message: 'a second question',
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: conversationWithMixedHistory,
-      policy: 'shared',
-    })
+    const context = compileSpecialistContext(
+      contextInput({ role: compression, message: 'a second question', conversation: conversationWithMixedHistory }),
+    )
 
     expect(context.history).toEqual([
       { kind: 'message', text: 'first question' },
@@ -95,42 +95,12 @@ describe('compileContext', () => {
     ])
   })
 
-  it('shared history omits a no-comment outcome, which is not a reading', () => {
-    const context = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: undefined,
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: conversationWithMixedHistory,
-      policy: 'shared',
-    })
-
-    expect(context.history.some((entry) => entry.kind === 'response' && entry.participantId === 'compression')).toBe(false)
-  })
-
   it('the stricter policy filters another specialist\'s unapplied historical response and keeps the participant\'s own', () => {
-    const forShape = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: undefined,
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: conversationWithMixedHistory,
-      policy: 'stricter',
-    })
-    const forCompression = compileContext({
-      role: compression,
-      owesAnswer: false,
-      message: undefined,
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: conversationWithMixedHistory,
-      policy: 'stricter',
-    })
+    const stricter: HistoryPolicy = 'stricter'
+    const forShape = compileSpecialistContext(contextInput({ role: shape, conversation: conversationWithMixedHistory, policy: stricter }))
+    const forCompression = compileSpecialistContext(
+      contextInput({ role: compression, conversation: conversationWithMixedHistory, policy: stricter }),
+    )
 
     expect(forShape.history).toEqual([
       { kind: 'message', text: 'first question' },
@@ -139,34 +109,66 @@ describe('compileContext', () => {
     expect(forCompression.history).toEqual([{ kind: 'message', text: 'first question' }])
   })
 
-  it('never contains a response from the round being formed, because that round is not in `conversation` yet', () => {
-    const forShape = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: 'a fresh round',
-      authorContext: undefined,
-      storyContext: undefined,
-      draft: 'text',
-      conversation: conversationWithMixedHistory,
-      policy: 'shared',
-      evidence: [{ participantId: 'compression', claim: 'a reading from this very round', note: undefined }],
-    })
+  it('SPEC "Context compilation": carries no reading from the round being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
+    for (const policy of ['shared', 'stricter'] as const) {
+      const context = compileSpecialistContext(contextInput({ role: shape, conversation: conversationWithMixedHistory, policy }))
 
-    expect(JSON.stringify(forShape.history)).not.toContain('a reading from this very round')
+      // The invariant is that this list is empty for every specialist, always:
+      // the round's own readings reach one participant only, and it is not this
+      // one. `ContextInput` has no `evidence` field for a caller to pass, so this
+      // is the constructed object agreeing with the type rather than a filter
+      // that could be forgotten.
+      expect(context.evidence).toEqual([])
+    }
+  })
+
+  it('keeps the author\'s message from a round that was abandoned, since the message was still said', () => {
+    const abandonedRound: Conversation = {
+      id: 'c1',
+      rounds: [
+        {
+          id: 'r1',
+          message: 'the question that went unanswered',
+          addressed: [],
+          outcome: 'abandoned',
+          participants: [{ participantId: 'shape', result: { kind: 'abandoned' } }],
+        },
+      ],
+    }
+
+    const context = compileSpecialistContext(contextInput({ role: shape, conversation: abandonedRound }))
+
+    expect(context.history).toEqual([{ kind: 'message', text: 'the question that went unanswered' }])
+  })
+})
+
+describe('compileStoryEditorContext', () => {
+  it('SPEC "Context compilation": alone weighs the round\'s own readings, beside the history every call gets', () => {
+    const context = compileStoryEditorContext(
+      contextInput({ role: shape, message: 'a second question', conversation: conversationWithMixedHistory }),
+      [{ participantId: 'compression', claim: 'a reading from this very round', note: undefined }],
+    )
+
+    expect(context.evidence).toEqual([{ participantId: 'compression', claim: 'a reading from this very round', note: undefined }])
+    expect(context.history).toEqual([
+      { kind: 'message', text: 'first question' },
+      { kind: 'response', participantId: 'shape', claim: 'the entry is late', note: undefined },
+    ])
+  })
+
+  it('renders the round\'s readings as their own section, distinct from the conversation so far', () => {
+    const context = compileStoryEditorContext(contextInput({ role: shape, conversation: conversationWithMixedHistory }), [
+      { participantId: 'compression', claim: 'the third line carries nothing', note: undefined },
+    ])
+
+    const prompt = renderPrompt(context, charter)
+    expect(prompt).toContain('Readings from this round')
+    expect(prompt).toContain('the third line carries nothing')
   })
 })
 
 describe('renderPrompt', () => {
-  const baseContext = compileContext({
-    role: shape,
-    owesAnswer: false,
-    message: undefined,
-    authorContext: undefined,
-    storyContext: undefined,
-    draft: 'The cups sat where she left them.',
-    conversation: undefined,
-    policy: 'shared',
-  })
+  const baseContext = compileSpecialistContext(contextInput({ role: shape, draft: 'The cups sat where she left them.' }))
 
   it('omits an unwritten context section entirely, rather than sending an empty heading', () => {
     const prompt = renderPrompt(baseContext, charter)
@@ -175,16 +177,9 @@ describe('renderPrompt', () => {
   })
 
   it('includes a context section, heading and body, once the author has written it', () => {
-    const context = compileContext({
-      role: shape,
-      owesAnswer: false,
-      message: undefined,
-      authorContext: 'prefers short sentences',
-      storyContext: 'a flash piece about a breakup',
-      draft: 'text',
-      conversation: undefined,
-      policy: 'shared',
-    })
+    const context = compileSpecialistContext(
+      contextInput({ role: shape, authorContext: 'prefers short sentences', storyContext: 'a flash piece about a breakup' }),
+    )
 
     const prompt = renderPrompt(context, charter)
     expect(prompt).toContain('Author context')
@@ -204,23 +199,10 @@ describe('renderPrompt', () => {
   })
 
   it('states that an answer is owed only when the call owes one', () => {
-    const owed = compileContext({ ...contextInputFor(shape), owesAnswer: true })
-    const eligible = compileContext({ ...contextInputFor(shape), owesAnswer: false })
+    const owed = compileSpecialistContext(contextInput({ role: shape, owesAnswer: true }))
+    const eligible = compileSpecialistContext(contextInput({ role: shape, owesAnswer: false }))
 
     expect(renderPrompt(owed, charter)).toContain(charter.directQuestionOwedAnswer)
     expect(renderPrompt(eligible, charter)).not.toContain(charter.directQuestionOwedAnswer)
   })
 })
-
-function contextInputFor(role: RoleDefinition) {
-  return {
-    role,
-    owesAnswer: false,
-    message: undefined,
-    authorContext: undefined,
-    storyContext: undefined,
-    draft: 'text',
-    conversation: undefined,
-    policy: 'shared' as const,
-  }
-}

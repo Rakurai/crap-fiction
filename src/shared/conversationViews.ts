@@ -6,8 +6,7 @@ import { failureReasonSchema } from './modelResult.js'
  * CONTEXT "Response"/"Round": a no-comment outcome carries neither claim nor
  * note; failure, silence and abandonment are ordinary and distinct from one
  * another, never collapsed into a missing value.
- */
-/**
+ *
  * `z.union` rather than `z.discriminatedUnion`: two of these members share
  * `kind: 'response'`, discriminated further by `outcome`, and
  * `discriminatedUnion` requires one discriminator value per member. A plain
@@ -27,6 +26,19 @@ export const participantResultSchema = z.union([
 ])
 
 export type ParticipantResult = z.infer<typeof participantResultSchema>
+
+/**
+ * A response that says something: the two outcomes that carry a claim. Both
+ * the history a later call is compiled from and the evidence the Story Editor
+ * weighs are made of these, and both need the claim's presence to be a fact
+ * about the type rather than a re-check — hence a narrowing function rather
+ * than a filter each caller writes and then has to assert its way out of.
+ */
+export type SubstantiveResponse = Extract<ParticipantResult, { kind: 'response'; outcome: 'commentary' | 'applicableSuggestion' }>
+
+export function substantiveResponse(result: ParticipantResult): SubstantiveResponse | undefined {
+  return result.kind === 'response' && result.outcome !== 'noComment' ? result : undefined
+}
 
 export const roundParticipantRecordSchema = z.object({
   participantId: z.string().min(1),

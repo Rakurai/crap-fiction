@@ -4,12 +4,13 @@ import type { ModelAccess } from '../model/modelAccess.js'
 import type { ModeDescriptor } from '../modes.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
-import { readConversation, readPiece, writeConversation, writePieceCast } from '../store/index.js'
-import { conversationSchema, type RoundParticipantRecord, type RoundRecord } from '../../shared/conversationViews.js'
+import { readConversation, readPiece, TolerantReadError, writeConversation, writePieceCast } from '../store/index.js'
+import { conversationSchema, type Conversation, type RoundParticipantRecord, type RoundRecord } from '../../shared/conversationViews.js'
 import type {
   ParticipantSettledEvent,
   ParticipantStateEvent,
   RoomErrorEvent,
+  RoomFailureCode,
   RoundClosedEvent,
   RoundOpenedEvent,
   RoundSnapshot,
@@ -34,7 +35,9 @@ export class RoomBusyError extends Error {
 
 type Listener = (event: RoomEvent) => void
 
-type ActiveOperation = {
+/** A round under way, as the room tracks it while it runs. */
+type ActiveRound = {
+  readonly pieceId: string
   readonly conversationId: string
   readonly roundId: string
   readonly message: string | undefined
@@ -42,6 +45,16 @@ type ActiveOperation = {
   readonly states: Map<string, 'preparing' | 'working'>
   readonly settled: RoundParticipantRecord[]
   readonly controller: AbortController
+}
+
+type ActiveOperation = ActiveRound & {
+  /**
+   * The round's own completion. A round outlives the request that opened it, so
+   * without this the promise driving it would be floating; held here it belongs
+   * to the object that represents the round, and a caller that needs to know the
+   * round is over can await it instead of watching for its absence.
+   */
+  readonly settlement: Promise<void>
 }
 
 /**
@@ -87,11 +100,19 @@ export class Room {
   readonly #policy: HistoryPolicy
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
-  readonly #operations = new Map<string, ActiveOperation>()
-  readonly #settlements = new Map<string, Promise<void>>()
   readonly #listeners = new Map<string, Set<Listener>>()
+  /**
+   * SPEC "Model access": there is no scheduler, and no runtime is ever asked to
+   * hold more than one call. The room is one object for the whole studio, so
+   * that bound is the room's to keep rather than each piece's — two pieces open
+   * at once would otherwise issue concurrent calls against the single local
+   * model. Hence one operation and not a map: the piece it belongs to is a
+   * field on it, so that a snapshot or an abandon naming a different piece
+   * finds nothing rather than reaching this one.
+   */
+  #operation: ActiveOperation | undefined = undefined
 
-  constructor(modelAccess: ModelAccess, roles: readonly RoleDefinition[], charter: Charter, mode: ModeDescriptor, policy: HistoryPolicy = 'shared') {
+  constructor(modelAccess: ModelAccess, roles: readonly RoleDefinition[], charter: Charter, mode: ModeDescriptor, policy: HistoryPolicy) {
     this.#modelAccess = modelAccess
     this.#charter = charter
     this.#policy = policy
@@ -111,8 +132,12 @@ export class Room {
     for (const listener of this.#listeners.get(pieceId) ?? []) listener(event)
   }
 
+  #operationFor(pieceId: string): ActiveOperation | undefined {
+    return this.#operation?.pieceId === pieceId ? this.#operation : undefined
+  }
+
   snapshot(pieceId: string): RoundSnapshot | undefined {
-    const operation = this.#operations.get(pieceId)
+    const operation = this.#operationFor(pieceId)
     if (operation === undefined) return undefined
     return {
       conversationId: operation.conversationId,
@@ -129,20 +154,26 @@ export class Room {
    * is the only thing it is parsed for. Addressing a specialist that is not
    * enabled enables it — the same durable write to `piece.yaml` as enabling
    * it directly — before the round opens.
+   *
+   * `message` is optional because a round can be opened by an act rather than
+   * by something the author typed, and CONTEXT "Round" keeps the record honest
+   * about which it was rather than composing words on the author's behalf.
+   * There is then nothing to read for addressing, so nothing is read.
    */
   async startRound(
     workspaceDir: string,
     pieceId: string,
     conversationId: string,
-    message: string,
+    message: string | undefined,
     draft: string,
   ): Promise<{ conversationId: string; roundId: string }> {
-    if (this.#operations.has(pieceId)) throw new RoomBusyError(pieceId)
+    const holder = this.#operation
+    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const addressed = parseAddressing(message, [...this.#specialists, this.#storyEditor])
+    const addressed = message === undefined ? [] : parseAddressing(message, [...this.#specialists, this.#storyEditor])
     const addressedIds = addressed.map((role) => role.id)
 
     const eligibleSpecialists =
@@ -169,7 +200,8 @@ export class Room {
     }
     const participants = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
 
-    const operation: ActiveOperation = {
+    const round: ActiveRound = {
+      pieceId,
       conversationId,
       roundId,
       message,
@@ -178,22 +210,46 @@ export class Room {
       settled: [],
       controller: new AbortController(),
     }
-    this.#operations.set(pieceId, operation)
     this.#emit(pieceId, { type: 'round.opened', data: { conversationId, roundId, message, participants } })
 
-    this.#settlements.set(
-      pieceId,
-      this.#run(workspaceDir, pieceId, conversationId, plan, draft, operation).finally(() => {
-        this.#operations.delete(pieceId)
-        this.#settlements.delete(pieceId)
-      }),
-    )
+    // The round is under way before there is a promise to represent it, so the
+    // operation is completed rather than mutated: the states map and the settled
+    // list are the same objects the running round writes into, so what a
+    // snapshot reads is the round's own progress and not a copy of its start.
+    // Clearing the operation is what frees the room, so it happens whichever way
+    // the round ended.
+    const settlement = this.#run(workspaceDir, pieceId, conversationId, plan, draft, round).finally(() => {
+      this.#operation = undefined
+    })
+    this.#operation = { ...round, settlement }
 
     return { conversationId, roundId }
   }
 
+  /**
+   * The round in flight for a piece, as something to wait on. A round settles
+   * after the request that opened it has already been answered, so a caller that
+   * needs the round finished — rather than merely started — has nothing else to
+   * hold; watching for the round's absence would be a polling loop.
+   */
+  settlement(pieceId: string): Promise<void> | undefined {
+    return this.#operationFor(pieceId)?.settlement
+  }
+
   abandon(pieceId: string): void {
-    this.#operations.get(pieceId)?.controller.abort()
+    this.#operationFor(pieceId)?.controller.abort()
+  }
+
+  /**
+   * A failure of the room's own, rather than of a participant's call. Both
+   * events go out and in this order: the code is the notice the author is shown,
+   * and the close is what stops the round being drawn as still running (SPEC
+   * "Operation state"). Emitting one without the other is how a round becomes
+   * permanently in flight in the client's projection.
+   */
+  #fail(pieceId: string, roundId: string, code: RoomFailureCode, message: string): void {
+    this.#emit(pieceId, { type: 'error', data: { code, message } })
+    this.#emit(pieceId, { type: 'round.closed', data: { roundId, outcome: 'failed' } })
   }
 
   async #run(
@@ -202,12 +258,25 @@ export class Room {
     conversationId: string,
     plan: RoundPlan,
     draft: string,
-    operation: ActiveOperation,
+    operation: ActiveRound,
   ): Promise<void> {
+    let existing: Conversation | undefined
     try {
-      const existing = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+      existing = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+    } catch (err) {
+      // A conversation file the store cannot read is the one failure the round
+      // meets before it has done anything, and it is the author's to act on —
+      // the round never opens against a record the studio would then overwrite.
+      if (err instanceof TolerantReadError) {
+        this.#fail(pieceId, plan.roundId, 'CONVERSATION_UNREADABLE', err.message)
+        return
+      }
+      throw err
+    }
 
-      const result = await runRound({
+    let result: Awaited<ReturnType<typeof runRound>>
+    try {
+      result = await runRound({
         plan,
         draft,
         authorContext: undefined,
@@ -232,25 +301,38 @@ export class Room {
           },
         },
       })
+    } catch (err) {
+      // Every outcome a participant call can have is already a record `runRound`
+      // returns, so reaching here means something the room has no vocabulary for
+      // — nothing to name to the author, and nothing to write. The round still
+      // closes, because a round that stopped running and is still drawn as
+      // running is a worse failure than the one that caused it, and then the
+      // error propagates: this is not the room's to handle.
+      this.#emit(pieceId, { type: 'round.closed', data: { roundId: plan.roundId, outcome: 'failed' } })
+      throw err
+    }
 
-      const round: RoundRecord = {
-        id: plan.roundId,
-        message: plan.message,
-        addressed: plan.addressedIds,
-        participants: result.participants,
-        outcome: result.outcome,
-      }
+    const record: RoundRecord = {
+      id: plan.roundId,
+      message: plan.message,
+      addressed: plan.addressedIds,
+      participants: result.participants,
+      outcome: result.outcome,
+    }
+    try {
       await writeConversation(workspaceDir, pieceId, conversationId, {
         id: conversationId,
-        rounds: [...(existing?.rounds ?? []), round],
+        rounds: [...(existing?.rounds ?? []), record],
       })
-
-      this.#emit(pieceId, { type: 'round.closed', data: { roundId: plan.roundId, outcome: result.outcome } })
     } catch (err) {
-      this.#emit(pieceId, {
-        type: 'error',
-        data: { code: 'ROOM_FAILURE', message: err instanceof Error ? err.message : 'the room failed unexpectedly' },
-      })
+      // The round happened and cannot be un-happened, but it is not on disk, so
+      // the author is told rather than left to discover on the next reload that
+      // the exchange they just read is gone. The close carries `failed` for the
+      // same reason: what settled did not become part of the record.
+      this.#fail(pieceId, plan.roundId, 'CONVERSATION_NOT_WRITTEN', err instanceof Error ? err.message : 'the conversation could not be written')
+      return
     }
+
+    this.#emit(pieceId, { type: 'round.closed', data: { roundId: plan.roundId, outcome: result.outcome } })
   }
 }

@@ -1,7 +1,9 @@
 import slugify from '@sindresorhus/slugify'
 import { Mutex } from 'async-mutex'
+import { nanoid } from 'nanoid'
 import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
 import type { PieceDetail, PieceSummary } from '../shared/pieceViews.js'
+import type { RoundSnapshot } from '../shared/roundEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
 import {
@@ -101,21 +103,36 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
  * `PieceNotFoundError`, since an author who typed a stray id gets no more
  * information from a path-traversal attempt than from a piece that never
  * existed.
+ *
+ * Whether a round is in flight is the room's fact and not this module's, so it
+ * is a parameter rather than something read here or left `null` for a caller to
+ * overwrite (SPEC "Seams": the room boundary owns the operations the author
+ * starts). A caller therefore cannot compose this view without having asked.
  */
-/**
- * The room's own state — a round in flight — is not this module's to know,
- * so `getPiece` reports `roundInFlight: null` unconditionally; the route
- * merges in whatever the room reports for this piece (SPEC "Seams": the room
- * boundary owns the operations the author starts).
- */
-export function getPiece(workspaceDir: string, id: string): PieceDetail {
+export function getPiece(workspaceDir: string, id: string, roundInFlight: RoundSnapshot | null): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
   return {
     ...summarize(id, piece),
     draft: piece.draft?.text ?? '',
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
-    roundInFlight: null,
+    roundInFlight,
   }
+}
+
+/**
+ * CONTEXT "Conversation": starting one is an intention until its first round
+ * opens, so this writes nothing — it names the conversation the first round will
+ * be written under. The piece is checked all the same, because an id naming no
+ * piece must not come back holding a conversation name the author could then
+ * send a round to.
+ *
+ * The name is minted here rather than in the route: which identifiers a piece's
+ * artifacts carry is this module's vocabulary, and a route that minted one would
+ * be deciding it.
+ */
+export function startConversation(workspaceDir: string, pieceId: string): { readonly id: string } {
+  if (!pieceExists(workspaceDir, pieceId)) throw new PieceNotFoundError(pieceId)
+  return { id: nanoid() }
 }
 
 /**

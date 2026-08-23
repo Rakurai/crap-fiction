@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import { fail, ok } from '../shared/envelope.js'
@@ -20,9 +19,10 @@ import {
   getPiece,
   listPieces,
   PieceNotFoundError,
+  startConversation,
 } from './pieces.js'
 import { RoomBusyError, type Room } from './room/room.js'
-import { writeSseEvent } from './sse.js'
+import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
@@ -76,8 +76,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    const piece = getPiece(workspace.require(), id)
-    return c.json(ok({ ...piece, roundInFlight: room.snapshot(id) ?? null }))
+    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null)))
   })
 
   app.put('/pieces/:id/draft', validateJson(putDraftSchema), async (c) => {
@@ -87,7 +86,7 @@ export function createApp(
   })
 
   app.post('/pieces/:id/conversations', (c) => {
-    return c.json(ok({ id: nanoid() }))
+    return c.json(ok(startConversation(workspace.require(), c.req.param('id'))))
   })
 
   app.get('/pieces/:id/conversations/:cid', (c) => {
@@ -108,13 +107,11 @@ export function createApp(
   app.get('/pieces/:id/events', (c) => {
     const pieceId = c.req.param('id')
     return streamSSE(c, async (stream) => {
-      let pending: Promise<void> = Promise.resolve()
-      const unsubscribe = room.subscribe(pieceId, (event) => {
-        pending = pending.then(() => writeSseEvent(stream, event.type, event.data))
-      })
+      const events = sseStream(stream)
+      const unsubscribe = room.subscribe(pieceId, (event) => events.write(event.type, event.data))
       await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
       unsubscribe()
-      await pending.catch(() => undefined)
+      await events.drain()
     })
   })
 
