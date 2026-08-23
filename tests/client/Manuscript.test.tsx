@@ -31,6 +31,29 @@ function leaveControl(): HTMLButtonElement {
   return screen.getByRole('button', { name: '‹ pieces' })
 }
 
+describe('the reading view', () => {
+  afterEach(cleanup)
+
+  it('holds no control at all, and says so in the register rather than in a footer', () => {
+    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
+
+    expect(screen.queryAllByRole('button')).toEqual([])
+    expect(screen.getByText('ESC TO RETURN')).toBeTruthy()
+  })
+
+  it('is left by the keystroke the hint names', () => {
+    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByText('ESC TO RETURN')).toBeNull()
+    expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
+  })
+})
+
 describe('the manuscript while a save is failing', () => {
   beforeEach(() => {
     vi.useFakeTimers()

@@ -80,6 +80,7 @@ export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptP
               <EditorContent editor={manuscript.editor} />
             </div>
           )}
+          {reading && <p className={styles.readingHint}>ESC TO RETURN</p>}
         </div>
       </div>
 
@@ -91,15 +92,6 @@ export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptP
             unavailable while “{title}” is unsaved.
           </p>
           {autosave.message !== undefined && <span className={styles.saveFailedCause}>{machineWords(autosave.message)}</span>}
-        </div>
-      )}
-
-      {reading && (
-        <div className={styles.readingFooter}>
-          <span className={styles.readingHint}>ESC TO RETURN</span>
-          <button type="button" className={styles.readingBack} onClick={manuscript.showRendered}>
-            back to writing
-          </button>
         </div>
       )}
     </div>
