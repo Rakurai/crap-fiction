@@ -6,8 +6,9 @@ import { HorizontalRule } from '@tiptap/extension-horizontal-rule'
 import { Italic } from '@tiptap/extension-italic'
 import { Paragraph } from '@tiptap/extension-paragraph'
 import { Text } from '@tiptap/extension-text'
+import { closeHistory } from '@tiptap/pm/history'
 import { useEditor, type Editor } from '@tiptap/react'
-import { useCallback, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { editorContentToMarkdown, markdownToEditorContent } from '../document/markdown.js'
 import { countWords } from '../shared/storyLength.js'
 
@@ -29,6 +30,7 @@ export type ManuscriptViewModel = {
   readonly sourceText: string
   readonly length: number
   readonly markdown: string
+  readonly containerRef: RefObject<HTMLDivElement | null>
   readonly setSourceText: (text: string) => void
   readonly showRendered: () => void
   readonly showSource: () => void
@@ -36,16 +38,53 @@ export type ManuscriptViewModel = {
 }
 
 /**
+ * Replaces the editor's content with the source text's meaning as one
+ * transaction, and places a history boundary on it explicitly rather than
+ * relying on the editor's own idle-time grouping — which the SPEC calls
+ * trivial machinery, not custom machinery, and which would otherwise let a
+ * fast round trip merge into whatever the author typed just before it.
+ */
+function applySourceText(editor: Editor, text: string) {
+  editor
+    .chain()
+    .setContent(markdownToEditorContent(text), { emitUpdate: true })
+    .command(({ tr }) => {
+      closeHistory(tr)
+      return true
+    })
+    .run()
+}
+
+/**
  * Owns the one thing SPEC "The prose surface" asks of the editing surface
  * beyond what TipTap already carries: which of the three ways to see the
- * manuscript is current, and moving between them without losing meaning.
- * Selection, clipboard, history and formatting stay the editor's own.
+ * manuscript is current, and moving between them without losing meaning or
+ * the reading/scroll position. Selection, clipboard, history and formatting
+ * stay the editor's own. Each `showX` is the one call a caller makes to
+ * enter that view — it captures the outgoing scroll ratio and restores it
+ * itself, so nothing outside this hook sequences the switch.
  */
 export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   const [view, setView] = useState<ManuscriptView>('rendered')
   const [sourceText, setSourceText] = useState('')
   const [length, setLength] = useState(() => countWords(initialMarkdown))
   const [markdown, setMarkdown] = useState(initialMarkdown)
+
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const pendingScrollRatio = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    const ratio = pendingScrollRatio.current
+    if (container === null || ratio === null) return
+    container.scrollTop = ratio * container.scrollHeight
+    pendingScrollRatio.current = null
+  }, [view])
+
+  const captureScrollRatio = useCallback(() => {
+    const container = containerRef.current
+    pendingScrollRatio.current = container !== null && container.scrollHeight > 0 ? container.scrollTop / container.scrollHeight : 0
+  }, [])
 
   const editor = useEditor({
     extensions: EXTENSIONS,
@@ -64,28 +103,31 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const showRendered = useCallback(() => {
     if (editor === null) return
+    captureScrollRatio()
     if (view === 'source') {
-      editor.commands.setContent(markdownToEditorContent(sourceText), { emitUpdate: true })
+      applySourceText(editor, sourceText)
     } else {
       editor.setEditable(true)
     }
     setView('rendered')
-  }, [editor, view, sourceText])
+  }, [editor, view, sourceText, captureScrollRatio])
 
   const showSource = useCallback(() => {
     if (editor === null || view === 'source') return
+    captureScrollRatio()
     setSourceText(editorContentToMarkdown(editor.getJSON()))
     setView('source')
-  }, [editor, view])
+  }, [editor, view, captureScrollRatio])
 
   const showReading = useCallback(() => {
     if (editor === null) return
+    captureScrollRatio()
     if (view === 'source') {
-      editor.commands.setContent(markdownToEditorContent(sourceText), { emitUpdate: true })
+      applySourceText(editor, sourceText)
     }
     editor.setEditable(false)
     setView('reading')
-  }, [editor, view, sourceText])
+  }, [editor, view, sourceText, captureScrollRatio])
 
-  return { editor, view, sourceText, length, markdown, setSourceText: updateSourceText, showRendered, showSource, showReading }
+  return { editor, view, sourceText, length, markdown, containerRef, setSourceText: updateSourceText, showRendered, showSource, showReading }
 }

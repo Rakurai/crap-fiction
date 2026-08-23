@@ -1,5 +1,5 @@
 import { EditorContent } from '@tiptap/react'
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 
@@ -23,40 +23,15 @@ type ManuscriptProps = {
 export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
   const autosave = useAutosave(pieceId, manuscript.markdown)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const pendingScrollRatio = useRef<number | null>(null)
-
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    const ratio = pendingScrollRatio.current
-    if (container === null || ratio === null) return
-    container.scrollTop = ratio * container.scrollHeight
-    pendingScrollRatio.current = null
-  }, [manuscript.view])
-
-  const captureScrollRatio = useCallback(() => {
-    const container = containerRef.current
-    pendingScrollRatio.current = container !== null && container.scrollHeight > 0 ? container.scrollTop / container.scrollHeight : 0
-  }, [])
-
-  const handleShowSource = useCallback(() => {
-    captureScrollRatio()
-    manuscript.showSource()
-  }, [captureScrollRatio, manuscript])
-
-  const handleShowRendered = useCallback(() => {
-    if (manuscript.view === 'source') captureScrollRatio()
-    manuscript.showRendered()
-  }, [captureScrollRatio, manuscript])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') handleShowRendered()
+      if (event.key === 'Escape') manuscript.showRendered()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [manuscript.view, handleShowRendered])
+  }, [manuscript.view, manuscript.showRendered])
 
   return (
     <div>
@@ -67,7 +42,7 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
           </button>
           <span>{title}</span>
           <span>{manuscript.length} words</span>
-          <button type="button" onClick={manuscript.view === 'source' ? handleShowRendered : handleShowSource}>
+          <button type="button" onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
             {manuscript.view === 'source' ? 'rendered' : 'source'}
           </button>
           <button type="button" onClick={manuscript.showReading}>
@@ -77,7 +52,7 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
         </div>
       )}
 
-      <div ref={containerRef}>
+      <div ref={manuscript.containerRef}>
         {manuscript.view === 'source' ? (
           <textarea
             aria-label="Manuscript source"
@@ -92,7 +67,7 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
       {manuscript.view === 'reading' && (
         <div>
           <span>Esc to return</span>
-          <button type="button" onClick={handleShowRendered}>
+          <button type="button" onClick={manuscript.showRendered}>
             back to writing
           </button>
         </div>
