@@ -47,6 +47,25 @@
   width: 420px;
 }
 
+/*
+ * The register speaks in upper case, and here that is a typographic matter
+ * rather than the text's: a path is data, and upper-casing the string would
+ * hand the author one their filesystem may not have.
+ */
+.workspace {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin: 0 0 16px;
+  word-break: break-all;
+}
+
+.creating {
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+
 .error {
   font: 400 11.5px/1.45 var(--font-ui);
   color: var(--ink2);

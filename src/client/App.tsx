@@ -17,7 +17,7 @@ export function App() {
       {workspace.status === 'unset' && (
         <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
       )}
-      {workspace.status === 'set' && <PiecesScreen />}
+      {workspace.status === 'set' && <PiecesScreen workspace={workspace.workspace} />}
     </div>
   )
 }

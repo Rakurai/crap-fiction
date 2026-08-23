@@ -8,13 +8,23 @@ import { ThemeToggle } from './ThemeToggle.js'
 import { usePieces } from './usePieces.js'
 import { useTheme } from './useTheme.js'
 
+type PiecesScreenProps = {
+  readonly workspace: string
+}
+
 /**
  * PRD "Move on to the next piece"/"Say where the work lives": the screen the
  * studio launches into. Model assignment is a place the author goes from
  * here (UX_DESIGN "Prominence"), alongside the theme, creating, listing and
  * opening pieces.
+ *
+ * The workspace directory heads it in the facts register, because this is the
+ * one screen where which directory the author is looking at is the standing
+ * question. The listing itself is the list: creating a piece is a control under
+ * the closing rule, and the field arrives when the author reaches for it rather
+ * than standing empty above their own stories.
  */
-export function PiecesScreen() {
+export function PiecesScreen({ workspace }: PiecesScreenProps) {
   const pieces = usePieces()
   const theme = useTheme()
   const [openedId, setOpenedId] = useState<string | undefined>(undefined)
@@ -34,7 +44,7 @@ export function PiecesScreen() {
         <ThemeToggle theme={theme.theme} onChoose={theme.choose} />
         <span className={styles.spacer} />
         <button type="button" className={styles.modelsButton} onClick={() => setShowCallSites(true)}>
-          Models
+          models
         </button>
       </div>
       <div className={styles.center}>
@@ -49,19 +59,22 @@ export function PiecesScreen() {
               {theme.chooseError}
             </p>
           )}
-          <NewPieceForm
-            submitting={pieces.status === 'ready' && pieces.creating}
-            error={pieces.status === 'ready' ? pieces.createError : undefined}
-            onSubmit={(title) => {
-              if (pieces.status === 'ready') pieces.create(title)
-            }}
-          />
+          <p className={styles.workspace}>{workspace}</p>
           {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} onOpen={setOpenedId} />}
           {pieces.status === 'error' && (
             <p className={styles.error} role="alert">
               {pieces.message}
             </p>
           )}
+          <div className={styles.creating}>
+            <NewPieceForm
+              submitting={pieces.status === 'ready' && pieces.creating}
+              error={pieces.status === 'ready' ? pieces.createError : undefined}
+              onSubmit={(title) => {
+                if (pieces.status === 'ready') pieces.create(title)
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
