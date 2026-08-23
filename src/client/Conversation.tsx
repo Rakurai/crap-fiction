@@ -1,12 +1,18 @@
-import { useState, type ReactNode } from 'react'
+import * as Ariakit from '@ariakit/react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Clock } from '../shared/clock.js'
 import { elapsed, facts, machineWords } from './facts.js'
 import styles from './Conversation.module.css'
+import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { everyCallFailed, tallyRound, type ProjectedParticipant, type ProjectedRound } from './roundProjection.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
+import type { HandleEntry } from './useRoster.js'
 import { useNow } from './useNow.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
+
+/** How many suggestions the composer's own combobox offers at once, so a broad prefix does not fill the screen. */
+const MAX_MENTION_MATCHES = 8
 
 type ConversationProps = {
   readonly pieceId: string
@@ -19,6 +25,8 @@ type ConversationProps = {
   readonly displayName: (participantId: string) => string
   /** The participant's own colour, stable for as long as the room is. */
   readonly mark: (participantId: string) => string
+  /** SPEC "The room": the shipped handles the composer's own combobox offers, read from the roster. */
+  readonly handles: readonly HandleEntry[]
   /**
    * Whether a model can be reached, as the screen last heard it. `undefined` is
    * not "unreachable": it is nothing heard either way, and a notice drawn from it
@@ -132,6 +140,19 @@ function roundFacts(round: ProjectedRound, nowMs: number): string {
 }
 
 /**
+ * UX_DESIGN "Where the author speaks": addressing an absent specialist brings
+ * it into the room's own durable cast, and the change is never something the
+ * author discovers later — it is said beside the round that caused it, in the
+ * mockup's own "ROOM CHANGED" placement, rather than folded into the round's
+ * facts line above.
+ */
+function roomChangedText(names: readonly string[]): string {
+  const [only] = names
+  if (names.length === 1 && only !== undefined) return `${only} was addressed and is now in the room.`
+  return `${names.join(', ')} were addressed and are now in the room.`
+}
+
+/**
  * UX_DESIGN "An operation in flight": the mockup's own placement, beside the
  * round's own facts line rather than at the composer — it is this round being
  * stopped, not the surface as a whole.
@@ -163,6 +184,12 @@ function RoundView({
   return (
     <div className={styles.round}>
       {round.message !== undefined && <p className={styles.message}>{round.message}</p>}
+      {round.brought.length > 0 && (
+        <div className={styles.roomChanged}>
+          <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
+          <span className={styles.roomChangedWords}>{roomChangedText(round.brought.map(displayName))}</span>
+        </div>
+      )}
       {round.outcome === 'inFlight' && <RoundFlight round={round} nowMs={nowMs} onAbandon={onAbandon} />}
       {round.participants.map((participant) => (
         <ParticipantBlock
@@ -188,9 +215,7 @@ function RoundView({
 
 /**
  * UX_DESIGN "The conversation": the second permanent surface, adjacent to
- * the manuscript. This tracer keeps to what issue #9 asks — one composer, the
- * accumulating rounds, and a round in flight staying legible — not the full
- * response-card and handle-combobox composition UX_DESIGN describes.
+ * the manuscript.
  */
 export function Conversation({
   pieceId,
@@ -201,10 +226,35 @@ export function Conversation({
   room,
   displayName,
   mark,
+  handles,
   runtime,
   clock,
 }: ConversationProps) {
   const [message, setMessage] = useState('')
+  const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
+  const [caretOffset, setCaretOffset] = useState<number | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const combobox = Ariakit.useComboboxStore()
+  const token = Ariakit.useStoreState(combobox, 'inputValue')
+
+  // SPEC "The room"/CODING_STANDARDS "The addressing parser... stay this
+  // repository's own": the same prefix rule the room reads a sigil by, offering
+  // rather than deciding — the room's own reading of the words the author sent
+  // is the only thing that ever addresses anyone.
+  const matches = useMemo(
+    () => (query === undefined ? [] : handles.filter((entry) => entry.handle.startsWith(token.toLowerCase())).slice(0, MAX_MENTION_MATCHES)),
+    [handles, query, token],
+  )
+
+  useLayoutEffect(() => {
+    combobox.setOpen(matches.length > 0)
+  }, [combobox, matches.length])
+
+  useLayoutEffect(() => {
+    if (caretOffset === null) return
+    textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
+  }, [caretOffset])
+
   const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
   const counting = conversation.projection.rounds.some((round) => round.outcome === 'inFlight')
   const nowMs = useNow(counting, clock)
@@ -214,6 +264,17 @@ export function Conversation({
     if (text.length === 0 || conversation.busy) return
     conversation.sendMessage(text)
     setMessage('')
+  }
+
+  function selectHandle(handle: string) {
+    if (query === undefined) return
+    const completed = completeMention(message, query, handle)
+    setQuery(undefined)
+    combobox.setInputValue('')
+    combobox.hide()
+    setMessage(completed.value)
+    setCaretOffset(completed.caret)
+    textareaRef.current?.focus()
   }
 
   return (
@@ -251,19 +312,64 @@ export function Conversation({
         <label className={styles.visuallyHidden} htmlFor="conversation-message">
           Message the room
         </label>
-        {/*
-         * Not disabled while the round is in flight. UX_DESIGN "A round in flight":
-         * nothing about a round in flight is a reason to stop typing, and taking the
-         * field away is exactly that. Sending is what waits — the button says so,
-         * and `submit` refuses either way.
-         */}
-        <input
-          id="conversation-message"
-          className={styles.input}
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder="what isn’t working about the ending"
-        />
+        <div className={styles.field}>
+          {/*
+           * Not disabled while the round is in flight. UX_DESIGN "A round in flight":
+           * nothing about a round in flight is a reason to stop typing, and taking the
+           * field away is exactly that. Sending is what waits — the button says so,
+           * and `submit` refuses either way.
+           *
+           * SPEC: "@ariakit/react"... "the combobox that offers handles as the
+           * author types one — the completion surface only". `value` carries the
+           * whole message; the store's own `inputValue` is only ever the live
+           * `@token`, kept separate so the room still reads the author's own text
+           * and never this combobox's idea of what was typed.
+           */}
+          <Ariakit.Combobox
+            id="conversation-message"
+            store={combobox}
+            className={styles.input}
+            value={message}
+            showOnClick={false}
+            showOnChange={false}
+            showOnKeyPress={false}
+            setValueOnChange={false}
+            render={
+              <textarea
+                ref={textareaRef}
+                rows={2}
+                placeholder="what isn’t working about the ending"
+                onPointerDown={combobox.hide}
+                onChange={(event) => {
+                  const textarea = event.target
+                  const next = mentionQuery(textarea.value, textarea.selectionStart ?? textarea.value.length)
+                  setQuery(next)
+                  setMessage(textarea.value)
+                  combobox.setInputValue(next?.token ?? '')
+                }}
+                onKeyDown={(event) => {
+                  // The caret leaving the token is the token closing, the same as
+                  // typing a space would: nothing left to complete.
+                  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') combobox.hide()
+                }}
+              />
+            }
+          />
+          <Ariakit.ComboboxPopover store={combobox} hidden={matches.length === 0} unmountOnHide gutter={4} className={styles.mentions}>
+            {matches.map((entry) => (
+              <Ariakit.ComboboxItem
+                key={entry.handle}
+                value={entry.handle}
+                focusOnHover
+                className={styles.mention}
+                onClick={() => selectHandle(entry.handle)}
+              >
+                <span className={styles.mentionHandle}>@{entry.handle}</span>
+                <span className={styles.mentionName}>{entry.displayName}</span>
+              </Ariakit.ComboboxItem>
+            ))}
+          </Ariakit.ComboboxPopover>
+        </div>
         <button type="submit" className={styles.send} disabled={conversation.busy || message.trim().length === 0}>
           {conversation.busy ? '…' : 'send'}
         </button>

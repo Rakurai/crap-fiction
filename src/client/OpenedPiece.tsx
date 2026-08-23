@@ -52,6 +52,7 @@ function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly on
           room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation }}
           displayName={roster.displayName}
           mark={roster.mark}
+          handles={roster.handles}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
           clock={Date.now}
         />

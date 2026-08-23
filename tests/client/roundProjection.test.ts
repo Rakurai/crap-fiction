@@ -19,8 +19,8 @@ import type { RoundClosedEvent, RoundSnapshot } from '../../src/shared/roundEven
  */
 const OPENED_AT = 1_700_000_000_000
 
-function opened(roundId: string, participants: readonly string[], message?: string): RoundEvent {
-  return { type: 'round.opened', data: { roundId, conversationId: 'c1', message, participants, openedAt: OPENED_AT } }
+function opened(roundId: string, participants: readonly string[], message?: string, brought: readonly string[] = []): RoundEvent {
+  return { type: 'round.opened', data: { roundId, conversationId: 'c1', message, participants, brought, openedAt: OPENED_AT } }
 }
 
 function state(roundId: string, participantId: string, state: 'preparing' | 'working'): RoundEvent {
@@ -131,6 +131,7 @@ describe('initialProjection', () => {
         id: 'r1',
         message: '@shape does the opening earn its length',
         addressed: ['shape'],
+        brought: [],
         outcome: 'settled',
         participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
       },
@@ -147,6 +148,7 @@ describe('initialProjection', () => {
         openedAt: undefined,
         outcome: 'settled',
         participants: [{ participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
+        brought: [],
       },
     ])
   })
@@ -205,6 +207,7 @@ describe('withRoundInFlight', () => {
       roundId: 'r1',
       message: 'a message',
       participants: ['shape', 'compression'],
+      brought: [],
       states: { compression: 'working' },
       settled: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' } }],
       openedAt: OPENED_AT,
@@ -222,6 +225,7 @@ describe('withRoundInFlight', () => {
           { participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'noComment' } },
           { participantId: 'compression', state: 'working', result: undefined },
         ],
+        brought: [],
       },
     ])
   })
@@ -249,6 +253,7 @@ describe('a resumed round and a live one', () => {
       roundId: 'r1',
       message: 'a message',
       participants,
+      brought: [],
       states: { interiority: 'working' },
       settled: [
         { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late', note: 'by a paragraph' } },

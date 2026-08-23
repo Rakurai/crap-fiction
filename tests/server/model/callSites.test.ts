@@ -18,6 +18,12 @@ describe('callSites', () => {
     expect(sites.find((site) => site.site === 'apply')?.roleDescription).toBeNull()
   })
 
+  it('carries a handle for a participant and none for an operation', () => {
+    const sites = callSites(roles)
+    expect(sites.find((site) => site.site === 'shape')?.handle).toBe('shape')
+    expect(sites.find((site) => site.site === 'apply')?.handle).toBeNull()
+  })
+
   it('fails when a participant id collides with an operation call site', () => {
     const colliding: readonly RoleDefinition[] = [{ id: 'apply', handle: 'apply', displayName: 'Apply', roleDescription: 'z' }]
     expect(() => callSites(colliding)).toThrowError(DuplicateCallSiteError)

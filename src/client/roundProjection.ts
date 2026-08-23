@@ -34,6 +34,8 @@ export type ProjectedRound = Readonly<{
    */
   outcome: 'inFlight' | 'settled' | 'abandoned' | 'failed'
   participants: readonly ProjectedParticipant[]
+  /** UX_DESIGN "Where the author speaks": ids this round's addressing durably enabled — ordinarily empty. */
+  brought: readonly string[]
 }>
 
 export type ConversationProjection = Readonly<{ rounds: readonly ProjectedRound[] }>
@@ -53,6 +55,7 @@ function fromRecord(round: RoundRecord): ProjectedRound {
     openedAt: undefined,
     outcome: round.outcome,
     participants: round.participants.map((record) => ({ participantId: record.participantId, state: 'settled', result: record.result })),
+    brought: round.brought,
   }
 }
 
@@ -82,6 +85,7 @@ export function withRoundInFlight(projection: ConversationProjection, snapshot: 
       state: settled.has(participantId) ? 'settled' : snapshot.states[participantId] ?? 'waiting',
       result: settled.get(participantId),
     })),
+    brought: snapshot.brought,
   }
   return { rounds: [...projection.rounds, round] }
 }
@@ -147,6 +151,7 @@ export function projectRoundEvent(projection: ConversationProjection, event: Rou
         openedAt: event.data.openedAt,
         outcome: 'inFlight',
         participants: event.data.participants.map((participantId) => ({ participantId, state: 'waiting', result: undefined })),
+        brought: event.data.brought,
       }
       return { rounds: [...projection.rounds, round] }
     }

@@ -19,6 +19,8 @@ export type RoundPlan = Readonly<{
   message: string | undefined
   /** Ids the author's message (or the act that opened the round) addressed. Empty means the round names no one. */
   addressedIds: readonly string[]
+  /** Ids addressing durably enabled for this round — a subset of `addressedIds`, and ordinarily empty. */
+  brought: readonly string[]
   /** The specialists this round will call, in the order it will call them. */
   specialists: readonly RoleDefinition[]
   /** Present, and last, exactly where the round will reach the Story Editor (CONTEXT "Round"). */

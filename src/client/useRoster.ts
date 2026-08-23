@@ -15,6 +15,9 @@ const MARKS = ['var(--mark-teal)', 'var(--mark-indigo)', 'var(--mark-clay)', 'va
 /** A participant no roster named has no identity to carry, so it is drawn in quiet chrome. */
 const UNMARKED = 'var(--ink3)'
 
+/** A participant as the composer's handle completion offers it — nothing an operation carries. */
+export type HandleEntry = Readonly<{ handle: string; displayName: string }>
+
 export type RosterViewModel = Readonly<{
   /**
    * Whether the roster request has finished, either way. The conversation waits
@@ -26,6 +29,14 @@ export type RosterViewModel = Readonly<{
   displayName: (participantId: string) => string
   /** The participant's own colour, as a value a style can carry. */
   mark: (participantId: string) => string
+  /**
+   * SPEC "Model access"/"The room": every participant's handle, for the
+   * composer's own combobox — the shipped handles, read from the roster rather
+   * than written out in the client. An operation call site carries no handle
+   * (it is never addressed), so it is absent here rather than offered as
+   * something the author could type `@` toward.
+   */
+  handles: readonly HandleEntry[]
 }>
 
 /**
@@ -47,5 +58,6 @@ export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewMo
       const place = named.findIndex((site) => site.site === participantId)
       return place === -1 ? UNMARKED : (MARKS[place % MARKS.length] ?? UNMARKED)
     },
+    handles: named.flatMap((site) => (site.handle === null ? [] : [{ handle: site.handle, displayName: site.displayName ?? site.site }])),
   }
 }

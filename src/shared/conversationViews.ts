@@ -56,6 +56,8 @@ export const roundRecordSchema = z.object({
   id: z.string().min(1),
   message: z.string().min(1).optional(),
   addressed: z.array(z.string().min(1)).readonly(),
+  /** Ids addressing durably enabled by this round, so history keeps saying the room changed. */
+  brought: z.array(z.string().min(1)).readonly(),
   participants: z.array(roundParticipantRecordSchema).readonly(),
   outcome: z.enum(['settled', 'abandoned']),
 })

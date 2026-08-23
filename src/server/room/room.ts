@@ -62,6 +62,7 @@ type ActiveRound = {
   readonly roundId: string
   readonly message: string | undefined
   readonly participants: readonly string[]
+  readonly brought: readonly string[]
   readonly states: Map<string, 'preparing' | 'working'>
   readonly settled: RoundParticipantRecord[]
   readonly controller: AbortController
@@ -151,6 +152,7 @@ export class Room {
       roundId: operation.roundId,
       message: operation.message,
       participants: operation.participants,
+      brought: operation.brought,
       states: Object.fromEntries(operation.states),
       settled: [...operation.settled],
       openedAt: operation.openedAt,
@@ -189,11 +191,9 @@ export class Room {
         ? this.#specialists.filter((role) => piece.metadata.cast.includes(role.id))
         : this.#specialists.filter((role) => addressedIds.includes(role.id))
 
-    if (addressedIds.length > 0) {
-      const missing = eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
-      if (missing.length > 0) {
-        await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...missing])
-      }
+    const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
+    if (brought.length > 0) {
+      await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
     }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
@@ -203,6 +203,7 @@ export class Room {
       roundId,
       message,
       addressedIds,
+      brought,
       specialists: eligibleSpecialists,
       storyEditor: storyEditorIncluded ? this.#storyEditor : undefined,
     }
@@ -215,13 +216,14 @@ export class Room {
       roundId,
       message,
       participants,
+      brought,
       states: new Map(),
       settled: [],
       controller: new AbortController(),
       openedAt,
     }
-    this.#emit(pieceId, { type: 'round.opened', data: { conversationId, roundId, message, participants, openedAt } })
-    this.#logger.info({ pieceId, conversationId, roundId, participants }, 'round opened')
+    this.#emit(pieceId, { type: 'round.opened', data: { conversationId, roundId, message, participants, brought, openedAt } })
+    this.#logger.info({ pieceId, conversationId, roundId, participants, brought }, 'round opened')
 
     // The round is under way before there is a promise to represent it, so the
     // operation is completed rather than mutated: the states map and the settled
@@ -331,6 +333,7 @@ export class Room {
       id: plan.roundId,
       message: plan.message,
       addressed: plan.addressedIds,
+      brought: plan.brought,
       participants: result.participants,
       outcome: result.outcome,
     }

@@ -253,6 +253,9 @@ describe('Room', () => {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
     })
 
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
     await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
     const settled = settlementOf(room, piece.id)
     adapter.release('shape')
@@ -260,6 +263,32 @@ describe('Room', () => {
 
     const updated = readPiece(workspaceDir, piece.id)
     expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+
+    // UX_DESIGN "Where the author speaks": the room says it now holds one more,
+    // at the round that brought the specialist in and in the record it left behind.
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.brought).toEqual(['shape'])
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[0]?.brought).toEqual(['shape'])
+  })
+
+  it('leaves `brought` empty when addressing names only specialists already in the cast', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    adapter.release('shape')
+    await settled
+
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.brought).toEqual([])
   })
 
   it('UX_DESIGN "Every specialist call failed... that call fails too": settles and persists a round with nothing in it at all, without ever emitting an error event', async () => {

@@ -33,6 +33,34 @@
 }
 
 /*
+ * UX_DESIGN "Where the author speaks": a specialist addressing durably brought
+ * in, said beside the round that caused it rather than left for the author to
+ * notice on their own. The tint is neutral — never the accent, which stays
+ * for the one affirmative action the interface has.
+ */
+.roomChanged {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 0 4px;
+  padding: 9px 11px;
+  background: var(--tint);
+  border-radius: 4px;
+}
+
+.roomChangedFacts {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+}
+
+.roomChangedWords {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+}
+
+/*
  * A response is a discrete block with a rule above it. Filling in order must not
  * read as a chain (UX_DESIGN "A round in flight"), and the rule is the mechanism
  * for that rather than decoration: without it five responses are one column of
@@ -181,20 +209,67 @@
 .composer {
   flex: none;
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   padding: 14px 16px;
   border-top: 1px solid var(--rule);
 }
 
-.input {
+.field {
   flex: 1;
   min-width: 0;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  resize: none;
   font: 400 13px/1.4 var(--font-ui);
   color: var(--ink);
   background: var(--prose);
   border: 1px solid var(--rule2);
   border-radius: 4px;
   padding: 8px 10px;
+}
+
+/*
+ * SPEC "@ariakit/react supplies behaviour and never appearance": the popover
+ * carries no look of its own, so every rule here is this interface's, in the
+ * completion surface's own ground (`--panel`) rather than the conversation's.
+ */
+.mentions {
+  background: var(--panel);
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mention {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 11px;
+  border-top: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.mention:first-child {
+  border-top: none;
+}
+
+.mention[data-active-item] {
+  background: var(--tint);
+}
+
+.mentionHandle {
+  font: 500 11.5px/1 var(--font-facts);
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+
+.mentionName {
+  font: 400 11px/1.3 var(--font-ui);
+  color: var(--ink3);
 }
 
 .send {

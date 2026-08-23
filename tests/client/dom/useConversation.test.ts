@@ -13,13 +13,14 @@ function settledRound(id: string): RoundRecord {
     id,
     message: `what about ${id}`,
     addressed: ['shape'],
+    brought: [],
     participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' } }],
     outcome: 'settled',
   }
 }
 
 function snapshot(roundId: string): RoundSnapshot {
-  return { conversationId: 'c1', roundId, message: 'the live one', participants: ['shape'], states: {}, settled: [], openedAt: OPENED_AT }
+  return { conversationId: 'c1', roundId, message: 'the live one', participants: ['shape'], brought: [], states: {}, settled: [], openedAt: OPENED_AT }
 }
 
 /**
@@ -92,7 +93,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
 
     stream({
       type: 'round.opened',
-      data: { conversationId: 'c1', roundId: 'r3', message: 'and now', participants: ['shape'], openedAt: OPENED_AT },
+      data: { conversationId: 'c1', roundId: 'r3', message: 'and now', participants: ['shape'], brought: [], openedAt: OPENED_AT },
     })
 
     // Until the file answers, the live round is the whole of what is known.

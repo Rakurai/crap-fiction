@@ -49,6 +49,7 @@ const conversationWithMixedHistory: Conversation = {
       id: 'r1',
       message: 'first question',
       addressed: [],
+      brought: [],
       outcome: 'settled',
       participants: [
         { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } },
@@ -138,6 +139,7 @@ describe('compileSpecialistContext', () => {
           id: 'r1',
           message: 'the question that went unanswered',
           addressed: [],
+          brought: [],
           outcome: 'abandoned',
           participants: [{ participantId: 'shape', result: { kind: 'abandoned' } }],
         },

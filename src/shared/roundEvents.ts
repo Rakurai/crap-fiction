@@ -24,6 +24,14 @@ export const roundOpenedEventSchema = z.object({
   message: z.string().min(1).optional(),
   participants: z.array(z.string().min(1)).readonly(),
   /**
+   * UX_DESIGN "Where the author speaks": ids addressing durably enabled for
+   * this round, so the room can say it now holds one more rather than leaving
+   * the author to notice a permanent change from one round's own roster.
+   * Empty is the ordinary case — a round names no one, or names only
+   * specialists already in the cast.
+   */
+  brought: z.array(z.string().min(1)).readonly(),
+  /**
    * When the round opened, as the studio's own clock read it. UX_DESIGN "A round
    * in flight" requires how long it has been, and PRD "Operational state" makes
    * elapsed time required rather than optional — so the one fact a client cannot
@@ -102,6 +110,8 @@ export const roundSnapshotSchema = z.object({
   roundId: z.string().min(1),
   message: z.string().min(1).optional(),
   participants: z.array(z.string().min(1)).readonly(),
+  /** Carried over from `round.opened`, so a reload mid-round still says the room changed. */
+  brought: z.array(z.string().min(1)).readonly(),
   states: z.record(z.string(), z.enum(['preparing', 'working'])),
   settled: z.array(roundParticipantRecordSchema).readonly(),
   /** The same stamp `round.opened` carried, so a reload's count continues rather than restarting. */

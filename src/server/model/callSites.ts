@@ -4,7 +4,8 @@ import type { RoleDefinition } from './roles.js'
 /**
  * SPEC "Model access": applying a recommendation and capturing context are
  * each assigned a model the same way a participant is, without being
- * participants themselves — so neither carries a role description.
+ * participants themselves — so neither carries a role description or a
+ * handle: an operation is never something the author addresses.
  */
 export const OPERATION_CALL_SITES = ['apply', 'capture'] as const
 
@@ -26,6 +27,7 @@ export class UnknownCallSiteError extends Error {
 
 export type CallSiteDescriptor = Readonly<{
   site: string
+  handle: string | null
   displayName: string | null
   roleDescription: string | null
 }>
@@ -44,8 +46,8 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
   }
 
   return [
-    ...roles.map((role) => ({ site: role.id, displayName: role.displayName, roleDescription: role.roleDescription })),
-    ...OPERATION_CALL_SITES.map((site) => ({ site, displayName: null, roleDescription: null })),
+    ...roles.map((role) => ({ site: role.id, handle: role.handle, displayName: role.displayName, roleDescription: role.roleDescription })),
+    ...OPERATION_CALL_SITES.map((site) => ({ site, handle: null, displayName: null, roleDescription: null })),
   ]
 }
 

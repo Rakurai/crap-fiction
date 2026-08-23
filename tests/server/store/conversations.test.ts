@@ -20,6 +20,7 @@ const oneRound: Conversation = {
       id: 'r1',
       message: 'does the opening earn its length',
       addressed: [],
+      brought: [],
       outcome: 'settled',
       participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
     },

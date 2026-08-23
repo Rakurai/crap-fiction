@@ -8,6 +8,12 @@ import type { RoomAdapters } from '../../../src/client/useConversation.js'
 
 const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experience', editor: 'Story Editor' }
 
+const HANDLES = [
+  { handle: 'shape', displayName: 'Shape' },
+  { handle: 'reader', displayName: 'Reader Experience' },
+  { handle: 'editor', displayName: 'Story Editor' },
+]
+
 /**
  * The room, stood still: this surface is being read, not driven, so the stream
  * yields nothing and the conversation is whatever the fixture recorded. Sending a
@@ -41,6 +47,7 @@ function renderConversation(round: RoundRecord, extra: Partial<ComponentProps<ty
       room={roomHolding(conversation)}
       displayName={(id) => NAMES[id] ?? id}
       mark={() => 'var(--mark-teal)'}
+      handles={HANDLES}
       runtime={{ reachable: true, models: ['a-model'] }}
       clock={() => OPENED_AT}
       {...extra}
@@ -64,6 +71,7 @@ describe('a settled round in the conversation', () => {
       id: 'r1',
       message: 'what isn’t working about the ending',
       addressed: [],
+      brought: [],
       participants: [
         {
           participantId: 'shape',
@@ -86,6 +94,7 @@ describe('a settled round in the conversation', () => {
     renderConversation({
       id: 'r1',
       addressed: [],
+      brought: [],
       participants: [{ participantId: 'reader', result: { kind: 'response', outcome: 'commentary', claim: 'I lost the room in the second turn.' } }],
       outcome: 'settled',
     })
@@ -101,6 +110,7 @@ describe('a settled round in the conversation', () => {
     renderConversation({
       id: 'r1',
       addressed: [],
+      brought: [],
       participants: [
         { participantId: 'shape', result: { kind: 'response', outcome: 'noComment' } },
         { participantId: 'editor', result: { kind: 'response', outcome: 'commentary', claim: 'It holds.' } },
@@ -118,6 +128,7 @@ describe('a settled round in the conversation', () => {
     renderConversation({
       id: 'r1',
       addressed: [],
+      brought: [],
       participants: [{ participantId: 'shape', result: { kind: 'failed', reason: 'timeout' } }],
       outcome: 'settled',
     })
@@ -135,6 +146,7 @@ describe('a settled round in the conversation', () => {
     renderConversation({
       id: 'r1',
       addressed: [],
+      brought: [],
       participants: [{ participantId: 'shape', result: { kind: 'failed', reason: 'nonconforming', returned: '{"claim": "the ending' } }],
       outcome: 'settled',
     })
@@ -149,6 +161,7 @@ describe('a settled round in the conversation', () => {
       id: 'r1',
       message: 'Is the third paragraph doing enough?',
       addressed: [],
+      brought: [],
       participants: [
         { participantId: 'shape', result: { kind: 'failed', reason: 'timeout' } },
         { participantId: 'reader', result: { kind: 'failed', reason: 'unreachable' } },
@@ -167,6 +180,7 @@ describe('a settled round in the conversation', () => {
     renderConversation({
       id: 'r1',
       addressed: [],
+      brought: [],
       participants: [
         { participantId: 'shape', result: { kind: 'failed', reason: 'timeout' } },
         { participantId: 'editor', result: { kind: 'response', outcome: 'commentary', claim: 'It holds.' } },
@@ -183,6 +197,7 @@ describe('a settled round in the conversation', () => {
 const SETTLED_ROUND: RoundRecord = {
   id: 'r0',
   addressed: [],
+  brought: [],
   participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'It holds.' } }],
   outcome: 'settled',
 }
@@ -197,6 +212,7 @@ describe('a round in flight', () => {
         roundId: 'r1',
         message: 'what isn’t working about the ending',
         participants: ['shape', 'reader', 'editor'],
+        brought: [],
         states: { shape: 'working' },
         settled: [],
         openedAt: OPENED_AT - 14_000,
@@ -215,6 +231,7 @@ describe('a round in flight', () => {
         conversationId: 'c1',
         roundId: 'r1',
         participants: ['shape'],
+        brought: [],
         states: { shape: 'working' },
         settled: [],
         openedAt: OPENED_AT,
@@ -238,6 +255,7 @@ describe('a round in flight', () => {
         conversationId: 'c1',
         roundId: 'r1',
         participants: ['shape'],
+        brought: [],
         states: { shape: 'working' },
         settled: [],
         openedAt: OPENED_AT,
@@ -277,5 +295,69 @@ describe('a room that cannot be reached', () => {
     // A probe that has not answered is not an unreachable room, and a notice drawn
     // from it would tell the author the room is down on this client's own silence.
     expect(screen.queryByText('ROOM UNAVAILABLE')).toBeNull()
+  })
+})
+
+describe('a specialist the addressing brought into the room', () => {
+  afterEach(cleanup)
+
+  it('says which one, beside the round that brought it in', async () => {
+    renderConversation({
+      id: 'r1',
+      message: '@reader is this scene too long',
+      addressed: ['reader'],
+      brought: ['reader'],
+      participants: [{ participantId: 'reader', result: { kind: 'response', outcome: 'commentary', claim: 'It runs long.' } }],
+      outcome: 'settled',
+    })
+
+    await screen.findByText('It runs long.')
+
+    expect(screen.getByText('ROOM CHANGED')).toBeTruthy()
+    expect(screen.getByText('Reader Experience was addressed and is now in the room.')).toBeTruthy()
+  })
+
+  it('says nothing where addressing changed nothing', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    await screen.findByText('It holds.')
+
+    expect(screen.queryByText('ROOM CHANGED')).toBeNull()
+  })
+})
+
+describe('handle completion at the composer', () => {
+  afterEach(cleanup)
+
+  it('offers every handle the token prefix-matches, as the author types one', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: '@sh' } })
+
+    expect(await screen.findByText('@shape')).toBeTruthy()
+    expect(screen.queryByText('@reader')).toBeNull()
+  })
+
+  it('offers nothing for a sigil that does not begin the message or follow whitespace', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: 'mail@sh' } })
+
+    expect(screen.queryByText('@shape')).toBeNull()
+  })
+
+  it('completes the token into the message, and closes the offer', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: '@sh' } })
+
+    const suggestion = await screen.findByRole('option', { name: /@shape/ })
+    fireEvent.click(suggestion)
+
+    await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
+    expect(screen.queryByRole('option')).toBeNull()
   })
 })

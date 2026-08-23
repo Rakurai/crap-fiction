@@ -4,7 +4,7 @@ import type { CallSiteAssignmentView } from '../../../src/shared/callSiteViews.j
 import { CallSiteList } from '../../../src/client/CallSiteList.js'
 
 const SITES: readonly CallSiteAssignmentView[] = [
-  { site: 'story-editor', displayName: 'Story Editor', roleDescription: null, assignment: null },
+  { site: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: null, assignment: null },
 ]
 
 const KNOWN = ['qwen3-30b', 'gemma-3-27b']
