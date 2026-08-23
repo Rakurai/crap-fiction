@@ -27,7 +27,8 @@ export type RuntimeStatus =
  * assignment names a model; its shape is opaque above this interface, and an
  * implementation owns its own retry, timeout and residency policy — none of
  * that is a parameter here. Two adapters satisfy this: `LMStudioAdapter`
- * against the real runtime, and `FixtureModelAdapter`, for tests only.
+ * against the real runtime, and `FixtureModelAdapter` in `tests/fixtures`,
+ * for tests only.
  */
 export type ModelAdapter = {
   invoke<T>(

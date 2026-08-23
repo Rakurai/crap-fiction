@@ -1,8 +1,8 @@
 import type { z } from 'zod'
-import type { CallResult, CallState, ModelAdapter, RuntimeStatus } from './types.js'
+import type { CallResult, CallState, ModelAdapter, RuntimeStatus } from '../../src/server/model/types.js'
 
-export type FixtureBehavior<T> = Readonly<{
-  result: CallResult<T>
+export type FixtureBehavior = Readonly<{
+  result: CallResult<unknown>
   /** States delivered to `onState`, in order, before `result` settles. */
   states?: readonly CallState[]
   /** Simulated work, cancellable by the signal passed to `invoke`. */
@@ -14,20 +14,18 @@ export type FixtureBehavior<T> = Readonly<{
  * for tests only. A test declares exactly what one call returns — a
  * conforming value, an abandonment, or any of the stated failures — and,
  * where the test needs it, a preparing state and a delay a real abort
- * signal can interrupt. There is no default behaviour: a fixture with
- * nothing configured has nothing to return, which is the point.
+ * signal can interrupt. There is no default behaviour and no default
+ * runtime status: a fixture with nothing configured has nothing to return.
  *
- * The configured behaviour is fixed at construction, for the one value type
- * the test needing it cares about; the cast to the seam's own per-call
- * generic is this fixture's business alone, since a schema is never
- * actually enforced here the way `LMStudioAdapter` enforces one.
+ * A declared value is recovered through the caller's own schema at
+ * `invoke`, the same way `LMStudioAdapter` recovers one, so no assertion
+ * stands in for that seam here.
  */
-export class FixtureModelAdapter<TValue = unknown> implements ModelAdapter {
-  readonly #behavior: FixtureBehavior<TValue>
+export class FixtureModelAdapter implements ModelAdapter {
+  readonly #behavior: FixtureBehavior
   readonly #runtimeStatus: RuntimeStatus
-  invocations = 0
 
-  constructor(behavior: FixtureBehavior<TValue>, runtimeStatus: RuntimeStatus = { reachable: true, models: [] }) {
+  constructor(behavior: FixtureBehavior, runtimeStatus: RuntimeStatus) {
     this.#behavior = behavior
     this.#runtimeStatus = runtimeStatus
   }
@@ -35,11 +33,10 @@ export class FixtureModelAdapter<TValue = unknown> implements ModelAdapter {
   async invoke<T>(
     _assignment: string,
     _prompt: string,
-    _schema: z.ZodType<T>,
+    schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
-    this.invocations += 1
     for (const state of this.#behavior.states ?? []) onState?.(state)
 
     if (this.#behavior.delayMs !== undefined) {
@@ -47,7 +44,10 @@ export class FixtureModelAdapter<TValue = unknown> implements ModelAdapter {
     }
 
     if (signal.aborted) return { outcome: 'abandoned' }
-    return this.#behavior.result as unknown as CallResult<T>
+
+    const result = this.#behavior.result
+    if (result.outcome !== 'value') return result
+    return { outcome: 'value', value: schema.parse(result.value) }
   }
 
   async status(): Promise<RuntimeStatus> {

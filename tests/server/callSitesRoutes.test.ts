@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
-import { FixtureModelAdapter } from '../../src/server/model/fixtureAdapter.js'
+import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
 import { ModelAccess } from '../../src/server/model/modelAccess.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftWriter } from '../../src/server/pieces.js'
@@ -37,7 +37,7 @@ describe('call sites and models', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function buildApp(runtimeStatus?: { reachable: true; models: readonly string[] } | { reachable: false }) {
+  function buildApp(runtimeStatus: { reachable: true; models: readonly string[] } | { reachable: false } = { reachable: true, models: [] }) {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
     const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, runtimeStatus)
