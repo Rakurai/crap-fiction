@@ -1,0 +1,5 @@
+# The image installs from the lockfile and nothing else; the working tree
+# reaches the container as a bind mount rather than as build context.
+*
+!package.json
+!package-lock.json

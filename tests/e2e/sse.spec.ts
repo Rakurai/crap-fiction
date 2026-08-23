@@ -19,7 +19,9 @@ test.beforeAll(async () => {
     plugins: [
       devServer({
         entry: 'tests/fixtures/sseProofApp.ts',
-        exclude: [...defaultOptions.exclude, /^\/$/],
+        // Unlike the studio's own config, `/` is the fixture's to serve: the
+        // proof needs a page of its own origin and nothing else.
+        exclude: defaultOptions.exclude,
       }),
     ],
     server: { port: 0, host: '127.0.0.1' },

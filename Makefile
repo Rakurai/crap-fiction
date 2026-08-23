@@ -5,7 +5,13 @@
 # looking for a package.json this repository does not have yet.
 TSX := ./.sandcastle/node_modules/.bin/tsx
 
-.PHONY: sandcastle
+# The four STUDIO_* variables live here rather than in this file. They are the
+# author's own — a data root and a port on their machine — and .gitignore keeps
+# the file out of the repository. Nothing below supplies a value for any of
+# them: an absent one is a startup failure naming it (SPEC "Deployment").
+STUDIO_ENV := .env
+
+.PHONY: sandcastle run
 
 # Work the next ticket on the ready-for-agent frontier. main.mts mints Bedrock
 # credentials on the host first and refuses to start if the SSO session is too
@@ -13,3 +19,19 @@ TSX := ./.sandcastle/node_modules/.bin/tsx
 # when it does.
 sandcastle:
 	$(TSX) .sandcastle/main.mts
+
+# Launch the studio: Vite serving the client, with the Hono application inside
+# it. The data root is checked for existence here because the alternative is a
+# launch that looks healthy and then fails with a bare ENOENT the first time the
+# author names a workspace.
+run:
+	@test -f $(STUDIO_ENV) || { \
+	  echo 'no $(STUDIO_ENV): write one setting STUDIO_DATA_ROOT, STUDIO_PORT, STUDIO_MODEL_RUNTIME_URL and STUDIO_LOG_LEVEL' >&2; \
+	  exit 1; \
+	}
+	@set -a; . ./$(STUDIO_ENV); set +a; \
+	  test -d "$$STUDIO_DATA_ROOT" || { \
+	    echo "STUDIO_DATA_ROOT is not a directory: $$STUDIO_DATA_ROOT" >&2; \
+	    exit 1; \
+	  }; \
+	  exec npm run dev
