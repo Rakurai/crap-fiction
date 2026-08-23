@@ -16,7 +16,10 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '127.0.0.1',
+    // SPEC "Local exposure": the namespace the deployment container supplies
+    // is the boundary; binding every interface here is what makes the
+    // published-loopback bind in the container's docker-compose reachable.
+    host: true,
     port: env.port,
     strictPort: true,
   },

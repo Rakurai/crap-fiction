@@ -4,16 +4,19 @@ import { originGuard } from '../../src/server/originGuard.js'
 
 function buildApp() {
   const app = new Hono()
-  app.use('*', originGuard('http://localhost:4000'))
+  app.use('*', originGuard(['http://localhost:4000', 'http://127.0.0.1:4000']))
   app.get('/thing', (c) => c.json({ success: true, data: null }))
   return app
 }
 
 describe('originGuard', () => {
-  it('allows a request carrying the configured origin', async () => {
-    const res = await buildApp().request('/thing', { headers: { origin: 'http://localhost:4000' } })
-    expect(res.status).toBe(200)
-  })
+  it.each(['http://localhost:4000', 'http://127.0.0.1:4000'])(
+    'allows a request carrying the origin %s',
+    async (origin) => {
+      const res = await buildApp().request('/thing', { headers: { origin } })
+      expect(res.status).toBe(200)
+    },
+  )
 
   it('allows a request carrying no origin at all', async () => {
     const res = await buildApp().request('/thing')

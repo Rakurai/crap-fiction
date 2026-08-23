@@ -34,9 +34,11 @@ export function createApp(
   modelAccess: ModelAccess,
 ): Hono {
   const sites = callSites(charter)
-  const allowedOrigin = `http://localhost:${env.port}`
+  // SPEC "Local exposure": the server binds every interface, and a browser
+  // may reach the published port as either loopback hostname.
+  const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]
   const app = new Hono()
-  app.use('*', originGuard(allowedOrigin))
+  app.use('*', originGuard(allowedOrigins))
 
   app.get('/workspace', (c) => {
     return c.json(ok({ workspace: workspace.get() ?? null }))
