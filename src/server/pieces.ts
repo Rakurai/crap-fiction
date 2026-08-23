@@ -1,13 +1,19 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import slugify from '@sindresorhus/slugify'
 import { Mutex } from 'async-mutex'
-import writeFileAtomic from 'write-file-atomic'
 import { z } from 'zod'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
 import { PathEscapesRootError, resolveWithinRoot } from './paths.js'
-import { readYamlArtifact, writeYamlArtifact } from './store.js'
+import {
+  artifactExists,
+  artifactModifiedMs,
+  readTextArtifact,
+  readYamlArtifact,
+  subdirectories,
+  writeTextArtifact,
+  writeYamlArtifact,
+} from './store.js'
 
 export class PieceNotFoundError extends Error {
   constructor(id: string) {
@@ -22,7 +28,7 @@ const pieceMetadataSchema = z.object({
   title: z.string().min(1),
   mode: z.string().min(1),
   status: pieceStatusSchema,
-  cast: z.array(z.string().min(1)).optional(),
+  cast: z.array(z.string().min(1)),
 })
 
 export type PieceStatus = z.infer<typeof pieceStatusSchema>
@@ -46,46 +52,32 @@ function draftPath(pieceDir: string): string {
   return path.join(pieceDir, 'draft.md')
 }
 
-/**
- * SPEC "Files": a piece with no draft yet has been only named, so its
- * manuscript is empty rather than a read failure.
- */
-function readDraft(pieceDir: string): string {
-  const draft = draftPath(pieceDir)
-  return existsSync(draft) ? readFileSync(draft, 'utf8') : ''
+type PieceMetadata = z.infer<typeof pieceMetadataSchema>
+type DraftRead = { text: string; modifiedMs: number }
+
+function loadPiece(id: string, pieceDir: string): { metadata: PieceMetadata; draft: DraftRead | undefined } {
+  const metadata = readYamlArtifact(pieceMetadataPath(pieceDir), pieceMetadataSchema)
+  if (metadata === undefined) {
+    throw new PieceNotFoundError(id)
+  }
+  return { metadata, draft: readTextArtifact(draftPath(pieceDir)) }
 }
 
 /**
  * SPEC "Files": a piece's length is its draft's, counted the same way
  * everywhere (`countWords`), and a piece with no draft yet is a piece the
  * author has only named — length 0, not a failure. Its modified time is the
- * draft's, falling back to `piece.yaml`'s own so a just-created piece still
- * has one.
+ * draft's when one exists, and `piece.yaml`'s own otherwise, so a
+ * just-created piece still has one.
  */
-function draftStats(pieceDir: string): { length: number; modified: number } {
-  const draft = draftPath(pieceDir)
-  if (existsSync(draft)) {
-    return { length: countWords(readFileSync(draft, 'utf8')), modified: statSync(draft).mtimeMs }
-  }
-  return { length: 0, modified: statSync(pieceMetadataPath(pieceDir)).mtimeMs }
-}
-
-function summarize(id: string, pieceDir: string): PieceSummary {
-  const metadata = readYamlArtifact(pieceMetadataPath(pieceDir), pieceMetadataSchema)
-  if (metadata === undefined) {
-    throw new PieceNotFoundError(id)
-  }
-  const { length, modified } = draftStats(pieceDir)
+function summarize(id: string, pieceDir: string, metadata: PieceMetadata, draft: DraftRead | undefined): PieceSummary {
+  const length = draft === undefined ? 0 : countWords(draft.text)
+  const modified = draft === undefined ? artifactModifiedMs(pieceMetadataPath(pieceDir)) : draft.modifiedMs
   return { id, title: metadata.title, mode: metadata.mode, status: metadata.status, length, modified }
 }
 
 function existingPieceIds(workspaceDir: string): ReadonlySet<string> {
-  if (!existsSync(workspaceDir)) return new Set()
-  return new Set(
-    readdirSync(workspaceDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name),
-  )
+  return new Set(subdirectories(workspaceDir))
 }
 
 /**
@@ -111,17 +103,15 @@ export async function createPiece(workspaceDir: string, title: string, mode: Mod
   const id = uniquePieceId(existingPieceIds(workspaceDir), title)
   const pieceDir = path.join(workspaceDir, id)
 
-  await writeYamlArtifact(pieceMetadataPath(pieceDir), (document) => {
-    document.set('title', title)
-    document.set('mode', mode.id)
-    document.set('status', 'drafting')
-    document.set(
-      'cast',
-      mode.cast.map((specialist) => specialist.id),
-    )
+  await writeYamlArtifact(pieceMetadataPath(pieceDir), {
+    title,
+    mode: mode.id,
+    status: 'drafting',
+    cast: mode.cast.map((specialist) => specialist.id),
   })
 
-  return summarize(id, pieceDir)
+  const { metadata, draft } = loadPiece(id, pieceDir)
+  return summarize(id, pieceDir, metadata, draft)
 }
 
 /**
@@ -130,11 +120,13 @@ export async function createPiece(workspaceDir: string, title: string, mode: Mod
  * it is required.
  */
 export function listPieces(workspaceDir: string): readonly PieceSummary[] {
-  if (!existsSync(workspaceDir)) return []
-
-  const pieces = readdirSync(workspaceDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(pieceMetadataPath(path.join(workspaceDir, entry.name))))
-    .map((entry) => summarize(entry.name, path.join(workspaceDir, entry.name)))
+  const pieces = subdirectories(workspaceDir)
+    .filter((name) => artifactExists(pieceMetadataPath(path.join(workspaceDir, name))))
+    .map((name) => {
+      const pieceDir = path.join(workspaceDir, name)
+      const { metadata, draft } = loadPiece(name, pieceDir)
+      return summarize(name, pieceDir, metadata, draft)
+    })
 
   return pieces.sort((a, b) => b.modified - a.modified)
 }
@@ -156,7 +148,7 @@ function resolvePieceDir(workspaceDir: string, id: string): string {
     throw err
   }
 
-  if (!existsSync(pieceMetadataPath(pieceDir))) {
+  if (!artifactExists(pieceMetadataPath(pieceDir))) {
     throw new PieceNotFoundError(id)
   }
 
@@ -165,11 +157,13 @@ function resolvePieceDir(workspaceDir: string, id: string): string {
 
 /**
  * SPEC "Transport": opening a piece returns its draft alongside its metadata,
- * unlike the listing, which reports only what a directory scan needs.
+ * unlike the listing, which reports only what a directory scan needs. Reads
+ * the draft once, shared between the summary and the draft text.
  */
 export function getPiece(workspaceDir: string, id: string): PieceDetail {
   const pieceDir = resolvePieceDir(workspaceDir, id)
-  return { ...summarize(id, pieceDir), draft: readDraft(pieceDir) }
+  const { metadata, draft } = loadPiece(id, pieceDir)
+  return { ...summarize(id, pieceDir, metadata, draft), draft: draft?.text ?? '' }
 }
 
 /**
@@ -185,6 +179,6 @@ export class DraftWriter {
 
   async save(workspaceDir: string, id: string, draft: string): Promise<void> {
     const pieceDir = resolvePieceDir(workspaceDir, id)
-    await this.#lock.runExclusive(() => writeFileAtomic(draftPath(pieceDir), draft))
+    await this.#lock.runExclusive(() => writeTextArtifact(draftPath(pieceDir), draft))
   }
 }

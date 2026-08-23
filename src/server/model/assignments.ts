@@ -30,7 +30,5 @@ export function listAssignments(dataRoot: string): ReadonlyMap<string, string> {
  * participant at a different model cannot lose one they did not touch.
  */
 export async function setAssignment(dataRoot: string, site: string, model: string): Promise<void> {
-  await writeYamlArtifact(settingsPath(dataRoot), (document) => {
-    document.setIn(['modelAssignments', site], model)
-  })
+  await writeYamlArtifact(settingsPath(dataRoot), { modelAssignments: { [site]: model } })
 }

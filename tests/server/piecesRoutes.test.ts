@@ -121,7 +121,11 @@ describe('/pieces', () => {
     const { app, workspace } = buildApp()
     const dir = await workspace.set('my-writing')
     mkdirSync(path.join(dir, 'cups'), { recursive: true })
-    writeFileSync(path.join(dir, 'cups', 'piece.yaml'), 'title: Cups\nmode: flash\nstatus: drafting\n', 'utf8')
+    writeFileSync(
+      path.join(dir, 'cups', 'piece.yaml'),
+      'title: Cups\nmode: flash\nstatus: drafting\ncast:\n  - shape\n',
+      'utf8',
+    )
 
     const putRes = await app.request('/pieces/cups/draft', {
       method: 'PUT',

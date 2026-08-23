@@ -48,9 +48,7 @@ export class WorkspaceRegistry {
       throw err
     }
 
-    await writeYamlArtifact(settingsPath(this.#dataRoot), (document) => {
-      document.set('workspace', resolved)
-    })
+    await writeYamlArtifact(settingsPath(this.#dataRoot), { workspace: resolved })
     this.#workspace = resolved
     return resolved
   }

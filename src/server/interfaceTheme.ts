@@ -24,7 +24,5 @@ export function getTheme(dataRoot: string): Theme | undefined {
 }
 
 export async function setTheme(dataRoot: string, theme: Theme): Promise<void> {
-  await writeYamlArtifact(settingsPath(dataRoot), (document) => {
-    document.setIn(['interfacePreferences', 'theme'], theme)
-  })
+  await writeYamlArtifact(settingsPath(dataRoot), { interfacePreferences: { theme } })
 }
