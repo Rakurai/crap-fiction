@@ -55,9 +55,15 @@
   cursor: pointer;
 }
 
-.control:hover {
+.control:hover:enabled {
   color: var(--ink);
   border-color: var(--ink3);
+}
+
+.control:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
 }
 
 .scroll {
@@ -168,7 +174,7 @@
   background: var(--paper);
 }
 
-.saveFailedFacts {
+.saveFailedStamp {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: .07em;
@@ -180,6 +186,15 @@
   color: var(--ink2);
   flex: 1;
   margin: 0;
+}
+
+.saveFailedCause {
+  font: 400 10px/1.5 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  max-width: 220px;
+  flex: none;
+  text-align: right;
 }
 
 .readingFooter {

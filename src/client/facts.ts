@@ -29,6 +29,15 @@ export function modeName(mode: string): string {
   return mode.toUpperCase()
 }
 
+/**
+ * Words that came back from the machine, said in the register rather than folded
+ * into a sentence about the author's work — SPEC "Write semantics" wants what a
+ * failed write returned on screen, and it is a fact about the machine.
+ */
+export function machineWords(text: string): string {
+  return text.toUpperCase()
+}
+
 export function timeOfDay(atMs: number): string {
   return clock.format(new Date(atMs))
 }

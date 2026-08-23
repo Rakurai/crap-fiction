@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAutosaveController } from '../../src/client/autosave.js'
 
+const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
+
+const clock = () => FAILED_AT_MS
+
 describe('createAutosaveController', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -12,7 +16,7 @@ describe('createAutosaveController', () => {
 
   it('does not save on construction, only once the text changes', () => {
     const save = vi.fn().mockResolvedValue(undefined)
-    createAutosaveController('draft one', save, vi.fn(), 1000)
+    createAutosaveController('draft one', save, vi.fn(), clock, 1000)
 
     vi.advanceTimersByTime(5000)
 
@@ -21,7 +25,7 @@ describe('createAutosaveController', () => {
 
   it('debounces a write, sending only the latest text once typing pauses', () => {
     const save = vi.fn().mockResolvedValue(undefined)
-    const controller = createAutosaveController('', save, vi.fn(), 1000)
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('a')
     vi.advanceTimersByTime(500)
@@ -39,7 +43,7 @@ describe('createAutosaveController', () => {
     let resolveFirst: (() => void) | undefined
     save.mockImplementationOnce(() => new Promise<void>((resolve) => (resolveFirst = resolve)))
     save.mockImplementationOnce(() => Promise.resolve())
-    const controller = createAutosaveController('', save, vi.fn(), 1000)
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('first')
     vi.advanceTimersByTime(1000)
@@ -59,11 +63,11 @@ describe('createAutosaveController', () => {
     save.mockImplementationOnce(() => Promise.reject(new Error('disk unhappy')))
     save.mockImplementationOnce(() => Promise.resolve())
     const onStateChange = vi.fn()
-    const controller = createAutosaveController('', save, onStateChange, 1000)
+    const controller = createAutosaveController('', save, onStateChange, clock, 1000)
 
     controller.update('first')
     vi.advanceTimersByTime(1000)
-    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true, message: 'disk unhappy' }))
+    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true, message: 'disk unhappy', atMs: FAILED_AT_MS }))
 
     vi.advanceTimersByTime(60_000)
     expect(save).toHaveBeenCalledTimes(1) // no hidden retry loop while nothing new was written
@@ -74,9 +78,22 @@ describe('createAutosaveController', () => {
     expect(onStateChange).toHaveBeenLastCalledWith({ failed: false })
   })
 
+  it('stamps the failure with the moment the write came back, not the moment it was scheduled', async () => {
+    const save = vi.fn().mockImplementationOnce(() => Promise.reject(new Error('disk unhappy')))
+    const onStateChange = vi.fn()
+    let reading = FAILED_AT_MS
+    const controller = createAutosaveController('', save, onStateChange, () => reading, 1000)
+
+    controller.update('first')
+    reading = FAILED_AT_MS + 4000
+    vi.advanceTimersByTime(1000)
+
+    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith(expect.objectContaining({ atMs: FAILED_AT_MS + 4000 })))
+  })
+
   it('flushes the pending write immediately, without waiting on it', () => {
     const save = vi.fn().mockResolvedValue(undefined)
-    const controller = createAutosaveController('', save, vi.fn(), 1000)
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('unsaved')
     controller.flush()
@@ -89,7 +106,7 @@ describe('createAutosaveController', () => {
     let resolveSave: (() => void) | undefined
     save.mockImplementationOnce(() => new Promise<void>((resolve) => (resolveSave = resolve)))
     const onStateChange = vi.fn()
-    const controller = createAutosaveController('', save, onStateChange, 1000)
+    const controller = createAutosaveController('', save, onStateChange, clock, 1000)
 
     controller.update('unsaved')
     controller.flush()

@@ -1,6 +1,6 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
-import { facts, modeName, wordCount } from './facts.js'
+import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import { useAutosave } from './useAutosave.js'
 import styles from './Manuscript.module.css'
 import { useManuscript } from './useManuscript.js'
@@ -22,6 +22,13 @@ type ManuscriptProps = {
  * rather than rendered prose), so an exact cursor mapping between the two
  * is not well-defined; the scroll ratio — where the author is looking — is
  * preserved across that switch instead.
+ *
+ * UX_DESIGN "A failed save": leaving is free everywhere else because everything
+ * written is already on disk, and while a save is failing it is refused rather
+ * than confirmed — an author asked whether to discard their own prose has been
+ * asked the wrong question. The notice is the one place that says why, so the
+ * disabled control carries no second explanation of its own. The manuscript
+ * stays editable throughout, and the next write that succeeds clears both.
  */
 export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
@@ -41,7 +48,7 @@ export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptP
     <div className={styles.wrapper}>
       {!reading && (
         <div className={styles.topBar}>
-          <button type="button" className={styles.control} onClick={onClose}>
+          <button type="button" className={styles.control} onClick={onClose} disabled={autosave.failed}>
             ‹ pieces
           </button>
           <span className={styles.title}>{title}</span>
@@ -76,12 +83,14 @@ export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptP
         </div>
       </div>
 
-      {!reading && autosave.failed && (
+      {!reading && autosave.failed && autosave.failedAtMs !== undefined && (
         <div className={styles.saveFailed}>
-          <span className={styles.saveFailedFacts}>NOT SAVED</span>
+          <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.failedAtMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            Couldn't save — {autosave.message} — will retry
+            The last write to draft.md failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            unavailable while “{title}” is unsaved.
           </p>
+          {autosave.message !== undefined && <span className={styles.saveFailedCause}>{machineWords(autosave.message)}</span>}
         </div>
       )}
 

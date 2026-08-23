@@ -363,6 +363,17 @@ the unwritten state stays in memory, the failure is stated where the author can 
 stays stated until it clears, the next ordinary write retries it, and nothing resolves it
 optimistically.
 
+**The notice claims no retry, because none is scheduled.** The retry rides the next ordinary write,
+so a notice promising one describes behaviour the client does not have: an author who reads it and
+stops typing is never written. The notice carries the moment the write failed — one that persists
+cannot otherwise be told from one that arrived a second ago — and what came back from the write, in
+the facts register rather than inside the sentence about the author's prose.
+
+**Leaving the piece is refused while a draft write is failing**, and refused rather than confirmed.
+The control that leaves cannot be operated, the notice is the single place that says why and names
+the manuscript it is holding, and the next write that succeeds makes leaving available again. Nothing
+asks the author to confirm discarding anything, and the manuscript stays editable throughout.
+
 ## Model access
 
 **One narrow internal interface for every model call**, and every call in the product goes

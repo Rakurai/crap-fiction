@@ -5,6 +5,7 @@ import { saveDraft } from './piecesClient.js'
 export type AutosaveViewModel = {
   readonly failed: boolean
   readonly message: string | undefined
+  readonly failedAtMs: number | undefined
   readonly flush: () => void
 }
 
@@ -19,7 +20,7 @@ export function useAutosave(pieceId: string, markdown: string): AutosaveViewMode
   const [state, setState] = useState<AutosaveState>({ failed: false })
   const controllerRef = useRef<ReturnType<typeof createAutosaveController> | undefined>(undefined)
 
-  controllerRef.current ??= createAutosaveController(markdown, (text) => saveDraft(pieceId, text), setState)
+  controllerRef.current ??= createAutosaveController(markdown, (text) => saveDraft(pieceId, text), setState, () => Date.now())
   const controller = controllerRef.current
 
   useEffect(() => {
@@ -30,5 +31,10 @@ export function useAutosave(pieceId: string, markdown: string): AutosaveViewMode
     return () => controller.flush()
   }, [controller])
 
-  return { failed: state.failed, message: state.failed ? state.message : undefined, flush: controller.flush }
+  return {
+    failed: state.failed,
+    message: state.failed ? state.message : undefined,
+    failedAtMs: state.failed ? state.atMs : undefined,
+    flush: controller.flush,
+  }
 }
