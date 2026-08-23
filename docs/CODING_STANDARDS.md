@@ -348,6 +348,12 @@ needs it, never retyped: a copy drifts the moment the original changes and the t
 Assert observable outcomes through the interface, never internal state, so tests survive a refactor
 behind it.
 
+A test that models what the environment would otherwise compute is asserting the mechanism, not the
+property, and must say which one it owns. Modelling is legitimate — the arithmetic is worth
+protecting where the arithmetic is the risk — but the property still wants the environment that
+computes it, and until something supplies that, the property is unprotected however green the
+mechanism reads.
+
 Mock only adapters at seams. Never mock an internal function to make a test convenient. Use the real
 or local-substitute implementation for anything that has one.
 

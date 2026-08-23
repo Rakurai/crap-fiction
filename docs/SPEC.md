@@ -1133,16 +1133,27 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
 | **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
-| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; the reading view preserves position |
+| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
 | **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
 
 **A small number of browser tests over the fixture implementation**, and the count is a ceiling on
-purpose. Several guarantees live at the integration of editor, state and interface where no
-single seam can prove them: that typing stays possible while a round lands, that the manuscript
-is read-only while an application is in flight and editable the moment it settles, that applying
-a recommendation changes the visible manuscript, that the editor's undo restores it, that
-switching between the rendered and Markdown views preserves the manuscript, that the reading
-view restores position, and that abandoning a round updates the conversation.
+purpose. A browser earns a test only where the thing that can break is a browser: real layout, real
+keystrokes, and the surface reacting to a state a real stream delivered. Where a hook or a component
+can state the property against a modelled DOM, it owns it and the browser does not repeat it.
+
+- Typing stays possible while a round lands, with the keystrokes reaching the editor while the
+  stream is delivering.
+- Applying a recommendation changes the visible manuscript; the manuscript is read-only for the
+  duration and editable the moment it settles; and the editor's own undo keystroke restores it.
+- The reading view restores position against real layout, where the element the browser scrolls and
+  the moment it has a height are the browser's to decide and not the test's to model.
+
+Beside them, one journey through the deployed arrangement — naming a workspace, making a piece,
+writing prose and finding it still there after a reload — because nothing below the browser can say
+that the parts were assembled at all.
+
+The three above need the studio answering from the fixture model implementation rather than from a
+runtime, which is a way of standing the studio up that does not exist yet.
 
 **No screenshot regression farm and no browser test per response state.** How the interface composes
 under lopsided and late responses is design work judged against the mockup, not a thing tests

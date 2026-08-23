@@ -11,7 +11,7 @@ TSX := ./.sandcastle/node_modules/.bin/tsx
 # them: an absent one is a startup failure naming it (SPEC "Deployment").
 STUDIO_ENV := .env
 
-.PHONY: sandcastle run test
+.PHONY: sandcastle run test test-browser
 
 # Work the next ticket on the ready-for-agent frontier. main.mts mints Bedrock
 # credentials on the host first and refuses to start if the SSO session is too
@@ -36,12 +36,18 @@ run:
 	  }; \
 	  exec npm run dev
 
-# Everything that can say the studio is broken, in the order that tells you
-# fastest: types, then the suite that needs no browser, then the journey through
-# one. The browser suite brings up its own studio on its own port against its own
-# data root, so it neither needs $(STUDIO_ENV) nor disturbs a studio already
-# running.
+# Everything that can say the studio is broken without a browser, in the order
+# that tells you fastest: types, then the suite. This is the whole gate for an
+# agent working a ticket, because the container it works in has no browser and
+# installing one there would buy a second arrangement to keep honest.
 test:
 	npm run typecheck
 	npm test
+
+# The journey through a real browser, run by hand on the author's machine. It
+# drives Chrome itself rather than a bundled build, because what it is for is the
+# studio working in the browser the author uses. It brings up its own studio on
+# its own port against its own data root, so it neither needs $(STUDIO_ENV) nor
+# disturbs a studio already running.
+test-browser:
 	npm run test:e2e
