@@ -10,9 +10,12 @@ export default defineConfig({
     react(),
     devServer({
       entry: 'src/server/index.ts',
-      // The client's own HTML shell is Vite's to serve; everything else
-      // not otherwise excluded is a candidate for a Hono route.
-      exclude: [...defaultOptions.exclude, /^\/$/],
+      // The client's own HTML shell is Vite's to serve, as are the typeface
+      // files the token layer names — the default excludes cover source and
+      // stylesheets but no binary asset, so a font request would otherwise
+      // reach the Hono application and come back a 404. Everything else not
+      // excluded is a candidate for a Hono route.
+      exclude: [...defaultOptions.exclude, /^\/$/, /\.woff2$/],
     }),
   ],
   server: {

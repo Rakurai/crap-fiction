@@ -31,6 +31,16 @@ function leaveControl(): HTMLButtonElement {
   return screen.getByRole('button', { name: '‹ pieces' })
 }
 
+describe('the piece header', () => {
+  afterEach(cleanup)
+
+  it('states the mode and the length in the facts register, in the mockup wording', () => {
+    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light of the day." onClose={vi.fn()} />)
+
+    expect(screen.getByText('FLASH · 5 WORDS')).toBeTruthy()
+  })
+})
+
 describe('the reading view', () => {
   afterEach(cleanup)
 
