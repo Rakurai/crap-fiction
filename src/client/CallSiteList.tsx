@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import type { CallSiteAssignmentView } from '../server/model/callSites.js'
+import styles from './CallSiteList.module.css'
 
 type CallSiteListProps = {
   readonly sites: readonly CallSiteAssignmentView[]
@@ -7,15 +8,16 @@ type CallSiteListProps = {
   readonly onAssign: (site: string, model: string) => void
 }
 
-/** Deliberately bare markup (see WorkspacePrompt). One form per site, so a site is assignable one at a time. */
+/** One form per site, so a site is assignable one at a time. */
 export function CallSiteList({ sites, assigning, onAssign }: CallSiteListProps) {
   return (
-    <ul>
+    <ul className={styles.list}>
       {sites.map((site) => (
-        <li key={site.site}>
-          <strong>{site.displayName ?? site.site}</strong>
-          {site.roleDescription !== null && <p>{site.roleDescription}</p>}
+        <li key={site.site} className={styles.item}>
+          <div className={styles.name}>{site.displayName ?? site.site}</div>
+          {site.roleDescription !== null && <p className={styles.role}>{site.roleDescription}</p>}
           <form
+            className={styles.form}
             onSubmit={(event: FormEvent<HTMLFormElement>) => {
               event.preventDefault()
               const model = new FormData(event.currentTarget).get('model')
@@ -24,11 +26,18 @@ export function CallSiteList({ sites, assigning, onAssign }: CallSiteListProps) 
               }
             }}
           >
-            <label>
+            <label className={styles.label} htmlFor={`model-${site.site}`}>
               Model
-              <input name="model" type="text" defaultValue={site.assignment ?? ''} disabled={assigning === site.site} />
             </label>
-            <button type="submit" disabled={assigning === site.site}>
+            <input
+              id={`model-${site.site}`}
+              name="model"
+              type="text"
+              className={styles.input}
+              defaultValue={site.assignment ?? ''}
+              disabled={assigning === site.site}
+            />
+            <button type="submit" className={styles.submit} disabled={assigning === site.site}>
               Assign
             </button>
           </form>

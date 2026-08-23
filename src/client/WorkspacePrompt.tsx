@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import styles from './WorkspacePrompt.module.css'
 
 type WorkspacePromptProps = {
   readonly error: string | undefined
@@ -6,11 +7,7 @@ type WorkspacePromptProps = {
   readonly onSubmit: (candidate: string) => void
 }
 
-/**
- * The only surface on screen while no workspace is configured (SPEC
- * "Files"). Deliberately bare markup: the component and token layer this
- * would otherwise use follows the mockup rather than preceding it.
- */
+/** The only surface on screen while no workspace is configured (SPEC "Files"). */
 export function WorkspacePrompt({ error, submitting, onSubmit }: WorkspacePromptProps) {
   const [path, setPath] = useState('')
 
@@ -20,20 +17,32 @@ export function WorkspacePrompt({ error, submitting, onSubmit }: WorkspacePrompt
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label htmlFor="workspace-path">Where do your pieces live?</label>
-      <input
-        id="workspace-path"
-        name="workspace-path"
-        type="text"
-        value={path}
-        onChange={(event) => setPath(event.target.value)}
-        required
-      />
-      <button type="submit" disabled={submitting}>
-        Set workspace
-      </button>
-      {error !== undefined && <p role="alert">{error}</p>}
-    </form>
+    <div className={styles.screen}>
+      <form className={styles.panel} onSubmit={handleSubmit}>
+        <label className={styles.heading} htmlFor="workspace-path">
+          Where do your pieces live?
+        </label>
+        <p className={styles.hint}>A directory inside the data root. Chosen once — this is not asked again.</p>
+        <input
+          id="workspace-path"
+          name="workspace-path"
+          type="text"
+          className={styles.input}
+          value={path}
+          onChange={(event) => setPath(event.target.value)}
+          required
+        />
+        <div className={styles.actions}>
+          <button type="submit" className={styles.submit} disabled={submitting}>
+            use this directory
+          </button>
+        </div>
+        {error !== undefined && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+      </form>
+    </div>
   )
 }

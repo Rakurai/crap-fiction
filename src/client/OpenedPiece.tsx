@@ -1,4 +1,5 @@
 import { Manuscript } from './Manuscript.js'
+import styles from './OpenedPiece.module.css'
 import { usePiece } from './usePiece.js'
 
 type OpenedPieceProps = {
@@ -14,12 +15,16 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   }
 
   return (
-    <div>
-      <button type="button" onClick={onClose}>
+    <div className={styles.screen}>
+      <button type="button" className={styles.back} onClick={onClose}>
         ‹ pieces
       </button>
-      {piece.status === 'loading' && <p>Opening…</p>}
-      {piece.status === 'error' && <p role="alert">{piece.message}</p>}
+      {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}
+      {piece.status === 'error' && (
+        <p className={styles.error} role="alert">
+          {piece.message}
+        </p>
+      )}
     </div>
   )
 }

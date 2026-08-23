@@ -3,6 +3,7 @@ import { CallSitesScreen } from './CallSitesScreen.js'
 import { NewPieceForm } from './NewPieceForm.js'
 import { OpenedPiece } from './OpenedPiece.js'
 import { PieceList } from './PieceList.js'
+import styles from './PiecesScreen.module.css'
 import { ThemeToggle } from './ThemeToggle.js'
 import { usePieces } from './usePieces.js'
 import { useTheme } from './useTheme.js'
@@ -28,22 +29,41 @@ export function PiecesScreen() {
   }
 
   return (
-    <div>
-      <ThemeToggle theme={theme.theme} onChoose={theme.choose} />
-      {theme.loadError !== undefined && <p role="alert">{theme.loadError}</p>}
-      {theme.chooseError !== undefined && <p role="alert">{theme.chooseError}</p>}
-      <button type="button" onClick={() => setShowCallSites(true)}>
-        Models
-      </button>
-      <NewPieceForm
-        submitting={pieces.status === 'ready' && pieces.creating}
-        error={pieces.status === 'ready' ? pieces.createError : undefined}
-        onSubmit={(title) => {
-          if (pieces.status === 'ready') pieces.create(title)
-        }}
-      />
-      {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} onOpen={setOpenedId} />}
-      {pieces.status === 'error' && <p role="alert">{pieces.message}</p>}
+    <div className={styles.screen}>
+      <div className={styles.topBar}>
+        <ThemeToggle theme={theme.theme} onChoose={theme.choose} />
+        <span className={styles.spacer} />
+        <button type="button" className={styles.modelsButton} onClick={() => setShowCallSites(true)}>
+          Models
+        </button>
+      </div>
+      <div className={styles.center}>
+        <div className={styles.panel}>
+          {theme.loadError !== undefined && (
+            <p className={styles.error} role="alert">
+              {theme.loadError}
+            </p>
+          )}
+          {theme.chooseError !== undefined && (
+            <p className={styles.error} role="alert">
+              {theme.chooseError}
+            </p>
+          )}
+          <NewPieceForm
+            submitting={pieces.status === 'ready' && pieces.creating}
+            error={pieces.status === 'ready' ? pieces.createError : undefined}
+            onSubmit={(title) => {
+              if (pieces.status === 'ready') pieces.create(title)
+            }}
+          />
+          {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} onOpen={setOpenedId} />}
+          {pieces.status === 'error' && (
+            <p className={styles.error} role="alert">
+              {pieces.message}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

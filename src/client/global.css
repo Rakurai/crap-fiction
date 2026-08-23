@@ -1,0 +1,32 @@
+/* Element resets the mockup carries beside its tokens — nothing here is a
+   component style, only the ground every surface stands on. */
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+[contenteditable] {
+  outline: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: var(--ink4);
+}

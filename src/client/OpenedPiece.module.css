@@ -1,0 +1,35 @@
+.screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--prose);
+  padding: 16px 22px;
+}
+
+.back {
+  align-self: flex-start;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 6px 9px;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.back:hover {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.status {
+  font: 400 12.5px/1.6 var(--font-ui);
+  color: var(--ink3);
+}
+
+.error {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+}

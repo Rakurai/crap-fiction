@@ -1,3 +1,4 @@
+import styles from './App.module.css'
 import { PiecesScreen } from './PiecesScreen.js'
 import { useWorkspace } from './useWorkspace.js'
 import { WorkspacePrompt } from './WorkspacePrompt.js'
@@ -11,9 +12,12 @@ export function App() {
     return <p role="alert">{workspace.message}</p>
   }
 
-  if (workspace.status === 'unset') {
-    return <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
-  }
-
-  return <PiecesScreen />
+  return (
+    <div className={styles.app}>
+      {workspace.status === 'unset' && (
+        <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
+      )}
+      {workspace.status === 'set' && <PiecesScreen />}
+    </div>
+  )
 }

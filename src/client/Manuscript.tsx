@@ -1,6 +1,7 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
 import { useAutosave } from './useAutosave.js'
+import styles from './Manuscript.module.css'
 import { useManuscript } from './useManuscript.js'
 
 type ManuscriptProps = {
@@ -23,6 +24,7 @@ type ManuscriptProps = {
 export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
   const autosave = useAutosave(pieceId, manuscript.markdown)
+  const reading = manuscript.view === 'reading'
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -34,40 +36,57 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
   }, [manuscript.view, manuscript.showRendered])
 
   return (
-    <div>
-      {manuscript.view !== 'reading' && (
-        <div>
-          <button type="button" onClick={onClose}>
+    <div className={styles.wrapper}>
+      {!reading && (
+        <div className={styles.topBar}>
+          <button type="button" className={styles.control} onClick={onClose}>
             ‹ pieces
           </button>
-          <span>{title}</span>
-          <span>{manuscript.length} words</span>
-          <button type="button" onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
-            {manuscript.view === 'source' ? 'rendered' : 'source'}
-          </button>
-          <button type="button" onClick={manuscript.showReading}>
-            reading
-          </button>
-          {autosave.failed && <span role="status">Couldn't save — {autosave.message} — will retry</span>}
+          <span className={styles.title}>{title}</span>
+          <span className={styles.length}>{manuscript.length} words</span>
+          <span className={styles.spacer} />
+          <div className={styles.controls}>
+            <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
+              {manuscript.view === 'source' ? 'rendered' : 'source'}
+            </button>
+            <button type="button" className={styles.control} onClick={manuscript.showReading}>
+              reading
+            </button>
+          </div>
         </div>
       )}
 
-      <div ref={manuscript.containerRef}>
-        {manuscript.view === 'source' ? (
-          <textarea
-            aria-label="Manuscript source"
-            value={manuscript.sourceText}
-            onChange={(event) => manuscript.setSourceText(event.target.value)}
-          />
-        ) : (
-          <EditorContent editor={manuscript.editor} />
-        )}
+      <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>
+        <div className={reading ? styles.readingMeasure : styles.measure}>
+          {reading && <h1 className={styles.readingTitle}>{title}</h1>}
+          {manuscript.view === 'source' ? (
+            <textarea
+              aria-label="Manuscript source"
+              className={styles.source}
+              value={manuscript.sourceText}
+              onChange={(event) => manuscript.setSourceText(event.target.value)}
+            />
+          ) : (
+            <div className={reading ? styles.readingEditor : styles.editor}>
+              <EditorContent editor={manuscript.editor} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {manuscript.view === 'reading' && (
-        <div>
-          <span>Esc to return</span>
-          <button type="button" onClick={manuscript.showRendered}>
+      {!reading && autosave.failed && (
+        <div className={styles.saveFailed}>
+          <span className={styles.saveFailedFacts}>NOT SAVED</span>
+          <p className={styles.saveFailedMessage} role="status">
+            Couldn't save — {autosave.message} — will retry
+          </p>
+        </div>
+      )}
+
+      {reading && (
+        <div className={styles.readingFooter}>
+          <span className={styles.readingHint}>ESC TO RETURN</span>
+          <button type="button" className={styles.readingBack} onClick={manuscript.showRendered}>
             back to writing
           </button>
         </div>

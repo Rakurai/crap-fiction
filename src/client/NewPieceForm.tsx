@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import styles from './NewPieceForm.module.css'
 
 type NewPieceFormProps = {
   readonly submitting: boolean
@@ -6,7 +7,6 @@ type NewPieceFormProps = {
   readonly onSubmit: (title: string) => void
 }
 
-/** Deliberately bare markup (see WorkspacePrompt). */
 export function NewPieceForm({ submitting, error, onSubmit }: NewPieceFormProps) {
   const [title, setTitle] = useState('')
 
@@ -17,20 +17,29 @@ export function NewPieceForm({ submitting, error, onSubmit }: NewPieceFormProps)
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label htmlFor="new-piece-title">Title</label>
-      <input
-        id="new-piece-title"
-        name="new-piece-title"
-        type="text"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        required
-      />
-      <button type="submit" disabled={submitting}>
-        new piece
-      </button>
-      {error !== undefined && <p role="alert">{error}</p>}
-    </form>
+    <div>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        <label className={styles.label} htmlFor="new-piece-title">
+          Title
+        </label>
+        <input
+          id="new-piece-title"
+          name="new-piece-title"
+          type="text"
+          className={styles.input}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          required
+        />
+        <button type="submit" className={styles.submit} disabled={submitting}>
+          new piece
+        </button>
+      </form>
+      {error !== undefined && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
