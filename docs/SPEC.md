@@ -177,8 +177,9 @@ over exactly the document model this needs. ProseMirror remains underneath, so t
 level control is available where the application genuinely needs it.
 
 **The document schema is constrained to what round-trips through Markdown semantically.** The
-manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them, and
-thematic breaks where a piece marks a scene division. Lists, tables, block quotes, links, images,
+manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them,
+thematic breaks where a piece marks a scene division, and hard line breaks where a piece holds two
+lines apart inside one paragraph. Lists, tables, block quotes, links, images,
 inline code, raw HTML and front matter are not in the schema, and Markdown source offering one of
 them is read as the prose it contains rather than refused — a story the author brought from
 elsewhere opens.
@@ -572,12 +573,20 @@ writing through a round is load-bearing rather than a nicety.
 **This is the seam the central bet lives in.** Everything else in the orchestration is
 plumbing.
 
-A call is assembled from three things the runtime holds, none of which is an intrinsic property
+A call is assembled from four things the runtime holds, none of which is an intrinsic property
 of the participant:
 
 ```
-role definition + model configuration + selected context compilation policy → participant call
+role definition + the mode's criteria for that participant + model configuration
+  + selected context compilation policy → participant call
 ```
+
+**The mode's criteria are named here because they are what make the specialists differ.** CONTEXT
+"Mode" has a mode supplying the criteria each specialist applies at that scale — what it attends to
+and the defect it is alert to — and a compilation that dropped them would separate four participants
+by one sentence of role description each, which is not the room the bet describes. The Story Editor
+has no such criteria, being no part of the cast, and is told what it is for by its role definition
+instead.
 
 ```
 compileContext(call, piece, conversation, policy) → Context

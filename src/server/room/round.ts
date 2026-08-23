@@ -1,21 +1,18 @@
-import type { Charter } from '../model/charter.js'
-import type { ModelAccess } from '../model/modelAccess.js'
+import type { ModelAccess } from '../model/types.js'
 import type { RoleDefinition } from '../model/roles.js'
-import {
-  substantiveResponse,
-  type Conversation,
-  type ParticipantResult,
-  type RoundParticipantRecord,
-} from '../../shared/conversationViews.js'
+import { substantiveResponse, type ParticipantResult, type RoundParticipantRecord } from '../../shared/conversationViews.js'
 import { responseValueSchema, type EligibleResponseValue, type OwedResponseValue } from '../../shared/participantResponse.js'
-import {
-  compileSpecialistContext,
-  compileStoryEditorContext,
-  renderPrompt,
-  type ContextInput,
-  type HistoryPolicy,
-  type ParticipantEvidence,
-} from './context.js'
+import type { ParticipantEvidence } from './context.js'
+
+/**
+ * The round's own vocabulary — the plan it runs to, the result it reaches, and
+ * the two steps every round takes for each participant. The loop itself is the
+ * room's private method rather than a function here: SPEC "Seams" makes the
+ * round loop internal to the room boundary, and everything it guarantees is
+ * observable at the room's own event stream, so an exported loop would be a
+ * second surface making the same promises one module further from the interface
+ * that carries them.
+ */
 
 export type RoundPlan = Readonly<{
   roundId: string
@@ -26,24 +23,6 @@ export type RoundPlan = Readonly<{
   specialists: readonly RoleDefinition[]
   /** Present, and last, exactly where the round will reach the Story Editor (CONTEXT "Round"). */
   storyEditor: RoleDefinition | undefined
-}>
-
-export type RoundCallbacks = Readonly<{
-  onState: (participantId: string, state: 'preparing' | 'working') => void
-  onSettled: (participantId: string, record: RoundParticipantRecord) => void
-}>
-
-export type RunRoundInput = Readonly<{
-  plan: RoundPlan
-  draft: string
-  authorContext: string | undefined
-  storyContext: string | undefined
-  conversation: Conversation | undefined
-  policy: HistoryPolicy
-  charter: Charter
-  modelAccess: ModelAccess
-  signal: AbortSignal
-  callbacks: RoundCallbacks
 }>
 
 export type RoundResult = Readonly<{
@@ -71,7 +50,13 @@ function toParticipantResult(value: EligibleResponseValue | OwedResponseValue): 
   return { kind: 'response', outcome: value.outcome, claim: value.claim, note: value.note }
 }
 
-async function callParticipant(
+/**
+ * One participant's call, from the schema its eligibility selects through to the
+ * record the conversation keeps. Which schema that is — whether a reply saying
+ * nothing is admissible at all — is the whole of what owing an answer changes at
+ * the model boundary, so it is decided here and nowhere else.
+ */
+export async function callParticipant(
   role: RoleDefinition,
   prompt: string,
   owesAnswer: boolean,
@@ -92,76 +77,14 @@ async function callParticipant(
   return { participantId: role.id, result: participantResult }
 }
 
-function evidenceFrom(records: readonly RoundParticipantRecord[]): readonly ParticipantEvidence[] {
+/**
+ * The readings a round produced, as the Story Editor weighs them. A no-comment
+ * outcome and a failure are not readings and never appear (CONTEXT "Response").
+ */
+export function evidenceFrom(records: readonly RoundParticipantRecord[]): readonly ParticipantEvidence[] {
   return records.flatMap((record) => {
     const response = substantiveResponse(record.result)
     if (response === undefined) return []
     return [{ participantId: record.participantId, claim: response.claim, note: response.note }]
   })
-}
-
-/**
- * SPEC "The round": compiles every eligible specialist's context before any
- * call is issued, calls them one at a time in the cast's order, then — where
- * the round will reach it — compiles and calls the Story Editor over what
- * settled. Abandonment stops the round at the call in flight: calls not yet
- * issued are never issued and never appear in the result, and no Story
- * Editor call is attempted.
- */
-export async function runRound(input: RunRoundInput): Promise<RoundResult> {
-  const { plan, draft, authorContext, storyContext, conversation, policy, charter, modelAccess, signal, callbacks } = input
-
-  const shared = { message: plan.message, authorContext, storyContext, draft, conversation, policy }
-  const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({ ...shared, role, owesAnswer })
-
-  // Every specialist's prompt, complete, before the first call goes out. The
-  // list is built rather than a map keyed by id so that iterating it needs no
-  // lookup and therefore no branch for a lookup that missed — a `continue` on
-  // an absent prompt would silently drop a specialist from the round.
-  const calls = plan.specialists.map((role) => {
-    const owesAnswer = plan.addressedIds.includes(role.id)
-    return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), charter) }
-  })
-
-  const records: RoundParticipantRecord[] = []
-  let abandoned = false
-
-  for (const call of calls) {
-    if (signal.aborted) {
-      abandoned = true
-      break
-    }
-
-    const record = await callParticipant(call.role, call.prompt, call.owesAnswer, modelAccess, signal, (state) =>
-      callbacks.onState(call.role.id, state),
-    )
-    records.push(record)
-    callbacks.onSettled(call.role.id, record)
-    if (record.result.kind === 'abandoned') {
-      abandoned = true
-      break
-    }
-  }
-
-  const storyEditor = plan.storyEditor
-  if (!abandoned && storyEditor !== undefined) {
-    if (signal.aborted) {
-      abandoned = true
-    } else {
-      const evidence = evidenceFrom(records)
-      // Addressed directly, it owes an answer for the ordinary reason. With no
-      // readings to weigh it owes one too: SPEC "The round" has the round that
-      // produced no answer saying so, and a Story Editor free to return no
-      // comment on a quiet round would leave the author with a round that
-      // reported nothing and explained nothing.
-      const owesAnswer = plan.addressedIds.includes(storyEditor.id) || evidence.length === 0
-      const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence), charter)
-      const record = await callParticipant(storyEditor, prompt, owesAnswer, modelAccess, signal, (state) => callbacks.onState(storyEditor.id, state))
-      records.push(record)
-      callbacks.onSettled(storyEditor.id, record)
-      if (record.result.kind === 'abandoned') abandoned = true
-    }
-  }
-
-  return { participants: records, outcome: abandoned ? 'abandoned' : 'settled' }
 }

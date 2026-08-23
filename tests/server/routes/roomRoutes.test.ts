@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ModelAccess } from '../../../src/server/model/modelAccess.js'
 import type { Room } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestApp } from '../../support/harness.js'
@@ -32,8 +31,8 @@ describe('the room over HTTP', () => {
     // Conforms to both the eligible and the owed response schema, so one
     // fixture behaviour serves every call site in these routes-level tests.
     const behavior: FixtureBehavior = delayMs === undefined ? { result: CONFORMING_RESULT } : { result: CONFORMING_RESULT, delayMs }
-    const modelAccess = new ModelAccess(FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] }), (site) => site)
-    const room = buildTestRoom({ modelAccess })
+    const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
+    const room = buildTestRoom(dataRoot, { modelAccess })
     const { app, workspace } = buildTestApp(dataRoot, { room })
 
     await workspace.set('my-writing')
@@ -104,6 +103,25 @@ describe('the room over HTTP', () => {
     expect(await second.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
 
     await settlementOf(room, 'cups')
+  })
+
+  /**
+   * Abandonment is idempotent and the room, not the store, is the authority on what
+   * is in flight — so abandoning nothing is a legitimate 200. Before a workspace
+   * exists it is not: this route answers the same way every other `/pieces/...`
+   * route does rather than reporting a request carried out in a place the author
+   * has not chosen yet.
+   */
+  it('refuses to abandon before a workspace is set, and abandons nothing afterwards without complaint', async () => {
+    const bare = buildTestApp(dataRoot).app
+
+    const refused = await bare.request('/pieces/cups/abandon', { method: 'POST' })
+    expect(refused.status).toBe(400)
+    expect(await refused.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
+
+    const { app } = await withPiece()
+    const accepted = await app.request('/pieces/cups/abandon', { method: 'POST' })
+    expect(accepted.status).toBe(200)
   })
 
   it('reports the round in flight on the piece before it settles, so a reload mid-round knows what it is watching', async () => {

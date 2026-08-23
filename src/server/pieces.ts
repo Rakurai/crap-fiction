@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify'
-import { Mutex } from 'async-mutex'
 import { nanoid } from 'nanoid'
 import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
+import { durableContextSchema } from '../shared/durableContext.js'
 import type { PieceDetail, PieceSummary } from '../shared/pieceViews.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import { countWords } from '../shared/storyLength.js'
@@ -12,8 +12,9 @@ import {
   pieceIds,
   readConversation,
   readPiece,
-  writeDraft,
+  readStoryContext,
   writePieceMetadata,
+  type DraftStore,
   type StoredPiece,
 } from './store/index.js'
 
@@ -114,6 +115,10 @@ export function getPiece(workspaceDir: string, id: string, roundInFlight: RoundS
   return {
     ...summarize(id, piece),
     draft: piece.draft?.text ?? '',
+    // The story context as the author wrote it, sections and all, rather than as
+    // a prompt renders it: this is the surface that shows the author what the
+    // room is working from, and #18 proposes changes against these entries.
+    storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     roundInFlight,
   }
@@ -147,18 +152,24 @@ export function getConversation(workspaceDir: string, pieceId: string, conversat
 }
 
 /**
- * SPEC "Write semantics": the client is the manuscript's only writer, one
- * write is in flight at a time, and an atomic rename makes a write
- * indivisible but not ordered — two in flight could complete oldest-last and
- * restore prose the author already replaced. A single mutex serializes every
- * draft write through this instance so that cannot happen, regardless of
- * what order the requests arrive in.
+ * SPEC "Write semantics": the client is the manuscript's only writer, and a draft
+ * write is refused for a piece that does not exist rather than creating one — the
+ * author creates pieces, and a stray id must not become a story.
+ *
+ * That one write is in flight at a time is the store's, not this module's: the
+ * artifact's writer is where overlapping writes are serialized (CODING_STANDARDS
+ * "Persistence"), and a second lock here would be a second owner of the same
+ * guarantee.
  */
 export class DraftWriter {
-  readonly #lock = new Mutex()
+  readonly #drafts: DraftStore
+
+  constructor(drafts: DraftStore) {
+    this.#drafts = drafts
+  }
 
   async save(workspaceDir: string, id: string, draft: string): Promise<void> {
     if (!pieceExists(workspaceDir, id)) throw new PieceNotFoundError(id)
-    await this.#lock.runExclusive(() => writeDraft(workspaceDir, id, draft))
+    await this.#drafts.write(workspaceDir, id, draft)
   }
 }

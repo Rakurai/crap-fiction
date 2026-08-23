@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { createAutosaveController, type AutosaveState } from './autosave.js'
 import type { saveDraft as saveDraftFn } from './piecesClient.js'
 
-export type AutosaveViewModel = {
-  readonly failed: boolean
-  readonly message: string | undefined
-  readonly failedAtMs: number | undefined
-  readonly flush: () => void
-}
+/**
+ * The controller's own state, passed through rather than flattened. Flattening it
+ * into three optional fields made the surface re-check what the union already
+ * guarantees — a failed save always has a message and a moment — and a check that
+ * cannot fail is a check that stops meaning anything (CODING_STANDARDS "Types":
+ * a discriminated union over an optional field encoding a state).
+ */
+export type AutosaveViewModel = Readonly<{
+  state: AutosaveState
+  flush: () => void
+}>
 
 /**
  * SPEC "Write semantics": debounces `draft.md` writes through the pure
@@ -33,10 +38,5 @@ export function useAutosave(pieceId: string, markdown: string, saveDraft: typeof
     return () => controller.flush()
   }, [controller])
 
-  return {
-    failed: state.failed,
-    message: state.failed ? state.message : undefined,
-    failedAtMs: state.failed ? state.atMs : undefined,
-    flush: controller.flush,
-  }
+  return { state, flush: controller.flush }
 }

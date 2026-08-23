@@ -1,44 +1,16 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-const repoRoot = path.join(import.meta.dirname, '..', '..')
-
 /**
- * Matches a relative import climbing out of `src/` into `tests/`, at any depth
- * and on a named, type, or bare side-effect import. It cannot see a reach
- * through a path alias, a `require()`, or a dynamic `import()`.
- */
-function reachesTests(source: string): boolean {
-  return /import\s+(?:[^'"]*from\s+)?['"](?:\.\.\/)+tests\//.test(source)
-}
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return sourceFiles(full)
-    return entry.name.endsWith('.ts') || entry.name.endsWith('.tsx') ? [full] : []
-  })
-}
-
-describe('reachesTests', () => {
-  it('catches a named import reaching into tests', () => {
-    expect(reachesTests("import { FixtureModelAdapter } from '../../tests/support/modelAdapter.js'")).toBe(true)
-  })
-
-  it('leaves an import within src alone', () => {
-    expect(reachesTests("import { thing } from '../shared/thing.js'")).toBe(false)
-  })
-})
-
-/**
- * #21: the studio can be started answering from the fixture model
- * implementation, and the way it is asked for cannot be reached by the
- * deployment the author runs. Both halves are one property and are held here —
- * the fixture studio starts and answers from the fixture, and nothing the
- * deployment loads can arrive at it.
+ * #21: the studio can be started answering from the fixture model implementation.
+ * Here that studio is stood up and asked, over the routes the author's own studio
+ * serves, whether it answers. The other half of #21 — that the deployment the
+ * author runs cannot reach the way this one is asked for — is a fact about the
+ * repo's import graph rather than about a running studio, and is held at
+ * `tests/repo/importGraph.test.ts`.
  */
 describe('the fixture studio', () => {
   let dataRoot: string
@@ -97,17 +69,4 @@ describe('the fixture studio', () => {
     expect((await res.json()).data).toMatchObject({ conversationId: 'c1' })
   })
 
-  it('is reachable from no module under src, so the studio the author runs cannot answer from a fixture', () => {
-    const offenders = sourceFiles(path.join(repoRoot, 'src')).filter((file) => reachesTests(readFileSync(file, 'utf8')))
-
-    expect(offenders).toEqual([])
-  })
-
-  it('is what the fixture Vite config serves, and the author\'s own config serves the real entry', () => {
-    // The entry each config names is the whole difference between the two
-    // studios. It is read from the file rather than imported, because importing
-    // either would run `loadEnv` against this test's own environment.
-    expect(readFileSync(path.join(repoRoot, 'vite.fixture.config.ts'), 'utf8')).toContain("studioConfig('tests/support/fixtureStudio.ts')")
-    expect(readFileSync(path.join(repoRoot, 'vite.config.ts'), 'utf8')).toContain("studioConfig('src/server/index.ts')")
-  })
 })

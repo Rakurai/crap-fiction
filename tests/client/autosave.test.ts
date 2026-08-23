@@ -1,9 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAutosaveController } from '../../src/client/autosave.js'
+import { createAutosaveController, type SaveDraft } from '../../src/client/autosave.js'
+import type { RequestResult } from '../../src/client/request.js'
 
 const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
 
 const clock = () => FAILED_AT_MS
+
+/**
+ * A write answers in the one convention every client request answers in, so
+ * these are what the adapter hands back rather than a resolved or rejected
+ * promise. A failing write is a studio that refused: the server states what went
+ * wrong writing draft.md, and that sentence is what the notice quotes.
+ */
+const WROTE: RequestResult<null> = { outcome: 'value', value: null }
+const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: 'ARTIFACT_INVALID', message })
+
+/** `vi.fn` typed to the seam, so a test cannot hand the controller something it would not receive. */
+function saver() {
+  return vi.fn<SaveDraft>()
+}
 
 describe('createAutosaveController', () => {
   beforeEach(() => {
@@ -15,7 +30,7 @@ describe('createAutosaveController', () => {
   })
 
   it('does not save on construction, only once the text changes', () => {
-    const save = vi.fn().mockResolvedValue(undefined)
+    const save = saver().mockResolvedValue(WROTE)
     createAutosaveController('draft one', save, vi.fn(), clock, 1000)
 
     vi.advanceTimersByTime(5000)
@@ -24,7 +39,7 @@ describe('createAutosaveController', () => {
   })
 
   it('debounces a write, sending only the latest text once typing pauses', () => {
-    const save = vi.fn().mockResolvedValue(undefined)
+    const save = saver().mockResolvedValue(WROTE)
     const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('a')
@@ -39,10 +54,10 @@ describe('createAutosaveController', () => {
   })
 
   it('keeps one write in flight at a time and sends the text produced behind it with the next', async () => {
-    const save = vi.fn()
-    let resolveFirst: (() => void) | undefined
-    save.mockImplementationOnce(() => new Promise<void>((resolve) => (resolveFirst = resolve)))
-    save.mockImplementationOnce(() => Promise.resolve())
+    const save = saver()
+    let resolveFirst: ((result: RequestResult<null>) => void) | undefined
+    save.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+    save.mockImplementationOnce(() => Promise.resolve(WROTE))
     const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('first')
@@ -53,15 +68,15 @@ describe('createAutosaveController', () => {
     vi.advanceTimersByTime(1000)
     expect(save).toHaveBeenCalledTimes(1) // the write in flight is not joined by a second one
 
-    resolveFirst?.()
+    resolveFirst?.(WROTE)
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
     expect(save).toHaveBeenNthCalledWith(2, 'second')
   })
 
   it('states a failed write and retries only on the next ordinary write, not on a timer of its own', async () => {
-    const save = vi.fn()
-    save.mockImplementationOnce(() => Promise.reject(new Error('disk unhappy')))
-    save.mockImplementationOnce(() => Promise.resolve())
+    const save = saver()
+    save.mockResolvedValueOnce(refused('disk unhappy'))
+    save.mockResolvedValueOnce(WROTE)
     const onStateChange = vi.fn()
     const controller = createAutosaveController('', save, onStateChange, clock, 1000)
 
@@ -78,8 +93,26 @@ describe('createAutosaveController', () => {
     expect(onStateChange).toHaveBeenLastCalledWith({ failed: false })
   })
 
+  it('leaves the notice standing when a write was abandoned: nothing was refused and nothing landed', async () => {
+    const save = saver()
+    save.mockResolvedValueOnce(refused('disk unhappy'))
+    save.mockResolvedValueOnce({ outcome: 'abandoned' })
+    const onStateChange = vi.fn()
+    const controller = createAutosaveController('', save, onStateChange, clock, 1000)
+
+    controller.update('first')
+    vi.advanceTimersByTime(1000)
+    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledTimes(1))
+
+    controller.update('second')
+    vi.advanceTimersByTime(1000)
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+
+    expect(onStateChange).toHaveBeenCalledTimes(1) // the failure is not cleared by a write that never reported
+  })
+
   it('stamps the failure with the moment the write came back, not the moment it was scheduled', async () => {
-    const save = vi.fn().mockImplementationOnce(() => Promise.reject(new Error('disk unhappy')))
+    const save = saver().mockResolvedValueOnce(refused('disk unhappy'))
     const onStateChange = vi.fn()
     let reading = FAILED_AT_MS
     const controller = createAutosaveController('', save, onStateChange, () => reading, 1000)
@@ -92,7 +125,7 @@ describe('createAutosaveController', () => {
   })
 
   it('flushes the pending write immediately, without waiting on it', () => {
-    const save = vi.fn().mockResolvedValue(undefined)
+    const save = saver().mockResolvedValue(WROTE)
     const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
 
     controller.update('unsaved')
@@ -102,9 +135,9 @@ describe('createAutosaveController', () => {
   })
 
   it('never resolves optimistically: state only changes once the write settles', async () => {
-    const save = vi.fn()
-    let resolveSave: (() => void) | undefined
-    save.mockImplementationOnce(() => new Promise<void>((resolve) => (resolveSave = resolve)))
+    const save = saver()
+    let resolveSave: ((result: RequestResult<null>) => void) | undefined
+    save.mockImplementationOnce(() => new Promise((resolve) => (resolveSave = resolve)))
     const onStateChange = vi.fn()
     const controller = createAutosaveController('', save, onStateChange, clock, 1000)
 
@@ -112,7 +145,7 @@ describe('createAutosaveController', () => {
     controller.flush()
     expect(onStateChange).not.toHaveBeenCalled()
 
-    resolveSave?.()
+    resolveSave?.(WROTE)
     await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: false }))
   })
 })

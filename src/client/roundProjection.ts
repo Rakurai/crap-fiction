@@ -19,6 +19,14 @@ export type ProjectedRound = Readonly<{
   roundId: string
   message: string | undefined
   /**
+   * When the round opened, as the studio's clock read it — the one fact the
+   * elapsed count is measured from. It is absent for a round read back from a
+   * conversation file, because a settled round has no elapsed time to show and
+   * the record carries no stamp: SPEC's conversation file holds what was said,
+   * not how long the saying took.
+   */
+  openedAt: number | undefined
+  /**
    * `failed` is the room's own failure rather than any participant's, and it is
    * separate from `inFlight` because a round that stopped is not a round still
    * running — the surface draws it as ended, whatever each participant had
@@ -42,6 +50,7 @@ function fromRecord(round: RoundRecord): ProjectedRound {
   return {
     roundId: round.id,
     message: round.message,
+    openedAt: undefined,
     outcome: round.outcome,
     participants: round.participants.map((record) => ({ participantId: record.participantId, state: 'settled', result: record.result })),
   }
@@ -66,6 +75,7 @@ export function withRoundInFlight(projection: ConversationProjection, snapshot: 
   const round: ProjectedRound = {
     roundId: snapshot.roundId,
     message: snapshot.message,
+    openedAt: snapshot.openedAt,
     outcome: 'inFlight',
     participants: snapshot.participants.map((participantId) => ({
       participantId,
@@ -74,6 +84,39 @@ export function withRoundInFlight(projection: ConversationProjection, snapshot: 
     })),
   }
   return { rounds: [...projection.rounds, round] }
+}
+
+/**
+ * How many participants are in each state, which is what UX_DESIGN "A round in
+ * flight" asks the round to say about itself: states and counts rather than a
+ * composed sentence. `answered` counts settled places whatever they settled to —
+ * a failed call and a no-comment response are both answers the round is no longer
+ * waiting on, and the difference between them is stated on the participant, not in
+ * a count of the room.
+ */
+export type RoundTally = Readonly<{
+  working: number
+  preparing: number
+  answered: number
+  waiting: number
+}>
+
+export function tallyRound(round: ProjectedRound): RoundTally {
+  const count = (state: ProjectedParticipantState): number => round.participants.filter((participant) => participant.state === state).length
+  return { working: count('working'), preparing: count('preparing'), answered: count('settled'), waiting: count('waiting') }
+}
+
+/**
+ * Whether the round has nothing to show: it is over, it called someone, and every
+ * one of them failed. A round the room itself failed does not qualify — its
+ * unreached participants have no result at all, and saying every call failed of a
+ * round whose calls were never made would be a claim about work that never
+ * happened.
+ */
+export function everyCallFailed(round: ProjectedRound): boolean {
+  if (round.outcome === 'inFlight') return false
+  if (round.participants.length === 0) return false
+  return round.participants.every((participant) => participant.result?.kind === 'failed')
 }
 
 function updateRound(projection: ConversationProjection, roundId: string, update: (round: ProjectedRound) => ProjectedRound): ConversationProjection {
@@ -101,6 +144,7 @@ export function projectRoundEvent(projection: ConversationProjection, event: Rou
       const round: ProjectedRound = {
         roundId: event.data.roundId,
         message: event.data.message,
+        openedAt: event.data.openedAt,
         outcome: 'inFlight',
         participants: event.data.participants.map((participantId) => ({ participantId, state: 'waiting', result: undefined })),
       }

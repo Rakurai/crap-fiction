@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Theme } from '../shared/theme.js'
+import { useLoaded } from './load.js'
+import { failureMessage } from './request.js'
 import { chooseTheme, fetchTheme } from './themeClient.js'
-import { isAbortError } from './request.js'
 
 export type ThemeViewModel = {
   /** `undefined` while loading, `null` when the author has not chosen. */
@@ -19,20 +20,10 @@ export type ThemeViewModel = {
  * interface following the operating system.
  */
 export function useTheme(): ThemeViewModel {
-  const [theme, setTheme] = useState<Theme | null | undefined>(undefined)
-  const [loadError, setLoadError] = useState<string | undefined>(undefined)
+  const [load, setLoad] = useLoaded(fetchTheme, [])
   const [chooseError, setChooseError] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchTheme(controller.signal)
-      .then((value) => setTheme(value))
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return
-        setLoadError(err instanceof Error ? err.message : 'failed to load theme')
-      })
-    return () => controller.abort()
-  }, [])
+  const theme = load.kind === 'ready' ? load.value.theme : undefined
 
   useEffect(() => {
     if (theme === undefined) return
@@ -45,18 +36,14 @@ export function useTheme(): ThemeViewModel {
 
   const choose = useCallback((next: Theme) => {
     setChooseError(undefined)
-    chooseTheme(next)
-      .then((result) => {
-        if (result.ok) {
-          setTheme(result.theme)
-        } else {
-          setChooseError(result.message)
-        }
-      })
-      .catch((err: unknown) => {
-        setChooseError(err instanceof Error ? err.message : 'failed to set theme')
-      })
+    void chooseTheme(next).then((result) => {
+      if (result.outcome === 'value') {
+        setLoad({ kind: 'ready', value: { theme: result.value.theme } })
+        return
+      }
+      setChooseError(failureMessage(result))
+    })
   }, [])
 
-  return { theme, loadError, chooseError, choose }
+  return { theme, loadError: load.kind === 'error' ? load.message : undefined, chooseError, choose }
 }

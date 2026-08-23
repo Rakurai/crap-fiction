@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import type { PieceDetail } from '../shared/pieceViews.js'
+import { useLoaded } from './load.js'
 import { fetchPiece } from './piecesClient.js'
-import { isAbortError } from './request.js'
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
@@ -9,19 +9,10 @@ export type PieceViewModel =
   | { readonly status: 'error'; readonly message: string }
 
 export function usePiece(id: string): PieceViewModel {
-  const [state, setState] = useState<PieceViewModel>({ status: 'loading' })
+  const load = useCallback((signal: AbortSignal) => fetchPiece(id, signal), [id])
+  const [state] = useLoaded(load, [id])
 
-  useEffect(() => {
-    const controller = new AbortController()
-    setState({ status: 'loading' })
-    fetchPiece(id, controller.signal)
-      .then((piece) => setState({ status: 'ready', piece }))
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return
-        setState({ status: 'error', message: err instanceof Error ? err.message : 'failed to open piece' })
-      })
-    return () => controller.abort()
-  }, [id])
-
-  return state
+  if (state.kind === 'loading') return { status: 'loading' }
+  if (state.kind === 'error') return { status: 'error', message: state.message }
+  return { status: 'ready', piece: state.value }
 }

@@ -8,7 +8,7 @@ import {
   roundOpenedEventSchema,
   type RoomErrorEvent,
 } from '../shared/roundEvents.js'
-import { RequestFailure, requestJson } from './request.js'
+import { requestJson, type RequestResult } from './request.js'
 import type { RoundEvent } from './roundProjection.js'
 
 export type RoomEvent = RoundEvent | Readonly<{ type: 'error'; data: RoomErrorEvent }>
@@ -22,22 +22,18 @@ function readJson(text: string): unknown {
   }
 }
 
-export type ActionResult = { readonly ok: true } | { readonly ok: false; readonly message: string }
-
-export async function createConversation(pieceId: string, signal?: AbortSignal): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  try {
-    const { id } = await requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations`, z.object({ id: z.string() }), {
-      method: 'POST',
-      signal: signal ?? null,
-    })
-    return { ok: true, id }
-  } catch (err) {
-    if (err instanceof RequestFailure) return { ok: false, message: err.message }
-    throw err
-  }
+export function createConversation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations`, z.object({ id: z.string() }), {
+    method: 'POST',
+    signal: signal ?? null,
+  })
 }
 
-export async function fetchConversation(pieceId: string, conversationId: string, signal?: AbortSignal): Promise<Conversation> {
+export function fetchConversation(
+  pieceId: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<Conversation>> {
   return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, conversationSchema, {
     signal: signal ?? null,
   })
@@ -50,19 +46,19 @@ const startRoundResultSchema = z.object({ conversationId: z.string(), roundId: z
  * way — the caller is expected to have flushed the pending draft write
  * without waiting on it before calling this, and to pass the same text here.
  */
-export async function startRound(pieceId: string, conversationId: string, message: string, draft: string, signal?: AbortSignal): Promise<ActionResult> {
-  try {
-    await requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/rounds`, startRoundResultSchema, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message, draft }),
-      signal: signal ?? null,
-    })
-    return { ok: true }
-  } catch (err) {
-    if (err instanceof RequestFailure) return { ok: false, message: err.message }
-    throw err
-  }
+export function startRound(
+  pieceId: string,
+  conversationId: string,
+  message: string,
+  draft: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<{ conversationId: string; roundId: string }>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/rounds`, startRoundResultSchema, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ message, draft }),
+    signal: signal ?? null,
+  })
 }
 
 /**

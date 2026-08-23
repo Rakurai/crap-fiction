@@ -13,8 +13,9 @@ import { documentSchema } from './schema.js'
  * - lists and block quotes lose their wrapper; their paragraphs remain
  * - links lose their href; their text remains
  * - images and inline code become the plain text they carry (alt, code)
- * - a hard break becomes a word-separating space, matching a soft break
  * - raw HTML is inert with `html: false`, so it reads as literal text
+ *
+ * A hard break is not among them: it is in the schema and is parsed as itself.
  */
 function tolerateUnadmittedLeaves(state: StateCore): void {
   for (const token of state.tokens) {
@@ -22,9 +23,6 @@ function tolerateUnadmittedLeaves(state: StateCore): void {
     for (const child of token.children) {
       if (child.type === 'image' || child.type === 'code_inline') {
         child.type = 'text'
-      } else if (child.type === 'hardbreak') {
-        child.type = 'text'
-        child.content = ' '
       }
     }
   }
@@ -40,6 +38,7 @@ const parser = new MarkdownParser(documentSchema, createTokenizer(), {
   paragraph: { block: 'paragraph' },
   heading: { block: 'heading', getAttrs: (tok) => ({ level: Number(tok.tag.slice(1)) }) },
   hr: { node: 'horizontalRule' },
+  hardbreak: { node: 'hardBreak' },
   em: { mark: 'italic' },
   strong: { mark: 'bold' },
   bullet_list: { ignore: true },
@@ -66,6 +65,22 @@ const serializer = new MarkdownSerializer(
     horizontalRule(state, node) {
       state.write('---')
       state.closeBlock(node)
+    },
+    /**
+     * A backslash before the newline, which is the one CommonMark spelling of a hard
+     * break that survives being read again — two trailing spaces are invisible in
+     * the source view and are stripped by anything that trims lines. A break at the
+     * end of a paragraph is written as nothing, because there is no following line
+     * for it to break and the newline the paragraph already ends with would read as
+     * an escape of it.
+     */
+    hardBreak(state, node, parent, index) {
+      for (let after = index + 1; after < parent.childCount; after++) {
+        if (parent.child(after).type !== node.type) {
+          state.write('\\\n')
+          return
+        }
+      }
     },
     text(state, node) {
       state.text(node.text ?? '')

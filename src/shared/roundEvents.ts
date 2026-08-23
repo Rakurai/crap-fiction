@@ -23,6 +23,17 @@ export const roundOpenedEventSchema = z.object({
   roundId: z.string().min(1),
   message: z.string().min(1).optional(),
   participants: z.array(z.string().min(1)).readonly(),
+  /**
+   * When the round opened, as the studio's own clock read it. UX_DESIGN "A round
+   * in flight" requires how long it has been, and PRD "Operational state" makes
+   * elapsed time required rather than optional — so the one fact a client cannot
+   * derive travels with the round, and everything else about the wait (which
+   * participant is working, how many have settled, how long) is derived from this
+   * and from the events that follow. A client's own clock would be the wrong one:
+   * it starts when the surface mounted, not when the round did, so a reload
+   * mid-round would restart the count.
+   */
+  openedAt: z.number().int().positive(),
 })
 
 export type RoundOpenedEvent = z.infer<typeof roundOpenedEventSchema>
@@ -58,11 +69,22 @@ export type RoundClosedEvent = z.infer<typeof roundClosedEventSchema>
 
 /**
  * The room's own failures, named in the product's vocabulary rather than in
- * the vocabulary of whatever threw. The set is closed because a client draws a
- * different notice for each, and an open string would let a message the author
- * cannot act on arrive where a code belongs.
+ * the vocabulary of whatever threw. The set is closed so that a code is a fact
+ * the studio decided to state: an open string would let whatever a library threw
+ * arrive where a code belongs, and a client is free to draw a different notice
+ * for each of these where the interface asks it to.
  */
-export const roomFailureCodeSchema = z.enum(['CONVERSATION_UNREADABLE', 'CONVERSATION_NOT_WRITTEN'])
+export const roomFailureCodeSchema = z.enum([
+  'CONVERSATION_UNREADABLE',
+  'CONVERSATION_NOT_WRITTEN',
+  'CONTEXT_UNREADABLE',
+  // The three above name what is wrong; this one admits that nothing does. Every
+  // outcome a participant call can have is already a record the round returns,
+  // so a round that ended some other way ended for a reason the room has no
+  // vocabulary for — and the author still has to be told, because the
+  // alternative is a round drawn as running that will never close.
+  'UNEXPECTED_FAILURE',
+])
 
 export type RoomFailureCode = z.infer<typeof roomFailureCodeSchema>
 
@@ -82,6 +104,8 @@ export const roundSnapshotSchema = z.object({
   participants: z.array(z.string().min(1)).readonly(),
   states: z.record(z.string(), z.enum(['preparing', 'working'])),
   settled: z.array(roundParticipantRecordSchema).readonly(),
+  /** The same stamp `round.opened` carried, so a reload's count continues rather than restarting. */
+  openedAt: z.number().int().positive(),
 })
 
 export type RoundSnapshot = z.infer<typeof roundSnapshotSchema>

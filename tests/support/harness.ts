@@ -1,12 +1,13 @@
 import type { Hono } from 'hono'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
+import { createLogger } from '../../src/server/logger.js'
 import { callSites } from '../../src/server/model/callSites.js'
-import { ModelAccess } from '../../src/server/model/modelAccess.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftWriter } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
+import { DraftStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -31,13 +32,13 @@ export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
  * The harness's own model access answers `/models` with `runtimeStatus`, which
  * is the whole of what any route reaches it for, and a test that never says what
  * the runtime reports gets a `/models` that fails rather than a reachable
- * runtime nobody scripted; `invoke` is scripted for no site, so a call that
+ * runtime nobody scripted; `call` is scripted for no site, so a call that
  * somehow reached it would fail the same way.
  */
 export function buildTestApp(dataRoot: string, overrides: HarnessOverrides = {}): TestApp {
   const mode = overrides.mode ?? MODE_FIXTURE
   const roles = overrides.roles ?? ROLES_FIXTURE
-  const room = overrides.room ?? buildTestRoom({ mode, roles })
+  const room = overrides.room ?? buildTestRoom(dataRoot, { mode, roles })
 
   const env: StudioEnv = Object.freeze({
     dataRoot,
@@ -46,14 +47,10 @@ export function buildTestApp(dataRoot: string, overrides: HarnessOverrides = {})
     logLevel: 'silent' as const,
   })
 
-  const workspace = new WorkspaceRegistry(dataRoot)
-  workspace.load()
+  const workspace = WorkspaceRegistry.openAt(dataRoot)
 
-  const modelAccess = new ModelAccess(
-    FixtureModelAdapter.bySite({}, overrides.runtimeStatus),
-    () => undefined,
-  )
+  const modelAccess = FixtureModelAdapter.bySite({}, overrides.runtimeStatus)
 
-  const app = createApp(env, workspace, mode, new DraftWriter(), callSites(roles), modelAccess, room)
+  const app = createApp(env, workspace, mode, new DraftWriter(new DraftStore()), callSites(roles), modelAccess, room, createLogger(env.logLevel))
   return { app, workspace }
 }

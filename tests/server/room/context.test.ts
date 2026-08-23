@@ -23,6 +23,7 @@ const charter = CHARTER_FIXTURE
  */
 function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition }): ContextInput {
   return {
+    criteria: undefined,
     owesAnswer: false,
     message: undefined,
     authorContext: undefined,
@@ -32,6 +33,13 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
     policy: 'shared',
     ...overrides,
   }
+}
+
+/** One `## `-headed section of a rendered prompt, from its heading to the next one. */
+function sectionOf(prompt: string, heading: string): string {
+  const [, body] = prompt.split(`## ${heading}\n`)
+  if (body === undefined) throw new Error(`no "${heading}" section in the prompt`)
+  return body.split('\n## ')[0] ?? body
 }
 
 const conversationWithMixedHistory: Conversation = {
@@ -186,6 +194,37 @@ describe('renderPrompt', () => {
     expect(prompt).toContain('prefers short sentences')
     expect(prompt).toContain('Story context')
     expect(prompt).toContain('a flash piece about a breakup')
+  })
+
+  /**
+   * SPEC "Context compilation": the mode's criteria for a participant are part of
+   * what a call is assembled from, and CONTEXT "Mode" is where they come from —
+   * what this specialist attends to at this scale and the defect it is alert to.
+   * Without them four specialists differ by one sentence of role description each.
+   */
+  it('states the mode\'s criteria for this specialist beside its role description', () => {
+    const context = compileSpecialistContext(
+      contextInput({
+        role: shape,
+        criteria: { attendsTo: 'Entry point, the turn, the inevitability of the close', defect: 'A middle presented as an ending' },
+      }),
+    )
+
+    // Under the role heading rather than merely somewhere in the prompt: what a
+    // participant is for is one statement, and criteria arriving under their own
+    // heading would read as a second job.
+    const roleSection = sectionOf(renderPrompt(context, charter), 'Your role')
+    expect(roleSection).toContain(shape.roleDescription)
+    expect(roleSection).toContain('Entry point, the turn, the inevitability of the close')
+    expect(roleSection).toContain('A middle presented as an ending')
+  })
+
+  it('carries only the role description for a participant the mode names no criteria for, and no empty labels', () => {
+    const prompt = renderPrompt(baseContext, charter)
+
+    expect(prompt).toContain(shape.roleDescription)
+    expect(prompt).not.toContain('you attend to')
+    expect(prompt).not.toContain('defect')
   })
 
   it('always carries the manuscript, unexcerpted', () => {

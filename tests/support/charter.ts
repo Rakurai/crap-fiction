@@ -12,6 +12,7 @@ export const CHARTER_FIXTURE: Charter = {
     commentary: 'a reading without a concrete action',
     applicableSuggestion: 'a recommendation concrete enough to apply',
   },
+  recommendationIsOneChange: 'one change, never a set of options to resolve first',
   directQuestionOwedAnswer: 'a participant addressed directly answers',
   noReasoningAboutTheAuthorsQuestion: 'nothing remarks on how the question was phrased',
 }

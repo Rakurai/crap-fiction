@@ -1,11 +1,9 @@
 import { z } from 'zod'
-import { readSettings, writeSettings } from '../store/index.js'
+import { readSettingsSection, writeSettingsSection } from '../store/index.js'
 import type { CallSiteDescriptor } from './callSites.js'
 import { requireCallSite } from './callSites.js'
 
-const settingsSchema = z.object({
-  modelAssignments: z.record(z.string(), z.string().min(1)).optional(),
-})
+const assignmentsSchema = z.record(z.string(), z.string().min(1))
 
 /**
  * SPEC "Files": model assignment is a property of the author's machine
@@ -16,13 +14,11 @@ const settingsSchema = z.object({
  * depends on, and holding it in memory would cost a restart per experiment.
  */
 export function getAssignment(dataRoot: string, site: string): string | undefined {
-  const settings = readSettings(dataRoot, settingsSchema)
-  return settings?.modelAssignments?.[site]
+  return readSettingsSection(dataRoot, 'modelAssignments', assignmentsSchema)?.[site]
 }
 
 export function listAssignments(dataRoot: string): ReadonlyMap<string, string> {
-  const settings = readSettings(dataRoot, settingsSchema)
-  return new Map(Object.entries(settings?.modelAssignments ?? {}))
+  return new Map(Object.entries(readSettingsSection(dataRoot, 'modelAssignments', assignmentsSchema) ?? {}))
 }
 
 /**
@@ -39,5 +35,5 @@ export async function setAssignment(
   model: string,
 ): Promise<void> {
   requireCallSite(sites, site)
-  await writeSettings(dataRoot, { modelAssignments: { [site]: model } })
+  await writeSettingsSection(dataRoot, 'modelAssignments', { [site]: model })
 }

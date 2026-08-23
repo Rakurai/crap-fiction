@@ -1,17 +1,23 @@
 import { z } from 'zod'
 import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
-import { RequestFailure, requestJson } from './request.js'
+import { requestJson, type RequestResult } from './request.js'
 
-export async function fetchPieces(signal?: AbortSignal): Promise<readonly PieceSummary[]> {
+/**
+ * The piece routes, each one line: what the route is, and what shape its payload
+ * has. Every one of them answers in the same `RequestResult`, so nothing here
+ * translates one representation of failure into another — that translation, six
+ * times over, was what these modules used to be mostly made of.
+ */
+export function fetchPieces(signal?: AbortSignal): Promise<RequestResult<readonly PieceSummary[]>> {
   return requestJson('/pieces', z.array(pieceSummarySchema).readonly(), { signal: signal ?? null })
 }
 
-export async function fetchPiece(id: string, signal?: AbortSignal): Promise<PieceDetail> {
+export function fetchPiece(id: string, signal?: AbortSignal): Promise<RequestResult<PieceDetail>> {
   return requestJson(`/pieces/${encodeURIComponent(id)}`, pieceDetailSchema, { signal: signal ?? null })
 }
 
-export async function saveDraft(id: string, draft: string, signal?: AbortSignal): Promise<void> {
-  await requestJson(`/pieces/${encodeURIComponent(id)}/draft`, z.null(), {
+export function saveDraft(id: string, draft: string, signal?: AbortSignal): Promise<RequestResult<null>> {
+  return requestJson(`/pieces/${encodeURIComponent(id)}/draft`, z.null(), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ draft }),
@@ -19,21 +25,11 @@ export async function saveDraft(id: string, draft: string, signal?: AbortSignal)
   })
 }
 
-export type CreatePieceResult = { readonly ok: true; readonly piece: PieceSummary } | { readonly ok: false; readonly message: string }
-
-export async function createPiece(title: string, signal?: AbortSignal): Promise<CreatePieceResult> {
-  try {
-    const piece = await requestJson('/pieces', pieceSummarySchema, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title }),
-      signal: signal ?? null,
-    })
-    return { ok: true, piece }
-  } catch (err) {
-    if (err instanceof RequestFailure) {
-      return { ok: false, message: err.message }
-    }
-    throw err
-  }
+export function createPiece(title: string, signal?: AbortSignal): Promise<RequestResult<PieceSummary>> {
+  return requestJson('/pieces', pieceSummarySchema, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title }),
+    signal: signal ?? null,
+  })
 }

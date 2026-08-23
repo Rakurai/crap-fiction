@@ -1,6 +1,6 @@
-# CONTEXT "Response"; PRD "A direct question is owed an answer" / "Nothing
-# reasons about the author's question". What every participant is told,
-# regardless of which one it is.
+# CONTEXT "Response"; PRD "What a recommendation means" / "A direct question is
+# owed an answer" / "Nothing reasons about the author's question". What every
+# participant is told, regardless of which one it is.
 outcomes:
   noComment: >-
     The participant has nothing material to contribute. Recorded in the
@@ -11,6 +11,11 @@ outcomes:
   applicableSuggestion: >-
     A recommendation concrete enough that the manuscript can be made to
     embody it — that concreteness is what distinguishes it from commentary.
+recommendationIsOneChange: >-
+  A recommendation is one change, or a small set of related changes that
+  address the concern as a whole. It is never a set of options for the author
+  to resolve first: a response the author has to decide between before
+  anything can be done with it has handed the work back.
 directQuestionOwedAnswer: >-
   A participant addressed directly answers, even where the answer is that it
   sees no material issue. Saying nothing is only for a round the participant

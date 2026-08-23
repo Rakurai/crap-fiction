@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PathEscapesRootError, readSettings, resolveWorkspaceDirectory, writeSettings } from './store/index.js'
+import { PathEscapesRootError, readSettingsSection, resolveWorkspaceDirectory, writeSettingsSection } from './store/index.js'
 
 export class WorkspaceOutsideRootError extends Error {
   constructor(dataRoot: string, candidate: string) {
@@ -15,27 +15,30 @@ export class WorkspaceNotSetError extends Error {
   }
 }
 
-const settingsSchema = z.object({
-  workspace: z.string().min(1).optional(),
-})
+const workspacePathSchema = z.string().min(1)
 
 /**
  * SPEC "Files": the workspace path is process configuration, read once, not
  * re-read per request the way author-editable data is — this registry is
  * that one read, held for the life of the process and updated in memory the
  * moment the author sets it, so nothing after startup asks the file again.
+ *
+ * `openAt` is the only way to get one, because a registry that had not read the
+ * file yet was indistinguishable from one that read it and found no workspace
+ * configured — the same `undefined` for two different facts, and a caller that
+ * forgot the second step would be told the author never chose a workspace.
  */
 export class WorkspaceRegistry {
   readonly #dataRoot: string
   #workspace: string | undefined
 
-  constructor(dataRoot: string) {
-    this.#dataRoot = dataRoot
+  static openAt(dataRoot: string): WorkspaceRegistry {
+    return new WorkspaceRegistry(dataRoot, readSettingsSection(dataRoot, 'workspace', workspacePathSchema))
   }
 
-  load(): void {
-    const settings = readSettings(this.#dataRoot, settingsSchema)
-    this.#workspace = settings?.workspace
+  private constructor(dataRoot: string, workspace: string | undefined) {
+    this.#dataRoot = dataRoot
+    this.#workspace = workspace
   }
 
   get(): string | undefined {
@@ -59,7 +62,7 @@ export class WorkspaceRegistry {
       throw err
     }
 
-    await writeSettings(this.#dataRoot, { workspace: resolved })
+    await writeSettingsSection(this.#dataRoot, 'workspace', resolved)
     this.#workspace = resolved
     return resolved
   }

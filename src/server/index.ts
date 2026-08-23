@@ -1,7 +1,6 @@
 import { bootstrap } from './bootstrap.js'
 import { getAssignment } from './model/assignments.js'
 import { LMStudioAdapter } from './model/lmStudioAdapter.js'
-import { ModelAccess } from './model/modelAccess.js'
 
 /**
  * The studio the author runs. It reaches models one way — the runtime at the
@@ -11,6 +10,8 @@ import { ModelAccess } from './model/modelAccess.js'
  * implementation is stood up by naming a different entry (SPEC
  * "Verification"), never by configuring this one.
  */
-const { app } = bootstrap((env) => new ModelAccess(new LMStudioAdapter(env.modelRuntimeUrl), (site) => getAssignment(env.dataRoot, site)))
+const { app } = bootstrap(
+  (env, logger) => new LMStudioAdapter(env.modelRuntimeUrl, (site) => getAssignment(env.dataRoot, site), logger),
+)
 
 export default app

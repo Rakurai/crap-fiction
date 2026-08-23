@@ -1,6 +1,6 @@
 # crap-fiction
 
-A local, single-user studio for writing fiction with a team of specialized agents. Currently a design-stage repo: the design documents named below are the source of truth, and there is no implementation yet.
+A local, single-user studio for writing fiction with a team of specialized agents. The design documents named below are the source of truth; the implementation under `src/` is partial and is built against them, so where code and documents disagree the documents are right and the code is behind.
 
 ## Agent skills
 

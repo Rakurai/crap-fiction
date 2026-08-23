@@ -1,12 +1,18 @@
+import type { Clock } from '../shared/clock.js'
+import { failureMessage, type RequestResult } from './request.js'
+
 export type AutosaveState =
   | { readonly failed: false }
   /** `atMs` is when the write failed: a notice that persists has to say how old it is. */
   | { readonly failed: true; readonly message: string; readonly atMs: number }
 
-export type SaveDraft = (text: string) => Promise<void>
-
-/** Reading the wall clock, handed in so the failure's moment is a value the tests can state. */
-export type Clock = () => number
+/**
+ * Writing the draft, in the one convention every client request answers in
+ * (`request.ts`). A write that was abandoned is not a failed save — the surface
+ * that would have shown the notice is gone — which is why the controller reads
+ * the outcome through `failureMessage` rather than testing for success.
+ */
+export type SaveDraft = (text: string) => Promise<RequestResult<null>>
 
 export type AutosaveController = {
   /** Records the manuscript's current text, debouncing the write it causes. */
@@ -36,8 +42,13 @@ export function createAutosaveController(initialText: string, save: SaveDraft, o
     dirty = false
     inFlight = true
     save(text)
-      .then(() => onStateChange({ failed: false }))
-      .catch((err: unknown) => onStateChange({ failed: true, message: err instanceof Error ? err.message : 'save failed', atMs: now() }))
+      .then((result) => {
+        // An abandoned write says nothing either way — it was not refused and it
+        // did not land — so whatever the notice says now is left standing.
+        if (result.outcome === 'abandoned') return
+        const message = failureMessage(result)
+        onStateChange(message === undefined ? { failed: false } : { failed: true, message, atMs: now() })
+      })
       .finally(() => {
         inFlight = false
         if (dirty) attempt()

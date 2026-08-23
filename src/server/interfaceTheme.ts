@@ -1,10 +1,8 @@
 import { z } from 'zod'
 import { themeSchema, type Theme } from '../shared/theme.js'
-import { readSettings, writeSettings } from './store/index.js'
+import { readSettingsSection, writeSettingsSection } from './store/index.js'
 
-const settingsSchema = z.object({
-  interfacePreferences: z.object({ theme: themeSchema.optional() }).optional(),
-})
+const preferencesSchema = z.object({ theme: themeSchema.optional() })
 
 /**
  * SPEC "Files": interface preferences are author-editable data, re-read at
@@ -15,10 +13,9 @@ const settingsSchema = z.object({
  * picked.
  */
 export function getTheme(dataRoot: string): Theme | undefined {
-  const settings = readSettings(dataRoot, settingsSchema)
-  return settings?.interfacePreferences?.theme
+  return readSettingsSection(dataRoot, 'interfacePreferences', preferencesSchema)?.theme
 }
 
 export async function setTheme(dataRoot: string, theme: Theme): Promise<void> {
-  await writeSettings(dataRoot, { interfacePreferences: { theme } })
+  await writeSettingsSection(dataRoot, 'interfacePreferences', { theme })
 }

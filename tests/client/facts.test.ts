@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { facts, modeName, timeOfDay, whenChanged, wordCount } from '../../src/client/facts.js'
+import { elapsed, facts, modeName, timeOfDay, whenChanged, wordCount } from '../../src/client/facts.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const NOW = new Date(2026, 7, 23, 20, 0).getTime()
@@ -45,6 +45,16 @@ describe('the facts register', () => {
 
   it('says the day the month rung turns as a formatted month', () => {
     expect(whenChanged(NOW - 30 * DAY_MS, clock)).toBe('1 MONTH AGO')
+  })
+
+  it('counts a wait in minutes and two-digit seconds, so the number does not change width as it runs', () => {
+    expect(elapsed(NOW - 14_000, NOW)).toBe('0:14')
+    expect(elapsed(NOW - 67_000, NOW)).toBe('1:07')
+    expect(elapsed(NOW - 600_000, NOW)).toBe('10:00')
+  })
+
+  it('counts a wait that has not begun as no time at all rather than as a negative one', () => {
+    expect(elapsed(NOW + 5_000, NOW)).toBe('0:00')
   })
 
   it('says a time of day on a 24-hour clock, as the notice stamps it', () => {

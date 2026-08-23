@@ -22,7 +22,6 @@
 .round {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
 .message {
@@ -30,22 +29,55 @@
   color: var(--ink);
   padding-left: 10px;
   border-left: 2px solid var(--ink3);
-  margin: 0;
+  margin: 0 0 4px;
+}
+
+/*
+ * A response is a discrete block with a rule above it. Filling in order must not
+ * read as a chain (UX_DESIGN "A round in flight"), and the rule is the mechanism
+ * for that rather than decoration: without it five responses are one column of
+ * paragraphs, which reads as continuous text taking up the one above.
+ */
+.participant {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 0 4px;
+  border-top: 1px solid var(--rule);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Identity only: never agreement, severity or confidence. */
+.mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
 }
 
 .name {
-  font: 500 12px/1.5 var(--font-ui);
+  font: 600 11.5px/1 var(--font-ui);
   color: var(--ink);
 }
 
-.response {
-  font: 400 12.5px/1.55 var(--font-ui);
-  color: var(--ink2);
+/* The room's own voice: the prose register, sharing a family with the manuscript. */
+.claim {
+  font: 400 15px/1.55 var(--font-prose);
+  color: var(--ink);
   margin: 0;
+  text-wrap: pretty;
 }
 
+/* The elaboration, a step quieter and in a different family, in its own block. */
 .note {
+  font: 400 12.5px/1.65 var(--font-ui);
   color: var(--ink2);
+  margin: 0;
 }
 
 .failed {
@@ -54,7 +86,36 @@
   margin: 0;
 }
 
-.pending {
+/*
+ * What the call returned, verbatim. Monospaced and wrapped rather than clipped:
+ * it is the machine's own bytes, it may be long, and an ellipsis here would hide
+ * the one thing the author was given to look at.
+ */
+.returned {
+  font: 400 10.5px/1.5 var(--font-facts);
+  color: var(--ink3);
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* What the round says about itself while it runs: counts and a clock, not a sentence. */
+.roundFacts {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+  margin: 0 0 4px;
+}
+
+.nothing {
+  font: 400 12.5px/1.55 var(--font-ui);
+  color: var(--ink2);
+  padding-top: 11px;
+  border-top: 1px solid var(--rule);
+  margin: 13px 0 0;
+}
+
+.state {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.06em;
@@ -75,6 +136,27 @@
   margin: 0;
 }
 
+/* At the composer, above it, in the mockup's two registers: the state, then what is still true. */
+.unavailable {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 13px 16px 0;
+}
+
+.unavailableFacts {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+}
+
+.unavailableWords {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+}
+
 .composer {
   flex: none;
   display: flex;
@@ -92,10 +174,6 @@
   border: 1px solid var(--rule2);
   border-radius: 4px;
   padding: 8px 10px;
-}
-
-.input:disabled {
-  color: var(--ink4);
 }
 
 .send {

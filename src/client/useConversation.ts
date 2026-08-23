@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import type { createConversation as createConversationFn, fetchConversation as fetchConversationFn, startRound as startRoundFn, subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
+import { failureMessage } from './request.js'
 import { EMPTY_PROJECTION, initialProjection, projectRoundEvent, withRoundInFlight, type ConversationProjection } from './roundProjection.js'
+
+/**
+ * Said when sending broke here rather than at the studio, which is the one
+ * failure the studio cannot describe because it never heard the request.
+ */
+const UNSENT = 'the message was not sent'
 
 export type ConversationViewModel = Readonly<{
   projection: ConversationProjection
@@ -50,14 +57,16 @@ export function useConversation(
     let active = true
 
     if (initialConversationId !== null) {
-      fetchConversation(pieceId, initialConversationId)
-        .then((conversation) => {
-          if (!active) return
-          setProjection((prev) => ({ rounds: [...initialProjection(conversation.rounds).rounds, ...prev.rounds] }))
-        })
-        .catch((err: unknown) => {
-          if (active) setError(err instanceof Error ? err.message : 'failed to load the conversation')
-        })
+      void fetchConversation(pieceId, initialConversationId).then((result) => {
+        if (!active) return
+        if (result.outcome === 'value') {
+          const loaded = initialProjection(result.value.rounds)
+          setProjection((prev) => ({ rounds: [...loaded.rounds, ...prev.rounds] }))
+          return
+        }
+        const message = failureMessage(result)
+        if (message !== undefined) setError(message)
+      })
     }
 
     const unsubscribe = subscribeToRoom(
@@ -94,27 +103,34 @@ export function useConversation(
     setError(undefined)
     setBusy(true)
 
+    /** The round is only under way once the server said so; until then this is what stops. */
+    function stop(message: string | undefined): void {
+      if (message !== undefined) setError(message)
+      setBusy(false)
+    }
+
     async function run(): Promise<void> {
       let conversationId = conversationIdRef.current
       if (conversationId === null) {
         const created = await createConversation(pieceId)
-        if (!created.ok) {
-          setError(created.message)
-          setBusy(false)
+        if (created.outcome !== 'value') {
+          stop(failureMessage(created))
           return
         }
-        conversationId = created.id
-        conversationIdRef.current = created.id
+        conversationId = created.value.id
+        conversationIdRef.current = created.value.id
       }
 
       const result = await startRound(pieceId, conversationId, message, getDraft())
-      if (!result.ok) {
-        setError(result.message)
-        setBusy(false)
-      }
+      if (result.outcome !== 'value') stop(failureMessage(result))
     }
 
-    void run()
+    // Nothing above returns a rejected promise for any outcome the studio can
+    // have, so this catch is for the one case left: something here threw. The
+    // author is told, rather than watching a composer that stays busy forever.
+    void run().catch((err: unknown) => {
+      stop(err instanceof Error ? err.message : UNSENT)
+    })
   }
 
   return { projection, busy, error, sendMessage }

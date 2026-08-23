@@ -17,16 +17,23 @@ export type CallResult<T> =
 export type CallState = 'preparing' | 'working'
 
 /**
- * SPEC "Seams"/"Model access": the seam every model call goes through. An
- * assignment names a model; its shape is opaque above this interface, and an
- * implementation owns its own retry, timeout and residency policy — none of
- * that is a parameter here. Two adapters satisfy this: `LMStudioAdapter`
- * against the real runtime, and `FixtureModelAdapter` in `tests/fixtures`,
- * for tests only.
+ * SPEC "Seams"/"Model access": the one seam every model call goes through, and
+ * the only one — a call is made by naming the *site* that needs it, which is
+ * the vocabulary the room speaks. Which model a site is assigned, whether one
+ * is assigned at all, and the retry, timeout and residency policy around the
+ * call are all owned by the implementation: none of them is a parameter here,
+ * and no caller can observe them except as one of the stated outcomes.
+ *
+ * That is what makes the taxonomy whole at this interface. Every member of
+ * `FailureReason` — `unconfigured` included — is something an implementation
+ * of this type *returns*, so a substitute can state any of them and a test can
+ * observe every one of them at the seam the product actually uses. Two
+ * implementations satisfy this: `LMStudioAdapter` against the real runtime, and
+ * `FixtureModelAdapter` in `tests/support/`, for tests only.
  */
-export type ModelAdapter = {
-  invoke<T>(
-    assignment: string,
+export type ModelAccess = {
+  call<T>(
+    site: string,
     prompt: string,
     schema: z.ZodType<T>,
     signal: AbortSignal,

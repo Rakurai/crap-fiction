@@ -44,20 +44,20 @@ describe('/workspace', () => {
     })
   })
 
-  it('refuses a workspace outside the data root with a stated reason, and sets nothing', async () => {
-    const app = buildApp()
-
-    const putRes = await app.request('/workspace', {
+  /**
+   * That a directory outside the data root is refused and that nothing is left set
+   * are the registry's, asserted at `server/workspace.test.ts`. What the route owes
+   * is the status and the code that refusal becomes on the wire.
+   */
+  it('refuses a workspace outside the data root as a 400 naming the reason', async () => {
+    const putRes = await buildApp().request('/workspace', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ workspace: '/etc/passwd' }),
     })
-    expect(putRes.status).toBe(400)
-    const body = await putRes.json()
-    expect(body).toMatchObject({ success: false, error: { code: 'WORKSPACE_OUTSIDE_ROOT' } })
 
-    const getRes = await app.request('/workspace')
-    expect(await getRes.json()).toEqual({ success: true, data: { workspace: null } })
+    expect(putRes.status).toBe(400)
+    expect(await putRes.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_OUTSIDE_ROOT' } })
   })
 
   it('refuses a request body with no workspace field', async () => {

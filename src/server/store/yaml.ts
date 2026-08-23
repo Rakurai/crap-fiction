@@ -48,13 +48,26 @@ function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
 
   if (raw === undefined) {
     if (optionalSection && core instanceof z.ZodArray) return []
-    if (optionalSection && core instanceof z.ZodObject) return {}
+    if (optionalSection && (core instanceof z.ZodObject || core instanceof z.ZodRecord)) return {}
     return undefined
   }
 
   if (core instanceof z.ZodArray) {
     const items = Array.isArray(raw) ? raw : [raw]
     return items.map((item) => tolerate(core.element, item))
+  }
+
+  // A record's keys are the author's own, so every one of them is tolerated
+  // against the same value schema — which is how a scalar written where a
+  // section's list belongs reads as a one-item list in a file whose section
+  // names no schema knows in advance.
+  if (core instanceof z.ZodRecord) {
+    if (!isPlainObject(raw)) return raw
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(raw)) {
+      result[key] = tolerate(core.valueType, value)
+    }
+    return result
   }
 
   if (core instanceof z.ZodObject) {

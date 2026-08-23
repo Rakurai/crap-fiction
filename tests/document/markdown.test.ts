@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { documentToMarkdown, editorContentToMarkdown, markdownToDocument, markdownToEditorContent } from '../../src/document/markdown.js'
 import { documentSchema } from '../../src/document/schema.js'
 
-const { doc, paragraph, heading, horizontalRule } = documentSchema.nodes
+const { doc, paragraph, heading, horizontalRule, hardBreak } = documentSchema.nodes
 const { bold, italic } = documentSchema.marks
 const text = documentSchema.text.bind(documentSchema)
 
@@ -123,10 +123,91 @@ describe('markdown round-trip over the constrained schema', () => {
     expect(result.child(0).textContent).toBe('Run npm test before you commit.')
   })
 
-  it('keeps words separated across a hard line break', () => {
-    const result = markdownToDocument('one\\\ntwo\n')
+  it('reads a hard line break as itself, not as a space', () => {
+    const result = markdownToDocument('the first line\\\nthe second\n')
+    const only = result.child(0)
 
-    expect(result.child(0).textContent).toBe('one two')
+    expect(result.childCount).toBe(1)
+    expect(only.type.name).toBe('paragraph')
+    expect(only.childCount).toBe(3)
+    expect(only.child(1).type.name).toBe('hardBreak')
+    expect(only.child(0).text).toBe('the first line')
+    expect(only.child(2).text).toBe('the second')
+  })
+
+  it('round-trips a hard line break inside a paragraph', () => {
+    const built = doc.createChecked(null, [
+      paragraph.createChecked(null, [text('Wilfred Owen, 1917'), hardBreak.createChecked(), text('and nobody since')]),
+    ])
+    roundTripsThrough(built)
+  })
+
+  /**
+   * A break with nothing after it has no line to break. Markdown has no spelling
+   * for one, so it is written away rather than written as an escape of the
+   * newline the paragraph already ends with — which is what a bare backslash
+   * there would read back as.
+   */
+  it('drops a hard line break with nothing after it', () => {
+    const built = doc.createChecked(null, [
+      paragraph.createChecked(null, [text('a line, and then the page ends'), hardBreak.createChecked()]),
+    ])
+
+    const markdown = documentToMarkdown(built)
+    expect(markdown).toBe('a line, and then the page ends')
+    expect(markdownToDocument(markdown).child(0).childCount).toBe(1)
+  })
+
+  it('opens a table as the prose of its cells, refusing nothing', () => {
+    const source = ['| who | wanted |', '| --- | --- |', '| Ada | the ending |', ''].join('\n')
+    const result = markdownToDocument(source)
+
+    // 'commonmark' has no table rule at all, so the pipes arrive as the literal
+    // text an author typed. Nothing is lost and nothing is refused.
+    expect(result.textContent).toContain('Ada')
+    expect(result.textContent).toContain('the ending')
+    for (let i = 0; i < result.childCount; i++) {
+      expect(result.child(i).type.name).toBe('paragraph')
+    }
+  })
+
+  it('opens raw HTML as the literal text it is written as', () => {
+    const result = markdownToDocument('She said <em>nothing</em> at all.\n')
+
+    // `html: false` leaves the tags inert, so they are prose rather than markup:
+    // the words survive, the emphasis the author did not write in Markdown does not.
+    expect(result.child(0).textContent).toBe('She said <em>nothing</em> at all.')
+    expect(result.child(0).child(0).marks.length).toBe(0)
+  })
+
+  it('opens YAML front matter as the prose it contains', () => {
+    const source = ['---', 'title: The Ending', '---', '', 'The first line of the piece.', ''].join('\n')
+    const result = markdownToDocument(source)
+
+    // No front-matter rule either: the opening fence reads as a thematic break
+    // and the keys read as prose. The manuscript holds no metadata — that lives
+    // in the piece's own artifacts — so there is nothing here to preserve.
+    expect(result.child(0).type.name).toBe('horizontalRule')
+    expect(result.textContent).toContain('title: The Ending')
+    expect(result.textContent).toContain('The first line of the piece.')
+  })
+
+  /**
+   * The write-back is what the author reads next time the piece is opened, so the
+   * loss the parser accepts has to be visible here too: the address, the image
+   * reference and the code fencing are gone from the file, not merely from the
+   * document in memory. The HTML tags stay, because inert tags are text and text
+   * is the one thing the manuscript never rewrites.
+   */
+  it('writes back a manuscript with the address, the image and the code fencing gone', () => {
+    const source = 'Read the [full letter](https://example.com/letter), see ![her](photo.png), and <b>note</b> `this`.\n'
+
+    const written = documentToMarkdown(markdownToDocument(source))
+
+    for (const gone of ['](', '![', '`']) {
+      expect(written).not.toContain(gone)
+    }
+    expect(written).toBe('Read the full letter, see her, and <b>note</b> this.')
   })
 
   it('round-trips through the editor-content bridge the same way as the document model', () => {

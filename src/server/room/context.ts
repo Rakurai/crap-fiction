@@ -20,9 +20,20 @@ export type HistoryEntry =
 
 export type ParticipantEvidence = Readonly<{ participantId: string; claim: string; note: string | undefined }>
 
+/**
+ * What the mode says this specialist applies at this scale (CONTEXT "Mode"). It
+ * is the mode's rather than the role's because the same specialist attends to
+ * different things at different lengths, which is the one axis this software is
+ * scoped along. `undefined` for the Story Editor, which is no part of the cast
+ * and has no criteria to apply — SPEC "Context compilation" says so, and its role
+ * definition is what tells it what it is for instead.
+ */
+export type SpecialistCriteria = Readonly<{ attendsTo: string; defect: string }>
+
 /** Everything a call's context is built from that does not depend on whose call it is. */
 export type ContextInput = Readonly<{
   role: RoleDefinition
+  criteria: SpecialistCriteria | undefined
   owesAnswer: boolean
   message: string | undefined
   authorContext: string | undefined
@@ -34,6 +45,7 @@ export type ContextInput = Readonly<{
 
 export type Context = Readonly<{
   role: RoleDefinition
+  criteria: SpecialistCriteria | undefined
   owesAnswer: boolean
   message: string | undefined
   authorContext: string | undefined
@@ -84,14 +96,16 @@ function deriveHistory(conversation: Conversation | undefined, policy: HistoryPo
 }
 
 /**
- * SPEC "Context compilation": `role definition + model configuration +
- * selected context compilation policy → participant call`. A pure function,
+ * SPEC "Context compilation": `role definition + the mode's criteria for that
+ * participant + model configuration + selected context compilation policy →
+ * participant call`. A pure function,
  * so the independence invariant is asserted against the object it
  * constructs rather than inferred from a rendered prompt.
  */
 function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
   return {
     role: input.role,
+    criteria: input.criteria,
     owesAnswer: input.owesAnswer,
     message: input.message,
     authorContext: input.authorContext,
@@ -131,6 +145,26 @@ function section(heading: string, body: string | undefined): string {
   return `## ${heading}\n\n${body.trim()}\n\n`
 }
 
+/**
+ * What the participant is for, in one section: its role definition, and where the
+ * mode names criteria for it, what it attends to at this scale and the defect it
+ * is alert to. They are one section rather than two because they are one
+ * statement — a specialist reading its criteria under a separate heading would be
+ * reading them as a second job.
+ */
+function roleText(context: Context): string {
+  const criteria = context.criteria
+  const body =
+    criteria === undefined
+      ? context.role.roleDescription
+      : [
+          context.role.roleDescription,
+          `At this scale you attend to: ${criteria.attendsTo}`,
+          `The defect you are alert to: ${criteria.defect}`,
+        ].join('\n\n')
+  return section('Your role', body)
+}
+
 function historyText(history: readonly HistoryEntry[]): string {
   if (history.length === 0) return ''
   const lines = history.map((entry) =>
@@ -153,10 +187,11 @@ function evidenceText(evidence: readonly ParticipantEvidence[]): string {
  */
 export function renderPrompt(context: Context, charter: Charter): string {
   const parts = [
-    section('Your role', context.role.roleDescription),
+    roleText(context),
     section('What "no comment" means', charter.outcomes.noComment),
     section('What commentary means', charter.outcomes.commentary),
     section('What an applicable suggestion means', charter.outcomes.applicableSuggestion),
+    section('What a recommendation is', charter.recommendationIsOneChange),
     context.owesAnswer ? section('You were addressed directly', charter.directQuestionOwedAnswer) : '',
     section('On the author\'s question', charter.noReasoningAboutTheAuthorsQuestion),
     section('Author context', context.authorContext),

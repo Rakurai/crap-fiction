@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY_PROJECTION,
+  everyCallFailed,
   initialProjection,
   projectRoundEvent,
+  tallyRound,
   withRoundInFlight,
   type ConversationProjection,
+  type ProjectedRound,
   type RoundEvent,
 } from '../../src/client/roundProjection.js'
 import type { RoundRecord } from '../../src/shared/conversationViews.js'
 import type { RoundClosedEvent, RoundSnapshot } from '../../src/shared/roundEvents.js'
 
+/**
+ * The moment a round opened, stated rather than read from a clock — the room
+ * stamps it, and every count the interface shows is measured from it.
+ */
+const OPENED_AT = 1_700_000_000_000
+
 function opened(roundId: string, participants: readonly string[], message?: string): RoundEvent {
-  return { type: 'round.opened', data: { roundId, conversationId: 'c1', message, participants } }
+  return { type: 'round.opened', data: { roundId, conversationId: 'c1', message, participants, openedAt: OPENED_AT } }
 }
 
 function state(roundId: string, participantId: string, state: 'preparing' | 'working'): RoundEvent {
@@ -133,12 +142,61 @@ describe('initialProjection', () => {
       {
         roundId: 'r1',
         message: '@shape does the opening earn its length',
+        // A settled round read back from the file has no opening stamp and needs
+        // none: there is no count still running to measure from it.
+        openedAt: undefined,
         outcome: 'settled',
         participants: [{ participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
       },
     ])
   })
 })
+
+describe('tallyRound', () => {
+  it('counts each state, with an answered participant counted whatever it answered', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression', 'interiority', 'story-editor']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'response', outcome: 'commentary', claim: 'x' }))
+    projection = projectRoundEvent(projection, settled('r1', 'compression', { kind: 'failed', reason: 'timeout' }))
+    projection = projectRoundEvent(projection, state('r1', 'interiority', 'working'))
+
+    expect(tallyRound(round(projection))).toEqual({ working: 1, preparing: 0, answered: 2, waiting: 1 })
+  })
+})
+
+describe('everyCallFailed', () => {
+  it('is true only once the round has ended and every call it made failed', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'failed', reason: 'timeout' }))
+    projection = projectRoundEvent(projection, settled('r1', 'compression', { kind: 'failed', reason: 'unreachable' }))
+    expect(everyCallFailed(round(projection))).toBe(false)
+
+    projection = projectRoundEvent(projection, closed('r1', 'settled'))
+    expect(everyCallFailed(round(projection))).toBe(true)
+  })
+
+  it('is false when one call answered, however little it said', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'failed', reason: 'timeout' }))
+    projection = projectRoundEvent(projection, settled('r1', 'compression', { kind: 'response', outcome: 'noComment' }))
+    projection = projectRoundEvent(projection, closed('r1', 'settled'))
+
+    expect(everyCallFailed(round(projection))).toBe(false)
+  })
+
+  it('is false for a round the room failed before it reached everyone: those calls were never made', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'failed', reason: 'timeout' }))
+    projection = projectRoundEvent(projection, closed('r1', 'failed'))
+
+    expect(everyCallFailed(round(projection))).toBe(false)
+  })
+})
+
+function round(projection: ConversationProjection): ProjectedRound {
+  const first = projection.rounds[0]
+  if (first === undefined) throw new Error('the projection holds no round')
+  return first
+}
 
 describe('withRoundInFlight', () => {
   it('seeds a round already in flight when the client reconnects, with what already settled intact', () => {
@@ -149,6 +207,7 @@ describe('withRoundInFlight', () => {
       participants: ['shape', 'compression'],
       states: { compression: 'working' },
       settled: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' } }],
+      openedAt: OPENED_AT,
     }
 
     const projection: ConversationProjection = withRoundInFlight(EMPTY_PROJECTION, snapshot)
@@ -157,6 +216,7 @@ describe('withRoundInFlight', () => {
       {
         roundId: 'r1',
         message: 'a message',
+        openedAt: OPENED_AT,
         outcome: 'inFlight',
         participants: [
           { participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'noComment' } },
@@ -164,5 +224,40 @@ describe('withRoundInFlight', () => {
         ],
       },
     ])
+  })
+})
+
+/**
+ * SPEC "Operation state": a client that reloaded mid-round is looking at the same
+ * round, and it has to be looking at the same thing. The two paths into a round in
+ * flight are otherwise independent code — one folds four kinds of event, the other
+ * reads one snapshot — so nothing but an assertion keeps them agreeing, and a
+ * divergence would be invisible until an author reloaded during a round.
+ */
+describe('a resumed round and a live one', () => {
+  it('project identically', () => {
+    const participants = ['shape', 'compression', 'interiority', 'story-editor']
+
+    let live = projectRoundEvent(EMPTY_PROJECTION, opened('r1', participants, 'a message'))
+    live = projectRoundEvent(live, settled('r1', 'shape', { kind: 'response', outcome: 'commentary', claim: 'the entry is late', note: 'by a paragraph' }))
+    live = projectRoundEvent(live, settled('r1', 'compression', { kind: 'failed', reason: 'timeout' }))
+    live = projectRoundEvent(live, state('r1', 'interiority', 'preparing'))
+    live = projectRoundEvent(live, state('r1', 'interiority', 'working'))
+
+    const snapshot: RoundSnapshot = {
+      conversationId: 'c1',
+      roundId: 'r1',
+      message: 'a message',
+      participants,
+      states: { interiority: 'working' },
+      settled: [
+        { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late', note: 'by a paragraph' } },
+        { participantId: 'compression', result: { kind: 'failed', reason: 'timeout' } },
+      ],
+      openedAt: OPENED_AT,
+    }
+    const resumed = withRoundInFlight(EMPTY_PROJECTION, snapshot)
+
+    expect(resumed).toEqual(live)
   })
 })

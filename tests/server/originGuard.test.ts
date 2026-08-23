@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
+import { createLogger } from '../../src/server/logger.js'
 import { originGuard } from '../../src/server/originGuard.js'
 
 function buildApp() {
   const app = new Hono()
-  app.use('*', originGuard(['http://localhost:4000', 'http://127.0.0.1:4000']))
+  app.use('*', originGuard(['http://localhost:4000', 'http://127.0.0.1:4000'], createLogger('silent')))
   app.get('/thing', (c) => c.json({ success: true, data: null }))
   return app
 }

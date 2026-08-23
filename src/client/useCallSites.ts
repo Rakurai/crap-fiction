@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import type { assignModel as assignModelFn, fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRuntimeStatusFn } from './callSitesClient.js'
-import { isAbortError } from './request.js'
+import { useLoaded } from './load.js'
+import { failureMessage } from './request.js'
 
 /** The call-site roster's adapters, reached by whoever composes this hook rather than imported here. */
 export type CallSiteAdapters = Readonly<{
@@ -24,66 +25,53 @@ export type CallSitesViewModel =
       readonly assign: (site: string, model: string) => void
     }
 
-type LoadState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'error'; readonly message: string }
-  | { readonly kind: 'ready'; readonly sites: readonly CallSiteAssignmentView[] }
-
 /**
  * PRD "Assign models to participants": owns the call-site listing, the
  * runtime's reachability, and assigning one site at a time. A site being
  * saved is tracked by its own id rather than a single boolean, since the
  * one-at-a-time contract still allows a second row's assignment to be read
  * while the first is in flight.
+ *
+ * Readiness waits on both requests. It used to derive from the roster alone,
+ * which meant every mount reported `ready` with the runtime still unknown — so
+ * the models a row could offer were briefly empty for reasons the surface had no
+ * way to distinguish from a runtime that is genuinely not running. An unreachable
+ * runtime is still ready: it is an answer, and the banner is what says so.
  */
 export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
   const { fetchCallSites, fetchRuntimeStatus, assignModel } = adapters
-  const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
-  const [runtime, setRuntime] = useState<RuntimeStatus | undefined>(undefined)
-  const [runtimeError, setRuntimeError] = useState<string | undefined>(undefined)
+  const [sites, setSites] = useLoaded(fetchCallSites, [])
+  const [probe] = useLoaded(fetchRuntimeStatus, [])
   const [assigning, setAssigning] = useState<string | undefined>(undefined)
   const [assignError, setAssignError] = useState<string | undefined>(undefined)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchCallSites(controller.signal)
-      .then((sites) => setLoad({ kind: 'ready', sites }))
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return
-        setLoad({ kind: 'error', message: err instanceof Error ? err.message : 'failed to load call sites' })
-      })
-    fetchRuntimeStatus(controller.signal)
-      .then((status) => setRuntime(status))
-      .catch((err: unknown) => {
-        if (isAbortError(err)) return
-        setRuntimeError(err instanceof Error ? err.message : 'failed to load model runtime status')
-      })
-    return () => controller.abort()
-  }, [])
 
   const assign = useCallback((site: string, model: string) => {
     setAssigning(site)
     setAssignError(undefined)
-    assignModel(site, model)
-      .then((result) => {
-        setAssigning(undefined)
-        if (result.ok) {
-          setLoad((current) =>
-            current.kind === 'ready'
-              ? { kind: 'ready', sites: current.sites.map((s) => (s.site === site ? { ...s, assignment: result.assignment } : s)) }
-              : current,
-          )
-        } else {
-          setAssignError(result.message)
-        }
-      })
-      .catch((err: unknown) => {
-        setAssigning(undefined)
-        setAssignError(err instanceof Error ? err.message : 'failed to assign model')
-      })
+    void assignModel(site, model).then((result) => {
+      setAssigning(undefined)
+      if (result.outcome === 'value') {
+        const { assignment } = result.value
+        setSites((current) =>
+          current.kind === 'ready'
+            ? { kind: 'ready', value: current.value.map((s) => (s.site === site ? { ...s, assignment } : s)) }
+            : current,
+        )
+        return
+      }
+      setAssignError(failureMessage(result))
+    })
   }, [])
 
-  if (load.kind === 'loading') return { status: 'loading' }
-  if (load.kind === 'error') return { status: 'error', message: load.message }
-  return { status: 'ready', sites: load.sites, runtime, runtimeError, assigning, assignError, assign }
+  if (sites.kind === 'loading' || probe.kind === 'loading') return { status: 'loading' }
+  if (sites.kind === 'error') return { status: 'error', message: sites.message }
+  return {
+    status: 'ready',
+    sites: sites.value,
+    runtime: probe.kind === 'ready' ? probe.value : undefined,
+    runtimeError: probe.kind === 'error' ? probe.message : undefined,
+    assigning,
+    assignError,
+    assign,
+  }
 }

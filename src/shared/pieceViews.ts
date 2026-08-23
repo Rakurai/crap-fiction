@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { durableContextSchema } from './durableContext.js'
 import { roundSnapshotSchema } from './roundEvents.js'
 
 /**
@@ -25,14 +26,17 @@ export const pieceSummarySchema = pieceSummaryShape.readonly()
 export type PieceSummary = z.infer<typeof pieceSummarySchema>
 
 /**
- * SPEC "Transport": opening a piece reports whatever round is in flight and
- * which conversation is current, so a client that reloaded knows what it is
- * looking at without a new event. `currentConversationId` is `null` until a
- * conversation's first round has opened (CONTEXT "Conversation").
+ * SPEC "Transport": opening a piece reports its metadata, its draft, its story
+ * context, and whatever round is in flight, so a client that reloaded knows what
+ * it is looking at without a new event. `currentConversationId` is `null` until a
+ * conversation's first round has opened (CONTEXT "Conversation"), and a piece
+ * whose story context has not been written yet reports no sections — the author
+ * has only named the piece (SPEC "Files").
  */
 export const pieceDetailSchema = pieceSummaryShape
   .extend({
     draft: z.string(),
+    storyContext: durableContextSchema,
     currentConversationId: z.string().nullable(),
     roundInFlight: roundSnapshotSchema.nullable(),
   })

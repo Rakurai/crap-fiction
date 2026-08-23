@@ -1,26 +1,16 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
-import { Conversation } from './Conversation.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
-import type { saveDraft as SaveDraftFn } from './piecesClient.js'
-import { useAutosave } from './useAutosave.js'
 import styles from './Manuscript.module.css'
-import type { CallSiteAdapters } from './useCallSites.js'
-import type { RoomAdapters } from './useConversation.js'
-import { useManuscript } from './useManuscript.js'
-import type { RoundSnapshot } from '../shared/roundEvents.js'
+import type { AutosaveViewModel } from './useAutosave.js'
+import type { ManuscriptViewModel } from './useManuscript.js'
 
 type ManuscriptProps = {
-  readonly pieceId: string
   readonly title: string
   readonly mode: string
-  readonly draft: string
-  readonly currentConversationId: string | null
-  readonly roundInFlight: RoundSnapshot | null
   readonly onClose: () => void
-  readonly saveDraft: typeof SaveDraftFn
-  readonly room: RoomAdapters
-  readonly callSites: CallSiteAdapters
+  readonly manuscript: ManuscriptViewModel
+  readonly autosave: AutosaveViewModel
 }
 
 /**
@@ -33,6 +23,12 @@ type ManuscriptProps = {
  * is not well-defined; the scroll ratio — where the author is looking — is
  * preserved across that switch instead.
  *
+ * This is the prose surface and nothing else. The manuscript's text and its
+ * autosave are handed in rather than owned here, because the conversation beside
+ * it needs both — and while this surface owned them, it also had to carry the
+ * conversation's adapters through, which made the prose surface the place the
+ * room's collaborators were wired. `OpenedPiece` is that place now.
+ *
  * UX_DESIGN "A failed save": leaving is free everywhere else because everything
  * written is already on disk, and while a save is failing it is refused rather
  * than confirmed — an author asked whether to discard their own prose has been
@@ -40,9 +36,7 @@ type ManuscriptProps = {
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ pieceId, title, mode, draft, currentConversationId, roundInFlight, onClose, saveDraft, room, callSites }: ManuscriptProps) {
-  const manuscript = useManuscript(draft)
-  const autosave = useAutosave(pieceId, manuscript.markdown, saveDraft)
+export function Manuscript({ title, mode, onClose, manuscript, autosave }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -55,68 +49,54 @@ export function Manuscript({ pieceId, title, mode, draft, currentConversationId,
   }, [manuscript.view, manuscript.showRendered])
 
   return (
-    <div className={styles.row}>
-      <div className={styles.wrapper}>
-        {!reading && (
-          <div className={styles.topBar}>
-            <button type="button" className={styles.control} onClick={onClose} disabled={autosave.failed}>
-              ‹ pieces
+    <div className={styles.wrapper}>
+      {!reading && (
+        <div className={styles.topBar}>
+          <button type="button" className={styles.control} onClick={onClose} disabled={autosave.state.failed}>
+            ‹ pieces
+          </button>
+          <span className={styles.title}>{title}</span>
+          <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
+          <span className={styles.spacer} />
+          <div className={styles.controls}>
+            <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
+              {manuscript.view === 'source' ? 'rendered' : 'source'}
             </button>
-            <span className={styles.title}>{title}</span>
-            <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
-            <span className={styles.spacer} />
-            <div className={styles.controls}>
-              <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
-                {manuscript.view === 'source' ? 'rendered' : 'source'}
-              </button>
-              <button type="button" className={styles.control} onClick={manuscript.showReading}>
-                reading
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>
-          <div className={reading ? styles.readingMeasure : styles.measure}>
-            {reading && <h1 className={styles.readingTitle}>{title}</h1>}
-            {manuscript.view === 'source' ? (
-              <textarea
-                aria-label="Manuscript source"
-                className={styles.source}
-                value={manuscript.sourceText}
-                onChange={(event) => manuscript.setSourceText(event.target.value)}
-              />
-            ) : (
-              <div className={reading ? styles.readingEditor : styles.editor}>
-                <EditorContent editor={manuscript.editor} />
-              </div>
-            )}
-            {reading && <p className={styles.readingHint}>ESC TO RETURN</p>}
+            <button type="button" className={styles.control} onClick={manuscript.showReading}>
+              reading
+            </button>
           </div>
         </div>
+      )}
 
-        {!reading && autosave.failed && autosave.failedAtMs !== undefined && (
-          <div className={styles.saveFailed}>
-            <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.failedAtMs))}</span>
-            <p className={styles.saveFailedMessage} role="status">
-              The last write to draft.md failed. Nothing has been discarded — keep writing. Leaving for another piece is
-              unavailable while “{title}” is unsaved.
-            </p>
-            {autosave.message !== undefined && <span className={styles.saveFailedCause}>{machineWords(autosave.message)}</span>}
-          </div>
-        )}
+      <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>
+        <div className={reading ? styles.readingMeasure : styles.measure}>
+          {reading && <h1 className={styles.readingTitle}>{title}</h1>}
+          {manuscript.view === 'source' ? (
+            <textarea
+              aria-label="Manuscript source"
+              className={styles.source}
+              value={manuscript.sourceText}
+              onChange={(event) => manuscript.setSourceText(event.target.value)}
+            />
+          ) : (
+            <div className={reading ? styles.readingEditor : styles.editor}>
+              <EditorContent editor={manuscript.editor} />
+            </div>
+          )}
+          {reading && <p className={styles.readingHint}>ESC TO RETURN</p>}
+        </div>
       </div>
 
-      {!reading && (
-        <Conversation
-          pieceId={pieceId}
-          currentConversationId={currentConversationId}
-          roundInFlight={roundInFlight}
-          draft={manuscript.markdown}
-          flushDraft={autosave.flush}
-          room={room}
-          callSites={callSites}
-        />
+      {!reading && autosave.state.failed && (
+        <div className={styles.saveFailed}>
+          <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
+          <p className={styles.saveFailedMessage} role="status">
+            The last write to draft.md failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            unavailable while “{title}” is unsaved.
+          </p>
+          <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>
+        </div>
       )}
     </div>
   )

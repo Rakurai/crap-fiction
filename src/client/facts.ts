@@ -10,6 +10,7 @@
  */
 
 import { differenceInCalendarDays, formatDistanceStrict, isSameDay } from 'date-fns'
+import type { Clock } from '../shared/clock.js'
 
 const words = new Intl.NumberFormat(undefined, { useGrouping: true })
 
@@ -42,8 +43,23 @@ export function timeOfDay(atMs: number): string {
   return clock.format(new Date(atMs))
 }
 
-/** Reading the wall clock, handed in so a rung the register turns on is a value a test can state. */
-export type Clock = () => number
+/**
+ * How long a round has been running, from the stamp it opened with — the mockup's
+ * `0:14`. Seconds are always two digits so the number does not change width as it
+ * counts, which is what keeps a line the author glances at from twitching. Minutes
+ * are not rolled up into hours: a call is bounded by its own timeout, so a round
+ * that has been running long enough for an hour column to matter is a round whose
+ * plain minute count is the more useful thing to have said.
+ *
+ * The moment is a value rather than a clock, unlike `whenChanged` below: a count
+ * that advances is read again every second, so whoever is doing the counting
+ * already holds the moment and reading a second clock here would let the two
+ * disagree.
+ */
+export function elapsed(fromMs: number, nowMs: number): string {
+  const seconds = Math.max(0, Math.floor((nowMs - fromMs) / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
 
 /**
  * When something last changed, in the mockup's wording: `TODAY`, `6 DAYS AGO`,

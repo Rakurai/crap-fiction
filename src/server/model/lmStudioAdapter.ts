@@ -2,10 +2,14 @@ import { LMStudioClient } from '@lmstudio/sdk'
 import pRetry from 'p-retry'
 import { z } from 'zod'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
-import type { CallResult, CallState, ModelAdapter } from './types.js'
+import type { Logger } from '../logger.js'
+import type { CallResult, CallState, ModelAccess } from './types.js'
 
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
+
+/** Which model a call site is assigned, or `undefined` where the author has assigned none. */
+export type GetAssignment = (site: string) => string | undefined
 
 /**
  * SPEC "Deployment": an absent or malformed `STUDIO_MODEL_RUNTIME_URL` is a
@@ -63,22 +67,55 @@ class NonConformingError extends Error {
  * of the runtime it calls. Reasoning never crosses out of this file: only
  * `result.content`, parsed against the caller's schema, ever leaves
  * `#attempt`.
+ *
+ * Assignment lookup is this adapter's own business for the same reason: a site
+ * with no assignment fails as unconfigured without the runtime ever being
+ * contacted, and nothing here falls back to another model. An assignment's
+ * shape is therefore never named above this file.
  */
-export class LMStudioAdapter implements ModelAdapter {
+export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
+  readonly #getAssignment: GetAssignment
+  readonly #logger: Logger
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, getAssignment: GetAssignment, logger: Logger) {
     this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
+    this.#getAssignment = getAssignment
+    this.#logger = logger
   }
 
-  async invoke<T>(
-    assignment: string,
+  /**
+   * One line per call, at the seam that owns the call: which site asked, which
+   * model it was assigned, and how it ended. Never the prompt and never what came
+   * back (CODING_STANDARDS "Logging") — those are the material the studio exists
+   * to handle, and a log line is where they would become a durable record nobody
+   * decided to keep. Every return path goes through here so there is exactly one
+   * such line and no path that quietly has none.
+   */
+  #logged<T>(site: string, assignment: string | undefined, result: CallResult<T>): CallResult<T> {
+    this.#logger.info(
+      {
+        site,
+        assignment,
+        outcome: result.outcome,
+        reason: result.outcome === 'failed' ? result.reason : undefined,
+      },
+      'model call',
+    )
+    return result
+  }
+
+  async call<T>(
+    site: string,
     prompt: string,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
-    if (signal.aborted) return { outcome: 'abandoned' }
+    if (signal.aborted) return this.#logged(site, undefined, { outcome: 'abandoned' })
+
+    const assignment = this.#getAssignment(site)
+    if (assignment === undefined) return this.#logged(site, undefined, { outcome: 'failed', reason: 'unconfigured' })
 
     const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS)
     const combined = AbortSignal.any([signal, timeoutSignal])
@@ -89,14 +126,14 @@ export class LMStudioAdapter implements ModelAdapter {
         retries: RETRIES,
         signal: combined,
       })
-      return { outcome: 'value', value }
+      return this.#logged(site, assignment, { outcome: 'value', value })
     } catch (error) {
-      if (signal.aborted) return { outcome: 'abandoned' }
+      if (signal.aborted) return this.#logged(site, assignment, { outcome: 'abandoned' })
       if (error instanceof NonConformingError) {
-        return { outcome: 'failed', reason: 'nonconforming', returned: error.returned }
+        return this.#logged(site, assignment, { outcome: 'failed', reason: 'nonconforming', returned: error.returned })
       }
-      if (timeoutSignal.aborted) return { outcome: 'failed', reason: 'timeout' }
-      return { outcome: 'failed', reason: 'unreachable' }
+      if (timeoutSignal.aborted) return this.#logged(site, assignment, { outcome: 'failed', reason: 'timeout' })
+      return this.#logged(site, assignment, { outcome: 'failed', reason: 'unreachable' })
     }
   }
 
@@ -131,7 +168,11 @@ export class LMStudioAdapter implements ModelAdapter {
     try {
       const models = await this.#client.system.listDownloadedModels('llm')
       return { reachable: true, models: models.map((model) => model.modelKey) }
-    } catch {
+    } catch (err) {
+      // The one place the runtime's absence is discovered, so the one place it is
+      // recorded: the author is shown `reachable: false` and nothing more, and
+      // whatever the SDK threw is a diagnostic fact that belongs on stderr.
+      this.#logger.warn({ err }, 'model runtime unreachable')
       return { reachable: false }
     }
   }

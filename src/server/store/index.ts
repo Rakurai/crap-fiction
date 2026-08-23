@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { Mutex } from 'async-mutex'
 import { z } from 'zod'
 import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
@@ -56,16 +57,42 @@ function settingsFile(dataRoot: string): string {
 /**
  * SPEC "Files": one `settings.yaml` under the data root holds the workspace
  * path, the interface preferences and the model assignments beside each other.
- * Each caller declares the section it owns and reads only that, which is what
- * keeps three unrelated concerns out of one schema and lets a write set one
- * section without reading the others.
+ * The three section names are this boundary's, on the same terms as every other
+ * layout fact it owns — a caller asks for the section it owns by name rather than
+ * declaring a schema shaped around a key it had to know. What is *in* a section
+ * stays the caller's: the workspace path, a theme and a model assignment are three
+ * unrelated concerns, and one schema over all of them would be one module knowing
+ * all three.
  */
-export function readSettings<T>(dataRoot: string, section: z.ZodType<T>): T | undefined {
-  return readYamlArtifact(settingsFile(dataRoot), section)
+export type SettingsSection = 'workspace' | 'interfacePreferences' | 'modelAssignments'
+
+/**
+ * One section of the settings file, validated against the caller's schema.
+ * `undefined` is a declared, meaningful absence — a section the author has not
+ * written — never a value nobody chose standing in for one.
+ */
+export function readSettingsSection<T>(dataRoot: string, section: SettingsSection, schema: z.ZodType<T>): T | undefined {
+  const settings = readYamlArtifact(settingsFile(dataRoot), z.object({ [section]: schema.optional() }))
+  return settings?.[section]
 }
 
-export async function writeSettings(dataRoot: string, values: Record<string, unknown>): Promise<void> {
-  await writeYamlArtifact(settingsFile(dataRoot), values)
+/**
+ * Sets one section and leaves the rest of the file — including anything the
+ * author wrote that no schema here knows — exactly as it stood.
+ */
+export async function writeSettingsSection(dataRoot: string, section: SettingsSection, value: unknown): Promise<void> {
+  await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
+}
+
+/**
+ * SPEC "Files": the author context is one file beside the workspaces rather
+ * than inside any of them, because it "generalizes across pieces and is a
+ * property of the author rather than of any story". `undefined` is a declared,
+ * meaningful absence — an author who has written none — never an empty context
+ * standing in for one.
+ */
+export function readAuthorContext<T>(dataRoot: string, schema: z.ZodType<T>): T | undefined {
+  return readYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), schema)
 }
 
 /**
@@ -118,6 +145,22 @@ function pieceMetadataFile(pieceDir: string): string {
 
 function draftFile(pieceDir: string): string {
   return path.join(pieceDir, 'draft.md')
+}
+
+function storyContextFile(pieceDir: string): string {
+  return path.join(pieceDir, 'story-context.yaml')
+}
+
+/**
+ * A piece's story context. SPEC "Files": "a piece with no draft, no story
+ * context and no conversations is a piece the author has only named", so an
+ * absent file is `undefined` — the declared absence of one — on the same terms
+ * as an id that addresses nothing inside the workspace.
+ */
+export function readStoryContext<T>(workspaceDir: string, id: string, schema: z.ZodType<T>): T | undefined {
+  const pieceDir = pieceDirectory(workspaceDir, id)
+  if (pieceDir === undefined) return undefined
+  return readYamlArtifact(storyContextFile(pieceDir), schema)
 }
 
 /**
@@ -173,8 +216,26 @@ export async function writePieceMetadata(
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata })
 }
 
-export async function writeDraft(workspaceDir: string, id: string, text: string): Promise<void> {
-  await writeTextArtifact(draftFile(resolveWithinRoot(workspaceDir, id)), text)
+/**
+ * The draft's one writer (CODING_STANDARDS "Persistence": one writer per artifact,
+ * and serialize what must not overlap at the writer that owns it). Writing a draft
+ * is not a function anything may call, because two calls in flight are the one way
+ * this artifact can lose prose: an atomic rename makes a write indivisible but not
+ * ordered, so two could complete oldest-last and restore text the author already
+ * replaced. Holding the lock here rather than above this boundary is what makes
+ * that impossible to get wrong from outside — there is nothing else to call.
+ *
+ * The lock is this instance's, not the module's (CODING_STANDARDS "No
+ * module-level mutable singletons"): the composition root constructs one, and a
+ * test constructs its own.
+ */
+export class DraftStore {
+  readonly #lock = new Mutex()
+
+  async write(workspaceDir: string, id: string, text: string): Promise<void> {
+    const file = draftFile(resolveWithinRoot(workspaceDir, id))
+    await this.#lock.runExclusive(() => writeTextArtifact(file, text))
+  }
 }
 
 /**

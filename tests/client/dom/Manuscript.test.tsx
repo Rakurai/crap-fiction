@@ -1,44 +1,38 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { facts, modeName, wordCount } from '../../../src/client/facts.js'
 import { Manuscript } from '../../../src/client/Manuscript.js'
+import type { RequestResult } from '../../../src/client/request.js'
+import { useAutosave } from '../../../src/client/useAutosave.js'
+import { useManuscript } from '../../../src/client/useManuscript.js'
 
-const saveDraft = vi.fn<(id: string, text: string) => Promise<void>>()
-
-// The conversation panel Manuscript renders beside the piece header is
-// exercised at its own seams (roundProjection, Room); these stand in for the
-// server it would otherwise reach on mount — a real fetch or EventSource has
-// nothing to answer in jsdom. Manuscript receives every one of its adapters
-// as a prop, so these are values handed to it rather than modules substituted
-// underneath it.
-const COLLABORATORS = {
-  saveDraft: (id: string, text: string) => saveDraft(id, text),
-  room: {
-    subscribeToRoom: () => () => {},
-    createConversation: async () => ({ ok: true as const, id: 'c1' }),
-    fetchConversation: async () => ({ id: 'c1', rounds: [] }),
-    startRound: async () => ({ ok: true as const }),
-  },
-  callSites: {
-    fetchCallSites: async () => [],
-    fetchRuntimeStatus: async () => ({ reachable: true as const, models: [] }),
-    assignModel: async () => ({ ok: true as const, assignment: '' }),
-  },
-}
+const saveDraft = vi.fn<(id: string, text: string) => Promise<RequestResult<null>>>()
 
 const DEFAULT_PROPS = {
   pieceId: 'the-lighthouse',
   title: 'The Lighthouse',
   mode: 'flash',
   draft: 'First light of the day.',
-  currentConversationId: null,
-  roundInFlight: null,
   onClose: vi.fn(),
-  ...COLLABORATORS,
+}
+
+/**
+ * The prose surface receives its manuscript and its autosave rather than owning
+ * them — `OpenedPiece` is where both are constructed, because the conversation
+ * beside it needs the same two. This is that composition, minus the conversation:
+ * these tests are about the prose surface, and the room is exercised at its own
+ * seams (roundProjection, Room).
+ */
+function Harness(props: typeof DEFAULT_PROPS) {
+  const manuscript = useManuscript(props.draft)
+  const autosave = useAutosave(props.pieceId, manuscript.markdown, (text) => saveDraft(props.pieceId, text))
+
+  return <Manuscript title={props.title} mode={props.mode} onClose={props.onClose} manuscript={manuscript} autosave={autosave} />
 }
 
 /** Every test renders the manuscript through here, overriding only what it cares about. */
 function renderManuscript(overrides: Partial<typeof DEFAULT_PROPS> = {}) {
-  return render(<Manuscript {...DEFAULT_PROPS} {...overrides} />)
+  return render(<Harness {...DEFAULT_PROPS} {...overrides} />)
 }
 
 /**
@@ -67,10 +61,18 @@ function leaveControl(): HTMLButtonElement {
 describe('the piece header', () => {
   afterEach(cleanup)
 
-  it('states the mode and the length in the facts register, in the mockup wording', () => {
+  /**
+   * The register's wording is `facts.ts`'s own and is asserted there. What the
+   * header claims is narrower: that the mode and the length reach the chrome as
+   * one composed fact rather than as two strings the surface joined itself. So the
+   * expectation is composed the way the header composes it — a change to the
+   * separator or to the pluralisation is a change to one module, and this test is
+   * not a second place it has to be made.
+   */
+  it('states the mode and the length as one composed fact', () => {
     renderManuscript({ draft: 'First light of the day.' })
 
-    expect(screen.getByText('FLASH · 5 WORDS')).toBeTruthy()
+    expect(screen.getByText(facts(modeName('flash'), wordCount(5)))).toBeTruthy()
   })
 })
 
@@ -101,6 +103,7 @@ describe('the manuscript while a save is failing', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     saveDraft.mockReset()
+    saveDraft.mockResolvedValue({ outcome: 'value', value: null })
   })
 
   afterEach(() => {
@@ -109,7 +112,7 @@ describe('the manuscript while a save is failing', () => {
   })
 
   it('refuses to leave, says what the machine said, and lets go once a write succeeds', async () => {
-    saveDraft.mockRejectedValueOnce(new Error('EACCES: permission denied'))
+    saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
     renderManuscript({ draft: 'First light.' })
 
     expect(leaveControl().disabled).toBe(false)
@@ -125,7 +128,6 @@ describe('the manuscript while a save is failing', () => {
     expect(leaveControl().disabled).toBe(true)
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false) // the manuscript stays editable
 
-    saveDraft.mockResolvedValueOnce(undefined)
     type('First light. Then none. Then light again.')
 
     await settle()
@@ -134,7 +136,7 @@ describe('the manuscript while a save is failing', () => {
   })
 
   it('asks nothing about discarding — the refusal is not a question', async () => {
-    saveDraft.mockRejectedValue(new Error('disk unhappy'))
+    saveDraft.mockResolvedValue({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'disk unhappy' })
     renderManuscript({ draft: 'First light.' })
 
     type('First light. Then none.')

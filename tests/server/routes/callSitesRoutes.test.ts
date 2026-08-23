@@ -26,19 +26,19 @@ describe('call sites and models', () => {
     return buildTestApp(dataRoot, { roles: CALL_SITE_ROLES, runtimeStatus }).app
   }
 
-  it('lists every call site, its role description where it has one, and no assignment yet', async () => {
+  /**
+   * Which call sites there are, what each carries and where an assignment shows as
+   * `null` are `callSites`'s own, asserted at `model/callSites.test.ts`. What the
+   * route owes is that the composed view reaches the author in the envelope's data
+   * field, whole and in the order the module built it.
+   */
+  it('carries the composed call-site view in the envelope', async () => {
     const res = await buildApp().request('/call-sites')
+
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({
-      success: true,
-      data: [
-        { site: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn', assignment: null },
-        { site: 'story-editor', displayName: 'Story Editor', roleDescription: 'the generalist', assignment: null },
-        { site: 'apply', displayName: null, roleDescription: null, assignment: null },
-        { site: 'capture', displayName: null, roleDescription: null, assignment: null },
-      ],
-    })
+    expect(body.success).toBe(true)
+    expect(body.data.map((site: { site: string }) => site.site)).toEqual(['shape', 'story-editor', 'apply', 'capture'])
   })
 
   it('assigns one call site without touching another, and the assignment is visible on the next read', async () => {
@@ -71,13 +71,17 @@ describe('call sites and models', () => {
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'CALL_SITE_NOT_FOUND' } })
   })
 
-  it('reports the runtime unreachable rather than a network error', async () => {
+  /**
+   * That an unanswering runtime reads as `{ reachable: false }` rather than as a
+   * thrown error is the adapter's, asserted at `model/lmStudioAdapter.test.ts`. The
+   * route's own claim is the one this asserts: a runtime that cannot be reached is
+   * still an answer, so it travels the envelope's success channel with a 200 and is
+   * never turned into a refusal the author would read as their own mistake.
+   */
+  it('reports an unreachable runtime on the success channel rather than as a refusal', async () => {
     const res = await buildApp({ reachable: false }).request('/models')
-    expect(await res.json()).toEqual({ success: true, data: { reachable: false } })
-  })
 
-  it('reports what the runtime holds when it is reachable', async () => {
-    const res = await buildApp({ reachable: true, models: ['llama-3'] }).request('/models')
-    expect(await res.json()).toEqual({ success: true, data: { reachable: true, models: ['llama-3'] } })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true, data: { reachable: false } })
   })
 })
