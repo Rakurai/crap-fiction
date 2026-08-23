@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createAutosaveController, type AutosaveState } from './autosave.js'
-import { saveDraft } from './piecesClient.js'
+import type { saveDraft as saveDraftFn } from './piecesClient.js'
 
 export type AutosaveViewModel = {
   readonly failed: boolean
@@ -15,8 +15,10 @@ export type AutosaveViewModel = {
  * as it changes and the failed-save indicator. `pieceId` is fixed for the
  * life of one controller — the surface that opens a piece unmounts this hook
  * rather than handing it a new id, so there is nothing to re-point mid-flight.
+ * `saveDraft` reaches the server; the caller supplies it rather than this
+ * hook importing the adapter that performs it.
  */
-export function useAutosave(pieceId: string, markdown: string): AutosaveViewModel {
+export function useAutosave(pieceId: string, markdown: string, saveDraft: typeof saveDraftFn): AutosaveViewModel {
   const [state, setState] = useState<AutosaveState>({ failed: false })
   const controllerRef = useRef<ReturnType<typeof createAutosaveController> | undefined>(undefined)
 

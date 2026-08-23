@@ -3,8 +3,8 @@ import { machineWords } from './facts.js'
 import styles from './Conversation.module.css'
 import type { ProjectedParticipant, ProjectedRound } from './roundProjection.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
-import { useCallSites } from './useCallSites.js'
-import { useConversation } from './useConversation.js'
+import { type CallSiteAdapters, useCallSites } from './useCallSites.js'
+import { type RoomAdapters, useConversation } from './useConversation.js'
 
 type ConversationProps = {
   readonly pieceId: string
@@ -12,6 +12,8 @@ type ConversationProps = {
   readonly roundInFlight: RoundSnapshot | null
   readonly draft: string
   readonly flushDraft: () => void
+  readonly room: RoomAdapters
+  readonly callSites: CallSiteAdapters
 }
 
 const STATE_LABEL: Record<'waiting' | 'preparing' | 'working', string> = {
@@ -72,10 +74,10 @@ function RoundView({ round, displayName }: { readonly round: ProjectedRound; rea
  * accumulating rounds, and a round in flight staying legible — not the full
  * response-card and handle-combobox composition UX_DESIGN describes.
  */
-export function Conversation({ pieceId, currentConversationId, roundInFlight, draft, flushDraft }: ConversationProps) {
+export function Conversation({ pieceId, currentConversationId, roundInFlight, draft, flushDraft, room, callSites: callSiteAdapters }: ConversationProps) {
   const [message, setMessage] = useState('')
-  const callSites = useCallSites()
-  const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft)
+  const callSites = useCallSites(callSiteAdapters)
+  const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
 
   const displayName = (id: string) => displayNameFor(callSites.status === 'ready' ? callSites.sites : undefined, id)
 

@@ -9,7 +9,7 @@
  * `NOT SAVED · 14:32`.
  */
 
-import { differenceInCalendarDays, formatDistanceToNowStrict, isToday } from 'date-fns'
+import { differenceInCalendarDays, formatDistanceStrict, isSameDay } from 'date-fns'
 
 const words = new Intl.NumberFormat(undefined, { useGrouping: true })
 
@@ -42,6 +42,9 @@ export function timeOfDay(atMs: number): string {
   return clock.format(new Date(atMs))
 }
 
+/** Reading the wall clock, handed in so a rung the register turns on is a value a test can state. */
+export type Clock = () => number
+
 /**
  * When something last changed, in the mockup's wording: `TODAY`, `6 DAYS AGO`,
  * `3 WEEKS AGO`. Relative time is what the author reads a listing for — a
@@ -54,14 +57,15 @@ export function timeOfDay(atMs: number): string {
  * AGO`. Past a month it is the formatter's again, since months and years are
  * units it does count in and a piece untouched that long needs no precision.
  */
-export function whenChanged(atMs: number): string {
+export function whenChanged(atMs: number, now: Clock): string {
   const at = new Date(atMs)
-  if (isToday(at)) return 'TODAY'
+  const reference = new Date(now())
+  if (isSameDay(at, reference)) return 'TODAY'
 
-  const days = Math.abs(differenceInCalendarDays(new Date(), at))
+  const days = Math.abs(differenceInCalendarDays(reference, at))
   if (days < 7) return ago(days, 'DAY')
   if (days < 30) return ago(Math.round(days / 7), 'WEEK')
-  return formatDistanceToNowStrict(at, { addSuffix: true, unit: days < 365 ? 'month' : 'year' }).toUpperCase()
+  return formatDistanceStrict(at, reference, { addSuffix: true, unit: days < 365 ? 'month' : 'year' }).toUpperCase()
 }
 
 function ago(count: number, noun: string): string {

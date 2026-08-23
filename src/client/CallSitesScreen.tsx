@@ -1,3 +1,4 @@
+import { assignModel, fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { CallSiteList } from './CallSiteList.js'
 import styles from './CallSitesScreen.module.css'
 import { RuntimeStatusBanner } from './RuntimeStatusBanner.js'
@@ -9,7 +10,7 @@ type CallSitesScreenProps = {
 
 /** PRD "Assign models to participants": the place the author goes, one action away from the piece list. */
 export function CallSitesScreen({ onClose }: CallSitesScreenProps) {
-  const view = useCallSites()
+  const view = useCallSites({ fetchCallSites, fetchRuntimeStatus, assignModel })
 
   return (
     <div className={styles.screen}>

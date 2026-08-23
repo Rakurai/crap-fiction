@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
-import { createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
+import type { createConversation as createConversationFn, fetchConversation as fetchConversationFn, startRound as startRoundFn, subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
 import { EMPTY_PROJECTION, initialProjection, projectRoundEvent, withRoundInFlight, type ConversationProjection } from './roundProjection.js'
 
 export type ConversationViewModel = Readonly<{
@@ -8,6 +8,14 @@ export type ConversationViewModel = Readonly<{
   busy: boolean
   error: string | undefined
   sendMessage: (message: string) => void
+}>
+
+/** The room's adapters, reached by whoever composes this hook rather than imported here. */
+export type RoomAdapters = Readonly<{
+  createConversation: typeof createConversationFn
+  fetchConversation: typeof fetchConversationFn
+  startRound: typeof startRoundFn
+  subscribeToRoom: typeof subscribeToRoomFn
 }>
 
 /**
@@ -28,7 +36,9 @@ export function useConversation(
   initialRoundInFlight: RoundSnapshot | null,
   flushDraft: () => void,
   getDraft: () => string,
+  room: RoomAdapters,
 ): ConversationViewModel {
+  const { createConversation, fetchConversation, startRound, subscribeToRoom } = room
   const [projection, setProjection] = useState<ConversationProjection>(() =>
     initialRoundInFlight === null ? EMPTY_PROJECTION : withRoundInFlight(EMPTY_PROJECTION, initialRoundInFlight),
   )

@@ -2,8 +2,11 @@ import { EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
 import { Conversation } from './Conversation.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
+import type { saveDraft as SaveDraftFn } from './piecesClient.js'
 import { useAutosave } from './useAutosave.js'
 import styles from './Manuscript.module.css'
+import type { CallSiteAdapters } from './useCallSites.js'
+import type { RoomAdapters } from './useConversation.js'
 import { useManuscript } from './useManuscript.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 
@@ -15,6 +18,9 @@ type ManuscriptProps = {
   readonly currentConversationId: string | null
   readonly roundInFlight: RoundSnapshot | null
   readonly onClose: () => void
+  readonly saveDraft: typeof SaveDraftFn
+  readonly room: RoomAdapters
+  readonly callSites: CallSiteAdapters
 }
 
 /**
@@ -34,9 +40,9 @@ type ManuscriptProps = {
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ pieceId, title, mode, draft, currentConversationId, roundInFlight, onClose }: ManuscriptProps) {
+export function Manuscript({ pieceId, title, mode, draft, currentConversationId, roundInFlight, onClose, saveDraft, room, callSites }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
-  const autosave = useAutosave(pieceId, manuscript.markdown)
+  const autosave = useAutosave(pieceId, manuscript.markdown, saveDraft)
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -108,6 +114,8 @@ export function Manuscript({ pieceId, title, mode, draft, currentConversationId,
           roundInFlight={roundInFlight}
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
+          room={room}
+          callSites={callSites}
         />
       )}
     </div>

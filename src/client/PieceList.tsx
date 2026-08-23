@@ -19,7 +19,7 @@ export function PieceList({ pieces, onOpen }: PieceListProps) {
           <button type="button" className={styles.open} onClick={() => onOpen(piece.id)}>
             {piece.title}
           </button>
-          <span className={styles.facts}>{facts(wordCount(piece.length), whenChanged(piece.modified))}</span>
+          <span className={styles.facts}>{facts(wordCount(piece.length), whenChanged(piece.modified, Date.now))}</span>
         </li>
       ))}
     </ul>
