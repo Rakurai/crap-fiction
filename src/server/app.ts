@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
+import { pieceStatusSchema } from '../shared/pieceViews.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
@@ -23,6 +24,7 @@ import {
   setPieceCast,
   startConversation,
   UnknownCastMemberError,
+  updatePieceDetails,
 } from './pieces.js'
 import { RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
@@ -36,7 +38,11 @@ const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postRoundSchema = z.object({ message: z.string().min(1), draft: z.string() })
-const patchPieceSchema = z.object({ cast: z.array(z.string().min(1)) })
+const patchPieceSchema = z.object({
+  title: z.string().min(1).optional(),
+  status: pieceStatusSchema.optional(),
+  cast: z.array(z.string().min(1)).optional(),
+})
 
 /**
  * Every route SPEC's transport table names beyond `/workspace`, `/pieces`,
@@ -90,15 +96,27 @@ export function createApp(
   })
 
   /**
-   * #13 "The room": enabling and disabling specialists is one lightweight
-   * write, carrying no rationale and taking effect on the next unaddressed
-   * round — SPEC's PATCH route also carries a piece's title and status, which
-   * belong to #19.
+   * #13 "The room"/#19 "Piece lifecycle": one route, three independent
+   * lightweight writes — enabling and disabling specialists takes effect on
+   * the next unaddressed round, and retitling or marking a piece finished or
+   * abandoned gates nothing. Each field is applied only when the author sent
+   * it, and the answer is the piece as it now stands, on the same terms as
+   * opening it, so a caller never has to reconcile two response shapes for
+   * one route.
    */
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
-    const { cast } = c.req.valid('json')
-    const view = await setPieceCast(workspace.require(), c.req.param('id'), room.specialists(), cast)
-    return c.json(ok(view))
+    const { title, status, cast } = c.req.valid('json')
+    const id = c.req.param('id')
+    const workspaceDir = workspace.require()
+
+    if (title !== undefined || status !== undefined) {
+      await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
+    }
+    if (cast !== undefined) {
+      await setPieceCast(workspaceDir, id, room.specialists(), cast)
+    }
+
+    return c.json(ok(getPiece(workspaceDir, id, room.snapshot(id) ?? null, room.specialists())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {

@@ -25,13 +25,25 @@ type PiecesScreenProps = {
  * than standing empty above their own stories.
  */
 export function PiecesScreen({ workspace }: PiecesScreenProps) {
-  const pieces = usePieces()
-  const theme = useTheme()
   const [openedId, setOpenedId] = useState<string | undefined>(undefined)
+  // Bumped on return from an opened piece, so the listing re-scans rather
+  // than going on showing whatever it read before that piece was retitled,
+  // marked finished or abandoned, or simply written to.
+  const [refreshKey, setRefreshKey] = useState(0)
+  const pieces = usePieces(refreshKey)
+  const theme = useTheme()
   const [showCallSites, setShowCallSites] = useState(false)
 
   if (openedId !== undefined) {
-    return <OpenedPiece id={openedId} onClose={() => setOpenedId(undefined)} />
+    return (
+      <OpenedPiece
+        id={openedId}
+        onClose={() => {
+          setOpenedId(undefined)
+          setRefreshKey((key) => key + 1)
+        }}
+      />
+    )
   }
 
   if (showCallSites) {

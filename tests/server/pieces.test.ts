@@ -2,7 +2,16 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError, setPieceCast, UnknownCastMemberError } from '../../src/server/pieces.js'
+import {
+  createPiece,
+  DraftWriter,
+  getPiece,
+  listPieces,
+  PieceNotFoundError,
+  setPieceCast,
+  UnknownCastMemberError,
+  updatePieceDetails,
+} from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftStore } from '../../src/server/store/index.js'
@@ -184,6 +193,44 @@ describe('setPieceCast', () => {
 
   it('reports a missing piece as a stated PieceNotFoundError rather than writing one', async () => {
     await expect(setPieceCast(workspaceDir, 'nothing-here', specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
+  })
+})
+
+describe('updatePieceDetails', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('retitles a piece, leaving its mode, status and directory untouched', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+
+    const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
+
+    expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
+    expect(getPiece(workspaceDir, 'cups', null, specialists).title).toBe('The Cups')
+  })
+
+  it('marks a piece finished or abandoned, with no transition it refuses', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+
+    const finished = await updatePieceDetails(workspaceDir, created.id, { status: 'finished' })
+    expect(finished.status).toBe('finished')
+
+    const abandoned = await updatePieceDetails(workspaceDir, created.id, { status: 'abandoned' })
+    expect(abandoned.status).toBe('abandoned')
+
+    const backToDrafting = await updatePieceDetails(workspaceDir, created.id, { status: 'drafting' })
+    expect(backToDrafting.status).toBe('drafting')
+  })
+
+  it('reports a missing piece as a stated PieceNotFoundError rather than writing one', async () => {
+    await expect(updatePieceDetails(workspaceDir, 'nothing-here', { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
   })
 })
 

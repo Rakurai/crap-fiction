@@ -1,9 +1,21 @@
 import { EditorContent } from '@tiptap/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { PieceStatus } from '../shared/pieceViews.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
+
+/** #19 "Piece lifecycle": retitling and marking a piece finished or abandoned, bundled the way `OpenedPiece` composes it. */
+type LifecycleProps = {
+  readonly status: PieceStatus
+  readonly retitling: boolean
+  readonly retitleError: string | undefined
+  readonly onRetitle: (title: string) => void
+  readonly settingStatus: boolean
+  readonly statusError: string | undefined
+  readonly onSetStatus: (status: PieceStatus) => void
+}
 
 type ManuscriptProps = {
   readonly title: string
@@ -13,6 +25,53 @@ type ManuscriptProps = {
   readonly autosave: AutosaveViewModel
   /** UX_DESIGN "Prominence": editing the room is one action away, reached from here like the other view controls — this surface knows nothing else about it. */
   readonly onOpenRoom: () => void
+  readonly lifecycle: LifecycleProps
+}
+
+/**
+ * #19 "Piece lifecycle": the title in place, reached and left in one action
+ * each way — the same reveal-on-click, escape-to-withdraw shape
+ * `NewPieceForm` uses for naming a piece the first time. Retitling never
+ * renames the piece's directory, so nothing here needs to know it has one.
+ */
+function EditableTitle({ title, saving, onRetitle }: { readonly title: string; readonly saving: boolean; readonly onRetitle: (title: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(title)
+
+  if (!editing) {
+    return (
+      <button type="button" className={styles.title} onClick={() => { setDraft(title); setEditing(true) }}>
+        {title}
+      </button>
+    )
+  }
+
+  return (
+    <form
+      className={styles.retitleForm}
+      onSubmit={(event) => {
+        event.preventDefault()
+        const next = draft.trim()
+        setEditing(false)
+        if (next.length > 0 && next !== title) onRetitle(next)
+      }}
+    >
+      <input
+        aria-label="Piece title"
+        className={styles.retitleInput}
+        value={draft}
+        autoFocus
+        disabled={saving}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setEditing(false)
+        }}
+      />
+      <button type="submit" className={styles.retitleSave} disabled={saving}>
+        save
+      </button>
+    </form>
+  )
 }
 
 /**
@@ -38,7 +97,7 @@ type ManuscriptProps = {
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom }: ManuscriptProps) {
+export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, lifecycle }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -57,8 +116,19 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
           <button type="button" className={styles.control} onClick={onClose} disabled={autosave.state.failed}>
             ‹ pieces
           </button>
-          <span className={styles.title}>{title}</span>
+          <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
           <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
+          <select
+            aria-label="Piece status"
+            className={styles.status}
+            value={lifecycle.status}
+            disabled={lifecycle.settingStatus}
+            onChange={(event) => lifecycle.onSetStatus(event.target.value as PieceStatus)}
+          >
+            <option value="drafting">drafting</option>
+            <option value="finished">finished</option>
+            <option value="abandoned">abandoned</option>
+          </select>
           <span className={styles.spacer} />
           <div className={styles.controls}>
             <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
@@ -72,6 +142,12 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
             </button>
           </div>
         </div>
+      )}
+
+      {!reading && (lifecycle.retitleError ?? lifecycle.statusError) !== undefined && (
+        <p className={styles.lifecycleError} role="alert">
+          {lifecycle.retitleError ?? lifecycle.statusError}
+        </p>
       )}
 
       <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>

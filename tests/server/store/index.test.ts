@@ -15,6 +15,7 @@ import {
   resolveWorkspaceDirectory,
   writeConversation,
   writePieceCast,
+  writePieceDetails,
   writePieceMetadata,
   writeSettingsSection,
 } from '../../../src/server/store/index.js'
@@ -164,6 +165,24 @@ describe("a piece's metadata", () => {
 
     const metadata = readPiece(workspaceDir, 'cups')?.metadata
     expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape', 'compression'] })
+  })
+
+  it('sets only the title, leaving mode, status and cast untouched', async () => {
+    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+
+    await writePieceDetails(workspaceDir, 'cups', { title: 'The Cups' })
+
+    const metadata = readPiece(workspaceDir, 'cups')?.metadata
+    expect(metadata).toEqual({ title: 'The Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+  })
+
+  it('sets only the status, leaving title, mode and cast untouched', async () => {
+    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+
+    await writePieceDetails(workspaceDir, 'cups', { status: 'finished' })
+
+    const metadata = readPiece(workspaceDir, 'cups')?.metadata
+    expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'finished', cast: ['shape'] })
   })
 })
 

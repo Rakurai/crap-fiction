@@ -163,11 +163,68 @@ describe('/pieces', () => {
     expect(patchRes.status).toBe(200)
     expect(await patchRes.json()).toMatchObject({
       success: true,
-      data: [{ id: 'shape', enabled: false }],
+      data: { cast: [{ id: 'shape', enabled: false }] },
     })
 
     const getRes = await app.request('/pieces/cups')
     expect(await getRes.json()).toMatchObject({ success: true, data: { cast: [{ id: 'shape', enabled: false }] } })
+  })
+
+  it('retitles a piece without renaming its directory', async () => {
+    const app = await withWorkspace()
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+
+    const patchRes = await app.request('/pieces/cups', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'The Cups' }),
+    })
+    expect(patchRes.status).toBe(200)
+    expect(await patchRes.json()).toMatchObject({ success: true, data: { id: 'cups', title: 'The Cups' } })
+
+    const getRes = await app.request('/pieces/cups')
+    expect(await getRes.json()).toMatchObject({ success: true, data: { id: 'cups', title: 'The Cups' } })
+  })
+
+  it('marks a piece finished, and nothing gates opening or writing its draft afterwards', async () => {
+    const app = await withWorkspace()
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+
+    const patchRes = await app.request('/pieces/cups', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'finished' }),
+    })
+    expect(await patchRes.json()).toMatchObject({ success: true, data: { status: 'finished' } })
+
+    const putRes = await app.request('/pieces/cups/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ draft: 'The last word.' }),
+    })
+    expect(putRes.status).toBe(200)
+
+    const getRes = await app.request('/pieces/cups')
+    expect(await getRes.json()).toMatchObject({ success: true, data: { status: 'finished', draft: 'The last word.' } })
+  })
+
+  it('reports retitling a piece that does not exist as PIECE_NOT_FOUND', async () => {
+    const app = await withWorkspace()
+    const res = await app.request('/pieces/nothing-here', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Anything' }),
+    })
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
   })
 
   it('refuses to widen a piece past its mode\'s cast', async () => {

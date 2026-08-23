@@ -2,7 +2,7 @@ import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
 import { durableContextSchema } from '../shared/durableContext.js'
-import type { CastMemberView, PieceDetail, PieceSummary } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import type { RoleDefinition } from './model/roles.js'
@@ -15,6 +15,7 @@ import {
   readPiece,
   readStoryContext,
   writePieceCast,
+  writePieceDetails,
   writePieceMetadata,
   type DraftStore,
   type StoredPiece,
@@ -180,6 +181,23 @@ export async function setPieceCast(
 
   await writePieceCast(workspaceDir, id, cast)
   return castView(specialists, cast)
+}
+
+/**
+ * #19 "Piece lifecycle": retitling and marking a piece finished or abandoned
+ * are the same one-lightweight-write shape as #13's cast toggle — carrying no
+ * rationale, gating nothing. CONTEXT "Piece": status is the whole of the
+ * lifecycle, so nothing here refuses a transition or checks what the piece's
+ * status already is.
+ */
+export async function updatePieceDetails(
+  workspaceDir: string,
+  id: string,
+  patch: Readonly<{ title?: string; status?: PieceStatus }>,
+): Promise<PieceSummary> {
+  requirePiece(workspaceDir, id)
+  await writePieceDetails(workspaceDir, id, patch)
+  return summarize(id, requirePiece(workspaceDir, id))
 }
 
 /**

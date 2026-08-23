@@ -247,6 +247,29 @@ export async function writePieceCast(workspaceDir: string, id: string, cast: rea
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: [...cast] })
 }
 
+/**
+ * #19 "Piece lifecycle": retitling and marking a piece finished or abandoned
+ * are the same durable write to `piece.yaml` as enabling a specialist —
+ * only the paths the author changed are set, so the piece's mode, cast and
+ * whichever of title or status was not given survive untouched. The
+ * directory is never touched: SPEC "Files" fixes a piece's id at creation,
+ * and a retitle is not a rename.
+ */
+export async function writePieceDetails(
+  workspaceDir: string,
+  id: string,
+  patch: Readonly<Partial<Pick<PieceMetadata, 'title' | 'status'>>>,
+): Promise<void> {
+  // Built rather than spread: `values` must carry only the keys the caller
+  // actually named — an `undefined` entry would still be a key `setPaths`
+  // sets, which is how a route passing both fields through unconditionally
+  // would blank out whichever one the author did not send.
+  const values: Record<string, unknown> = {}
+  if (patch.title !== undefined) values.title = patch.title
+  if (patch.status !== undefined) values.status = patch.status
+  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
+}
+
 // ---------------------------------------------------------------------------
 // Conversations
 // ---------------------------------------------------------------------------

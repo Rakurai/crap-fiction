@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { castMemberViewSchema, pieceDetailSchema, pieceSummarySchema, type CastMemberView, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
+import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceStatus, type PieceSummary } from '../shared/pieceViews.js'
 import { requestJson, type RequestResult } from './request.js'
 
 /**
@@ -34,12 +34,20 @@ export function createPiece(title: string, signal?: AbortSignal): Promise<Reques
   })
 }
 
-/** CONTEXT "Room"/#13: enabling and disabling a specialist, carrying the piece's whole enabled cast at once. */
-export function setPieceCast(id: string, cast: readonly string[], signal?: AbortSignal): Promise<RequestResult<readonly CastMemberView[]>> {
-  return requestJson(`/pieces/${encodeURIComponent(id)}`, z.array(castMemberViewSchema).readonly(), {
+export type PiecePatch = Readonly<{ title?: string; status?: PieceStatus; cast?: readonly string[] }>
+
+/**
+ * #13 "The room"/#19 "Piece lifecycle": the one PATCH the route answers with
+ * the piece as it now stands, on the same terms as opening it — enabling and
+ * disabling a specialist, retitling and marking a piece finished or
+ * abandoned are all this one call, differing only in which fields the
+ * caller names.
+ */
+export function updatePiece(id: string, patch: PiecePatch, signal?: AbortSignal): Promise<RequestResult<PieceDetail>> {
+  return requestJson(`/pieces/${encodeURIComponent(id)}`, pieceDetailSchema, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ cast }),
+    body: JSON.stringify(patch),
     signal: signal ?? null,
   })
 }

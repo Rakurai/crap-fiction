@@ -15,6 +15,15 @@ const DEFAULT_PROPS = {
   draft: 'First light of the day.',
   onClose: vi.fn(),
   onOpenRoom: vi.fn(),
+  lifecycle: {
+    status: 'drafting' as const,
+    retitling: false,
+    retitleError: undefined as string | undefined,
+    onRetitle: vi.fn(),
+    settingStatus: false,
+    statusError: undefined as string | undefined,
+    onSetStatus: vi.fn(),
+  },
 }
 
 /**
@@ -36,6 +45,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       manuscript={manuscript}
       autosave={autosave}
       onOpenRoom={props.onOpenRoom}
+      lifecycle={props.lifecycle}
     />
   )
 }
@@ -83,6 +93,70 @@ describe('the piece header', () => {
     renderManuscript({ draft: 'First light of the day.' })
 
     expect(screen.getByText(facts(modeName('flash'), wordCount(5)))).toBeTruthy()
+  })
+})
+
+describe('the piece title', () => {
+  afterEach(cleanup)
+
+  it('is reached and left in one action each way, and retitles on submit', () => {
+    const onRetitle = vi.fn()
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onRetitle } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
+    const input = screen.getByLabelText('Piece title')
+    fireEvent.change(input, { target: { value: 'The Lantern' } })
+    fireEvent.click(screen.getByRole('button', { name: 'save' }))
+
+    expect(onRetitle).toHaveBeenCalledWith('The Lantern')
+    expect(screen.queryByLabelText('Piece title')).toBeNull()
+    expect(screen.getByRole('button', { name: 'The Lighthouse' })).toBeTruthy()
+  })
+
+  it('withdraws on Escape without retitling', () => {
+    const onRetitle = vi.fn()
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onRetitle } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
+    fireEvent.change(screen.getByLabelText('Piece title'), { target: { value: 'Something else entirely' } })
+    fireEvent.keyDown(screen.getByLabelText('Piece title'), { key: 'Escape' })
+
+    expect(onRetitle).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'The Lighthouse' })).toBeTruthy()
+  })
+
+  it('asks nothing of an unchanged or blank title', () => {
+    const onRetitle = vi.fn()
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onRetitle } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
+    fireEvent.click(screen.getByRole('button', { name: 'save' }))
+    expect(onRetitle).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
+    fireEvent.change(screen.getByLabelText('Piece title'), { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'save' }))
+    expect(onRetitle).not.toHaveBeenCalled()
+  })
+})
+
+describe('the piece status', () => {
+  afterEach(cleanup)
+
+  it('is marked finished or abandoned with nothing more asked', () => {
+    const onSetStatus = vi.fn()
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onSetStatus } })
+
+    fireEvent.change(screen.getByLabelText('Piece status'), { target: { value: 'finished' } })
+
+    expect(onSetStatus).toHaveBeenCalledWith('finished')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('states a refused status change beside the header rather than silently', () => {
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, statusError: 'the studio did not answer' } })
+
+    expect(screen.getByRole('alert').textContent).toBe('the studio did not answer')
   })
 })
 

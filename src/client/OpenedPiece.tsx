@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CastMemberView, PieceDetail } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
 import { useLoaded } from './load.js'
@@ -25,6 +25,17 @@ type RoomProps = {
   readonly onToggle: (id: string) => void
 }
 
+/** #19 "Piece lifecycle": retitling and marking a piece finished or abandoned, bundled the same way `RoomProps` bundles the cast toggle. */
+type LifecycleProps = {
+  readonly status: PieceStatus
+  readonly retitling: boolean
+  readonly retitleError: string | undefined
+  readonly onRetitle: (title: string) => void
+  readonly settingStatus: boolean
+  readonly statusError: string | undefined
+  readonly onSetStatus: (status: PieceStatus) => void
+}
+
 /**
  * UX_DESIGN "Design thesis": two surfaces are always present, the prose and the
  * conversation about it. This is the one place that knows they are two — it owns
@@ -39,7 +50,17 @@ type RoomProps = {
  * it is what keeps a participant from being drawn under its internal id for the
  * moment before the roster lands.
  */
-function Surfaces({ piece, room, onClose }: { readonly piece: PieceDetail; readonly room: RoomProps; readonly onClose: () => void }) {
+function Surfaces({
+  piece,
+  room,
+  lifecycle,
+  onClose,
+}: {
+  readonly piece: PieceDetail
+  readonly room: RoomProps
+  readonly lifecycle: LifecycleProps
+  readonly onClose: () => void
+}) {
   const manuscript = useManuscript(piece.draft)
   const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
@@ -61,6 +82,7 @@ function Surfaces({ piece, room, onClose }: { readonly piece: PieceDetail; reado
         manuscript={manuscript}
         autosave={autosave}
         onOpenRoom={() => setRoomOpen(true)}
+        lifecycle={lifecycle}
       />
       {manuscript.view !== 'reading' && roster.settled && (
         <Conversation
@@ -92,19 +114,40 @@ function Surfaces({ piece, room, onClose }: { readonly piece: PieceDetail; reado
 export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
+  /**
+   * SPEC "Substrate": switching pieces abandons whatever operation is in
+   * flight, which keeps whatever landed. Asked unconditionally — the room's
+   * own abandon is a legitimate no-op when nothing was running (SPEC
+   * "Seams") — rather than this surface tracking whether one was, which
+   * would be inventing a fact the room already owns.
+   */
+  function leave(): void {
+    void abandonOperation(id)
+    onClose()
+  }
+
   if (piece.status === 'ready') {
     return (
       <Surfaces
         piece={piece.piece}
         room={{ cast: piece.piece.cast, toggling: piece.castToggling, error: piece.castError, onToggle: piece.toggleCast }}
-        onClose={onClose}
+        lifecycle={{
+          status: piece.piece.status,
+          retitling: piece.retitling,
+          retitleError: piece.retitleError,
+          onRetitle: piece.retitle,
+          settingStatus: piece.settingStatus,
+          statusError: piece.statusError,
+          onSetStatus: piece.setStatus,
+        }}
+        onClose={leave}
       />
     )
   }
 
   return (
     <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={onClose}>
+      <button type="button" className={styles.back} onClick={leave}>
         ‹ pieces
       </button>
       {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}
