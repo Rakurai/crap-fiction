@@ -1,3 +1,4 @@
+import { PiecesScreen } from './PiecesScreen.js'
 import { useWorkspace } from './useWorkspace.js'
 import { WorkspacePrompt } from './WorkspacePrompt.js'
 
@@ -10,5 +11,5 @@ export function App() {
     return <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
   }
 
-  return <p>Studio</p>
+  return <PiecesScreen />
 }

@@ -1,6 +1,6 @@
-import path from 'node:path'
 import { z } from 'zod'
 import { PathEscapesRootError, resolveWithinRoot } from './paths.js'
+import { settingsPath } from './settingsFile.js'
 import { readYamlArtifact, writeYamlArtifact } from './store.js'
 
 export class WorkspaceOutsideRootError extends Error {
@@ -13,10 +13,6 @@ export class WorkspaceOutsideRootError extends Error {
 const settingsSchema = z.object({
   workspace: z.string().min(1).optional(),
 })
-
-function settingsPath(dataRoot: string): string {
-  return path.join(dataRoot, 'config', 'settings.yaml')
-}
 
 /**
  * SPEC "Files": the workspace path is process configuration, read once, not
