@@ -131,21 +131,39 @@ function roundFacts(round: ProjectedRound, nowMs: number): string {
   return facts(...said, ...(round.openedAt === undefined ? [] : [elapsed(round.openedAt, nowMs)]))
 }
 
+/**
+ * UX_DESIGN "An operation in flight": the mockup's own placement, beside the
+ * round's own facts line rather than at the composer — it is this round being
+ * stopped, not the surface as a whole.
+ */
+function RoundFlight({ round, nowMs, onAbandon }: { readonly round: ProjectedRound; readonly nowMs: number; readonly onAbandon: () => void }) {
+  return (
+    <div className={styles.flight}>
+      <span className={styles.roundFacts}>{roundFacts(round, nowMs)}</span>
+      <button type="button" className={styles.abandon} onClick={onAbandon}>
+        abandon
+      </button>
+    </div>
+  )
+}
+
 function RoundView({
   round,
   nowMs,
   displayName,
   mark,
+  onAbandon,
 }: {
   readonly round: ProjectedRound
   readonly nowMs: number
   readonly displayName: (id: string) => string
   readonly mark: (id: string) => string
+  readonly onAbandon: () => void
 }) {
   return (
     <div className={styles.round}>
       {round.message !== undefined && <p className={styles.message}>{round.message}</p>}
-      {round.outcome === 'inFlight' && <p className={styles.roundFacts}>{roundFacts(round, nowMs)}</p>}
+      {round.outcome === 'inFlight' && <RoundFlight round={round} nowMs={nowMs} onAbandon={onAbandon} />}
       {round.participants.map((participant) => (
         <ParticipantBlock
           key={participant.participantId}
@@ -202,7 +220,7 @@ export function Conversation({
     <div className={styles.wrapper}>
       <div className={styles.rounds}>
         {conversation.projection.rounds.map((round) => (
-          <RoundView key={round.roundId} round={round} nowMs={nowMs} displayName={displayName} mark={mark} />
+          <RoundView key={round.roundId} round={round} nowMs={nowMs} displayName={displayName} mark={mark} onAbandon={conversation.abandon} />
         ))}
       </div>
       {conversation.error !== undefined && (

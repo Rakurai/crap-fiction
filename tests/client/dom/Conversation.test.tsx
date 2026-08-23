@@ -1,8 +1,9 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Conversation as ConversationRecord, RoundRecord } from '../../../src/shared/conversationViews.js'
 import { Conversation } from '../../../src/client/Conversation.js'
+import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 
 const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experience', editor: 'Story Editor' }
@@ -12,12 +13,13 @@ const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experien
  * yields nothing and the conversation is whatever the fixture recorded. Sending a
  * message is exercised where it is decided — `useConversation` and `Room`.
  */
-function roomHolding(conversation: ConversationRecord): RoomAdapters {
+function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null })): RoomAdapters {
   return {
     subscribeToRoom: () => () => {},
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: conversation.id } }),
     fetchConversation: () => Promise.resolve({ outcome: 'value', value: conversation }),
     startRound: () => Promise.resolve({ outcome: 'value', value: { conversationId: conversation.id, roundId: 'r1' } }),
+    abandonOperation,
   }
 }
 
@@ -223,7 +225,37 @@ describe('a round in flight', () => {
 
     // Sending is what waits, and the button is where that is said.
     expect((input as HTMLInputElement).disabled).toBe(false)
-    expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '…' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('offers abandoning for as long as the round is in flight, and asks the room for it', async () => {
+    const abandonOperation = vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null }))
+    const room = roomHolding({ id: 'c1', rounds: [SETTLED_ROUND] }, abandonOperation)
+
+    renderConversation(SETTLED_ROUND, {
+      room,
+      roundInFlight: {
+        conversationId: 'c1',
+        roundId: 'r1',
+        participants: ['shape'],
+        states: { shape: 'working' },
+        settled: [],
+        openedAt: OPENED_AT,
+      },
+    })
+
+    const abandon = await screen.findByRole('button', { name: 'abandon' })
+    fireEvent.click(abandon)
+
+    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse')
+  })
+
+  it('offers no abandoning for a round that already settled', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    await screen.findByText('It holds.')
+
+    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
   })
 })
 

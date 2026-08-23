@@ -5,7 +5,7 @@ import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
-import { createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
+import { abandonOperation, createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
@@ -49,7 +49,7 @@ function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly on
           roundInFlight={piece.roundInFlight}
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, startRound, subscribeToRoom }}
+          room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation }}
           displayName={roster.displayName}
           mark={roster.mark}
           runtime={probe.kind === 'ready' ? probe.value : undefined}

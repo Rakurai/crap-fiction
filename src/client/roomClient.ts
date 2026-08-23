@@ -62,6 +62,18 @@ export function startRound(
 }
 
 /**
+ * SPEC "Room": whatever operation is in flight for the piece, stopped —
+ * the room is the authority on which one that is, so this names only the
+ * piece and carries nothing about a round or a conversation.
+ */
+export function abandonOperation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/abandon`, z.null(), {
+    method: 'POST',
+    signal: signal ?? null,
+  })
+}
+
+/**
  * SPEC "Transport": server-sent events for round activity, one stream for
  * the open piece. Each frame is validated against its own event's schema
  * before anything downstream trusts it — the same seam discipline every

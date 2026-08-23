@@ -44,6 +44,7 @@ function roomWithHeldConversation(conversation: Conversation) {
     createConversation: vi.fn(),
     fetchConversation: vi.fn(() => held),
     startRound: vi.fn(),
+    abandonOperation: vi.fn(),
     subscribeToRoom: vi.fn((_pieceId, onEvent) => {
       deliver = onEvent
       return () => {}
@@ -130,5 +131,65 @@ describe('merging the conversation on disk with the one being streamed', () => {
     await waitFor(() => {
       expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r1', 'r2'])
     })
+  })
+})
+
+/**
+ * UX_DESIGN "An operation in flight": abandoning is offered for as long as one
+ * is running and asks the room to stop it — the actual stop is reported back
+ * through `round.closed`, which the merge tests above already cover, so this
+ * is only the asking.
+ */
+describe('abandoning an operation', () => {
+  function idleRoom(
+    abandonOperation: RoomAdapters['abandonOperation'] = vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
+  ): RoomAdapters {
+    return {
+      createConversation: vi.fn(),
+      fetchConversation: vi.fn(),
+      startRound: vi.fn(),
+      abandonOperation,
+      subscribeToRoom: vi.fn(() => () => {}),
+    }
+  }
+
+  it('asks the room to abandon the piece\'s operation while one is in flight', async () => {
+    const room = idleRoom()
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, snapshot('r1'), () => {}, () => 'the draft', room),
+    )
+
+    await act(async () => {
+      result.current.abandon()
+    })
+
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse')
+  })
+
+  it('asks nothing when no operation is in flight', () => {
+    const room = idleRoom()
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, null, () => {}, () => 'the draft', room),
+    )
+
+    result.current.abandon()
+
+    expect(room.abandonOperation).not.toHaveBeenCalled()
+  })
+
+  it('reports it when the studio cannot be asked to abandon', async () => {
+    const room = idleRoom(vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })))
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, snapshot('r1'), () => {}, () => 'the draft', room),
+    )
+
+    await act(async () => {
+      result.current.abandon()
+    })
+
+    await waitFor(() => expect(result.current.error).toBe('the studio did not answer'))
   })
 })

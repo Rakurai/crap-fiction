@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
-import type { createConversation as createConversationFn, fetchConversation as fetchConversationFn, startRound as startRoundFn, subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
+import type {
+  abandonOperation as abandonOperationFn,
+  createConversation as createConversationFn,
+  fetchConversation as fetchConversationFn,
+  startRound as startRoundFn,
+  subscribeToRoom as subscribeToRoomFn,
+} from './roomClient.js'
 import { failureMessage } from './request.js'
 import { EMPTY_PROJECTION, initialProjection, projectRoundEvent, withRoundInFlight, type ConversationProjection } from './roundProjection.js'
 
@@ -15,6 +21,7 @@ export type ConversationViewModel = Readonly<{
   busy: boolean
   error: string | undefined
   sendMessage: (message: string) => void
+  abandon: () => void
 }>
 
 /** The room's adapters, reached by whoever composes this hook rather than imported here. */
@@ -23,6 +30,7 @@ export type RoomAdapters = Readonly<{
   fetchConversation: typeof fetchConversationFn
   startRound: typeof startRoundFn
   subscribeToRoom: typeof subscribeToRoomFn
+  abandonOperation: typeof abandonOperationFn
 }>
 
 /**
@@ -45,7 +53,7 @@ export function useConversation(
   getDraft: () => string,
   room: RoomAdapters,
 ): ConversationViewModel {
-  const { createConversation, fetchConversation, startRound, subscribeToRoom } = room
+  const { createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation } = room
   const [projection, setProjection] = useState<ConversationProjection>(() =>
     initialRoundInFlight === null ? EMPTY_PROJECTION : withRoundInFlight(EMPTY_PROJECTION, initialRoundInFlight),
   )
@@ -133,5 +141,19 @@ export function useConversation(
     })
   }
 
-  return { projection, busy, error, sendMessage }
+  /**
+   * UX_DESIGN "An operation in flight": offered for as long as one is running
+   * and nothing more — the room reports its own stop through `round.closed`,
+   * so this asks for that and otherwise touches no state itself. A studio that
+   * cannot be reached is told the same way sending one is.
+   */
+  function abandon(): void {
+    if (!busy) return
+    void abandonOperation(pieceId).then((result) => {
+      const message = failureMessage(result)
+      if (message !== undefined) setError(message)
+    })
+  }
+
+  return { projection, busy, error, sendMessage, abandon }
 }

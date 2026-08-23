@@ -99,12 +99,33 @@
   white-space: pre-wrap;
 }
 
+.flight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 4px;
+}
+
 /* What the round says about itself while it runs: counts and a clock, not a sentence. */
 .roundFacts {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.07em;
-  margin: 0 0 4px;
+  flex: 1;
+}
+
+.abandon {
+  flex: none;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.abandon:hover {
+  color: var(--ink);
 }
 
 .nothing {
