@@ -186,6 +186,118 @@ describe('runRound', () => {
     expect(adapter.promptFor('story-editor')).toBeUndefined()
   })
 
+  it('UX_DESIGN "A quiet round": settles ordinarily when every specialist has nothing material, and the Story Editor answers anyway', async () => {
+    const { modelAccess, adapter } = access({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } } },
+    })
+
+    const plan: RoundPlan = {
+      roundId: 'r1',
+      message: 'a message',
+      addressedIds: [],
+      specialists: [shape, compression],
+      storyEditor: editor,
+    }
+
+    const result = await runRound({
+      plan,
+      draft: 'text',
+      authorContext: undefined,
+      storyContext: undefined,
+      conversation: undefined,
+      policy: 'shared',
+      charter,
+      modelAccess,
+      signal: new AbortController().signal,
+      callbacks: { onState: () => {}, onSettled: () => {} },
+    })
+
+    expect(result.outcome).toBe('settled')
+    expect(result.participants.map((p) => p.result.kind)).toEqual(['response', 'response', 'response'])
+    // Owed an answer because nothing substantive landed from either specialist.
+    expect(adapter.promptFor('story-editor')).toContain(charter.directQuestionOwedAnswer)
+    expect(adapter.promptFor('story-editor')).not.toContain('noComment')
+  })
+
+  it('UX_DESIGN "Every specialist call failed": settles ordinarily with the failures stated and the Story Editor\'s answer standing beside them', async () => {
+    const { modelAccess, adapter } = access({
+      shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
+      compression: { result: { outcome: 'failed', reason: 'timeout' } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading with nothing from the room to lean on' } } },
+    })
+
+    const plan: RoundPlan = {
+      roundId: 'r1',
+      message: 'a message',
+      addressedIds: [],
+      specialists: [shape, compression],
+      storyEditor: editor,
+    }
+
+    const result = await runRound({
+      plan,
+      draft: 'text',
+      authorContext: undefined,
+      storyContext: undefined,
+      conversation: undefined,
+      policy: 'shared',
+      charter,
+      modelAccess,
+      signal: new AbortController().signal,
+      callbacks: { onState: () => {}, onSettled: () => {} },
+    })
+
+    expect(result.outcome).toBe('settled')
+    expect(result.participants[0]).toEqual({ participantId: 'shape', result: { kind: 'failed', reason: 'unconfigured' } })
+    expect(result.participants[1]).toEqual({ participantId: 'compression', result: { kind: 'failed', reason: 'timeout' } })
+    expect(result.participants[2]?.result.kind).toBe('response')
+    // Owed an answer because a failure is not a reading either.
+    expect(adapter.promptFor('story-editor')).toContain(charter.directQuestionOwedAnswer)
+    expect(adapter.promptFor('story-editor')).not.toContain('unconfigured')
+    expect(adapter.promptFor('story-editor')).not.toContain('timeout')
+  })
+
+  it('UX_DESIGN "Every specialist call failed... that call fails too": a round with nothing in it at all still settles, rather than erroring, when the Story Editor fails as well', async () => {
+    const { modelAccess } = access({
+      shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
+      compression: { result: { outcome: 'failed', reason: 'unreachable' } },
+      'story-editor': { result: { outcome: 'failed', reason: 'nonconforming', returned: 'not json' } },
+    })
+
+    const plan: RoundPlan = {
+      roundId: 'r1',
+      message: 'a message',
+      addressedIds: [],
+      specialists: [shape, compression],
+      storyEditor: editor,
+    }
+
+    const result = await runRound({
+      plan,
+      draft: 'text',
+      authorContext: undefined,
+      storyContext: undefined,
+      conversation: undefined,
+      policy: 'shared',
+      charter,
+      modelAccess,
+      signal: new AbortController().signal,
+      callbacks: { onState: () => {}, onSettled: () => {} },
+    })
+
+    // Nothing landed anywhere in the round, and that is information, not an
+    // error: the round still settles, carrying every failure plainly, rather
+    // than throwing or reporting itself abandoned.
+    expect(result.outcome).toBe('settled')
+    expect(result.participants).toEqual([
+      { participantId: 'shape', result: { kind: 'failed', reason: 'unconfigured' } },
+      { participantId: 'compression', result: { kind: 'failed', reason: 'unreachable' } },
+      { participantId: 'story-editor', result: { kind: 'failed', reason: 'nonconforming', returned: 'not json' } },
+    ])
+  })
+
   it('reports a specialist\'s failure plainly and still reaches the Story Editor over the readings that did land', async () => {
     const { modelAccess, adapter } = access({
       shape: { result: { outcome: 'failed', reason: 'nonconforming', returned: 'garbage' } },

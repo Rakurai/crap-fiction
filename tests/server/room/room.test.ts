@@ -139,6 +139,33 @@ describe('Room', () => {
     expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
   })
 
+  it('UX_DESIGN "Every specialist call failed... that call fails too": settles and persists a round with nothing in it at all, without ever emitting an error event', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom({
+      shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
+      compression: { result: { outcome: 'failed', reason: 'unreachable' } },
+      'story-editor': { result: { outcome: 'failed', reason: 'nonconforming', returned: 'not json' } },
+    })
+
+    const events: string[] = []
+    room.subscribe(piece.id, (event) => {
+      events.push(event.type)
+    })
+
+    const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    await waitForIdle(room, piece.id)
+
+    // Nothing landed anywhere in the round, and that reads as information at
+    // the boundary the author actually sees: a settled round, never the
+    // room's own `error` event.
+    expect(events).not.toContain('error')
+    expect(events[events.length - 1]).toBe('round.closed')
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.rounds[0]?.outcome).toBe('settled')
+    expect(conversation?.rounds[0]?.participants.map((p) => p.result.kind)).toEqual(['failed', 'failed', 'failed'])
+  })
+
   it('persists an abandoned round to the conversation file rather than skipping the write', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom({
