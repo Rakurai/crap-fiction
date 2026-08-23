@@ -38,7 +38,7 @@ export type CallSiteDescriptor = Readonly<{
  */
 export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDescriptor[] {
   for (const role of roles) {
-    if ((OPERATION_CALL_SITES as readonly string[]).includes(role.id)) {
+    if (OPERATION_CALL_SITES.some((site) => site === role.id)) {
       throw new DuplicateCallSiteError(role.id)
     }
   }

@@ -50,11 +50,11 @@ function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
   }
 
   if (core instanceof z.ZodObject) {
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw
+    if (!isPlainObject(raw)) return raw
     const shape = core.shape
     const result: Record<string, unknown> = {}
     for (const key of Object.keys(shape)) {
-      result[key] = tolerate(shape[key], (raw as Record<string, unknown>)[key])
+      result[key] = tolerate(shape[key], raw[key])
     }
     return result
   }
