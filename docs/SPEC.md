@@ -91,6 +91,8 @@ reasoning, and it is not repeated.
 | Timeout, and composing it with the author's abandon signal | the platform's `AbortSignal.timeout` and `AbortSignal.any` |
 | Prose editor | `@tiptap/*` over `prosemirror-*` |
 | Markdown parsing and serialization | `prosemirror-markdown` |
+| The document model `prosemirror-markdown` parses into and serializes from | `prosemirror-model` |
+| The tokenizer `prosemirror-markdown`'s parser is constructed with | `markdown-it` |
 | Before-and-after comparison of two manuscript states | `diff` |
 | Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
 | Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
@@ -856,6 +858,8 @@ GET    /pieces/:id/events                          SSE
 PUT    /author-context
 GET    /workspace                                  the configured directory, or that there is none
 PUT    /workspace                                  the directory the author chose
+GET    /theme                                      the author's chosen appearance, or that they have not chosen
+PUT    /theme                                      the appearance the author chose
 GET    /call-sites                                 every site, its role description where it has one,
                                                    and its current assignment
 PUT    /call-sites/:site/assignment                the model assigned to one site
