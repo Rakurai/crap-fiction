@@ -3,7 +3,65 @@
    everything else steps back. Neither is primary.
 
    Default (no explicit choice) follows prefers-color-scheme; an explicit
-   [data-theme] always wins over it because it is declared after it below. */
+   [data-theme] always wins over it because it is declared after it below.
+
+   The two named faces are files in this repository, latin-subset woff2 served by
+   the app. The mockup gets them from a Google Fonts <link>, which VISION "Local,
+   and fully usable offline" rules out: a font fetched at first paint leaves the
+   author on a face nobody chose whenever the fetch does not land. The weights are
+   the ones that request names, and no others. The facts register is the platform's
+   own monospace stack by design — see SPEC.
+
+   Both faces are OFL, and the licences sit beside them in fonts/. */
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./fonts/spectral-latin-300.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/spectral-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/spectral-latin-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/spectral-latin-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/spectral-latin-italic-400.woff2') format('woff2');
+}
+
+/* One variable file across the three weights the interface uses, as Google serves it. */
+@font-face {
+  font-family: 'Public Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/public-sans-latin-variable.woff2') format('woff2');
+}
 
 :root {
   --bg:      #171614;  /* app ground */

@@ -95,6 +95,7 @@ reasoning, and it is not repeated.
 | The tokenizer `prosemirror-markdown`'s parser is constructed with | `markdown-it` |
 | Before-and-after comparison of two manuscript states | `diff` |
 | Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
+| The prose and interface typefaces | latin-subset `woff2` under `src/client/fonts/`, in this repository |
 | Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
 | Formatting when a conversation was last active | `date-fns` |
 | Holding the conversation at its latest response | `use-stick-to-bottom` |
@@ -128,6 +129,20 @@ general enough to cover them would arrive with a policy the product has not chos
 substrate — the two themes, the three type registers, the rules and the marks — applied through CSS
 Modules. Nothing supplies appearance from a package, and the values are read from the mockup rather
 than reinvented beside it.
+
+**The typefaces are files in this repository.** Spectral for the prose and Public Sans for the
+interface travel with the application as latin-subset `woff2` under `src/client/fonts/`, declared in
+`tokens.css` and served by the app. The mockup gets them from a Google Fonts `<link>`, which is mockup
+scaffolding: VISION "Local, and fully usable offline" rules out a runtime network fetch, and a font
+that fails to arrive leaves the author on a face nobody chose. Only the weights the mockup's own
+request names are carried — Spectral 300/400/500/600 and 400 italic, Public Sans 400/500/600 — since
+the geometry in the CSS modules was settled against those metrics. Both faces are OFL and the licences
+sit beside them.
+
+**The facts register composes on the platform's own monospace stack**, and names no face. It is the
+register the machine speaks in, where the local terminal face is the right voice and a shipped one
+would be a change to the composition rather than a fix to it. This is the one register whose face the
+browser chooses, and it is chosen deliberately.
 
 **`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
 is the condition of adopting it: a library carrying its own look would compete with the registers the
