@@ -198,9 +198,9 @@ describe('renderPrompt', () => {
     expect(prompt).toContain('The cups sat where she left them.')
   })
 
-  it('omits the author\'s message section when there is none', () => {
+  it('omits the "Author\'s message" section when there is none', () => {
     const prompt = renderPrompt(baseContext, charter)
-    expect(prompt).not.toContain('message')
+    expect(prompt).not.toContain("Author's message")
   })
 
   it('states that an answer is owed only when the call owes one', () => {

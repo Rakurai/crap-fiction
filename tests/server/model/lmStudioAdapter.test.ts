@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { eligibleResponseValueSchema, owedResponseValueSchema } from '../../../src/shared/participantResponse.js'
 
 const { modelFn, completeFn } = vi.hoisted(() => ({
   modelFn: vi.fn(),
@@ -104,5 +105,29 @@ describe('LMStudioAdapter.invoke', () => {
 
     expect(await pending).toEqual({ outcome: 'abandoned' })
     expect(completeFn).not.toHaveBeenCalled()
+  })
+})
+
+describe('LMStudioAdapter.invoke against the participant response schemas', () => {
+  it('refuses a reply that says something but states no claim', async () => {
+    const returned = JSON.stringify({ outcome: 'commentary' })
+    modelFn.mockResolvedValue({ complete: completeFn })
+    completeFn.mockResolvedValue({ content: returned })
+
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
+    const result = await adapter.invoke('llama-3', 'prompt', eligibleResponseValueSchema, new AbortController().signal)
+
+    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned })
+  })
+
+  it('refuses a no-comment reply from a participant that owes an answer', async () => {
+    const returned = JSON.stringify({ outcome: 'noComment' })
+    modelFn.mockResolvedValue({ complete: completeFn })
+    completeFn.mockResolvedValue({ content: returned })
+
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
+    const result = await adapter.invoke('llama-3', 'prompt', owedResponseValueSchema, new AbortController().signal)
+
+    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned })
   })
 })
