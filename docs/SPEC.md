@@ -97,7 +97,7 @@ reasoning, and it is not repeated.
 | Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
 | The prose and interface typefaces | latin-subset `woff2` under `src/client/fonts/`, in this repository |
 | Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
-| Formatting when a conversation was last active | `date-fns` |
+| Relative time — when a conversation was last active, when a piece last changed | `date-fns` |
 | Holding the conversation at its latest response | `use-stick-to-bottom` |
 | Client store fed by the event stream | `zustand` |
 | Conversation and change identifiers | `nanoid` |
@@ -106,7 +106,14 @@ reasoning, and it is not repeated.
 | Logging | `pino` |
 | Model runtime | `@lmstudio/sdk` |
 | Test runner | `vitest` |
+| A DOM for tests that need one, without a browser | `jsdom` |
+| Rendering a hook or a surface under that DOM | `@testing-library/react` |
 | Browser tests | `@playwright/test` |
+
+**The roster names capabilities, not every line of `package.json`.** A package named here brings with
+it the type declarations it does not ship (`@types/*`) and the piece it is unusable without — `react-dom`
+under `react`, `@vitejs/plugin-react` under `vite` — and nothing further. Anything installed that is
+neither an entry above nor one of those is a document change argued here first.
 
 Several entries carry a constraint on how they are used.
 
@@ -1110,6 +1117,12 @@ satisfy a check that was meant to catch its absence.
 
 **Vitest**, sharing the client's transform pipeline so there is no second configuration, with
 the editor's document tested headless.
+
+**A DOM without a browser where a hook or a surface is the boundary**, through `jsdom` and
+`@testing-library/react`, per-file rather than as the suite's environment: the server and the pure
+rules are the larger part of the suite and have no use for one. It is for what the component itself
+decides — a control refused, a field that arrives on an action, what a notice says — and not for what
+only the running application settles, which is the browser tests' few purposes below.
 
 **The boundaries are the test surface.** Each property is asserted at exactly one of them, and
 nowhere twice — a rule asserted at two levels is a rule that will be changed at one.
