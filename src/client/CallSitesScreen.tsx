@@ -15,9 +15,11 @@ export function CallSitesScreen({ onClose }: CallSitesScreenProps) {
       <button type="button" onClick={onClose}>
         ‹ pieces
       </button>
+      {view.status === 'error' && <p role="alert">{view.message}</p>}
       {view.status === 'ready' && (
         <>
           <RuntimeStatusBanner runtime={view.runtime} />
+          {view.runtimeError !== undefined && <p role="alert">{view.runtimeError}</p>}
           {view.assignError !== undefined && <p role="alert">{view.assignError}</p>}
           <CallSiteList sites={view.sites} assigning={view.assigning} onAssign={view.assign} />
         </>

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { settingsPath } from './settingsFile.js'
 import { readYamlArtifact, writeYamlArtifact } from './store.js'
 
-const themeSchema = z.enum(['light', 'dark'])
+export const themeSchema = z.enum(['light', 'dark'])
 
 export type Theme = z.infer<typeof themeSchema>
 

@@ -63,7 +63,7 @@ describe('createAutosaveController', () => {
 
     controller.update('first')
     vi.advanceTimersByTime(1000)
-    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true }))
+    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true, message: 'disk unhappy' }))
 
     vi.advanceTimersByTime(60_000)
     expect(save).toHaveBeenCalledTimes(1) // no hidden retry loop while nothing new was written

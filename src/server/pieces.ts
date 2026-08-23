@@ -33,16 +33,20 @@ const pieceMetadataSchema = z.object({
 
 export type PieceStatus = z.infer<typeof pieceStatusSchema>
 
-export type PieceSummary = Readonly<{
-  id: string
-  title: string
-  mode: string
-  status: PieceStatus
-  length: number
-  modified: number
-}>
+const pieceSummaryShape = z.object({
+  id: z.string(),
+  title: z.string(),
+  mode: z.string(),
+  status: pieceStatusSchema,
+  length: z.number(),
+  modified: z.number(),
+})
 
-export type PieceDetail = PieceSummary & Readonly<{ draft: string }>
+export const pieceSummarySchema = pieceSummaryShape.readonly()
+export type PieceSummary = z.infer<typeof pieceSummarySchema>
+
+export const pieceDetailSchema = pieceSummaryShape.extend({ draft: z.string() }).readonly()
+export type PieceDetail = z.infer<typeof pieceDetailSchema>
 
 function pieceMetadataPath(pieceDir: string): string {
   return path.join(pieceDir, 'piece.yaml')

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Theme } from '../server/interfaceTheme.js'
 import { chooseTheme, fetchTheme } from './themeClient.js'
+import { isAbortError } from './request.js'
 
 export type ThemeViewModel = {
   /** `undefined` while loading, `null` when the author has not chosen. */
   readonly theme: Theme | null | undefined
+  readonly loadError: string | undefined
+  readonly chooseError: string | undefined
   readonly choose: (theme: Theme) => void
 }
 
@@ -17,15 +20,18 @@ export type ThemeViewModel = {
  */
 export function useTheme(): ThemeViewModel {
   const [theme, setTheme] = useState<Theme | null | undefined>(undefined)
+  const [loadError, setLoadError] = useState<string | undefined>(undefined)
+  const [chooseError, setChooseError] = useState<string | undefined>(undefined)
 
   useEffect(() => {
-    let cancelled = false
-    fetchTheme().then((value) => {
-      if (!cancelled) setTheme(value)
-    })
-    return () => {
-      cancelled = true
-    }
+    const controller = new AbortController()
+    fetchTheme(controller.signal)
+      .then((value) => setTheme(value))
+      .catch((err: unknown) => {
+        if (isAbortError(err)) return
+        setLoadError(err instanceof Error ? err.message : 'failed to load theme')
+      })
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -38,8 +44,19 @@ export function useTheme(): ThemeViewModel {
   }, [theme])
 
   const choose = useCallback((next: Theme) => {
-    chooseTheme(next).then(setTheme)
+    setChooseError(undefined)
+    chooseTheme(next)
+      .then((result) => {
+        if (result.ok) {
+          setTheme(result.theme)
+        } else {
+          setChooseError(result.message)
+        }
+      })
+      .catch((err: unknown) => {
+        setChooseError(err instanceof Error ? err.message : 'failed to set theme')
+      })
   }, [])
 
-  return { theme, choose }
+  return { theme, loadError, chooseError, choose }
 }

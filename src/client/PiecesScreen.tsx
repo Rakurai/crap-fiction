@@ -30,6 +30,8 @@ export function PiecesScreen() {
   return (
     <div>
       <ThemeToggle theme={theme.theme} onChoose={theme.choose} />
+      {theme.loadError !== undefined && <p role="alert">{theme.loadError}</p>}
+      {theme.chooseError !== undefined && <p role="alert">{theme.chooseError}</p>}
       <button type="button" onClick={() => setShowCallSites(true)}>
         Models
       </button>
@@ -41,6 +43,7 @@ export function PiecesScreen() {
         }}
       />
       {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} onOpen={setOpenedId} />}
+      {pieces.status === 'error' && <p role="alert">{pieces.message}</p>}
     </div>
   )
 }

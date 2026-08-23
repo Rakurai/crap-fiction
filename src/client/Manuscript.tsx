@@ -48,7 +48,7 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
           <button type="button" onClick={manuscript.showReading}>
             reading
           </button>
-          {autosave.failed && <span role="status">Couldn't save — will retry</span>}
+          {autosave.failed && <span role="status">Couldn't save — {autosave.message} — will retry</span>}
         </div>
       )}
 

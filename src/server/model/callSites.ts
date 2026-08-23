@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { RoleDefinition } from './roles.js'
 
 /**
@@ -18,11 +19,25 @@ export class DuplicateCallSiteError extends Error {
 
 export type CallSiteDescriptor = Readonly<{
   site: string
-  displayName: string | undefined
-  roleDescription: string | undefined
+  displayName: string | null
+  roleDescription: string | null
 }>
 
-export type CallSiteAssignmentView = CallSiteDescriptor & Readonly<{ assignment: string | null }>
+/**
+ * Absence has one representation over the wire (CODING_STANDARDS "HTTP
+ * layer"): `null`, matching the workspace and theme boundaries, rather than
+ * an `undefined` field JSON drops silently.
+ */
+export const callSiteAssignmentViewSchema = z
+  .object({
+    site: z.string(),
+    displayName: z.string().nullable(),
+    roleDescription: z.string().nullable(),
+    assignment: z.string().nullable(),
+  })
+  .readonly()
+
+export type CallSiteAssignmentView = z.infer<typeof callSiteAssignmentViewSchema>
 
 /**
  * SPEC "Files"/"Model access": the call site is the whole of what the model
@@ -39,7 +54,7 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
 
   return [
     ...roles.map((role) => ({ site: role.id, displayName: role.displayName, roleDescription: role.roleDescription })),
-    ...OPERATION_CALL_SITES.map((site) => ({ site, displayName: undefined, roleDescription: undefined })),
+    ...OPERATION_CALL_SITES.map((site) => ({ site, displayName: null, roleDescription: null })),
   ]
 }
 

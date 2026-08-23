@@ -1,4 +1,4 @@
-export type AutosaveState = { readonly failed: boolean }
+export type AutosaveState = { readonly failed: false } | { readonly failed: true; readonly message: string }
 
 export type SaveDraft = (text: string) => Promise<void>
 
@@ -31,7 +31,7 @@ export function createAutosaveController(initialText: string, save: SaveDraft, o
     inFlight = true
     save(text)
       .then(() => onStateChange({ failed: false }))
-      .catch(() => onStateChange({ failed: true }))
+      .catch((err: unknown) => onStateChange({ failed: true, message: err instanceof Error ? err.message : 'save failed' }))
       .finally(() => {
         inFlight = false
         if (dirty) attempt()

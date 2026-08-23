@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 export type ApiError = { readonly code: string; readonly message: string }
 
 export type ApiResponse<T> =
@@ -10,4 +12,17 @@ export function ok<T>(data: T): ApiResponse<T> {
 
 export function fail(code: string, message: string): ApiResponse<never> {
   return { success: false, error: { code, message } }
+}
+
+/**
+ * The one schema every client request validates its response against
+ * (CODING_STANDARDS "Schemas and validation": validate at the seam that
+ * reads foreign bytes). Parametrized by the payload schema so each adapter
+ * states only what its own endpoint returns.
+ */
+export function apiResponseSchema<T extends z.ZodType>(data: T) {
+  return z.discriminatedUnion('success', [
+    z.object({ success: z.literal(true), data }),
+    z.object({ success: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
+  ])
 }

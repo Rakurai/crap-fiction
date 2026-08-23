@@ -15,7 +15,7 @@ describe('callSites', () => {
   it('carries a role description for a participant and none for an operation', () => {
     const sites = callSites(roles)
     expect(sites.find((site) => site.site === 'shape')?.roleDescription).toBe('x')
-    expect(sites.find((site) => site.site === 'apply')?.roleDescription).toBeUndefined()
+    expect(sites.find((site) => site.site === 'apply')?.roleDescription).toBeNull()
   })
 
   it('fails when a participant id collides with an operation call site', () => {

@@ -7,6 +7,10 @@ export function App() {
 
   if (workspace.status === 'loading') return null
 
+  if (workspace.status === 'error') {
+    return <p role="alert">{workspace.message}</p>
+  }
+
   if (workspace.status === 'unset') {
     return <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
   }

@@ -1,39 +1,27 @@
-import type { ApiResponse } from '../server/envelope.js'
+import { z } from 'zod'
+import { RequestFailure, requestJson } from './request.js'
 
-export class WorkspaceRequestFailure extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'WorkspaceRequestFailure'
-  }
-}
+const workspaceStateSchema = z.object({ workspace: z.string().nullable() })
+const workspaceSetSchema = z.object({ workspace: z.string() })
 
-async function unwrap<T>(response: Response): Promise<T> {
-  const body = (await response.json()) as ApiResponse<T>
-  if (!body.success) {
-    throw new WorkspaceRequestFailure(body.error.message)
-  }
-  return body.data
-}
-
-export async function fetchWorkspace(): Promise<string | null> {
-  const res = await fetch('/workspace')
-  const data = await unwrap<{ workspace: string | null }>(res)
+export async function fetchWorkspace(signal?: AbortSignal): Promise<string | null> {
+  const data = await requestJson('/workspace', workspaceStateSchema, { signal: signal ?? null })
   return data.workspace
 }
 
-export type ChooseWorkspaceResult = { ok: true; workspace: string } | { ok: false; message: string }
+export type ChooseWorkspaceResult = { readonly ok: true; readonly workspace: string } | { readonly ok: false; readonly message: string }
 
-export async function chooseWorkspace(candidate: string): Promise<ChooseWorkspaceResult> {
-  const res = await fetch('/workspace', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ workspace: candidate }),
-  })
+export async function chooseWorkspace(candidate: string, signal?: AbortSignal): Promise<ChooseWorkspaceResult> {
   try {
-    const data = await unwrap<{ workspace: string }>(res)
+    const data = await requestJson('/workspace', workspaceSetSchema, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ workspace: candidate }),
+      signal: signal ?? null,
+    })
     return { ok: true, workspace: data.workspace }
   } catch (err) {
-    if (err instanceof WorkspaceRequestFailure) {
+    if (err instanceof RequestFailure) {
       return { ok: false, message: err.message }
     }
     throw err

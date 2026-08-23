@@ -54,8 +54,8 @@ describe('call sites and models', () => {
       data: [
         { site: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn', assignment: null },
         { site: 'story-editor', displayName: 'Story Editor', roleDescription: 'the generalist', assignment: null },
-        { site: 'apply', assignment: null },
-        { site: 'capture', assignment: null },
+        { site: 'apply', displayName: null, roleDescription: null, assignment: null },
+        { site: 'capture', displayName: null, roleDescription: null, assignment: null },
       ],
     })
   })

@@ -14,7 +14,7 @@ export function CallSiteList({ sites, assigning, onAssign }: CallSiteListProps) 
       {sites.map((site) => (
         <li key={site.site}>
           <strong>{site.displayName ?? site.site}</strong>
-          {site.roleDescription !== undefined && <p>{site.roleDescription}</p>}
+          {site.roleDescription !== null && <p>{site.roleDescription}</p>}
           <form
             onSubmit={(event: FormEvent<HTMLFormElement>) => {
               event.preventDefault()

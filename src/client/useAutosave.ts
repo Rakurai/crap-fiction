@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { createAutosaveController } from './autosave.js'
+import { createAutosaveController, type AutosaveState } from './autosave.js'
 import { saveDraft } from './piecesClient.js'
 
 export type AutosaveViewModel = {
   readonly failed: boolean
+  readonly message: string | undefined
   readonly flush: () => void
 }
 
@@ -15,14 +16,10 @@ export type AutosaveViewModel = {
  * rather than handing it a new id, so there is nothing to re-point mid-flight.
  */
 export function useAutosave(pieceId: string, markdown: string): AutosaveViewModel {
-  const [failed, setFailed] = useState(false)
+  const [state, setState] = useState<AutosaveState>({ failed: false })
   const controllerRef = useRef<ReturnType<typeof createAutosaveController> | undefined>(undefined)
 
-  controllerRef.current ??= createAutosaveController(
-    markdown,
-    (text) => saveDraft(pieceId, text),
-    (state) => setFailed(state.failed),
-  )
+  controllerRef.current ??= createAutosaveController(markdown, (text) => saveDraft(pieceId, text), setState)
   const controller = controllerRef.current
 
   useEffect(() => {
@@ -33,5 +30,5 @@ export function useAutosave(pieceId: string, markdown: string): AutosaveViewMode
     return () => controller.flush()
   }, [controller])
 
-  return { failed, flush: controller.flush }
+  return { failed: state.failed, message: state.failed ? state.message : undefined, flush: controller.flush }
 }
