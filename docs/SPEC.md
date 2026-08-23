@@ -990,6 +990,14 @@ Compose supplies each one explicitly. An absent or malformed value is a startup 
 because a deployment value defaulted in an image is a value nobody chose and the author would be the
 one to discover it.
 
+**What counts as malformed is settled where the value is used, not where it is read.** The
+environment loader knows that the runtime URL is a URL and nothing further: which schemes actually
+reach the runtime is the model module's fact, so the model module validates what it is handed before
+it calls anything, and states the failure naming the variable. The alternative is an environment
+loader that names a transport, and a plausible wrong value — the port LM Studio's own interface shows,
+written with `http://` in front of it — that passes startup validation and then exits with a vendor
+stack trace.
+
 **The container runs as a non-root user**, and Docker Desktop's file sharing maps ownership so the
 prose it writes is prose the author can edit, commit and diff on the host. A studio whose output the
 author needs `sudo` to touch has broken the commitment that the files outlive the tool.

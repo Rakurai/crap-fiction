@@ -13,13 +13,43 @@ vi.mock('@lmstudio/sdk', () => ({
   },
 }))
 
-const { LMStudioAdapter } = await import('../../../src/server/model/lmStudioAdapter.js')
+const { LMStudioAdapter, ModelRuntimeUrlError } = await import('../../../src/server/model/lmStudioAdapter.js')
 
 const schema = z.object({ claim: z.string() })
 
 beforeEach(() => {
   modelFn.mockReset()
   completeFn.mockReset()
+})
+
+describe('the runtime URL the adapter is constructed with', () => {
+  it('accepts the two schemes the runtime is reachable over', () => {
+    expect(() => new LMStudioAdapter('ws://localhost:1234')).not.toThrow()
+    expect(() => new LMStudioAdapter('wss://studio.local:1234')).not.toThrow()
+  })
+
+  it('refuses the plausible wrong scheme, naming the variable and what was wrong with it', () => {
+    expect(() => new LMStudioAdapter('http://localhost:1234')).toThrowError(ModelRuntimeUrlError)
+    expect(() => new LMStudioAdapter('http://localhost:1234')).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
+    expect(() => new LMStudioAdapter('http://localhost:1234')).toThrowError(/must be ws or wss, not http/)
+  })
+
+  it('refuses a value that is not a URL at all', () => {
+    expect(() => new LMStudioAdapter('localhost:1234')).toThrowError(ModelRuntimeUrlError)
+    expect(() => new LMStudioAdapter('localhost:1234')).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
+  })
+
+  it('refuses before anything vendor-owned is constructed, so no vendor message reaches the author', () => {
+    let thrown: unknown
+    try {
+      new LMStudioAdapter('http://localhost:4000')
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(ModelRuntimeUrlError)
+    expect(String(thrown)).not.toContain('LMStudioClient')
+    expect(String(thrown)).not.toContain('baseUrl')
+  })
 })
 
 describe('LMStudioAdapter.invoke', () => {
@@ -29,7 +59,7 @@ describe('LMStudioAdapter.invoke', () => {
       .mockResolvedValueOnce({ content: 'not json' })
       .mockResolvedValueOnce({ content: JSON.stringify({ claim: 'the room agrees' }) })
 
-    const adapter = new LMStudioAdapter('http://localhost:1234')
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
     const result = await adapter.invoke('llama-3', 'prompt', schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'value', value: { claim: 'the room agrees' } })
@@ -40,7 +70,7 @@ describe('LMStudioAdapter.invoke', () => {
     modelFn.mockResolvedValue({ complete: completeFn })
     completeFn.mockResolvedValue({ content: 'still not json' })
 
-    const adapter = new LMStudioAdapter('http://localhost:1234')
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
     const result = await adapter.invoke('llama-3', 'prompt', schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned: 'still not json' })
@@ -53,7 +83,7 @@ describe('LMStudioAdapter.invoke', () => {
       .mockResolvedValueOnce({ content: 'garbage' })
       .mockResolvedValueOnce({ content: JSON.stringify({ claim: 'second try' }) })
 
-    const adapter = new LMStudioAdapter('http://localhost:1234')
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
     const result = await adapter.invoke('llama-3', 'prompt', schema, new AbortController().signal)
 
     expect(Object.keys(result)).toEqual(['outcome', 'value'])
@@ -68,7 +98,7 @@ describe('LMStudioAdapter.invoke', () => {
         }),
     )
 
-    const adapter = new LMStudioAdapter('http://localhost:1234')
+    const adapter = new LMStudioAdapter('ws://localhost:1234')
     const pending = adapter.invoke('llama-3', 'prompt', schema, controller.signal)
     controller.abort()
 

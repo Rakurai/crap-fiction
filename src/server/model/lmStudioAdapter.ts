@@ -7,6 +7,43 @@ import type { CallResult, CallState, ModelAdapter } from './types.js'
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
 
+/**
+ * SPEC "Deployment": an absent or malformed `STUDIO_MODEL_RUNTIME_URL` is a
+ * startup failure naming it. Which values are malformed is this module's fact
+ * and not `env.ts`'s — the variable is described as where the model module
+ * reaches the runtime precisely so the shape stays opaque above this seam
+ * (CODING_STANDARDS "Contain vendor concepts in the module that owns the
+ * vendor") — so the check lives here and states the failure in the product's
+ * own words rather than letting a vendor stack trace be what the author reads.
+ */
+export class ModelRuntimeUrlError extends Error {
+  constructor(value: string, reason: string) {
+    super(`STUDIO_MODEL_RUNTIME_URL cannot be reached: ${reason} (the value was "${value}")`)
+    this.name = 'ModelRuntimeUrlError'
+  }
+}
+
+const REACHABLE_SCHEMES = ['ws:', 'wss:']
+
+function requireReachable(baseUrl: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(baseUrl)
+  } catch {
+    throw new ModelRuntimeUrlError(baseUrl, 'it is not a URL')
+  }
+
+  if (!REACHABLE_SCHEMES.includes(parsed.protocol)) {
+    const scheme = parsed.protocol.replace(':', '')
+    throw new ModelRuntimeUrlError(
+      baseUrl,
+      `the runtime is reached over a WebSocket, so the scheme must be ws or wss, not ${scheme} — the port LM Studio's interface shows is right, the scheme is not`,
+    )
+  }
+
+  return baseUrl
+}
+
 class NonConformingError extends Error {
   readonly returned: string
 
@@ -31,7 +68,7 @@ export class LMStudioAdapter implements ModelAdapter {
   readonly #client: LMStudioClient
 
   constructor(baseUrl: string) {
-    this.#client = new LMStudioClient({ baseUrl })
+    this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
   }
 
   async invoke<T>(
