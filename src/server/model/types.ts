@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 
 /**
  * SPEC "Model access": the failure taxonomy is the product's own — no status
@@ -17,15 +18,6 @@ export type CallResult<T> =
  * two apart simply never reports preparing.
  */
 export type CallState = 'preparing' | 'working'
-
-export const runtimeStatusSchema = z
-  .discriminatedUnion('reachable', [
-    z.object({ reachable: z.literal(true), models: z.array(z.string()).readonly() }),
-    z.object({ reachable: z.literal(false) }),
-  ])
-  .readonly()
-
-export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>
 
 /**
  * SPEC "Seams"/"Model access": the seam every model call goes through. An

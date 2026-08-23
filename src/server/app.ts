@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
-import { fail, ok } from './envelope.js'
+import { fail, ok } from '../shared/envelope.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
 import type { CallSiteDescriptor } from './model/callSites.js'

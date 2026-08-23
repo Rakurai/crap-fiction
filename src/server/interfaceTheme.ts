@@ -1,10 +1,7 @@
 import { z } from 'zod'
+import { themeSchema, type Theme } from '../shared/theme.js'
 import { settingsPath } from './settingsFile.js'
 import { readYamlArtifact, writeYamlArtifact } from './store.js'
-
-export const themeSchema = z.enum(['light', 'dark'])
-
-export type Theme = z.infer<typeof themeSchema>
 
 const settingsSchema = z.object({
   interfacePreferences: z.object({ theme: themeSchema.optional() }).optional(),

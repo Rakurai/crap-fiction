@@ -1,4 +1,4 @@
-import type { Theme } from '../server/interfaceTheme.js'
+import type { Theme } from '../shared/theme.js'
 import styles from './ThemeToggle.module.css'
 
 type ThemeToggleProps = {

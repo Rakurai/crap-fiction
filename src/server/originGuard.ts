@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono'
-import { fail } from './envelope.js'
+import { fail } from '../shared/envelope.js'
 
 /**
  * Refuses a request carrying an Origin the server does not serve (SPEC

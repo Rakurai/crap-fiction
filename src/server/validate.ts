@@ -1,6 +1,6 @@
 import { zValidator } from '@hono/zod-validator'
 import type { z } from 'zod'
-import { fail } from './envelope.js'
+import { fail } from '../shared/envelope.js'
 import { firstSchemaIssue } from './schemaIssue.js'
 
 /**

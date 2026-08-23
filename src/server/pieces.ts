@@ -2,6 +2,7 @@ import path from 'node:path'
 import slugify from '@sindresorhus/slugify'
 import { Mutex } from 'async-mutex'
 import { z } from 'zod'
+import { pieceStatusSchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
 import { PathEscapesRootError, resolveWithinRoot } from './paths.js'
@@ -22,8 +23,6 @@ export class PieceNotFoundError extends Error {
   }
 }
 
-const pieceStatusSchema = z.enum(['drafting', 'finished', 'abandoned'])
-
 const pieceMetadataSchema = z.object({
   title: z.string().min(1),
   mode: z.string().min(1),
@@ -31,22 +30,6 @@ const pieceMetadataSchema = z.object({
   cast: z.array(z.string().min(1)),
 })
 
-export type PieceStatus = z.infer<typeof pieceStatusSchema>
-
-const pieceSummaryShape = z.object({
-  id: z.string(),
-  title: z.string(),
-  mode: z.string(),
-  status: pieceStatusSchema,
-  length: z.number(),
-  modified: z.number(),
-})
-
-export const pieceSummarySchema = pieceSummaryShape.readonly()
-export type PieceSummary = z.infer<typeof pieceSummarySchema>
-
-export const pieceDetailSchema = pieceSummaryShape.extend({ draft: z.string() }).readonly()
-export type PieceDetail = z.infer<typeof pieceDetailSchema>
 
 function pieceMetadataPath(pieceDir: string): string {
   return path.join(pieceDir, 'piece.yaml')

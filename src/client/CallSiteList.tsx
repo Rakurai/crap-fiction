@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { CallSiteAssignmentView } from '../server/model/callSites.js'
+import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import styles from './CallSiteList.module.css'
 
 type CallSiteListProps = {

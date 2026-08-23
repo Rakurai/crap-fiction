@@ -1,4 +1,4 @@
-import type { PieceSummary } from '../server/pieces.js'
+import type { PieceSummary } from '../shared/pieceViews.js'
 import styles from './PieceList.module.css'
 
 type PieceListProps = {

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../server/pieces.js'
+import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
 import { RequestFailure, requestJson } from './request.js'
 
 export async function fetchPieces(signal?: AbortSignal): Promise<readonly PieceSummary[]> {

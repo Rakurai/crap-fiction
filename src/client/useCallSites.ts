@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CallSiteAssignmentView } from '../server/model/callSites.js'
-import type { RuntimeStatus } from '../server/model/types.js'
+import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
+import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import { assignModel, fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { isAbortError } from './request.js'
 

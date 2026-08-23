@@ -1,5 +1,6 @@
 import type { z } from 'zod'
-import type { CallResult, CallState, ModelAdapter, RuntimeStatus } from './types.js'
+import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
+import type { CallResult, CallState, ModelAdapter } from './types.js'
 
 export type GetAssignment = (site: string) => string | undefined
 

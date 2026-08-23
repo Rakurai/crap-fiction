@@ -1,4 +1,4 @@
-import type { RuntimeStatus } from '../server/model/types.js'
+import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import styles from './RuntimeStatusBanner.module.css'
 
 type RuntimeStatusBannerProps = {

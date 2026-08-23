@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
 import type { RoleDefinition } from './roles.js'
 
 /**
@@ -29,22 +29,6 @@ export type CallSiteDescriptor = Readonly<{
   displayName: string | null
   roleDescription: string | null
 }>
-
-/**
- * Absence has one representation over the wire (CODING_STANDARDS "HTTP
- * layer"): `null`, matching the workspace and theme boundaries, rather than
- * an `undefined` field JSON drops silently.
- */
-export const callSiteAssignmentViewSchema = z
-  .object({
-    site: z.string(),
-    displayName: z.string().nullable(),
-    roleDescription: z.string().nullable(),
-    assignment: z.string().nullable(),
-  })
-  .readonly()
-
-export type CallSiteAssignmentView = z.infer<typeof callSiteAssignmentViewSchema>
 
 /**
  * SPEC "Files"/"Model access": the call site is the whole of what the model

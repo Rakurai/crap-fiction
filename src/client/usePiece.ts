@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PieceDetail } from '../server/pieces.js'
+import type { PieceDetail } from '../shared/pieceViews.js'
 import { fetchPiece } from './piecesClient.js'
 import { isAbortError } from './request.js'
 

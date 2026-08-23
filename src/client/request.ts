@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { apiResponseSchema } from '../server/envelope.js'
+import { apiResponseSchema } from '../shared/envelope.js'
 
 export class RequestFailure extends Error {
   constructor(message: string) {

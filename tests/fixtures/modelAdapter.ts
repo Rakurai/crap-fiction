@@ -1,5 +1,6 @@
 import type { z } from 'zod'
-import type { CallResult, CallState, ModelAdapter, RuntimeStatus } from '../../src/server/model/types.js'
+import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
+import type { CallResult, CallState, ModelAdapter } from '../../src/server/model/types.js'
 
 export type FixtureBehavior = Readonly<{
   result: CallResult<unknown>

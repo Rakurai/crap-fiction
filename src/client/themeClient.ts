@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { themeSchema, type Theme } from '../server/interfaceTheme.js'
+import { themeSchema, type Theme } from '../shared/theme.js'
 import { RequestFailure, requestJson } from './request.js'
 
 const themeStateSchema = z.object({ theme: themeSchema.nullable() })

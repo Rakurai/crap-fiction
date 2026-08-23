@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PieceSummary } from '../server/pieces.js'
+import type { PieceSummary } from '../shared/pieceViews.js'
 import { createPiece, fetchPieces } from './piecesClient.js'
 import { isAbortError } from './request.js'
 

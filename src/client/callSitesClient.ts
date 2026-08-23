@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { callSiteAssignmentViewSchema, type CallSiteAssignmentView } from '../server/model/callSites.js'
-import { runtimeStatusSchema, type RuntimeStatus } from '../server/model/types.js'
+import { callSiteAssignmentViewSchema, type CallSiteAssignmentView } from '../shared/callSiteViews.js'
+import { runtimeStatusSchema, type RuntimeStatus } from '../shared/runtimeStatus.js'
 import { RequestFailure, requestJson } from './request.js'
 
 export async function fetchCallSites(signal?: AbortSignal): Promise<readonly CallSiteAssignmentView[]> {

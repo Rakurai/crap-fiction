@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Theme } from '../server/interfaceTheme.js'
+import type { Theme } from '../shared/theme.js'
 import { chooseTheme, fetchTheme } from './themeClient.js'
 import { isAbortError } from './request.js'
 

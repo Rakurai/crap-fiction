@@ -1,7 +1,8 @@
 import { LMStudioClient } from '@lmstudio/sdk'
 import pRetry from 'p-retry'
 import { z } from 'zod'
-import type { CallResult, CallState, ModelAdapter, RuntimeStatus } from './types.js'
+import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
+import type { CallResult, CallState, ModelAdapter } from './types.js'
 
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
