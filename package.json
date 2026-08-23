@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "0.9.0",
+    "@lmstudio/sdk": "1.5.0",
     "@sindresorhus/slugify": "3.0.0",
     "@tiptap/core": "3.30.2",
     "@tiptap/extension-bold": "3.30.2",
@@ -24,6 +25,7 @@
     "async-mutex": "^0.5.0",
     "hono": "4.13.3",
     "markdown-it": "15.0.0",
+    "p-retry": "6.2.1",
     "pino": "10.3.1",
     "prosemirror-markdown": "1.13.6",
     "react": "19.2.8",

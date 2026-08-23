@@ -1,0 +1,9 @@
+# CONTEXT "Story Editor": the generalist participant, always present, and not
+# one of the cast. Its objective is its own and holistic.
+id: story-editor
+handle: editor
+displayName: Story Editor
+roleDescription: >-
+  Evaluates the current story against the author's story context and author
+  context, using the specialists' readings as evidence, and recommends what
+  best serves the piece as a whole.

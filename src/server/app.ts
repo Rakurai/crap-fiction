@@ -3,6 +3,10 @@ import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import { fail, ok } from './envelope.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
+import { listAssignments, setAssignment } from './model/assignments.js'
+import { callSites, withAssignments } from './model/callSites.js'
+import type { RoleDefinition } from './model/charter.js'
+import type { ModelAccess } from './model/modelAccess.js'
 import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
 import { createPiece, type DraftWriter, getPiece, listPieces, PieceNotFoundError } from './pieces.js'
@@ -14,13 +18,22 @@ const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: z.enum(['light', 'dark']) })
 const putDraftSchema = z.object({ draft: z.string() })
+const putAssignmentSchema = z.object({ model: z.string().min(1) })
 
 /**
  * The room and every route SPEC's transport table names beyond `/workspace`,
- * `/pieces`, the piece draft and the interface theme belong to later
- * tickets.
+ * `/pieces`, the piece draft, the interface theme and the model seam belong
+ * to later tickets.
  */
-export function createApp(env: StudioEnv, workspace: WorkspaceRegistry, modes: readonly ModeDescriptor[], draftWriter: DraftWriter): Hono {
+export function createApp(
+  env: StudioEnv,
+  workspace: WorkspaceRegistry,
+  modes: readonly ModeDescriptor[],
+  draftWriter: DraftWriter,
+  charter: readonly RoleDefinition[],
+  modelAccess: ModelAccess,
+): Hono {
+  const sites = callSites(charter)
   const allowedOrigin = `http://localhost:${env.port}`
   const app = new Hono()
   app.use('*', originGuard(allowedOrigin))
@@ -85,6 +98,24 @@ export function createApp(env: StudioEnv, workspace: WorkspaceRegistry, modes: r
     const { theme } = c.req.valid('json')
     await setTheme(env.dataRoot, theme)
     return c.json(ok({ theme }))
+  })
+
+  app.get('/call-sites', (c) => {
+    return c.json(ok(withAssignments(sites, listAssignments(env.dataRoot))))
+  })
+
+  app.put('/call-sites/:site/assignment', validateJson(putAssignmentSchema), async (c) => {
+    const site = c.req.param('site')
+    if (!sites.some((candidate) => candidate.site === site)) {
+      return c.json(fail('CALL_SITE_NOT_FOUND', `no call site "${site}"`), 404)
+    }
+    const { model } = c.req.valid('json')
+    await setAssignment(env.dataRoot, site, model)
+    return c.json(ok({ site, assignment: model }))
+  })
+
+  app.get('/models', async (c) => {
+    return c.json(ok(await modelAccess.status()))
   })
 
   app.onError((err, c) => {
