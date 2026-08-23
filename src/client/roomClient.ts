@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
 import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
 import {
   participantSettledEventSchema,
@@ -57,6 +58,31 @@ export function startRound(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ message, draft }),
+    signal: signal ?? null,
+  })
+}
+
+/**
+ * CONTEXT "Apply"/SPEC "Applying a recommendation": the response applied,
+ * identified by the round and participant it came from, and any constraint
+ * the author supplied verbatim. `draft` travels the same way a round's does —
+ * the caller is expected to have flushed the pending draft write without
+ * waiting on it and to pass the same text here — because the room never
+ * reads the manuscript from disk to serve a call.
+ */
+export function applyRecommendation(
+  pieceId: string,
+  conversationId: string,
+  roundId: string,
+  participantId: string,
+  draft: string,
+  constraint: string | undefined,
+  signal?: AbortSignal,
+): Promise<RequestResult<ApplyOutcome>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ roundId, participantId, draft, constraint }),
     signal: signal ?? null,
   })
 }

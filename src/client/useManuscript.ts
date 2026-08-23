@@ -35,6 +35,13 @@ export type ManuscriptViewModel = {
   readonly showRendered: () => void
   readonly showSource: () => void
   readonly showReading: () => void
+  /**
+   * CONTEXT "Apply": makes the manuscript embody a recommendation, applied to
+   * the editor as one transaction so the editor's own undo reverses it as one
+   * action — the same mechanism a round trip through the source view already
+   * reaches the editor with, reused rather than reinvented.
+   */
+  readonly applyRecommendation: (markdown: string) => void
 }
 
 /**
@@ -136,5 +143,26 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     setView('reading')
   }, [editor, view, sourceText, captureScrollRatio])
 
-  return { editor, view, sourceText, length, markdown, containerRef, setSourceText: updateSourceText, showRendered, showSource, showReading }
+  const applyRecommendation = useCallback(
+    (text: string) => {
+      if (editor === null) return
+      applySourceText(editor, text)
+      if (view === 'source') setSourceText(text)
+    },
+    [editor, view],
+  )
+
+  return {
+    editor,
+    view,
+    sourceText,
+    length,
+    markdown,
+    containerRef,
+    setSourceText: updateSourceText,
+    showRendered,
+    showSource,
+    showReading,
+    applyRecommendation,
+  }
 }

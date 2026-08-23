@@ -140,4 +140,102 @@ describe('the room over HTTP', () => {
 
     await settlementOf(room, 'cups')
   })
+
+  describe('applying a recommendation', () => {
+    /**
+     * A round settled over HTTP first, so the piece holds an applicable
+     * suggestion at a real round and participant id — the identity an
+     * `/apply` request names.
+     */
+    async function withRecommendation(): Promise<{ app: Hono; room: Room; roundId: string }> {
+      const modelAccess = FixtureModelAdapter.bySite(
+        {
+          shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } } },
+          apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } } },
+        },
+        { reachable: true, models: [] },
+      )
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+      const roundRes = await app.request('/pieces/cups/conversations/c1/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: '@shape a direct question', draft: 'The cups sat where she left them.' }),
+      })
+      const { roundId } = (await roundRes.json()).data
+      await settlementOf(room, 'cups')
+      return { app, room, roundId }
+    }
+
+    it('reaches the manuscript the model returned, on the same request', async () => {
+      const { app, roundId } = await withRecommendation()
+
+      const res = await app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ roundId, participantId: 'shape', draft: 'The cups sat where she left them.' }),
+      })
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ success: true, data: { outcome: 'applied' } })
+    })
+
+    it('refuses an unknown recommendation with RECOMMENDATION_NOT_FOUND', async () => {
+      const { app, roundId } = await withRecommendation()
+
+      const res = await app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ roundId, participantId: 'compression', draft: 'text' }),
+      })
+
+      expect(res.status).toBe(404)
+      expect(await res.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })
+    })
+
+    it('refuses to apply while a round is in flight, with ROOM_BUSY', async () => {
+      const behavior: FixtureBehavior = {
+        result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
+        delayMs: 50,
+      }
+      const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+      await app.request('/pieces/cups/conversations/c1/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: '@shape a direct question', draft: 'text' }),
+      })
+      await settlementOf(room, 'cups')
+
+      await app.request('/pieces/cups/conversations/c1/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'another message', draft: 'text' }),
+      })
+
+      const applyRes = await app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ roundId: 'r1', participantId: 'shape', draft: 'text' }),
+      })
+      expect(applyRes.status).toBe(409)
+      expect(await applyRes.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
+
+      await settlementOf(room, 'cups')
+    })
+  })
 })

@@ -7,7 +7,7 @@ import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
 import { RoomEditor } from './RoomEditor.js'
-import { abandonOperation, createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
+import { abandonOperation, applyRecommendation, createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
@@ -72,6 +72,11 @@ function Surfaces({
   // arrives on the one action that reaches it and leaves on the one that
   // closes it.
   const [roomOpen, setRoomOpen] = useState(false)
+  // SPEC "Applying a recommendation": the manuscript's own read-only lock,
+  // held for exactly the duration of the call — a fact `Conversation` learns
+  // first, since applying is one of the actions a response offers, and
+  // mirrored here because `Manuscript` is the surface the lock is drawn on.
+  const [applying, setApplying] = useState(false)
 
   return (
     <div className={styles.row}>
@@ -83,6 +88,7 @@ function Surfaces({
         autosave={autosave}
         onOpenRoom={() => setRoomOpen(true)}
         lifecycle={lifecycle}
+        applying={applying}
       />
       {manuscript.view !== 'reading' && roster.settled && (
         <Conversation
@@ -91,12 +97,14 @@ function Surfaces({
           roundInFlight={piece.roundInFlight}
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation }}
+          room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
           mark={roster.mark}
           handles={roster.handles}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
           clock={Date.now}
+          onApplied={manuscript.applyRecommendation}
+          onApplyingChange={setApplying}
         />
       )}
       {roomOpen && (

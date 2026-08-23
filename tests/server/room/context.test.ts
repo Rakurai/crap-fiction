@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compileApplyContext,
   compileSpecialistContext,
   compileStoryEditorContext,
+  renderApplyPrompt,
   renderPrompt,
+  type ApplyContextInput,
   type ContextInput,
   type HistoryPolicy,
 } from '../../../src/server/room/context.js'
@@ -58,6 +61,113 @@ const conversationWithMixedHistory: Conversation = {
     },
   ],
 }
+
+function applyContextInput(overrides: Partial<ApplyContextInput> & { conversation: ApplyContextInput['conversation']; throughRoundId: string }): ApplyContextInput {
+  return {
+    recommendationClaim: 'cut the second paragraph',
+    recommendationNote: undefined,
+    constraint: undefined,
+    authorContext: undefined,
+    storyContext: undefined,
+    draft: 'text',
+    ...overrides,
+  }
+}
+
+const conversationWithTwoRounds: Conversation = {
+  id: 'c1',
+  rounds: [
+    {
+      id: 'r1',
+      message: 'first question',
+      addressed: [],
+      brought: [],
+      outcome: 'settled',
+      participants: [
+        { participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph', note: 'it repeats the opening' } },
+      ],
+    },
+    {
+      id: 'r2',
+      message: 'a later question',
+      addressed: [],
+      brought: [],
+      outcome: 'settled',
+      participants: [{ participantId: 'compression', result: { kind: 'response', outcome: 'commentary', claim: 'the ending still drags' } }],
+    },
+  ],
+}
+
+describe('compileApplyContext', () => {
+  it('carries the recommendation, the constraint and both durable contexts through untouched', () => {
+    const context = compileApplyContext(
+      applyContextInput({
+        recommendationClaim: 'cut the second paragraph',
+        recommendationNote: 'it repeats the opening',
+        constraint: 'keep the last line',
+        authorContext: 'prefers short sentences',
+        storyContext: 'a flash piece about a breakup',
+        draft: 'The cups sat where she left them.',
+        conversation: conversationWithTwoRounds,
+        throughRoundId: 'r1',
+      }),
+    )
+
+    expect(context.recommendationClaim).toBe('cut the second paragraph')
+    expect(context.recommendationNote).toBe('it repeats the opening')
+    expect(context.constraint).toBe('keep the last line')
+    expect(context.authorContext).toBe('prefers short sentences')
+    expect(context.storyContext).toBe('a flash piece about a breakup')
+    expect(context.draft).toBe('The cups sat where she left them.')
+  })
+
+  it('reads history through the round the recommendation came from, and no further', () => {
+    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+
+    expect(context.history).toEqual([
+      { kind: 'message', text: 'first question' },
+      { kind: 'response', participantId: 'shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
+    ])
+  })
+
+  it('carries no constraint when the author supplied none', () => {
+    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+
+    expect(context.constraint).toBeUndefined()
+  })
+})
+
+describe('renderApplyPrompt', () => {
+  it('states the recommendation and the constraint, each under its own section', () => {
+    const context = compileApplyContext(
+      applyContextInput({
+        recommendationClaim: 'cut the second paragraph',
+        constraint: 'keep the last line',
+        conversation: conversationWithTwoRounds,
+        throughRoundId: 'r1',
+      }),
+    )
+
+    const prompt = renderApplyPrompt(context, charter)
+    expect(prompt).toContain('cut the second paragraph')
+    expect(prompt).toContain("The author's constraint")
+    expect(prompt).toContain('keep the last line')
+  })
+
+  it('omits the constraint section when the author supplied none', () => {
+    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+
+    expect(renderApplyPrompt(context, charter)).not.toContain("The author's constraint")
+  })
+
+  it('always carries the manuscript, unexcerpted', () => {
+    const context = compileApplyContext(
+      applyContextInput({ draft: 'The cups sat where she left them.', conversation: conversationWithTwoRounds, throughRoundId: 'r1' }),
+    )
+
+    expect(renderApplyPrompt(context, charter)).toContain('The cups sat where she left them.')
+  })
+})
 
 describe('compileSpecialistContext', () => {
   it('carries the draft, the message and both durable contexts through untouched', () => {

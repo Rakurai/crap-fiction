@@ -7,6 +7,7 @@ import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigg
 import { everyCallFailed, tallyRound, type ProjectedParticipant, type ProjectedRound } from './roundProjection.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
+import { useApply, type ApplyingResponse } from './useApply.js'
 import type { HandleEntry } from './useRoster.js'
 import { useNow } from './useNow.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
@@ -36,6 +37,10 @@ type ConversationProps = {
   readonly runtime: RuntimeStatus | undefined
   /** The clock the elapsed count is read from, so a test states the moment rather than waiting for it. */
   readonly clock: Clock
+  /** CONTEXT "Apply": the manuscript once an application settles — this surface knows nothing about the editor beyond handing it the result. */
+  readonly onApplied?: (markdown: string) => void
+  /** SPEC "Applying a recommendation": whether the manuscript's own read-only lock should be held, for the surface that draws it. */
+  readonly onApplyingChange?: (applying: boolean) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -103,9 +108,91 @@ function participantSays(participant: ProjectedParticipant): ReactNode {
  * agreement, no severity, no confidence — and is decorative to anything reading
  * the page, which has the name in text right beside it.
  */
-function ParticipantBlock({ participant, name, mark }: { readonly participant: ProjectedParticipant; readonly name: string; readonly mark: string }) {
+/**
+ * UX_DESIGN "Applying, and seeing what it did": the constraint field a
+ * response's own Apply offers — empty applies the recommendation as written,
+ * and text carries as an additional instruction verbatim (CONTEXT
+ * "Constraint"). Local state because nothing above needs the draft constraint
+ * until the moment Apply is pressed.
+ */
+function ApplyAction({
+  roundId,
+  participantId,
+  disabled,
+  onApply,
+}: {
+  readonly roundId: string
+  readonly participantId: string
+  readonly disabled: boolean
+  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
+}) {
+  const [constraint, setConstraint] = useState('')
+
+  return (
+    <div className={styles.apply}>
+      <input
+        aria-label="Constraint for applying this recommendation"
+        className={styles.applyConstraint}
+        value={constraint}
+        disabled={disabled}
+        placeholder="a constraint, if there is one"
+        onChange={(event) => setConstraint(event.target.value)}
+      />
+      <button
+        type="button"
+        className={styles.applyButton}
+        disabled={disabled}
+        onClick={() => onApply(roundId, participantId, constraint.trim().length > 0 ? constraint.trim() : undefined)}
+      >
+        apply
+      </button>
+    </div>
+  )
+}
+
+/**
+ * UX_DESIGN "An operation in flight": the same register a round in flight
+ * uses, drawn on the response being applied rather than merged with the
+ * round's own facts line — an application is not the round that produced the
+ * recommendation.
+ */
+function ApplyingFlight({ onAbandon }: { readonly onAbandon: () => void }) {
+  return (
+    <div className={styles.apply}>
+      <span className={styles.applyingFacts}>APPLYING</span>
+      <button type="button" className={styles.abandon} onClick={onAbandon}>
+        abandon
+      </button>
+    </div>
+  )
+}
+
+function ParticipantBlock({
+  participant,
+  roundId,
+  name,
+  mark,
+  applying,
+  applyDisabled,
+  onApply,
+  onAbandonApply,
+}: {
+  readonly participant: ProjectedParticipant
+  readonly roundId: string
+  readonly name: string
+  readonly mark: string
+  /** Whether this exact response is the one mid-application. */
+  readonly applying: boolean
+  /** Whether Apply is offered at all right now — another operation already holds the room. */
+  readonly applyDisabled: boolean
+  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
+  readonly onAbandonApply: () => void
+}) {
   const says = participantSays(participant)
   if (says === null) return null
+
+  const recommends =
+    participant.state === 'settled' && participant.result?.kind === 'response' && participant.result.outcome === 'applicableSuggestion'
 
   return (
     <div className={styles.participant}>
@@ -114,6 +201,12 @@ function ParticipantBlock({ participant, name, mark }: { readonly participant: P
         <span className={styles.name}>{name}</span>
       </div>
       {says}
+      {recommends &&
+        (applying ? (
+          <ApplyingFlight onAbandon={onAbandonApply} />
+        ) : (
+          <ApplyAction roundId={roundId} participantId={participant.participantId} disabled={applyDisabled} onApply={onApply} />
+        ))}
     </div>
   )
 }
@@ -174,12 +267,20 @@ function RoundView({
   displayName,
   mark,
   onAbandon,
+  applying,
+  applyDisabled,
+  onApply,
+  onAbandonApply,
 }: {
   readonly round: ProjectedRound
   readonly nowMs: number
   readonly displayName: (id: string) => string
   readonly mark: (id: string) => string
   readonly onAbandon: () => void
+  readonly applying: ApplyingResponse | undefined
+  readonly applyDisabled: boolean
+  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
+  readonly onAbandonApply: () => void
 }) {
   return (
     <div className={styles.round}>
@@ -195,8 +296,13 @@ function RoundView({
         <ParticipantBlock
           key={participant.participantId}
           participant={participant}
+          roundId={round.roundId}
           name={displayName(participant.participantId)}
           mark={mark(participant.participantId)}
+          applying={applying?.roundId === round.roundId && applying.participantId === participant.participantId}
+          applyDisabled={applyDisabled}
+          onApply={onApply}
+          onAbandonApply={onAbandonApply}
         />
       ))}
       {round.outcome === 'abandoned' && <p className={styles.abandoned}>ABANDONED</p>}
@@ -229,6 +335,8 @@ export function Conversation({
   handles,
   runtime,
   clock,
+  onApplied = () => {},
+  onApplyingChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -256,12 +364,17 @@ export function Conversation({
   }, [caretOffset])
 
   const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, room)
   const counting = conversation.projection.rounds.some((round) => round.outcome === 'inFlight')
   const nowMs = useNow(counting, clock)
+  // SPEC "Operation state": one operation at a time, whichever kind — the
+  // client disables the controls that would start a second one rather than
+  // relying on the room's own refusal, which exists for the case this misses.
+  const roomBusy = conversation.busy || apply.applying !== undefined
 
   function submit() {
     const text = message.trim()
-    if (text.length === 0 || conversation.busy) return
+    if (text.length === 0 || roomBusy) return
     conversation.sendMessage(text)
     setMessage('')
   }
@@ -281,12 +394,23 @@ export function Conversation({
     <div className={styles.wrapper}>
       <div className={styles.rounds}>
         {conversation.projection.rounds.map((round) => (
-          <RoundView key={round.roundId} round={round} nowMs={nowMs} displayName={displayName} mark={mark} onAbandon={conversation.abandon} />
+          <RoundView
+            key={round.roundId}
+            round={round}
+            nowMs={nowMs}
+            displayName={displayName}
+            mark={mark}
+            onAbandon={conversation.abandon}
+            applying={apply.applying}
+            applyDisabled={roomBusy}
+            onApply={apply.apply}
+            onAbandonApply={apply.abandon}
+          />
         ))}
       </div>
-      {conversation.error !== undefined && (
+      {(conversation.error ?? apply.error) !== undefined && (
         <p className={styles.error} role="alert">
-          {conversation.error}
+          {conversation.error ?? apply.error}
         </p>
       )}
       {/*
@@ -370,7 +494,7 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
-        <button type="submit" className={styles.send} disabled={conversation.busy || message.trim().length === 0}>
+        <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
           {conversation.busy ? '…' : 'send'}
         </button>
       </form>

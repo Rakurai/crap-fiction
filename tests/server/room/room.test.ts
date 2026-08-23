@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModelAccess } from '../../../src/server/model/types.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
-import { readConversation, readPiece, writePieceCast } from '../../../src/server/store/index.js'
-import { conversationSchema } from '../../../src/shared/conversationViews.js'
-import { Room, RoomBusyError, type RoomEvent } from '../../../src/server/room/room.js'
+import { readConversation, readPiece, writeConversation, writePieceCast } from '../../../src/server/store/index.js'
+import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
+import { RecommendationNotFoundError, Room, RoomBusyError, type RoomEvent } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
 
@@ -339,6 +339,147 @@ describe('Room', () => {
     // all, on the same terms as a settled one.
     const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
     expect(conversation?.rounds[0]?.outcome).toBe('abandoned')
+  })
+})
+
+/** A conversation whose first round left one applicable suggestion behind, ready to apply. */
+function conversationWithRecommendation(): Conversation {
+  return {
+    id: 'c1',
+    rounds: [
+      {
+        id: 'r1',
+        message: 'does the opening earn its length',
+        addressed: [],
+        brought: [],
+        outcome: 'settled',
+        participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } }],
+      },
+    ],
+  }
+}
+
+describe('Room.apply', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-apply-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('produces the manuscript the model returned, calling no participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'The cups sat where she left them, twice.')
+
+    expect(result).toEqual({ outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } })
+    expect(adapter.promptFor('shape')).toBeUndefined()
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+    // The room only ever reads the draft from the request, and it never writes one.
+    expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
+  })
+
+  it('carries the recommendation and the author\'s constraint, verbatim, into the call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
+    })
+
+    await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', 'keep the last line', 'draft text')
+
+    expect(adapter.promptFor('apply')).toContain('cut the second paragraph')
+    expect(adapter.promptFor('apply')).toContain('keep the last line')
+    expect(adapter.promptFor('apply')).toContain('draft text')
+  })
+
+  it('refuses when no such applicable suggestion stands at that identity', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {})
+
+    // "compression" said nothing in this round at all — no participant record to find.
+    await expect(room.apply(workspaceDir, piece.id, 'c1', 'r1', 'compression', undefined, 'draft')).rejects.toThrowError(
+      RecommendationNotFoundError,
+    )
+    // A refused apply never touches the lock: the room is free for the next thing the author does.
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
+  it('refuses to apply while a round is in flight for the same piece', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c2', 'a message', 'draft text')
+
+    await expect(room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('refuses to open a round while an application is in flight', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+    })
+
+    const applying = room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft')
+
+    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('apply')
+    await applying
+  })
+
+  it('resolves as abandoned, and leaves the recommendation applicable, when abandoned mid-call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+    })
+
+    const applying = room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    room.abandon(piece.id)
+    await expect(applying).resolves.toEqual({ outcome: 'abandoned' })
+
+    // The lock released, and the recommendation was never touched — a second
+    // attempt reaches the model the same way the first did.
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    adapter.release('apply')
+    const second = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    expect(second).toEqual({ outcome: 'value', value: { manuscript: 'revised' } })
+  })
+
+  it('changes nothing on a failed call, and leaves the recommendation applicable', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'failed', reason: 'unconfigured' } },
+    })
+
+    const failed = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    expect(failed).toEqual({ outcome: 'failed', reason: 'unconfigured' })
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
   })
 })
 

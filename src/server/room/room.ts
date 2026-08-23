@@ -2,11 +2,18 @@ import { nanoid } from 'nanoid'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
-import type { ModelAccess } from '../model/types.js'
-import { PieceNotFoundError } from '../pieces.js'
+import type { CallResult, ModelAccess } from '../model/types.js'
+import { applyResultSchema } from '../../shared/applyResult.js'
+import { ConversationNotFoundError, PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { readConversation, readPiece, TolerantReadError, writeConversation, writePieceCast } from '../store/index.js'
-import { conversationSchema, type Conversation, type RoundParticipantRecord, type RoundRecord } from '../../shared/conversationViews.js'
+import {
+  conversationSchema,
+  substantiveResponse,
+  type Conversation,
+  type RoundParticipantRecord,
+  type RoundRecord,
+} from '../../shared/conversationViews.js'
 import type {
   ParticipantSettledEvent,
   ParticipantStateEvent,
@@ -18,8 +25,10 @@ import type {
 } from '../../shared/roundEvents.js'
 import { parseAddressing } from './addressing.js'
 import {
+  compileApplyContext,
   compileSpecialistContext,
   compileStoryEditorContext,
+  renderApplyPrompt,
   renderPrompt,
   type ContextInput,
   type HistoryPolicy,
@@ -43,6 +52,14 @@ export class RoomBusyError extends Error {
   }
 }
 
+/** No applicable suggestion stands at the named place — a stale identity, or an outcome that was never one. */
+export class RecommendationNotFoundError extends Error {
+  constructor(pieceId: string, roundId: string, participantId: string) {
+    super(`no applicable suggestion from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
+    this.name = 'RecommendationNotFoundError'
+  }
+}
+
 type Listener = (event: RoomEvent) => void
 
 /**
@@ -55,8 +72,18 @@ function failureText(err: unknown): string {
   return err instanceof Error ? err.message : 'the round stopped for a reason the studio cannot name'
 }
 
+/** The applicable suggestion the author named, or `undefined` — a stale identity, or a response that never was one. */
+function findRecommendation(conversation: Conversation, roundId: string, participantId: string) {
+  const round = conversation.rounds.find((candidate) => candidate.id === roundId)
+  const record = round?.participants.find((candidate) => candidate.participantId === participantId)
+  if (record === undefined) return undefined
+  const response = substantiveResponse(record.result)
+  return response?.outcome === 'applicableSuggestion' ? response : undefined
+}
+
 /** A round under way, as the room tracks it while it runs. */
 type ActiveRound = {
+  readonly kind: 'round'
   readonly pieceId: string
   readonly conversationId: string
   readonly roundId: string
@@ -70,7 +97,7 @@ type ActiveRound = {
   readonly openedAt: number
 }
 
-type ActiveOperation = ActiveRound & {
+type RunningRound = ActiveRound & {
   /**
    * The round's own completion, held by the object that represents the round: a
    * round outlives the request that opened it, so a caller that needs to know it
@@ -80,6 +107,26 @@ type ActiveOperation = ActiveRound & {
    */
   readonly settlement: Promise<void>
 }
+
+/**
+ * An application under way. Unlike a round it outlives nothing — the request
+ * that started it is the request that reads its result — so there is no
+ * settlement to hold and nothing to snapshot: a client that reloaded mid-call
+ * has no `applying` state to restore, only the request it is already waiting
+ * on.
+ */
+type ActiveApply = {
+  readonly kind: 'apply'
+  readonly pieceId: string
+  readonly controller: AbortController
+}
+
+/**
+ * SPEC "Operation state": one author-initiated model operation at a time,
+ * whichever kind it is — the lock is the room's single `#operation` field
+ * regardless, and only a round has more to say about itself while it runs.
+ */
+type ActiveOperation = RunningRound | ActiveApply
 
 /**
  * SPEC "Seams": the room boundary owns the operations the author starts —
@@ -156,7 +203,7 @@ export class Room {
 
   snapshot(pieceId: string): RoundSnapshot | undefined {
     const operation = this.#operationFor(pieceId)
-    if (operation === undefined) return undefined
+    if (operation === undefined || operation.kind !== 'round') return undefined
     return {
       conversationId: operation.conversationId,
       roundId: operation.roundId,
@@ -221,6 +268,7 @@ export class Room {
 
     const openedAt = this.#now()
     const round: ActiveRound = {
+      kind: 'round',
       pieceId,
       conversationId,
       roundId,
@@ -268,11 +316,69 @@ export class Room {
    * hold; watching for the round's absence would be a polling loop.
    */
   settlement(pieceId: string): Promise<void> | undefined {
-    return this.#operationFor(pieceId)?.settlement
+    const operation = this.#operationFor(pieceId)
+    return operation?.kind === 'round' ? operation.settlement : undefined
   }
 
   abandon(pieceId: string): void {
     this.#operationFor(pieceId)?.controller.abort()
+  }
+
+  /**
+   * CONTEXT "Apply"/SPEC "Applying a recommendation": one call, its result
+   * reached by the request that asked for it — there is no round to open and
+   * no participant is called, so nothing here touches the room's own event
+   * stream. The manuscript's read-only lock is this method's own duration:
+   * held from the moment the operation is claimed to the `finally` that
+   * releases it, whichever way the call ends.
+   *
+   * Everything the call is compiled from is read before the lock is taken —
+   * a piece, a conversation or a recommendation this method cannot find is a
+   * refusal that never touches `#operation`, on the same terms `startRound`
+   * refuses before touching it.
+   */
+  async apply(
+    workspaceDir: string,
+    pieceId: string,
+    conversationId: string,
+    roundId: string,
+    participantId: string,
+    constraint: string | undefined,
+    draft: string,
+  ): Promise<CallResult<{ manuscript: string }>> {
+    const holder = this.#operation
+    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+
+    const piece = readPiece(workspaceDir, pieceId)
+    if (piece === undefined) throw new PieceNotFoundError(pieceId)
+
+    const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+    if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
+
+    const recommendation = findRecommendation(conversation, roundId, participantId)
+    if (recommendation === undefined) throw new RecommendationNotFoundError(pieceId, roundId, participantId)
+
+    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
+
+    const controller = new AbortController()
+    this.#operation = { kind: 'apply', pieceId, controller }
+
+    try {
+      const context = compileApplyContext({
+        recommendationClaim: recommendation.claim,
+        recommendationNote: recommendation.note,
+        constraint,
+        authorContext: durableContext.authorContext,
+        storyContext: durableContext.storyContext,
+        draft,
+        conversation,
+        throughRoundId: roundId,
+      })
+      const prompt = renderApplyPrompt(context, this.#charter)
+      return await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
+    } finally {
+      this.#operation = undefined
+    }
   }
 
   /**

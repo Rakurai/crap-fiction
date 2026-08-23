@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import type {
   abandonOperation as abandonOperationFn,
+  applyRecommendation as applyRecommendationFn,
   createConversation as createConversationFn,
   fetchConversation as fetchConversationFn,
   startRound as startRoundFn,
@@ -22,6 +23,14 @@ export type ConversationViewModel = Readonly<{
   error: string | undefined
   sendMessage: (message: string) => void
   abandon: () => void
+  /**
+   * The conversation an author action addresses right now, once one exists —
+   * `null` until the first round mints it. Applying a recommendation needs
+   * this rather than the id the piece opened with: a conversation minted by
+   * this hook's own first round is a fact this hook holds and the piece
+   * was never told.
+   */
+  conversationId: string | null
 }>
 
 /** The room's adapters, reached by whoever composes this hook rather than imported here. */
@@ -31,6 +40,7 @@ export type RoomAdapters = Readonly<{
   startRound: typeof startRoundFn
   subscribeToRoom: typeof subscribeToRoomFn
   abandonOperation: typeof abandonOperationFn
+  applyRecommendation: typeof applyRecommendationFn
 }>
 
 /**
@@ -155,5 +165,5 @@ export function useConversation(
     })
   }
 
-  return { projection, busy, error, sendMessage, abandon }
+  return { projection, busy, error, sendMessage, abandon, conversationId: conversationIdRef.current }
 }

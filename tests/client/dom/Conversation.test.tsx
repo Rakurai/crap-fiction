@@ -26,6 +26,7 @@ function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAda
     fetchConversation: () => Promise.resolve({ outcome: 'value', value: conversation }),
     startRound: () => Promise.resolve({ outcome: 'value', value: { conversationId: conversation.id, roundId: 'r1' } }),
     abandonOperation,
+    applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'applied', manuscript: 'the revised manuscript' } }),
   }
 }
 

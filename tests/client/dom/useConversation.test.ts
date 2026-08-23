@@ -46,6 +46,7 @@ function roomWithHeldConversation(conversation: Conversation) {
     fetchConversation: vi.fn(() => held),
     startRound: vi.fn(),
     abandonOperation: vi.fn(),
+    applyRecommendation: vi.fn(),
     subscribeToRoom: vi.fn((_pieceId, onEvent) => {
       deliver = onEvent
       return () => {}
@@ -150,6 +151,7 @@ describe('abandoning an operation', () => {
       fetchConversation: vi.fn(),
       startRound: vi.fn(),
       abandonOperation,
+      applyRecommendation: vi.fn(),
       subscribeToRoom: vi.fn(() => () => {}),
     }
   }

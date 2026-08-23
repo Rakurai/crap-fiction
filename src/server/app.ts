@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
+import type { ApplyOutcome } from '../shared/applyViews.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
 import { themeSchema } from '../shared/theme.js'
@@ -26,7 +27,7 @@ import {
   UnknownCastMemberError,
   updatePieceDetails,
 } from './pieces.js'
-import { RoomBusyError, type Room } from './room/room.js'
+import { RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
@@ -38,6 +39,12 @@ const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postRoundSchema = z.object({ message: z.string().min(1), draft: z.string() })
+const postApplySchema = z.object({
+  roundId: z.string().min(1),
+  participantId: z.string().min(1),
+  constraint: z.string().min(1).optional(),
+  draft: z.string(),
+})
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
@@ -140,6 +147,28 @@ export function createApp(
   })
 
   /**
+   * SPEC "Applying a recommendation"/"Transport": one call, its whole result
+   * reached by this request — there is no round to open and no event to
+   * subscribe to. The route's own part is thin: validate, delegate to the
+   * room, and translate the room's `CallResult` into the wire's own
+   * `ApplyOutcome` taxonomy, unwrapped from the envelope's own success path
+   * because a failed or an abandoned call are not a request that failed —
+   * they are answers the room composed, the same way a round's failed
+   * participant is.
+   */
+  app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
+    const { roundId, participantId, constraint, draft } = c.req.valid('json')
+    const result = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), roundId, participantId, constraint, draft)
+    const outcome: ApplyOutcome =
+      result.outcome === 'value'
+        ? { outcome: 'applied', manuscript: result.value.manuscript }
+        : result.outcome === 'abandoned'
+          ? { outcome: 'abandoned' }
+          : { outcome: 'failed', reason: result.reason, returned: result.returned }
+    return c.json(ok(outcome))
+  })
+
+  /**
    * The workspace is required here as it is on every other `/pieces/...` route,
    * even though the room — not the store — is the authority on what is in flight
    * and abandoning nothing is a legitimate answer. Reachability before a workspace
@@ -211,6 +240,7 @@ export function createApp(
     if (err instanceof UnknownCastMemberError) return refused('CAST_MEMBER_UNKNOWN', 400)
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
+    if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)
 
     // Nothing here names it, so nothing here can tell the author what it was. It

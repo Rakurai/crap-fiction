@@ -26,6 +26,13 @@ type ManuscriptProps = {
   /** UX_DESIGN "Prominence": editing the room is one action away, reached from here like the other view controls — this surface knows nothing else about it. */
   readonly onOpenRoom: () => void
   readonly lifecycle: LifecycleProps
+  /**
+   * SPEC "Applying a recommendation": the manuscript is read-only for exactly
+   * the duration of that call — a fact about the response being applied, not
+   * about anything this surface decided, so it arrives as a prop rather than
+   * from a control drawn here.
+   */
+  readonly applying: boolean
 }
 
 /**
@@ -97,7 +104,7 @@ function EditableTitle({ title, saving, onRetitle }: { readonly title: string; r
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, lifecycle }: ManuscriptProps) {
+export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, lifecycle, applying }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -109,6 +116,15 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [manuscript.view, manuscript.showRendered])
 
+  // Layered on top of the view's own editable rule rather than folded into
+  // it: which view is current and whether an application holds the
+  // manuscript are independent facts, and `showRendered`/`showReading`
+  // already state the first. `reading` wins regardless of `applying` — an
+  // application settling mid-read must not make the reading view editable.
+  useEffect(() => {
+    manuscript.editor?.setEditable(!reading && !applying)
+  }, [manuscript.editor, reading, applying])
+
   return (
     <div className={styles.wrapper}>
       {!reading && (
@@ -118,6 +134,7 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
           <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
+          {applying && <span className={styles.applying}>READ-ONLY</span>}
           <select
             aria-label="Piece status"
             className={styles.status}
@@ -158,6 +175,7 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
               aria-label="Manuscript source"
               className={styles.source}
               value={manuscript.sourceText}
+              disabled={applying}
               onChange={(event) => manuscript.setSourceText(event.target.value)}
             />
           ) : (

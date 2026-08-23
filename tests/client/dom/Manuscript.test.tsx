@@ -24,6 +24,7 @@ const DEFAULT_PROPS = {
     statusError: undefined as string | undefined,
     onSetStatus: vi.fn(),
   },
+  applying: false,
 }
 
 /**
@@ -46,6 +47,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       autosave={autosave}
       onOpenRoom={props.onOpenRoom}
       lifecycle={props.lifecycle}
+      applying={props.applying}
     />
   )
 }
@@ -193,6 +195,41 @@ describe('the reading view', () => {
 
     expect(screen.queryByText('ESC TO RETURN')).toBeNull()
     expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
+  })
+})
+
+describe('the manuscript while an application is in flight', () => {
+  afterEach(cleanup)
+
+  /**
+   * SPEC "Applying a recommendation": read-only for exactly the call's
+   * duration, drawn from the same `applying` state a control already refuses
+   * from elsewhere in this file (`leaveControl().disabled`) — a decision the
+   * component makes from a prop, so `jsdom` states it the same way.
+   */
+  it('holds the source textarea read-only, and says so in the register, while an application runs', () => {
+    renderManuscript({ applying: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'source' }))
+    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('READ-ONLY')).toBeTruthy()
+  })
+
+  it('leaves the rendered editing surface untouched by an application still starting elsewhere, absent the prop', () => {
+    renderManuscript({ applying: false })
+
+    expect(screen.getByLabelText('Manuscript').getAttribute('contenteditable')).toBe('true')
+  })
+
+  it('is editable again, with no trace of the notice, the instant the application is no longer applying', () => {
+    const { rerender } = renderManuscript({ applying: true })
+    fireEvent.click(screen.getByRole('button', { name: 'source' }))
+    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
+
+    rerender(<Harness {...DEFAULT_PROPS} applying={false} />)
+
+    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByText('READ-ONLY')).toBeNull()
   })
 })
 

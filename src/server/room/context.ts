@@ -140,6 +140,94 @@ export function compileStoryEditorContext(input: ContextInput, evidence: readonl
   return contextFrom(input, evidence)
 }
 
+/** Everything an application's call is built from that does not depend on the conversation it reads through. */
+export type ApplyContextInput = Readonly<{
+  recommendationClaim: string
+  recommendationNote: string | undefined
+  constraint: string | undefined
+  authorContext: string | undefined
+  storyContext: string | undefined
+  draft: string
+  conversation: Conversation
+  /** The round the recommendation being applied came from — history is read through this round and no further. */
+  throughRoundId: string
+}>
+
+export type ApplyContext = Readonly<{
+  recommendationClaim: string
+  recommendationNote: string | undefined
+  constraint: string | undefined
+  authorContext: string | undefined
+  storyContext: string | undefined
+  draft: string
+  history: readonly HistoryEntry[]
+}>
+
+/**
+ * CONTEXT "Apply": the conversation through the recommendation being applied
+ * — every round up to and including the one that produced it, on shared
+ * history's own terms (every message, every substantive response), and
+ * nothing from a round that followed. The recommendation is interpreted
+ * against what the author had read when it was made, not against exchanges
+ * that came after.
+ */
+function historyThrough(conversation: Conversation, throughRoundId: string): readonly HistoryEntry[] {
+  const entries: HistoryEntry[] = []
+  for (const round of conversation.rounds) {
+    if (round.message !== undefined) entries.push({ kind: 'message', text: round.message })
+    entries.push(...substantiveResponses(round))
+    if (round.id === throughRoundId) break
+  }
+  return entries
+}
+
+/**
+ * SPEC "Context compilation": `compileContext`'s third call kind — an
+ * application, with the recommendation and the author's constraint — compiled
+ * by the same family of pure functions a participant's call is, so the
+ * invariant it is asserted against is the constructed object rather than a
+ * rendered prompt.
+ */
+export function compileApplyContext(input: ApplyContextInput): ApplyContext {
+  return {
+    recommendationClaim: input.recommendationClaim,
+    recommendationNote: input.recommendationNote,
+    constraint: input.constraint,
+    authorContext: input.authorContext,
+    storyContext: input.storyContext,
+    draft: input.draft,
+    history: historyThrough(input.conversation, input.throughRoundId),
+  }
+}
+
+/**
+ * The one instruction an application's call carries that no participant's
+ * does — deterministic and never displayed, the same way the instruction
+ * behind asking a participant for a concrete change is not (SPEC "The
+ * round"). SPEC "Applying a recommendation": stable input does not imply
+ * restrained output, so the instruction says exactly what is licensed to
+ * change and no more.
+ */
+const APPLY_INSTRUCTION =
+  "Revise the manuscript so that it embodies the recommendation below, honoring the author's constraint where one is given. Change only what embodying the recommendation and the constraint requires — nothing else about the prose. Return the manuscript whole."
+
+export function renderApplyPrompt(context: ApplyContext, charter: Charter): string {
+  const recommendation =
+    context.recommendationNote !== undefined ? `${context.recommendationClaim} ${context.recommendationNote}` : context.recommendationClaim
+
+  const parts = [
+    section('What to do', APPLY_INSTRUCTION),
+    section('What a recommendation is', charter.recommendationIsOneChange),
+    section('Author context', context.authorContext),
+    section('Story context', context.storyContext),
+    section('Manuscript', context.draft),
+    historyText(context.history),
+    section('The recommendation being applied', recommendation),
+    section("The author's constraint", context.constraint),
+  ]
+  return parts.filter((part) => part.length > 0).join('')
+}
+
 function section(heading: string, body: string | undefined): string {
   if (body === undefined || body.trim().length === 0) return ''
   return `## ${heading}\n\n${body.trim()}\n\n`

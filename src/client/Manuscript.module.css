@@ -91,6 +91,14 @@
   text-overflow: ellipsis;
 }
 
+.applying {
+  flex: none;
+  font: 500 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  white-space: nowrap;
+}
+
 .spacer {
   flex: 1;
   min-width: 6px;

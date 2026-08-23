@@ -48,6 +48,23 @@ describe('useManuscript', () => {
     expect(result.current.markdown).not.toContain('World.') // now the earlier edit is undone
   })
 
+  it('applies a recommendation as one transaction, the same as a round trip through the source view', () => {
+    const { result } = renderHook(() => useManuscript('First paragraph.'))
+
+    act(() => typeParagraph(editorOf(result.current), ' Second paragraph.'))
+    expect(result.current.markdown).toContain('Second paragraph.')
+
+    act(() => result.current.applyRecommendation('First paragraph. Second paragraph. Third paragraph.'))
+    expect(result.current.markdown).toContain('Third paragraph.')
+
+    act(() => editorOf(result.current).commands.undo()) // undoes the application itself, whatever it touched
+    expect(result.current.markdown).not.toContain('Third paragraph.')
+    expect(result.current.markdown).toContain('Second paragraph.')
+
+    act(() => editorOf(result.current).commands.undo()) // undoes the paragraph typed before the application
+    expect(result.current.markdown).not.toContain('Second paragraph.')
+  })
+
   it('captures the outgoing scroll ratio and restores it on the incoming view without the caller sequencing anything', () => {
     // renderHook's `result.current` only settles after the passive-effect
     // phase, which runs after the hook's own layout effect that this test
