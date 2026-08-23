@@ -212,6 +212,13 @@ the workspaces rather than inside any of them.
         <change-id>.json       the passages one application changed, before and after
 ```
 
+**This layout is the store boundary's, and only its.** Every artifact above is reached by asking for
+the artifact — a piece's metadata, a piece's draft, the settings file — never by handing the store a
+path, so no module outside it composes one, and moving a file is one edit inside the boundary rather
+than a search across the modules that happened to read it. The workspace directory is the one
+exception, because the author names it and it is afterwards the root every piece is addressed
+against; the boundary is what resolves it and what refuses one that escapes.
+
 The workspace the author names is rejected unless it lands inside the data root. The data root
 itself is never asked for, because whoever ran the application already said where it is — and
 config living under it rather than in a per-user home directory is what makes the author's
@@ -228,7 +235,9 @@ absent key means the author has not chosen, which is a different thing from a va
 supplied on their behalf, and it is why nothing writes one until they pick.
 
 Shipped data travels with the application in three kinds: the participant charter, the role
-definitions, and the mode descriptors. The charter is what every participant is told whichever one it
+definitions, and the mode descriptors. It sits beside the application's own source rather than under
+the data root, and where exactly is the store boundary's like the rest of the layout: the modules
+that read modes, roles and the charter state what each must contain and never where it is. The charter is what every participant is told whichever one it
 is — what the three outcomes mean and what makes a recommendation applicable rather than commentary,
 that a direct question is owed an answer, and that nothing reasons about the author's question
 instead of about the story. It is its own kind because repeating it inside every role definition
@@ -1013,8 +1022,13 @@ Two are load-bearing and the rest of the orchestration is internal.
 | **model** | a call site, a prompt, a schema and an abort signal in; a conforming value, an abandonment, or a stated failure out | the LM Studio implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
 Two further interfaces are expected and useful without being doctrine. A **store** boundary
-concentrates atomic writes and artifact access, and gives tests an in-memory implementation. A
-**room** boundary owns the operations the author starts — start one, abandon the current one,
+concentrates atomic writes and artifact access, and owns the file layout "Files" draws: its entry
+points name artifacts — the settings file, a piece's metadata, a piece's draft, the three kinds of
+shipped data — so no module above it composes a path or holds a file handle, and containment against
+the workspace root is part of that ownership rather than a check a caller remembers to make. It is
+not a seam tests substitute: they cross the real implementation against a temporary directory, which
+is the real thing, and a second implementation with no variation behind it would be a premature seam
+asserting nothing. A **room** boundary owns the operations the author starts — start one, abandon the current one,
 subscribe to its events — which is already the client's contract, so tests and the client cross the
 same surface.
 

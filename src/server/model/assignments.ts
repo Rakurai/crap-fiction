@@ -1,6 +1,5 @@
 import { z } from 'zod'
-import { settingsPath } from '../settingsFile.js'
-import { readYamlArtifact, writeYamlArtifact } from '../store.js'
+import { readSettings, writeSettings } from '../store/index.js'
 import type { CallSiteDescriptor } from './callSites.js'
 import { requireCallSite } from './callSites.js'
 
@@ -17,12 +16,12 @@ const settingsSchema = z.object({
  * depends on, and holding it in memory would cost a restart per experiment.
  */
 export function getAssignment(dataRoot: string, site: string): string | undefined {
-  const settings = readYamlArtifact(settingsPath(dataRoot), settingsSchema)
+  const settings = readSettings(dataRoot, settingsSchema)
   return settings?.modelAssignments?.[site]
 }
 
 export function listAssignments(dataRoot: string): ReadonlyMap<string, string> {
-  const settings = readYamlArtifact(settingsPath(dataRoot), settingsSchema)
+  const settings = readSettings(dataRoot, settingsSchema)
   return new Map(Object.entries(settings?.modelAssignments ?? {}))
 }
 
@@ -40,5 +39,5 @@ export async function setAssignment(
   model: string,
 ): Promise<void> {
   requireCallSite(sites, site)
-  await writeYamlArtifact(settingsPath(dataRoot), { modelAssignments: { [site]: model } })
+  await writeSettings(dataRoot, { modelAssignments: { [site]: model } })
 }

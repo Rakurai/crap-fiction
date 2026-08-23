@@ -3,7 +3,15 @@ import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
-import { firstSchemaIssue } from './schemaIssue.js'
+import { firstSchemaIssue } from '../schemaIssue.js'
+
+/**
+ * The persistence boundary's inner layer: reading and writing one artifact at a
+ * path, and the tolerances a hand-edited file gets on the way in. Everything
+ * here takes a path, which is why none of it is the boundary's interface —
+ * `./index.js` is, and it names artifacts. Nothing outside `src/server/store/`
+ * imports this file.
+ */
 
 export class TolerantReadError extends Error {
   constructor(file: string, entry: string, reason: string) {
@@ -179,18 +187,16 @@ export async function writeTextArtifact(filePath: string, text: string): Promise
   await writeFileAtomic(filePath, text)
 }
 
-/** Whether an artifact exists, without naming a path or handle to the caller. */
-export function artifactExists(filePath: string): boolean {
+export function fileExists(filePath: string): boolean {
   return existsSync(filePath)
 }
 
-/** The moment an existing artifact was last written. */
-export function artifactModifiedMs(filePath: string): number {
+export function fileModifiedMs(filePath: string): number {
   return statSync(filePath).mtimeMs
 }
 
 /** The subdirectory names directly inside `dir`, or none if `dir` does not exist. */
-export function subdirectories(dir: string): readonly string[] {
+export function directoryNames(dir: string): readonly string[] {
   if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())

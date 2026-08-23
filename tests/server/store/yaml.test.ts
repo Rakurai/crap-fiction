@@ -10,7 +10,7 @@ import {
   ShippedDataError,
   TolerantReadError,
   writeYamlArtifact,
-} from '../../src/server/store.js'
+} from '../../../src/server/store/yaml.js'
 
 describe('readYamlArtifact / writeYamlArtifact', () => {
   let dir: string

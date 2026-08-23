@@ -1,49 +1,40 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { loadRoles } from '../../../src/server/model/roles.js'
-import { ShippedDataError } from '../../../src/server/store.js'
+import { describe, expect, it } from 'vitest'
+import { loadRoles, requireDistinctRoles, type RoleDefinition } from '../../../src/server/model/roles.js'
+import { ShippedDataError } from '../../../src/server/store/index.js'
 
-describe('loadRoles', () => {
-  let dir: string
+const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' }
 
-  beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'studio-roles-'))
-  })
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true })
-  })
-
-  function write(name: string, contents: string) {
-    writeFileSync(path.join(dir, name), contents, 'utf8')
-  }
-
-  it('loads a valid role definition', () => {
-    write('shape.yaml', 'id: shape\nhandle: shape\ndisplayName: Shape\nroleDescription: x\n')
-    expect(loadRoles(dir)).toEqual([{ id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' }])
-  })
-
-  it('fails startup, naming the file and the entry, when a role is missing a required field', () => {
-    write('shape.yaml', 'id: shape\nhandle: shape\nroleDescription: x\n')
-    expect(() => loadRoles(dir)).toThrowError(ShippedDataError)
-    expect(() => loadRoles(dir)).toThrowError(/displayName/)
-  })
-
-  it('fails startup when a handle is not one lowercase token', () => {
-    write('shape.yaml', 'id: shape\nhandle: "Shape One"\ndisplayName: Shape\nroleDescription: x\n')
-    expect(() => loadRoles(dir)).toThrowError(ShippedDataError)
+describe('requireDistinctRoles', () => {
+  it('passes a roster whose ids and handles are all distinct', () => {
+    const compression: RoleDefinition = {
+      id: 'compression',
+      handle: 'compression',
+      displayName: 'Compression',
+      roleDescription: 'y',
+    }
+    expect(requireDistinctRoles([shape, compression])).toEqual([shape, compression])
   })
 
   it('fails startup when two role definitions share a handle', () => {
-    write('shape.yaml', 'id: shape\nhandle: same\ndisplayName: Shape\nroleDescription: x\n')
-    write('compression.yaml', 'id: compression\nhandle: same\ndisplayName: Compression\nroleDescription: y\n')
-    expect(() => loadRoles(dir)).toThrowError(ShippedDataError)
-    expect(() => loadRoles(dir)).toThrowError(/duplicate handle/)
+    const other: RoleDefinition = { ...shape, id: 'compression', displayName: 'Compression' }
+    expect(() => requireDistinctRoles([shape, other])).toThrowError(ShippedDataError)
+    expect(() => requireDistinctRoles([shape, other])).toThrowError(/duplicate handle/)
   })
 
-  it('fails startup when no role definitions are shipped at all', () => {
-    expect(() => loadRoles(dir)).toThrowError(ShippedDataError)
+  it('fails startup when two role definitions share an id', () => {
+    const other: RoleDefinition = { ...shape, handle: 'other' }
+    expect(() => requireDistinctRoles([shape, other])).toThrowError(/duplicate participant id/)
+  })
+})
+
+describe('loadRoles', () => {
+  it('loads the roles actually shipped with the application, each with a single-token handle', () => {
+    const roles = loadRoles()
+    expect(roles.length).toBeGreaterThan(0)
+    for (const role of roles) {
+      expect(role.handle).toMatch(/^[a-z][a-z0-9]*$/)
+      expect(role.displayName.length).toBeGreaterThan(0)
+      expect(role.roleDescription.length).toBeGreaterThan(0)
+    }
   })
 })

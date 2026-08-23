@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError } from '../../src/server/pieces.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { TolerantReadError } from '../../src/server/store.js'
+import { TolerantReadError } from '../../src/server/store/index.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',

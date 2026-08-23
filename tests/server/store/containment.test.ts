@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { PathEscapesRootError, resolveWithinRoot } from '../../src/server/paths.js'
+import { PathEscapesRootError, resolveWithinRoot } from '../../../src/server/store/containment.js'
 
 describe('resolveWithinRoot', () => {
   let root: string

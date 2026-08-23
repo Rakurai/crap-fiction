@@ -11,7 +11,7 @@ import type { ModelAccess } from './model/modelAccess.js'
 import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
 import { createPiece, type DraftWriter, getPiece, listPieces, PieceNotFoundError } from './pieces.js'
-import { TolerantReadError } from './store.js'
+import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
 

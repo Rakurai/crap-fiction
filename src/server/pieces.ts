@@ -1,20 +1,16 @@
-import path from 'node:path'
 import slugify from '@sindresorhus/slugify'
 import { Mutex } from 'async-mutex'
-import { z } from 'zod'
-import { pieceStatusSchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
+import type { PieceDetail, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
-import { PathEscapesRootError, resolveWithinRoot } from './paths.js'
 import {
-  artifactExists,
-  artifactModifiedMs,
-  readTextArtifact,
-  readYamlArtifact,
-  subdirectories,
-  writeTextArtifact,
-  writeYamlArtifact,
-} from './store.js'
+  pieceExists,
+  pieceIds,
+  readPiece,
+  writeDraft,
+  writePieceMetadata,
+  type StoredPiece,
+} from './store/index.js'
 
 export class PieceNotFoundError extends Error {
   constructor(id: string) {
@@ -23,48 +19,29 @@ export class PieceNotFoundError extends Error {
   }
 }
 
-const pieceMetadataSchema = z.object({
-  title: z.string().min(1),
-  mode: z.string().min(1),
-  status: pieceStatusSchema,
-  cast: z.array(z.string().min(1)),
-})
-
-
-function pieceMetadataPath(pieceDir: string): string {
-  return path.join(pieceDir, 'piece.yaml')
-}
-
-function draftPath(pieceDir: string): string {
-  return path.join(pieceDir, 'draft.md')
-}
-
-type PieceMetadata = z.infer<typeof pieceMetadataSchema>
-type DraftRead = { text: string; modifiedMs: number }
-
-function loadPiece(id: string, pieceDir: string): { metadata: PieceMetadata; draft: DraftRead | undefined } {
-  const metadata = readYamlArtifact(pieceMetadataPath(pieceDir), pieceMetadataSchema)
-  if (metadata === undefined) {
-    throw new PieceNotFoundError(id)
-  }
-  return { metadata, draft: readTextArtifact(draftPath(pieceDir)) }
-}
-
 /**
  * SPEC "Files": a piece's length is its draft's, counted the same way
  * everywhere (`countWords`), and a piece with no draft yet is a piece the
  * author has only named — length 0, not a failure. Its modified time is the
- * draft's when one exists, and `piece.yaml`'s own otherwise, so a
- * just-created piece still has one.
+ * draft's when one exists, and its metadata's otherwise, so a just-created
+ * piece still has one.
  */
-function summarize(id: string, pieceDir: string, metadata: PieceMetadata, draft: DraftRead | undefined): PieceSummary {
-  const length = draft === undefined ? 0 : countWords(draft.text)
-  const modified = draft === undefined ? artifactModifiedMs(pieceMetadataPath(pieceDir)) : draft.modifiedMs
-  return { id, title: metadata.title, mode: metadata.mode, status: metadata.status, length, modified }
+function summarize(id: string, piece: StoredPiece): PieceSummary {
+  const { metadata, draft } = piece
+  return {
+    id,
+    title: metadata.title,
+    mode: metadata.mode,
+    status: metadata.status,
+    length: draft === undefined ? 0 : countWords(draft.text),
+    modified: draft === undefined ? piece.metadataModifiedMs : draft.modifiedMs,
+  }
 }
 
-function existingPieceIds(workspaceDir: string): ReadonlySet<string> {
-  return new Set(subdirectories(workspaceDir))
+function requirePiece(workspaceDir: string, id: string): StoredPiece {
+  const piece = readPiece(workspaceDir, id)
+  if (piece === undefined) throw new PieceNotFoundError(id)
+  return piece
 }
 
 /**
@@ -81,76 +58,43 @@ function uniquePieceId(existing: ReadonlySet<string>, title: string): string {
 }
 
 /**
- * SPEC "Files"/"HTTP layer": creation writes `piece.yaml` and nothing else —
- * no model call, no draft file — so a piece is creatable with the runtime
- * not even running. The mode's default cast becomes the piece's enabled
- * cast.
+ * SPEC "Files"/"HTTP layer": creation writes the piece's metadata and nothing
+ * else — no model call, no draft — so a piece is creatable with the runtime not
+ * even running. The mode's default cast becomes the piece's enabled cast.
  */
 export async function createPiece(workspaceDir: string, title: string, mode: ModeDescriptor): Promise<PieceSummary> {
-  const id = uniquePieceId(existingPieceIds(workspaceDir), title)
-  const pieceDir = path.join(workspaceDir, id)
+  const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
-  await writeYamlArtifact(pieceMetadataPath(pieceDir), {
+  await writePieceMetadata(workspaceDir, id, {
     title,
     mode: mode.id,
     status: 'drafting',
     cast: mode.cast.map((specialist) => specialist.id),
   })
 
-  const { metadata, draft } = loadPiece(id, pieceDir)
-  return summarize(id, pieceDir, metadata, draft)
+  return summarize(id, requirePiece(workspaceDir, id))
 }
 
 /**
- * SPEC "Files": listing pieces is a directory scan, not a registry — a
- * directory is a piece when it holds a `piece.yaml` and nothing else about
- * it is required.
+ * SPEC "Files": listing pieces is a directory scan, not a registry — the store
+ * reports which ids are pieces and this reports what the listing shows of each.
  */
 export function listPieces(workspaceDir: string): readonly PieceSummary[] {
-  const pieces = subdirectories(workspaceDir)
-    .filter((name) => artifactExists(pieceMetadataPath(path.join(workspaceDir, name))))
-    .map((name) => {
-      const pieceDir = path.join(workspaceDir, name)
-      const { metadata, draft } = loadPiece(name, pieceDir)
-      return summarize(name, pieceDir, metadata, draft)
-    })
-
+  const pieces = pieceIds(workspaceDir).map((id) => summarize(id, requirePiece(workspaceDir, id)))
   return pieces.sort((a, b) => b.modified - a.modified)
 }
 
 /**
- * The piece directory for an id that must already exist, refusing one that
- * escapes the workspace the same way `getPiece` does: a `PieceNotFoundError`
- * either way, since an author who typed a stray id gets no more information
- * from a path-traversal attempt than from a piece that never existed.
- */
-function resolvePieceDir(workspaceDir: string, id: string): string {
-  let pieceDir: string
-  try {
-    pieceDir = resolveWithinRoot(workspaceDir, id)
-  } catch (err) {
-    if (err instanceof PathEscapesRootError) {
-      throw new PieceNotFoundError(id)
-    }
-    throw err
-  }
-
-  if (!artifactExists(pieceMetadataPath(pieceDir))) {
-    throw new PieceNotFoundError(id)
-  }
-
-  return pieceDir
-}
-
-/**
  * SPEC "Transport": opening a piece returns its draft alongside its metadata,
- * unlike the listing, which reports only what a directory scan needs. Reads
- * the draft once, shared between the summary and the draft text.
+ * unlike the listing, which reports only what a directory scan needs. An id
+ * that names no piece and an id that would escape the workspace are the same
+ * `PieceNotFoundError`, since an author who typed a stray id gets no more
+ * information from a path-traversal attempt than from a piece that never
+ * existed.
  */
 export function getPiece(workspaceDir: string, id: string): PieceDetail {
-  const pieceDir = resolvePieceDir(workspaceDir, id)
-  const { metadata, draft } = loadPiece(id, pieceDir)
-  return { ...summarize(id, pieceDir, metadata, draft), draft: draft?.text ?? '' }
+  const piece = requirePiece(workspaceDir, id)
+  return { ...summarize(id, piece), draft: piece.draft?.text ?? '' }
 }
 
 /**
@@ -165,7 +109,7 @@ export class DraftWriter {
   readonly #lock = new Mutex()
 
   async save(workspaceDir: string, id: string, draft: string): Promise<void> {
-    const pieceDir = resolvePieceDir(workspaceDir, id)
-    await this.#lock.runExclusive(() => writeTextArtifact(draftPath(pieceDir), draft))
+    if (!pieceExists(workspaceDir, id)) throw new PieceNotFoundError(id)
+    await this.#lock.runExclusive(() => writeDraft(workspaceDir, id, draft))
   }
 }

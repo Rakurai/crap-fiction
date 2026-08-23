@@ -1,4 +1,3 @@
-import path from 'node:path'
 import type { Hono } from 'hono'
 import { createApp } from './app.js'
 import { loadEnv, type StudioEnv } from './env.js'
@@ -40,9 +39,9 @@ export function bootstrap(): Studio {
   logger.info({ port: env.port }, 'studio starting')
   const workspace = new WorkspaceRegistry(env.dataRoot)
   workspace.load()
-  const mode = loadModes(path.join(import.meta.dirname, 'modes'))
-  const roles = loadRoles(path.join(import.meta.dirname, 'model', 'roles'))
-  const charter = loadCharter(path.join(import.meta.dirname, 'model', 'charter.yaml'))
+  const mode = loadModes()
+  const roles = loadRoles()
+  const charter = loadCharter()
   const sites = callSites(roles)
   const draftWriter = new DraftWriter()
   const modelAdapter = new LMStudioAdapter(env.modelRuntimeUrl)

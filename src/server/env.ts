@@ -1,6 +1,6 @@
-import path from 'node:path'
 import { z } from 'zod'
 import { firstSchemaIssue } from './schemaIssue.js'
+import { isAbsoluteLocation } from './store/index.js'
 
 const VARIABLES = [
   'STUDIO_DATA_ROOT',
@@ -15,7 +15,7 @@ const shapeSchema = z.object({
   STUDIO_DATA_ROOT: z
     .string()
     .min(1)
-    .refine(path.isAbsolute, 'must be an absolute path'),
+    .refine(isAbsoluteLocation, 'must be an absolute path'),
   STUDIO_PORT: z
     .string()
     .regex(/^\d+$/, 'must be a positive integer')

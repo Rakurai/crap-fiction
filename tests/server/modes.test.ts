@@ -1,50 +1,36 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { loadModes } from '../../src/server/modes.js'
-import { ShippedDataError } from '../../src/server/store.js'
+import { describe, expect, it } from 'vitest'
+import { loadModes, selectSingleMode, type ModeDescriptor } from '../../src/server/modes.js'
+import { ShippedDataError } from '../../src/server/store/index.js'
 
-describe('loadModes', () => {
-  let dir: string
+const flash: ModeDescriptor = {
+  id: 'flash',
+  name: 'Flash',
+  cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }],
+}
 
-  beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'studio-modes-'))
-  })
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true })
-  })
-
+describe('selectSingleMode', () => {
   it('resolves the one shipped mode descriptor', () => {
-    writeFileSync(
-      path.join(dir, 'flash.yaml'),
-      'id: flash\nname: Flash\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n',
-      'utf8',
-    )
-    const mode = loadModes(dir)
-    expect(mode).toEqual({ id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] })
+    expect(selectSingleMode([flash])).toEqual(flash)
   })
 
   it('fails startup when more than one mode is shipped', () => {
-    writeFileSync(path.join(dir, 'flash.yaml'), 'id: flash\nname: Flash\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n', 'utf8')
-    writeFileSync(path.join(dir, 'epic.yaml'), 'id: epic\nname: Epic\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n', 'utf8')
-    expect(() => loadModes(dir)).toThrowError(ShippedDataError)
-    expect(() => loadModes(dir)).toThrowError(/found 2/)
-  })
-
-  it('fails startup, naming the file and the entry, when a mode is missing a required field', () => {
-    writeFileSync(path.join(dir, 'broken.yaml'), 'id: flash\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n', 'utf8')
-    expect(() => loadModes(dir)).toThrowError(ShippedDataError)
-    expect(() => loadModes(dir)).toThrowError(/name/)
+    expect(() => selectSingleMode([flash, { ...flash, id: 'epic', name: 'Epic' }])).toThrowError(ShippedDataError)
+    expect(() => selectSingleMode([flash, { ...flash, id: 'epic', name: 'Epic' }])).toThrowError(/found 2/)
   })
 
   it('fails startup when no mode descriptors are shipped at all', () => {
-    expect(() => loadModes(dir)).toThrowError(ShippedDataError)
+    expect(() => selectSingleMode([])).toThrowError(ShippedDataError)
   })
+})
 
-  it('fails startup when a cast entry is missing its criteria', () => {
-    writeFileSync(path.join(dir, 'flash.yaml'), 'id: flash\nname: Flash\ncast:\n  - id: shape\n', 'utf8')
-    expect(() => loadModes(dir)).toThrowError(ShippedDataError)
+describe('loadModes', () => {
+  it('resolves the mode actually shipped with the application', () => {
+    const mode = loadModes()
+    expect(mode.id).toBe('flash')
+    expect(mode.cast.length).toBeGreaterThan(0)
+    for (const specialist of mode.cast) {
+      expect(specialist.attendsTo.length).toBeGreaterThan(0)
+      expect(specialist.defect.length).toBeGreaterThan(0)
+    }
   })
 })

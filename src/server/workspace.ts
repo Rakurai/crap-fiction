@@ -1,7 +1,5 @@
 import { z } from 'zod'
-import { PathEscapesRootError, resolveWithinRoot } from './paths.js'
-import { settingsPath } from './settingsFile.js'
-import { readYamlArtifact, writeYamlArtifact } from './store.js'
+import { PathEscapesRootError, readSettings, resolveWorkspaceDirectory, writeSettings } from './store/index.js'
 
 export class WorkspaceOutsideRootError extends Error {
   constructor(dataRoot: string, candidate: string) {
@@ -36,7 +34,7 @@ export class WorkspaceRegistry {
   }
 
   load(): void {
-    const settings = readYamlArtifact(settingsPath(this.#dataRoot), settingsSchema)
+    const settings = readSettings(this.#dataRoot, settingsSchema)
     this.#workspace = settings?.workspace
   }
 
@@ -53,7 +51,7 @@ export class WorkspaceRegistry {
   async set(candidate: string): Promise<string> {
     let resolved: string
     try {
-      resolved = resolveWithinRoot(this.#dataRoot, candidate)
+      resolved = resolveWorkspaceDirectory(this.#dataRoot, candidate)
     } catch (err) {
       if (err instanceof PathEscapesRootError) {
         throw new WorkspaceOutsideRootError(this.#dataRoot, candidate)
@@ -61,7 +59,7 @@ export class WorkspaceRegistry {
       throw err
     }
 
-    await writeYamlArtifact(settingsPath(this.#dataRoot), { workspace: resolved })
+    await writeSettings(this.#dataRoot, { workspace: resolved })
     this.#workspace = resolved
     return resolved
   }
