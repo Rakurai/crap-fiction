@@ -88,10 +88,18 @@ describe('pieces', () => {
     expect(listed.map((p) => p.id)).toEqual([newer.id, older.id])
   })
 
-  it('opens a piece by its directory id', async () => {
+  it('opens a piece by its directory id, with an empty draft', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     const opened = getPiece(workspaceDir, created.id)
-    expect(opened).toEqual(created)
+    expect(opened).toEqual({ ...created, draft: '' })
+  })
+
+  it('opens a piece carrying its draft text', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+    writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
+
+    const opened = getPiece(workspaceDir, created.id)
+    expect(opened.draft).toBe('Two small words.')
   })
 
   it('reports a missing piece as a stated PieceNotFoundError', () => {

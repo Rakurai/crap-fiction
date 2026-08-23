@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { documentToMarkdown, markdownToDocument } from '../../src/document/markdown.js'
+import { documentToMarkdown, editorContentToMarkdown, markdownToDocument, markdownToEditorContent } from '../../src/document/markdown.js'
 import { documentSchema } from '../../src/document/schema.js'
 
 const { doc, paragraph, heading, horizontalRule } = documentSchema.nodes
@@ -127,5 +127,11 @@ describe('markdown round-trip over the constrained schema', () => {
     const result = markdownToDocument('one\\\ntwo\n')
 
     expect(result.child(0).textContent).toBe('one two')
+  })
+
+  it('round-trips through the editor-content bridge the same way as the document model', () => {
+    const source = '# Chapter One\n\nThe *cups* rattled, and the **saucer** cracked.\n'
+    const content = markdownToEditorContent(source)
+    expect(editorContentToMarkdown(content)).toBe(documentToMarkdown(markdownToDocument(source)))
   })
 })

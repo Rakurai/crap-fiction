@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { PieceSummary } from '../server/pieces.js'
+import type { PieceDetail } from '../server/pieces.js'
 import { fetchPiece } from './piecesClient.js'
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly piece: PieceSummary }
+  | { readonly status: 'ready'; readonly piece: PieceDetail }
   | { readonly status: 'error'; readonly message: string }
 
 export function usePiece(id: string): PieceViewModel {

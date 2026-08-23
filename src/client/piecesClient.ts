@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../server/envelope.js'
-import type { PieceSummary } from '../server/pieces.js'
+import type { PieceDetail, PieceSummary } from '../server/pieces.js'
 
 export class PiecesRequestFailure extends Error {
   constructor(message: string) {
@@ -21,9 +21,9 @@ export async function fetchPieces(): Promise<readonly PieceSummary[]> {
   return unwrap<readonly PieceSummary[]>(res)
 }
 
-export async function fetchPiece(id: string): Promise<PieceSummary> {
+export async function fetchPiece(id: string): Promise<PieceDetail> {
   const res = await fetch(`/pieces/${encodeURIComponent(id)}`)
-  return unwrap<PieceSummary>(res)
+  return unwrap<PieceDetail>(res)
 }
 
 export type CreatePieceResult = { readonly ok: true; readonly piece: PieceSummary } | { readonly ok: false; readonly message: string }

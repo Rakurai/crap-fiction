@@ -34,12 +34,23 @@ export type PieceSummary = Readonly<{
   modified: number
 }>
 
+export type PieceDetail = PieceSummary & Readonly<{ draft: string }>
+
 function pieceMetadataPath(pieceDir: string): string {
   return path.join(pieceDir, 'piece.yaml')
 }
 
 function draftPath(pieceDir: string): string {
   return path.join(pieceDir, 'draft.md')
+}
+
+/**
+ * SPEC "Files": a piece with no draft yet has been only named, so its
+ * manuscript is empty rather than a read failure.
+ */
+function readDraft(pieceDir: string): string {
+  const draft = draftPath(pieceDir)
+  return existsSync(draft) ? readFileSync(draft, 'utf8') : ''
 }
 
 /**
@@ -126,7 +137,11 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
   return pieces.sort((a, b) => b.modified - a.modified)
 }
 
-export function getPiece(workspaceDir: string, id: string): PieceSummary {
+/**
+ * SPEC "Transport": opening a piece returns its draft alongside its metadata,
+ * unlike the listing, which reports only what a directory scan needs.
+ */
+export function getPiece(workspaceDir: string, id: string): PieceDetail {
   let pieceDir: string
   try {
     pieceDir = resolveWithinRoot(workspaceDir, id)
@@ -141,5 +156,5 @@ export function getPiece(workspaceDir: string, id: string): PieceSummary {
     throw new PieceNotFoundError(id)
   }
 
-  return summarize(id, pieceDir)
+  return { ...summarize(id, pieceDir), draft: readDraft(pieceDir) }
 }

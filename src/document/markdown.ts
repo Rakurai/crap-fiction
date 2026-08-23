@@ -1,3 +1,4 @@
+import type { JSONContent } from '@tiptap/core'
 import MarkdownIt, { type MarkdownIt as MarkdownItInstance, type StateCore } from 'markdown-it'
 import { MarkdownParser, MarkdownSerializer } from 'prosemirror-markdown'
 import type { Node } from 'prosemirror-model'
@@ -84,4 +85,18 @@ export function markdownToDocument(markdown: string): Node {
 /** Serializes the manuscript's document model back into Markdown. */
 export function documentToMarkdown(document: Node): string {
   return serializer.serialize(document)
+}
+
+/**
+ * The editor integration's own view of the manuscript: TipTap's `content`
+ * option and `getJSON()` both traffic in this shape rather than a
+ * ProseMirror `Node`, so the seam between the document model and the editor
+ * is JSON, never a `Node` built by one schema instance handed to another's.
+ */
+export function markdownToEditorContent(markdown: string): JSONContent {
+  return markdownToDocument(markdown).toJSON()
+}
+
+export function editorContentToMarkdown(content: JSONContent): string {
+  return documentToMarkdown(documentSchema.nodeFromJSON(content))
 }
