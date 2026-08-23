@@ -88,6 +88,13 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const editor = useEditor({
     extensions: EXTENSIONS,
+    // The rendered view's editing surface says what it is the way the source
+    // view's textarea does by being one: a named, multi-line text field. A bare
+    // contenteditable division is a division as far as anything reading the
+    // page is concerned, so the prose surface would be addressable only by
+    // where it sits — by assistive technology, and by anything else that
+    // reaches the studio the way an author does.
+    editorProps: { attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Manuscript' } },
     content: markdownToEditorContent(initialMarkdown),
     onUpdate: ({ editor: current }) => {
       setLength(countWords(current.getText({ blockSeparator: '\n\n' })))

@@ -11,7 +11,7 @@ TSX := ./.sandcastle/node_modules/.bin/tsx
 # them: an absent one is a startup failure naming it (SPEC "Deployment").
 STUDIO_ENV := .env
 
-.PHONY: sandcastle run
+.PHONY: sandcastle run test
 
 # Work the next ticket on the ready-for-agent frontier. main.mts mints Bedrock
 # credentials on the host first and refuses to start if the SSO session is too
@@ -35,3 +35,13 @@ run:
 	    exit 1; \
 	  }; \
 	  exec npm run dev
+
+# Everything that can say the studio is broken, in the order that tells you
+# fastest: types, then the suite that needs no browser, then the journey through
+# one. The browser suite brings up its own studio on its own port against its own
+# data root, so it neither needs $(STUDIO_ENV) nor disturbs a studio already
+# running.
+test:
+	npm run typecheck
+	npm test
+	npm run test:e2e

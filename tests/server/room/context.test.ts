@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compileContext, renderPrompt } from '../../../src/server/room/context.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { Conversation } from '../../../src/shared/conversationViews.js'
-import { CHARTER_FIXTURE } from '../../fixtures/charter.js'
+import { CHARTER_FIXTURE } from '../../support/charter.js'
 
 const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
 const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', roleDescription: 'reasons about omission' }

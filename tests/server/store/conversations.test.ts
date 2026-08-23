@@ -39,6 +39,11 @@ describe('conversations', () => {
 
   it('reports the most recently written conversation as the most recent one', async () => {
     await writeConversation(workspaceDir, 'cups', 'older', { id: 'older', rounds: [] })
+    // The one place a test outside the store composes a path the store owns,
+    // and it is deliberate: "most recent" is a claim about modification times,
+    // and the store offers no way to age a file it has written. Writing the two
+    // in order instead would rest on the filesystem's timestamp resolution
+    // rather than on anything the store promises.
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, 'cups', 'conversations', 'older.json'), past, past)
 

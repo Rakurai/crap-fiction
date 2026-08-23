@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHARTER_FIXTURE } from '../../fixtures/charter.js'
+import { CHARTER_FIXTURE } from '../../support/charter.js'
 import { ModelAccess } from '../../../src/server/model/modelAccess.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import { runRound, type RoundPlan } from '../../../src/server/room/round.js'

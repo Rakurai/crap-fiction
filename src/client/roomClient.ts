@@ -56,10 +56,6 @@ export async function startRound(pieceId: string, conversationId: string, messag
   }
 }
 
-export async function abandonRound(pieceId: string, signal?: AbortSignal): Promise<void> {
-  await requestJson(`/pieces/${encodeURIComponent(pieceId)}/abandon`, z.null(), { method: 'POST', signal: signal ?? null })
-}
-
 /**
  * SPEC "Transport": server-sent events for round activity, one stream for
  * the open piece. Each frame is validated against its own event's schema

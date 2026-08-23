@@ -1,4 +1,4 @@
-import { CHARTER_FIXTURE } from '../fixtures/charter.js'
+import { CHARTER_FIXTURE } from './charter.js'
 import type { Charter } from '../../src/server/model/charter.js'
 import { ModelAccess } from '../../src/server/model/modelAccess.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
@@ -40,7 +40,7 @@ export type RoomOverrides = Readonly<{
 
 /**
  * SPEC "Room": the one place a test builds a `Room` directly. The charter a
- * room needs is `CHARTER_FIXTURE`, declared once in `tests/fixtures/charter.ts`,
+ * room needs is `CHARTER_FIXTURE`, declared once beside this file,
  * rather than a literal repeated per file that must be kept in agreement with
  * it by hand.
  */
