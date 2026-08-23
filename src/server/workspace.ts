@@ -10,6 +10,13 @@ export class WorkspaceOutsideRootError extends Error {
   }
 }
 
+export class WorkspaceNotSetError extends Error {
+  constructor() {
+    super('no workspace is configured')
+    this.name = 'WorkspaceNotSetError'
+  }
+}
+
 const settingsSchema = z.object({
   workspace: z.string().min(1).optional(),
 })
@@ -34,6 +41,12 @@ export class WorkspaceRegistry {
   }
 
   get(): string | undefined {
+    return this.#workspace
+  }
+
+  /** The configured workspace, or a declared `WorkspaceNotSetError` for a route to translate. */
+  require(): string {
+    if (this.#workspace === undefined) throw new WorkspaceNotSetError()
     return this.#workspace
   }
 

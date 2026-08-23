@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { z } from 'zod'
+import { firstSchemaIssue } from './schemaIssue.js'
 
 const VARIABLES = [
   'STUDIO_DATA_ROOT',
@@ -49,8 +50,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): StudioEnv {
   })
 
   if (!result.success) {
-    const issue = result.error.issues[0]
-    throw new Error(`invalid environment variable ${String(issue?.path[0])}: ${issue?.message}`)
+    const { entry, message } = firstSchemaIssue(result.error)
+    throw new Error(`invalid environment variable ${entry}: ${message}`)
   }
 
   return Object.freeze({

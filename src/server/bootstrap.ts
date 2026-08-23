@@ -18,20 +18,21 @@ export type Studio = {
   readonly env: StudioEnv
   readonly logger: Logger
   readonly workspace: WorkspaceRegistry
-  readonly modes: readonly ModeDescriptor[]
+  readonly mode: ModeDescriptor
   readonly charter: Charter
   readonly roles: readonly RoleDefinition[]
 }
 
 /**
  * The one place startup validation happens: an absent or malformed
- * STUDIO_* variable, invalid shipped mode data, invalid shipped role data,
- * or an invalid shipped charter, throws here before anything else runs. The
- * workspace path is read here too and only here — SPEC "Files" holds it as
- * process configuration rather than data re-read per request. `callSites`
- * is invoked for its validation alone: a participant id colliding with an
- * operation site is also a startup failure, not something a request should
- * discover.
+ * STUDIO_* variable, invalid or non-singular shipped mode data, invalid
+ * shipped role data, or an invalid shipped charter, throws here before
+ * anything else runs. The workspace path is read here too and only here —
+ * SPEC "Files" holds it as process configuration rather than data re-read per
+ * request. `callSites` both validates the roster — a participant id
+ * colliding with an operation site is a startup failure, not something a
+ * request should discover — and produces the one `sites` value the app is
+ * built with, so it is constructed here once rather than again inside it.
  */
 export function bootstrap(): Studio {
   const env = loadEnv()
@@ -39,13 +40,13 @@ export function bootstrap(): Studio {
   logger.info({ port: env.port }, 'studio starting')
   const workspace = new WorkspaceRegistry(env.dataRoot)
   workspace.load()
-  const modes = loadModes(path.join(import.meta.dirname, 'modes'))
+  const mode = loadModes(path.join(import.meta.dirname, 'modes'))
   const roles = loadRoles(path.join(import.meta.dirname, 'model', 'roles'))
   const charter = loadCharter(path.join(import.meta.dirname, 'model', 'charter.yaml'))
-  callSites(roles)
+  const sites = callSites(roles)
   const draftWriter = new DraftWriter()
   const modelAdapter = new LMStudioAdapter(env.modelRuntimeUrl)
   const modelAccess = new ModelAccess(modelAdapter, (site) => getAssignment(env.dataRoot, site))
-  const app = createApp(env, workspace, modes, draftWriter, roles, modelAccess)
-  return { app, env, logger, workspace, modes, charter, roles }
+  const app = createApp(env, workspace, mode, draftWriter, sites, modelAccess)
+  return { app, env, logger, workspace, mode, charter, roles }
 }

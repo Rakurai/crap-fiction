@@ -3,6 +3,7 @@ import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
+import { firstSchemaIssue } from './schemaIssue.js'
 
 export class TolerantReadError extends Error {
   constructor(file: string, entry: string, reason: string) {
@@ -77,17 +78,17 @@ export function readYamlArtifact<T>(filePath: string, schema: z.ZodType<T>): T |
 
   const text = readFileSync(filePath, 'utf8')
   const document = parseDocument(text)
-  if (document.errors.length > 0) {
-    throw new TolerantReadError(filePath, '(document)', document.errors[0]?.message ?? 'invalid YAML')
+  const [documentError] = document.errors
+  if (documentError !== undefined) {
+    throw new TolerantReadError(filePath, '(document)', documentError.message)
   }
 
   const raw = document.toJS() ?? {}
   const tolerated = tolerate(schema, raw)
   const result = schema.safeParse(tolerated)
   if (!result.success) {
-    const issue = result.error.issues[0]
-    const entry = issue !== undefined && issue.path.length > 0 ? issue.path.join('.') : '(document)'
-    throw new TolerantReadError(filePath, entry, issue?.message ?? 'invalid value')
+    const { entry, message } = firstSchemaIssue(result.error)
+    throw new TolerantReadError(filePath, entry, message)
   }
 
   return result.data
@@ -128,9 +129,8 @@ function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {
   const raw = parse(readFileSync(filePath, 'utf8'))
   const result = schema.safeParse(raw)
   if (!result.success) {
-    const issue = result.error.issues[0]
-    const entry = issue !== undefined && issue.path.length > 0 ? issue.path.join('.') : '(document)'
-    throw new ShippedDataError(filePath, entry, issue?.message ?? 'invalid value')
+    const { entry, message } = firstSchemaIssue(result.error)
+    throw new ShippedDataError(filePath, entry, message)
   }
   return result.data
 }

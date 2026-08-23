@@ -5,19 +5,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
 import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
+import { callSites } from '../../src/server/model/callSites.js'
 import { ModelAccess } from '../../src/server/model/modelAccess.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftWriter } from '../../src/server/pieces.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 
-const fixtureModes: readonly ModeDescriptor[] = [
-  { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] },
-]
+const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
 
 const fixtureRoles = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn' },
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'the generalist' },
 ]
+const fixtureSites = callSites(fixtureRoles)
 
 describe('call sites and models', () => {
   let dataRoot: string
@@ -42,7 +42,7 @@ describe('call sites and models', () => {
     workspace.load()
     const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, runtimeStatus)
     const modelAccess = new ModelAccess(adapter, () => undefined)
-    return createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureRoles, modelAccess)
+    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, modelAccess)
   }
 
   it('lists every call site, its role description where it has one, and no assignment yet', async () => {

@@ -17,6 +17,13 @@ export class DuplicateCallSiteError extends Error {
   }
 }
 
+export class UnknownCallSiteError extends Error {
+  constructor(site: string) {
+    super(`no call site "${site}"`)
+    this.name = 'UnknownCallSiteError'
+  }
+}
+
 export type CallSiteDescriptor = Readonly<{
   site: string
   displayName: string | null
@@ -56,6 +63,13 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
     ...roles.map((role) => ({ site: role.id, displayName: role.displayName, roleDescription: role.roleDescription })),
     ...OPERATION_CALL_SITES.map((site) => ({ site, displayName: null, roleDescription: null })),
   ]
+}
+
+/** The named call site, or a declared `UnknownCallSiteError` for a route to translate. */
+export function requireCallSite(sites: readonly CallSiteDescriptor[], site: string): CallSiteDescriptor {
+  const found = sites.find((candidate) => candidate.site === site)
+  if (found === undefined) throw new UnknownCallSiteError(site)
+  return found
 }
 
 export function withAssignments(

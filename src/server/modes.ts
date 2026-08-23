@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { readYamlDirectory } from './store.js'
+import { readYamlDirectory, ShippedDataError } from './store.js'
 
 const modeSpecialistSchema = z.object({
   id: z.string().min(1),
@@ -28,7 +28,18 @@ export type ModeDescriptor = Readonly<{
  * shipped-data loader: the author never hand-edits shipped data, so no
  * tolerance applies, and invalid shipped data is a startup failure (SPEC
  * "Files") rather than a degraded mode.
+ *
+ * PRD "Choose the form": with one form implemented, the author is shown the
+ * form rather than asked to choose it — a fact settled here, once, rather
+ * than by a route picking the first descriptor it finds. A roster that does
+ * not resolve to exactly one mode is a startup failure naming what was
+ * wrong, not a value a request-handling route invents.
  */
-export function loadModes(dir: string): readonly ModeDescriptor[] {
-  return readYamlDirectory(dir, modeSchema)
+export function loadModes(dir: string): ModeDescriptor {
+  const modes = readYamlDirectory(dir, modeSchema)
+  const [mode] = modes
+  if (modes.length !== 1 || mode === undefined) {
+    throw new ShippedDataError(dir, '(directory)', `expected exactly one mode, found ${modes.length}`)
+  }
+  return mode
 }

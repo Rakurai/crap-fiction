@@ -16,14 +16,21 @@ describe('loadModes', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('loads a valid mode descriptor', () => {
+  it('resolves the one shipped mode descriptor', () => {
     writeFileSync(
       path.join(dir, 'flash.yaml'),
       'id: flash\nname: Flash\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n',
       'utf8',
     )
-    const modes = loadModes(dir)
-    expect(modes).toEqual([{ id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }])
+    const mode = loadModes(dir)
+    expect(mode).toEqual({ id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] })
+  })
+
+  it('fails startup when more than one mode is shipped', () => {
+    writeFileSync(path.join(dir, 'flash.yaml'), 'id: flash\nname: Flash\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n', 'utf8')
+    writeFileSync(path.join(dir, 'epic.yaml'), 'id: epic\nname: Epic\ncast:\n  - id: shape\n    attendsTo: x\n    defect: y\n', 'utf8')
+    expect(() => loadModes(dir)).toThrowError(ShippedDataError)
+    expect(() => loadModes(dir)).toThrowError(/found 2/)
   })
 
   it('fails startup, naming the file and the entry, when a mode is missing a required field', () => {

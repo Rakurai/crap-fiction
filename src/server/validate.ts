@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator'
 import type { z } from 'zod'
 import { fail } from './envelope.js'
+import { firstSchemaIssue } from './schemaIssue.js'
 
 /**
  * SPEC "HTTP layer"/CODING_STANDARDS: every JSON response carries the one
@@ -10,8 +11,7 @@ import { fail } from './envelope.js'
 export function validateJson<T extends z.ZodType>(schema: T) {
   return zValidator('json', schema, (result, c) => {
     if (!result.success) {
-      const issue = result.error.issues[0]
-      return c.json(fail('INVALID_REQUEST', issue?.message ?? 'invalid request body'), 400)
+      return c.json(fail('INVALID_REQUEST', firstSchemaIssue(result.error).message), 400)
     }
   })
 }

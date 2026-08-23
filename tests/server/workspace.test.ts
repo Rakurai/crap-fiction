@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { WorkspaceOutsideRootError, WorkspaceRegistry } from '../../src/server/workspace.js'
+import { WorkspaceNotSetError, WorkspaceOutsideRootError, WorkspaceRegistry } from '../../src/server/workspace.js'
 
 describe('WorkspaceRegistry', () => {
   let dataRoot: string
@@ -19,6 +19,19 @@ describe('WorkspaceRegistry', () => {
     const registry = new WorkspaceRegistry(dataRoot)
     registry.load()
     expect(registry.get()).toBeUndefined()
+  })
+
+  it('raises a declared failure from require() when nothing was ever set', () => {
+    const registry = new WorkspaceRegistry(dataRoot)
+    registry.load()
+    expect(() => registry.require()).toThrowError(WorkspaceNotSetError)
+  })
+
+  it('returns the resolved workspace from require() once one is set', async () => {
+    const registry = new WorkspaceRegistry(dataRoot)
+    registry.load()
+    const resolved = await registry.set('my-writing')
+    expect(registry.require()).toBe(resolved)
   })
 
   it('refuses a directory outside the data root and leaves nothing set', async () => {
