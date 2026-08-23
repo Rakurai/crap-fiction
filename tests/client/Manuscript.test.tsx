@@ -6,6 +6,24 @@ const saveDraft = vi.fn<(id: string, text: string) => Promise<void>>()
 
 vi.mock('../../src/client/piecesClient.js', () => ({ saveDraft: (id: string, text: string) => saveDraft(id, text) }))
 
+// The header/reading/save-failure behaviour below is the piece under test;
+// the conversation panel Manuscript now renders beside it is exercised at
+// its own seams (roundProjection, Room). These are the two adapters it opens
+// on mount — a real fetch or EventSource has nothing to answer in jsdom.
+vi.mock('../../src/client/roomClient.js', () => ({
+  subscribeToRoom: () => () => {},
+  createConversation: async () => ({ ok: true, id: 'c1' }),
+  fetchConversation: async () => ({ id: 'c1', rounds: [] }),
+  startRound: async () => ({ ok: true }),
+  abandonRound: async () => {},
+}))
+
+vi.mock('../../src/client/callSitesClient.js', () => ({
+  fetchCallSites: async () => [],
+  fetchRuntimeStatus: async () => ({ reachable: true, models: [] }),
+  assignModel: async () => ({ ok: true, assignment: '' }),
+}))
+
 const { Manuscript } = await import('../../src/client/Manuscript.js')
 
 /**
@@ -35,7 +53,17 @@ describe('the piece header', () => {
   afterEach(cleanup)
 
   it('states the mode and the length in the facts register, in the mockup wording', () => {
-    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light of the day." onClose={vi.fn()} />)
+    render(
+      <Manuscript
+        pieceId="the-lighthouse"
+        title="The Lighthouse"
+        mode="flash"
+        draft="First light of the day."
+        currentConversationId={null}
+        roundInFlight={null}
+        onClose={vi.fn()}
+      />,
+    )
 
     expect(screen.getByText('FLASH · 5 WORDS')).toBeTruthy()
   })
@@ -45,7 +73,17 @@ describe('the reading view', () => {
   afterEach(cleanup)
 
   it('holds no control at all, and says so in the register rather than in a footer', () => {
-    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+    render(
+      <Manuscript
+        pieceId="the-lighthouse"
+        title="The Lighthouse"
+        mode="flash"
+        draft="First light."
+        currentConversationId={null}
+        roundInFlight={null}
+        onClose={vi.fn()}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'reading' }))
 
@@ -54,7 +92,17 @@ describe('the reading view', () => {
   })
 
   it('is left by the keystroke the hint names', () => {
-    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+    render(
+      <Manuscript
+        pieceId="the-lighthouse"
+        title="The Lighthouse"
+        mode="flash"
+        draft="First light."
+        currentConversationId={null}
+        roundInFlight={null}
+        onClose={vi.fn()}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'reading' }))
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -77,7 +125,17 @@ describe('the manuscript while a save is failing', () => {
 
   it('refuses to leave, says what the machine said, and lets go once a write succeeds', async () => {
     saveDraft.mockRejectedValueOnce(new Error('EACCES: permission denied'))
-    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+    render(
+      <Manuscript
+        pieceId="the-lighthouse"
+        title="The Lighthouse"
+        mode="flash"
+        draft="First light."
+        currentConversationId={null}
+        roundInFlight={null}
+        onClose={vi.fn()}
+      />,
+    )
 
     expect(leaveControl().disabled).toBe(false)
 
@@ -102,7 +160,17 @@ describe('the manuscript while a save is failing', () => {
 
   it('asks nothing about discarding — the refusal is not a question', async () => {
     saveDraft.mockRejectedValue(new Error('disk unhappy'))
-    render(<Manuscript pieceId="the-lighthouse" title="The Lighthouse" mode="flash" draft="First light." onClose={vi.fn()} />)
+    render(
+      <Manuscript
+        pieceId="the-lighthouse"
+        title="The Lighthouse"
+        mode="flash"
+        draft="First light."
+        currentConversationId={null}
+        roundInFlight={null}
+        onClose={vi.fn()}
+      />,
+    )
 
     type('First light. Then none.')
     await settle()

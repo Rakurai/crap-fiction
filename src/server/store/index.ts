@@ -6,10 +6,13 @@ import {
   directoryNames,
   fileExists,
   fileModifiedMs,
+  fileNames,
+  readJsonArtifact,
   readTextArtifact,
   readYamlArtifact,
   readYamlDirectory,
   readYamlFile,
+  writeJsonArtifact,
   writeTextArtifact,
   writeYamlArtifact,
 } from './yaml.js'
@@ -171,6 +174,77 @@ export async function writePieceMetadata(
 
 export async function writeDraft(workspaceDir: string, id: string, text: string): Promise<void> {
   await writeTextArtifact(draftFile(resolveWithinRoot(workspaceDir, id)), text)
+}
+
+/**
+ * SPEC "Room": addressing a specialist that is not enabled is the same
+ * durable write to `piece.yaml` as enabling it directly. Only the `cast` path
+ * is set, so a piece's title, mode and status survive untouched.
+ */
+export async function writePieceCast(workspaceDir: string, id: string, cast: readonly string[]): Promise<void> {
+  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: [...cast] })
+}
+
+// ---------------------------------------------------------------------------
+// Conversations
+// ---------------------------------------------------------------------------
+
+const CONVERSATION_SUFFIX = '.json'
+
+function conversationsDirectory(pieceDir: string): string {
+  return path.join(pieceDir, 'conversations')
+}
+
+function conversationFile(pieceDir: string, conversationId: string): string {
+  return path.join(conversationsDirectory(pieceDir), `${conversationId}${CONVERSATION_SUFFIX}`)
+}
+
+/**
+ * SPEC "Files": one JSON file per conversation. `undefined` is a declared,
+ * meaningful absence — a conversation identifier nothing has been written
+ * under yet (CONTEXT "Conversation": starting one is an intention until its
+ * first round opens).
+ */
+export function readConversation<T>(
+  workspaceDir: string,
+  pieceId: string,
+  conversationId: string,
+  schema: z.ZodType<T>,
+): T | undefined {
+  const pieceDir = pieceDirectory(workspaceDir, pieceId)
+  if (pieceDir === undefined) return undefined
+  return readJsonArtifact(conversationFile(pieceDir, conversationId), schema)
+}
+
+export async function writeConversation(
+  workspaceDir: string,
+  pieceId: string,
+  conversationId: string,
+  value: unknown,
+): Promise<void> {
+  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
+  await writeJsonArtifact(conversationFile(pieceDir, conversationId), value)
+}
+
+/**
+ * SPEC "Files": a conversation's last activity is its last round's, a fact
+ * about the file rather than a counter the application maintains — this is
+ * that fact for whichever conversation is most recently active, which is the
+ * one opening a piece resumes (CONTEXT "Conversation").
+ */
+export function mostRecentConversationId(workspaceDir: string, pieceId: string): string | undefined {
+  const pieceDir = pieceDirectory(workspaceDir, pieceId)
+  if (pieceDir === undefined) return undefined
+
+  const dir = conversationsDirectory(pieceDir)
+  const names = fileNames(dir, CONVERSATION_SUFFIX)
+  if (names.length === 0) return undefined
+
+  const [mostRecent] = names
+    .map((name) => ({ id: name.slice(0, -CONVERSATION_SUFFIX.length), modifiedMs: fileModifiedMs(path.join(dir, name)) }))
+    .sort((a, b) => b.modifiedMs - a.modifiedMs)
+
+  return mostRecent?.id
 }
 
 // ---------------------------------------------------------------------------

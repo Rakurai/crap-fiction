@@ -89,10 +89,10 @@ describe('pieces', () => {
     expect(listed.map((p) => p.id)).toEqual([newer.id, older.id])
   })
 
-  it('opens a piece by its directory id, with an empty draft', async () => {
+  it('opens a piece by its directory id, with an empty draft and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     const opened = getPiece(workspaceDir, created.id)
-    expect(opened).toEqual({ ...created, draft: '' })
+    expect(opened).toEqual({ ...created, draft: '', currentConversationId: null, roundInFlight: null })
   })
 
   it('opens a piece carrying its draft text', async () => {

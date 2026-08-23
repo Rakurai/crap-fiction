@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
+import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import { fail, ok } from '../shared/envelope.js'
@@ -10,7 +12,17 @@ import { UnknownCallSiteError, withAssignments } from './model/callSites.js'
 import type { ModelAccess } from './model/modelAccess.js'
 import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
-import { createPiece, type DraftWriter, getPiece, listPieces, PieceNotFoundError } from './pieces.js'
+import {
+  ConversationNotFoundError,
+  createPiece,
+  type DraftWriter,
+  getConversation,
+  getPiece,
+  listPieces,
+  PieceNotFoundError,
+} from './pieces.js'
+import { RoomBusyError, type Room } from './room/room.js'
+import { writeSseEvent } from './sse.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
@@ -20,10 +32,11 @@ const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
+const postRoundSchema = z.object({ message: z.string().min(1), draft: z.string() })
 
 /**
- * The room and every route SPEC's transport table names beyond `/workspace`,
- * `/pieces`, the piece draft, the interface theme and the model seam belong
+ * Every route SPEC's transport table names beyond `/workspace`, `/pieces`,
+ * the piece draft, the interface theme, the model seam and the room belongs
  * to later tickets.
  */
 export function createApp(
@@ -33,6 +46,7 @@ export function createApp(
   draftWriter: DraftWriter,
   sites: readonly CallSiteDescriptor[],
   modelAccess: ModelAccess,
+  room: Room,
 ): Hono {
   // SPEC "Local exposure": the server binds every interface, and a browser
   // may reach the published port as either loopback hostname.
@@ -61,13 +75,47 @@ export function createApp(
   })
 
   app.get('/pieces/:id', (c) => {
-    return c.json(ok(getPiece(workspace.require(), c.req.param('id'))))
+    const id = c.req.param('id')
+    const piece = getPiece(workspace.require(), id)
+    return c.json(ok({ ...piece, roundInFlight: room.snapshot(id) ?? null }))
   })
 
   app.put('/pieces/:id/draft', validateJson(putDraftSchema), async (c) => {
     const { draft } = c.req.valid('json')
     await draftWriter.save(workspace.require(), c.req.param('id'), draft)
     return c.json(ok(null))
+  })
+
+  app.post('/pieces/:id/conversations', (c) => {
+    return c.json(ok({ id: nanoid() }))
+  })
+
+  app.get('/pieces/:id/conversations/:cid', (c) => {
+    return c.json(ok(getConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))))
+  })
+
+  app.post('/pieces/:id/conversations/:cid/rounds', validateJson(postRoundSchema), async (c) => {
+    const { message, draft } = c.req.valid('json')
+    const result = await room.startRound(workspace.require(), c.req.param('id'), c.req.param('cid'), message, draft)
+    return c.json(ok(result))
+  })
+
+  app.post('/pieces/:id/abandon', (c) => {
+    room.abandon(c.req.param('id'))
+    return c.json(ok(null))
+  })
+
+  app.get('/pieces/:id/events', (c) => {
+    const pieceId = c.req.param('id')
+    return streamSSE(c, async (stream) => {
+      let pending: Promise<void> = Promise.resolve()
+      const unsubscribe = room.subscribe(pieceId, (event) => {
+        pending = pending.then(() => writeSseEvent(stream, event.type, event.data))
+      })
+      await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
+      unsubscribe()
+      await pending.catch(() => undefined)
+    })
   })
 
   app.get('/theme', (c) => {
@@ -107,6 +155,12 @@ export function createApp(
     }
     if (err instanceof PieceNotFoundError) {
       return c.json(fail('PIECE_NOT_FOUND', err.message), 404)
+    }
+    if (err instanceof ConversationNotFoundError) {
+      return c.json(fail('CONVERSATION_NOT_FOUND', err.message), 404)
+    }
+    if (err instanceof RoomBusyError) {
+      return c.json(fail('ROOM_BUSY', err.message), 409)
     }
     if (err instanceof TolerantReadError) {
       return c.json(fail('ARTIFACT_INVALID', err.message), 500)

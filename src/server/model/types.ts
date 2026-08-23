@@ -1,11 +1,8 @@
 import { z } from 'zod'
+import type { FailureReason } from '../../shared/modelResult.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 
-/**
- * SPEC "Model access": the failure taxonomy is the product's own — no status
- * code, runtime error class or SDK exception type crosses this boundary.
- */
-export type FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'nonconforming'
+export type { FailureReason } from '../../shared/modelResult.js'
 
 export type CallResult<T> =
   | { readonly outcome: 'value'; readonly value: T }

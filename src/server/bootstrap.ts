@@ -10,6 +10,7 @@ import { ModelAccess } from './model/modelAccess.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
 import { DraftWriter } from './pieces.js'
+import { Room } from './room/room.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -46,6 +47,7 @@ export function bootstrap(): Studio {
   const draftWriter = new DraftWriter()
   const modelAdapter = new LMStudioAdapter(env.modelRuntimeUrl)
   const modelAccess = new ModelAccess(modelAdapter, (site) => getAssignment(env.dataRoot, site))
-  const app = createApp(env, workspace, mode, draftWriter, sites, modelAccess)
+  const room = new Room(modelAccess, roles, charter, mode)
+  const app = createApp(env, workspace, mode, draftWriter, sites, modelAccess, room)
   return { app, env, logger, workspace, mode, charter, roles }
 }

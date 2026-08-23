@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
 import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
+import { CHARTER_FIXTURE } from '../fixtures/charter.js'
 import { callSites } from '../../src/server/model/callSites.js'
 import { ModelAccess } from '../../src/server/model/modelAccess.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftWriter } from '../../src/server/pieces.js'
+import { Room } from '../../src/server/room/room.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 
 const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
@@ -42,7 +44,8 @@ describe('call sites and models', () => {
     workspace.load()
     const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, runtimeStatus)
     const modelAccess = new ModelAccess(adapter, () => undefined)
-    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, modelAccess)
+    const room = new Room(modelAccess, fixtureRoles, CHARTER_FIXTURE, fixtureMode)
+    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, modelAccess, room)
   }
 
   it('lists every call site, its role description where it has one, and no assignment yet', async () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { roundSnapshotSchema } from './roundEvents.js'
 
 /**
  * What a piece looks like over the wire. Both ends need these: the server
@@ -23,5 +24,17 @@ const pieceSummaryShape = z.object({
 export const pieceSummarySchema = pieceSummaryShape.readonly()
 export type PieceSummary = z.infer<typeof pieceSummarySchema>
 
-export const pieceDetailSchema = pieceSummaryShape.extend({ draft: z.string() }).readonly()
+/**
+ * SPEC "Transport": opening a piece reports whatever round is in flight and
+ * which conversation is current, so a client that reloaded knows what it is
+ * looking at without a new event. `currentConversationId` is `null` until a
+ * conversation's first round has opened (CONTEXT "Conversation").
+ */
+export const pieceDetailSchema = pieceSummaryShape
+  .extend({
+    draft: z.string(),
+    currentConversationId: z.string().nullable(),
+    roundInFlight: roundSnapshotSchema.nullable(),
+  })
+  .readonly()
 export type PieceDetail = z.infer<typeof pieceDetailSchema>

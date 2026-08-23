@@ -26,6 +26,7 @@
     "date-fns": "4.4.0",
     "hono": "4.13.3",
     "markdown-it": "15.0.0",
+    "nanoid": "5.1.16",
     "p-retry": "6.2.1",
     "pino": "10.3.1",
     "prosemirror-markdown": "1.13.6",

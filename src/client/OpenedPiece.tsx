@@ -17,6 +17,8 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
         title={piece.piece.title}
         mode={piece.piece.mode}
         draft={piece.piece.draft}
+        currentConversationId={piece.piece.currentConversationId}
+        roundInFlight={piece.piece.roundInFlight}
         onClose={onClose}
       />
     )

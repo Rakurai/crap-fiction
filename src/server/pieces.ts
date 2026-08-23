@@ -1,11 +1,14 @@
 import slugify from '@sindresorhus/slugify'
 import { Mutex } from 'async-mutex'
+import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
 import type { PieceDetail, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
 import {
+  mostRecentConversationId,
   pieceExists,
   pieceIds,
+  readConversation,
   readPiece,
   writeDraft,
   writePieceMetadata,
@@ -16,6 +19,13 @@ export class PieceNotFoundError extends Error {
   constructor(id: string) {
     super(`no piece "${id}"`)
     this.name = 'PieceNotFoundError'
+  }
+}
+
+export class ConversationNotFoundError extends Error {
+  constructor(pieceId: string, conversationId: string) {
+    super(`no conversation "${conversationId}" for piece "${pieceId}"`)
+    this.name = 'ConversationNotFoundError'
   }
 }
 
@@ -92,9 +102,31 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
  * information from a path-traversal attempt than from a piece that never
  * existed.
  */
+/**
+ * The room's own state — a round in flight — is not this module's to know,
+ * so `getPiece` reports `roundInFlight: null` unconditionally; the route
+ * merges in whatever the room reports for this piece (SPEC "Seams": the room
+ * boundary owns the operations the author starts).
+ */
 export function getPiece(workspaceDir: string, id: string): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  return { ...summarize(id, piece), draft: piece.draft?.text ?? '' }
+  return {
+    ...summarize(id, piece),
+    draft: piece.draft?.text ?? '',
+    currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
+    roundInFlight: null,
+  }
+}
+
+/**
+ * SPEC "Files"/"Transport": a conversation exists once its first round
+ * opens, so an id naming none yet is a stated `ConversationNotFoundError`
+ * rather than an empty conversation standing in for one.
+ */
+export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): Conversation {
+  const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+  if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
+  return conversation
 }
 
 /**

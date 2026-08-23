@@ -202,3 +202,43 @@ export function directoryNames(dir: string): readonly string[] {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
 }
+
+/** The file names directly inside `dir` ending in `suffix`, or none if `dir` does not exist. */
+export function fileNames(dir: string, suffix: string): readonly string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(suffix))
+    .map((entry) => entry.name)
+}
+
+/**
+ * Reads a JSON artifact validated against `schema`, or `undefined` for a
+ * declared, meaningful absence. Conversations are JSON rather than
+ * hand-edited YAML (SPEC "Files"), so no tolerance applies here — anything
+ * that fails to parse or validate is a stated `TolerantReadError` naming the
+ * file and the entry, on the same terms as a corrupted YAML artifact.
+ */
+export function readJsonArtifact<T>(filePath: string, schema: z.ZodType<T>): T | undefined {
+  if (!existsSync(filePath)) return undefined
+
+  let raw: unknown
+  try {
+    raw = JSON.parse(readFileSync(filePath, 'utf8'))
+  } catch (err) {
+    throw new TolerantReadError(filePath, '(document)', err instanceof Error ? err.message : 'invalid JSON')
+  }
+
+  const result = schema.safeParse(raw)
+  if (!result.success) {
+    const { entry, message } = firstSchemaIssue(result.error)
+    throw new TolerantReadError(filePath, entry, message)
+  }
+
+  return result.data
+}
+
+/** Writes a JSON artifact atomically, creating its directory if needed. */
+export async function writeJsonArtifact(filePath: string, value: unknown): Promise<void> {
+  mkdirSync(path.dirname(filePath), { recursive: true })
+  await writeFileAtomic(filePath, JSON.stringify(value, null, 2))
+}
