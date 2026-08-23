@@ -50,7 +50,6 @@ export class LMStudioAdapter implements ModelAdapter {
       const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, combined, onState), {
         retries: RETRIES,
         signal: combined,
-        shouldRetry: (error) => !(error instanceof NonConformingError),
       })
       return { outcome: 'value', value }
     } catch (error) {
