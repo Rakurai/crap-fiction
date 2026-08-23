@@ -11,7 +11,15 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
   if (piece.status === 'ready') {
-    return <Manuscript pieceId={id} title={piece.piece.title} draft={piece.piece.draft} onClose={onClose} />
+    return (
+      <Manuscript
+        pieceId={id}
+        title={piece.piece.title}
+        mode={piece.piece.mode}
+        draft={piece.piece.draft}
+        onClose={onClose}
+      />
+    )
   }
 
   return (

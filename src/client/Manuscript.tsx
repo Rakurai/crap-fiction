@@ -1,5 +1,6 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect } from 'react'
+import { facts, modeName, wordCount } from './facts.js'
 import { useAutosave } from './useAutosave.js'
 import styles from './Manuscript.module.css'
 import { useManuscript } from './useManuscript.js'
@@ -7,6 +8,7 @@ import { useManuscript } from './useManuscript.js'
 type ManuscriptProps = {
   readonly pieceId: string
   readonly title: string
+  readonly mode: string
   readonly draft: string
   readonly onClose: () => void
 }
@@ -21,7 +23,7 @@ type ManuscriptProps = {
  * is not well-defined; the scroll ratio — where the author is looking — is
  * preserved across that switch instead.
  */
-export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) {
+export function Manuscript({ pieceId, title, mode, draft, onClose }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
   const autosave = useAutosave(pieceId, manuscript.markdown)
   const reading = manuscript.view === 'reading'
@@ -43,7 +45,7 @@ export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) 
             ‹ pieces
           </button>
           <span className={styles.title}>{title}</span>
-          <span className={styles.length}>{manuscript.length} words</span>
+          <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
           <span className={styles.spacer} />
           <div className={styles.controls}>
             <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
