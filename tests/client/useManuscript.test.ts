@@ -3,7 +3,16 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useManuscript } from '../../src/client/useManuscript.js'
 
-function typeParagraph(editor: NonNullable<ReturnType<typeof useManuscript>['editor']>, text: string) {
+type Editor = NonNullable<ReturnType<typeof useManuscript>['editor']>
+
+/** The editor mounts with the hook; a null one is the test's own failure to report. */
+function editorOf(manuscript: ReturnType<typeof useManuscript>): Editor {
+  const { editor } = manuscript
+  if (editor === null) throw new Error('the editor did not mount')
+  return editor
+}
+
+function typeParagraph(editor: Editor, text: string) {
   editor.commands.insertContentAt(editor.state.doc.content.size - 1, text)
 }
 
@@ -11,23 +20,23 @@ describe('useManuscript', () => {
   it('leaves undo history intact across a round trip through the source view', () => {
     const { result } = renderHook(() => useManuscript('First paragraph.'))
 
-    act(() => typeParagraph(result.current.editor!, ' Second paragraph.'))
+    act(() => typeParagraph(editorOf(result.current), ' Second paragraph.'))
     expect(result.current.markdown).toContain('Second paragraph.')
 
     act(() => result.current.showSource())
     act(() => result.current.showRendered())
     expect(result.current.markdown).toContain('Second paragraph.') // round trip preserves meaning
 
-    act(() => result.current.editor!.commands.undo()) // undoes the switch itself, a no-op replace
+    act(() => editorOf(result.current).commands.undo()) // undoes the switch itself, a no-op replace
     expect(result.current.markdown).toContain('Second paragraph.')
 
-    act(() => result.current.editor!.commands.undo()) // undoes the paragraph typed before the switch
+    act(() => editorOf(result.current).commands.undo()) // undoes the paragraph typed before the switch
     expect(result.current.markdown).not.toContain('Second paragraph.')
   })
 
   it('reaches the editor as one transaction on return from source, regardless of timing', () => {
     const { result } = renderHook(() => useManuscript('Hello.'))
-    const editor = result.current.editor!
+    const editor = editorOf(result.current)
 
     act(() => typeParagraph(editor, ' World.'))
     act(() => result.current.showSource()) // no delay before showRendered — a fast round trip

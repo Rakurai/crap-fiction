@@ -14,9 +14,10 @@ type RuntimeStatusBannerProps = {
 export function RuntimeStatusBanner({ runtime }: RuntimeStatusBannerProps) {
   if (runtime === undefined) return null
   if (!runtime.reachable) return <p className={styles.banner}>MODEL RUNTIME NOT RUNNING</p>
+  const count = runtime.models.length
   return (
     <p className={styles.banner}>
-      MODEL RUNTIME RUNNING · {runtime.models.length} MODEL(S) DOWNLOADED
+      MODEL RUNTIME RUNNING · {count} {count === 1 ? 'MODEL' : 'MODELS'} DOWNLOADED
     </p>
   )
 }

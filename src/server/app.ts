@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import { fail, ok } from '../shared/envelope.js'
+import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
 import type { CallSiteDescriptor } from './model/callSites.js'
@@ -16,7 +17,7 @@ import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1) })
-const putThemeSchema = z.object({ theme: z.enum(['light', 'dark']) })
+const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 
