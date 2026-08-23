@@ -11,6 +11,8 @@ type ManuscriptProps = {
   readonly onClose: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
+  /** UX_DESIGN "Prominence": editing the room is one action away, reached from here like the other view controls — this surface knows nothing else about it. */
+  readonly onOpenRoom: () => void
 }
 
 /**
@@ -36,7 +38,7 @@ type ManuscriptProps = {
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ title, mode, onClose, manuscript, autosave }: ManuscriptProps) {
+export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -64,6 +66,9 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave }: Manus
             </button>
             <button type="button" className={styles.control} onClick={manuscript.showReading}>
               reading
+            </button>
+            <button type="button" className={styles.control} onClick={onOpenRoom}>
+              room
             </button>
           </div>
         </div>

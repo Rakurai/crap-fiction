@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
+import { castMemberViewSchema, pieceDetailSchema, pieceSummarySchema, type CastMemberView, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
 import { requestJson, type RequestResult } from './request.js'
 
 /**
@@ -30,6 +30,16 @@ export function createPiece(title: string, signal?: AbortSignal): Promise<Reques
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ title }),
+    signal: signal ?? null,
+  })
+}
+
+/** CONTEXT "Room"/#13: enabling and disabling a specialist, carrying the piece's whole enabled cast at once. */
+export function setPieceCast(id: string, cast: readonly string[], signal?: AbortSignal): Promise<RequestResult<readonly CastMemberView[]>> {
+  return requestJson(`/pieces/${encodeURIComponent(id)}`, z.array(castMemberViewSchema).readonly(), {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ cast }),
     signal: signal ?? null,
   })
 }

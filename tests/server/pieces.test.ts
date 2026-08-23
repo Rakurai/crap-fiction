@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError } from '../../src/server/pieces.js'
+import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError, setPieceCast, UnknownCastMemberError } from '../../src/server/pieces.js'
+import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { DraftStore } from '../../src/server/store/index.js'
 
@@ -14,6 +15,11 @@ const flash: ModeDescriptor = {
     { id: 'compression', attendsTo: 'x', defect: 'y' },
   ],
 }
+
+const specialists: readonly RoleDefinition[] = [
+  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it' },
+  { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space' },
+]
 
 describe('pieces', () => {
   let workspaceDir: string
@@ -91,8 +97,18 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
-    const opened = getPiece(workspaceDir, created.id, null)
-    expect(opened).toEqual({ ...created, draft: '', storyContext: {}, currentConversationId: null, roundInFlight: null })
+    const opened = getPiece(workspaceDir, created.id, null, specialists)
+    expect(opened).toEqual({
+      ...created,
+      draft: '',
+      storyContext: {},
+      currentConversationId: null,
+      roundInFlight: null,
+      cast: [
+        { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
+        { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
+      ],
+    })
   })
 
   it('opens a piece reporting the story context the author wrote, section by section', async () => {
@@ -103,7 +119,7 @@ describe('pieces', () => {
       'utf8',
     )
 
-    expect(getPiece(workspaceDir, created.id, null).storyContext).toEqual({
+    expect(getPiece(workspaceDir, created.id, null, specialists).storyContext).toEqual({
       Premise: ['two cups, one left behind'],
       'Point of view': ['close third, past tense'],
     })
@@ -113,16 +129,61 @@ describe('pieces', () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
 
-    const opened = getPiece(workspaceDir, created.id, null)
+    const opened = getPiece(workspaceDir, created.id, null, specialists)
     expect(opened.draft).toBe('Two small words.')
   })
 
   it('reports a missing piece as a stated PieceNotFoundError', () => {
-    expect(() => getPiece(workspaceDir, 'nothing-here', null)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, 'nothing-here', null, specialists)).toThrowError(PieceNotFoundError)
   })
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
-    expect(() => getPiece(workspaceDir, '../../etc', null)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, '../../etc', null, specialists)).toThrowError(PieceNotFoundError)
+  })
+})
+
+describe('setPieceCast', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('disables a specialist and reports the cast as it now stands', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+
+    const view = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
+
+    expect(view).toEqual([
+      { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
+      { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
+    ])
+    expect(getPiece(workspaceDir, created.id, null, specialists).cast).toEqual(view)
+  })
+
+  it('re-enables a specialist disabled earlier, simply making it eligible again', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+    await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
+
+    const view = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
+
+    expect(view.find((member) => member.id === 'compression')?.enabled).toBe(true)
+  })
+
+  it('never widens the room past the mode\'s cast: an id outside it is a stated UnknownCastMemberError', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash)
+
+    await expect(setPieceCast(workspaceDir, created.id, specialists, ['shape', 'story-editor'])).rejects.toThrowError(
+      UnknownCastMemberError,
+    )
+  })
+
+  it('reports a missing piece as a stated PieceNotFoundError rather than writing one', async () => {
+    await expect(setPieceCast(workspaceDir, 'nothing-here', specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
   })
 })
 

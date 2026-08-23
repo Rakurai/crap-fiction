@@ -130,4 +130,71 @@ describe('/pieces', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
   })
+
+  it('opens a piece listing its specialists with their role descriptions, all enabled by default', async () => {
+    const app = await withWorkspace()
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+
+    const res = await app.request('/pieces/cups')
+    const body = await res.json()
+    expect(body).toMatchObject({
+      success: true,
+      data: { cast: [{ id: 'shape', displayName: 'Shape', roleDescription: 'x', enabled: true }] },
+    })
+  })
+
+  it('disables a specialist, and the next open reports it disabled', async () => {
+    const app = await withWorkspace()
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+
+    const patchRes = await app.request('/pieces/cups', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cast: [] }),
+    })
+    expect(patchRes.status).toBe(200)
+    expect(await patchRes.json()).toMatchObject({
+      success: true,
+      data: [{ id: 'shape', enabled: false }],
+    })
+
+    const getRes = await app.request('/pieces/cups')
+    expect(await getRes.json()).toMatchObject({ success: true, data: { cast: [{ id: 'shape', enabled: false }] } })
+  })
+
+  it('refuses to widen a piece past its mode\'s cast', async () => {
+    const app = await withWorkspace()
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+
+    const res = await app.request('/pieces/cups', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cast: ['story-editor'] }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
+  })
+
+  it('reports enabling a specialist for a piece that does not exist as PIECE_NOT_FOUND', async () => {
+    const app = await withWorkspace()
+    const res = await app.request('/pieces/nothing-here', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cast: [] }),
+    })
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
+  })
 })

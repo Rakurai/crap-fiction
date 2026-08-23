@@ -20,7 +20,9 @@ import {
   getPiece,
   listPieces,
   PieceNotFoundError,
+  setPieceCast,
   startConversation,
+  UnknownCastMemberError,
 } from './pieces.js'
 import { RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
@@ -34,6 +36,7 @@ const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postRoundSchema = z.object({ message: z.string().min(1), draft: z.string() })
+const patchPieceSchema = z.object({ cast: z.array(z.string().min(1)) })
 
 /**
  * Every route SPEC's transport table names beyond `/workspace`, `/pieces`,
@@ -83,7 +86,19 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null)))
+    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null, room.specialists())))
+  })
+
+  /**
+   * #13 "The room": enabling and disabling specialists is one lightweight
+   * write, carrying no rationale and taking effect on the next unaddressed
+   * round — SPEC's PATCH route also carries a piece's title and status, which
+   * belong to #19.
+   */
+  app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
+    const { cast } = c.req.valid('json')
+    const view = await setPieceCast(workspace.require(), c.req.param('id'), room.specialists(), cast)
+    return c.json(ok(view))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
@@ -175,6 +190,7 @@ export function createApp(
     if (err instanceof WorkspaceOutsideRootError) return refused('WORKSPACE_OUTSIDE_ROOT', 400)
     if (err instanceof UnknownCallSiteError) return refused('CALL_SITE_NOT_FOUND', 404)
     if (err instanceof PieceNotFoundError) return refused('PIECE_NOT_FOUND', 404)
+    if (err instanceof UnknownCastMemberError) return refused('CAST_MEMBER_UNKNOWN', 400)
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)

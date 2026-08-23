@@ -1,5 +1,6 @@
 /* The two permanent surfaces, side by side. */
 .row {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;

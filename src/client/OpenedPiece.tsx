@@ -1,10 +1,12 @@
-import type { PieceDetail } from '../shared/pieceViews.js'
+import { useState } from 'react'
+import type { CastMemberView, PieceDetail } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
 import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
+import { RoomEditor } from './RoomEditor.js'
 import { abandonOperation, createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
@@ -14,6 +16,13 @@ import { useRoster } from './useRoster.js'
 type OpenedPieceProps = {
   readonly id: string
   readonly onClose: () => void
+}
+
+type RoomProps = {
+  readonly cast: readonly CastMemberView[]
+  readonly toggling: string | undefined
+  readonly error: string | undefined
+  readonly onToggle: (id: string) => void
 }
 
 /**
@@ -30,7 +39,7 @@ type OpenedPieceProps = {
  * it is what keeps a participant from being drawn under its internal id for the
  * moment before the roster lands.
  */
-function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly onClose: () => void }) {
+function Surfaces({ piece, room, onClose }: { readonly piece: PieceDetail; readonly room: RoomProps; readonly onClose: () => void }) {
   const manuscript = useManuscript(piece.draft)
   const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
@@ -38,10 +47,21 @@ function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly on
   // rather than only on the models screen: it is the composer's notice, and the
   // composer is on this screen.
   const [probe] = useLoaded(fetchRuntimeStatus, [])
+  // UX_DESIGN "Prominence": editing the room owns no permanent space — it
+  // arrives on the one action that reaches it and leaves on the one that
+  // closes it.
+  const [roomOpen, setRoomOpen] = useState(false)
 
   return (
     <div className={styles.row}>
-      <Manuscript title={piece.title} mode={piece.mode} onClose={onClose} manuscript={manuscript} autosave={autosave} />
+      <Manuscript
+        title={piece.title}
+        mode={piece.mode}
+        onClose={onClose}
+        manuscript={manuscript}
+        autosave={autosave}
+        onOpenRoom={() => setRoomOpen(true)}
+      />
       {manuscript.view !== 'reading' && roster.settled && (
         <Conversation
           pieceId={piece.id}
@@ -57,6 +77,14 @@ function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly on
           clock={Date.now}
         />
       )}
+      {roomOpen && (
+        <RoomEditor members={room.cast} toggling={room.toggling} onToggle={room.onToggle} onClose={() => setRoomOpen(false)} />
+      )}
+      {room.error !== undefined && (
+        <p className={styles.error} role="alert">
+          {room.error}
+        </p>
+      )}
     </div>
   )
 }
@@ -64,7 +92,15 @@ function Surfaces({ piece, onClose }: { readonly piece: PieceDetail; readonly on
 export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
-  if (piece.status === 'ready') return <Surfaces piece={piece.piece} onClose={onClose} />
+  if (piece.status === 'ready') {
+    return (
+      <Surfaces
+        piece={piece.piece}
+        room={{ cast: piece.piece.cast, toggling: piece.castToggling, error: piece.castError, onToggle: piece.toggleCast }}
+        onClose={onClose}
+      />
+    )
+  }
 
   return (
     <div className={styles.screen}>

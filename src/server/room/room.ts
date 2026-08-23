@@ -129,6 +129,16 @@ export class Room {
     this.#criteria = roster.criteria
   }
 
+  /**
+   * The room's own roster, for the one surface outside a round that needs to
+   * name who could ever be in it (#13: listing a piece's specialists to enable
+   * or disable them). The Story Editor is never part of this — CONTEXT "Room":
+   * "the Story Editor is always present and is not one of them".
+   */
+  specialists(): readonly RoleDefinition[] {
+    return this.#specialists
+  }
+
   subscribe(pieceId: string, listener: Listener): () => void {
     const set = this.#listeners.get(pieceId) ?? new Set()
     set.add(listener)

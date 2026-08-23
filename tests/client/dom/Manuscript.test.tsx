@@ -14,6 +14,7 @@ const DEFAULT_PROPS = {
   mode: 'flash',
   draft: 'First light of the day.',
   onClose: vi.fn(),
+  onOpenRoom: vi.fn(),
 }
 
 /**
@@ -27,7 +28,16 @@ function Harness(props: typeof DEFAULT_PROPS) {
   const manuscript = useManuscript(props.draft)
   const autosave = useAutosave(props.pieceId, manuscript.markdown, (text) => saveDraft(props.pieceId, text))
 
-  return <Manuscript title={props.title} mode={props.mode} onClose={props.onClose} manuscript={manuscript} autosave={autosave} />
+  return (
+    <Manuscript
+      title={props.title}
+      mode={props.mode}
+      onClose={props.onClose}
+      manuscript={manuscript}
+      autosave={autosave}
+      onOpenRoom={props.onOpenRoom}
+    />
+  )
 }
 
 /** Every test renders the manuscript through here, overriding only what it cares about. */
@@ -73,6 +83,19 @@ describe('the piece header', () => {
     renderManuscript({ draft: 'First light of the day.' })
 
     expect(screen.getByText(facts(modeName('flash'), wordCount(5)))).toBeTruthy()
+  })
+})
+
+describe('editing the room', () => {
+  afterEach(cleanup)
+
+  it('is one action away, and knows nothing beyond that it was reached', () => {
+    const onOpenRoom = vi.fn()
+    renderManuscript({ onOpenRoom })
+
+    fireEvent.click(screen.getByRole('button', { name: 'room' }))
+
+    expect(onOpenRoom).toHaveBeenCalledTimes(1)
   })
 })
 

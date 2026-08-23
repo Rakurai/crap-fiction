@@ -2,9 +2,10 @@ import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
 import { durableContextSchema } from '../shared/durableContext.js'
-import type { PieceDetail, PieceSummary } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceSummary } from '../shared/pieceViews.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import { countWords } from '../shared/storyLength.js'
+import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import {
   mostRecentConversationId,
@@ -13,6 +14,7 @@ import {
   readConversation,
   readPiece,
   readStoryContext,
+  writePieceCast,
   writePieceMetadata,
   type DraftStore,
   type StoredPiece,
@@ -29,6 +31,19 @@ export class ConversationNotFoundError extends Error {
   constructor(pieceId: string, conversationId: string) {
     super(`no conversation "${conversationId}" for piece "${pieceId}"`)
     this.name = 'ConversationNotFoundError'
+  }
+}
+
+/**
+ * #13 "What already stands": the mode's cast is the ceiling, resolved once at
+ * the composition root — this surface never widens a piece's room beyond it.
+ * An id naming no specialist in that ceiling is refused rather than written,
+ * since the room this piece can ever hold does not include it.
+ */
+export class UnknownCastMemberError extends Error {
+  constructor(pieceId: string, memberId: string) {
+    super(`piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
+    this.name = 'UnknownCastMemberError'
   }
 }
 
@@ -55,6 +70,22 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
   const piece = readPiece(workspaceDir, id)
   if (piece === undefined) throw new PieceNotFoundError(id)
   return piece
+}
+
+/**
+ * CONTEXT "Room": the piece's specialists, each with its static role
+ * description and whether it presently sits in the enabled cast. `specialists`
+ * is the mode's cast resolved to role definitions — the ceiling this piece's
+ * room can ever hold — so a specialist the piece has disabled is still listed,
+ * ready to be enabled again.
+ */
+function castView(specialists: readonly RoleDefinition[], enabled: readonly string[]): readonly CastMemberView[] {
+  return specialists.map((role) => ({
+    id: role.id,
+    displayName: role.displayName,
+    roleDescription: role.roleDescription,
+    enabled: enabled.includes(role.id),
+  }))
 }
 
 /**
@@ -110,7 +141,12 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
  * overwrite (SPEC "Seams": the room boundary owns the operations the author
  * starts). A caller therefore cannot compose this view without having asked.
  */
-export function getPiece(workspaceDir: string, id: string, roundInFlight: RoundSnapshot | null): PieceDetail {
+export function getPiece(
+  workspaceDir: string,
+  id: string,
+  roundInFlight: RoundSnapshot | null,
+  specialists: readonly RoleDefinition[],
+): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
   return {
     ...summarize(id, piece),
@@ -121,7 +157,29 @@ export function getPiece(workspaceDir: string, id: string, roundInFlight: RoundS
     storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     roundInFlight,
+    cast: castView(specialists, piece.metadata.cast),
   }
+}
+
+/**
+ * CONTEXT "Room"/#13: the author's own act of enabling or disabling a
+ * specialist, carrying no rationale and no lifecycle — just the cast the piece
+ * now has. `specialists` is the mode's ceiling, checked here so a stray or
+ * stale id never widens a piece's room past what its mode admits.
+ */
+export async function setPieceCast(
+  workspaceDir: string,
+  id: string,
+  specialists: readonly RoleDefinition[],
+  cast: readonly string[],
+): Promise<readonly CastMemberView[]> {
+  requirePiece(workspaceDir, id)
+  const ceiling = new Set(specialists.map((role) => role.id))
+  const outside = cast.find((memberId) => !ceiling.has(memberId))
+  if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
+
+  await writePieceCast(workspaceDir, id, cast)
+  return castView(specialists, cast)
 }
 
 /**
