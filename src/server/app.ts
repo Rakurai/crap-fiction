@@ -5,7 +5,7 @@ import { fail, ok } from './envelope.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
 import { callSites, withAssignments } from './model/callSites.js'
-import type { RoleDefinition } from './model/charter.js'
+import type { RoleDefinition } from './model/roles.js'
 import type { ModelAccess } from './model/modelAccess.js'
 import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
@@ -30,10 +30,10 @@ export function createApp(
   workspace: WorkspaceRegistry,
   modes: readonly ModeDescriptor[],
   draftWriter: DraftWriter,
-  charter: readonly RoleDefinition[],
+  roles: readonly RoleDefinition[],
   modelAccess: ModelAccess,
 ): Hono {
-  const sites = callSites(charter)
+  const sites = callSites(roles)
   // SPEC "Local exposure": the server binds every interface, and a browser
   // may reach the published port as either loopback hostname.
   const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]

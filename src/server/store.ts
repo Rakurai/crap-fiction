@@ -124,6 +124,17 @@ export async function writeYamlArtifact(filePath: string, values: Record<string,
   await writeFileAtomic(filePath, document.toString())
 }
 
+function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {
+  const raw = parse(readFileSync(filePath, 'utf8'))
+  const result = schema.safeParse(raw)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    const entry = issue !== undefined && issue.path.length > 0 ? issue.path.join('.') : '(document)'
+    throw new ShippedDataError(filePath, entry, issue?.message ?? 'invalid value')
+  }
+  return result.data
+}
+
 /**
  * Reads every `.yaml` file in `dir` as one shipped-data entry, validated
  * strictly against `schema`: the author never hand-edits shipped data, so
@@ -132,23 +143,25 @@ export async function writeYamlArtifact(filePath: string, values: Record<string,
  */
 export function readYamlDirectory<T>(dir: string, schema: z.ZodType<T>): readonly T[] {
   const files = readdirSync(dir).filter((name) => name.endsWith('.yaml'))
-  const items = files.map((name) => {
-    const filePath = path.join(dir, name)
-    const raw = parse(readFileSync(filePath, 'utf8'))
-    const result = schema.safeParse(raw)
-    if (!result.success) {
-      const issue = result.error.issues[0]
-      const entry = issue !== undefined && issue.path.length > 0 ? issue.path.join('.') : '(document)'
-      throw new ShippedDataError(filePath, entry, issue?.message ?? 'invalid value')
-    }
-    return result.data
-  })
+  const items = files.map((name) => parseShippedYaml(path.join(dir, name), schema))
 
   if (items.length === 0) {
     throw new ShippedDataError(dir, '(directory)', 'no data found')
   }
 
   return items
+}
+
+/**
+ * Reads a single shipped-data file, validated strictly against `schema` on
+ * the same terms as `readYamlDirectory`: an absent or invalid file is a
+ * startup failure naming the file and the entry (SPEC "Files").
+ */
+export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
+  return parseShippedYaml(filePath, schema)
 }
 
 /**

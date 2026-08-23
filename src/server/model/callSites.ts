@@ -1,4 +1,4 @@
-import type { RoleDefinition } from './charter.js'
+import type { RoleDefinition } from './roles.js'
 
 /**
  * SPEC "Model access": applying a recommendation and capturing context are
@@ -28,17 +28,17 @@ export type CallSiteAssignmentView = CallSiteDescriptor & Readonly<{ assignment:
  * SPEC "Files"/"Model access": the call site is the whole of what the model
  * interface knows about the caller — a participant, or one of the two
  * operations. This is every site that may be assigned a model, participants
- * first, in the charter's order.
+ * first, in the role roster's order.
  */
-export function callSites(charter: readonly RoleDefinition[]): readonly CallSiteDescriptor[] {
-  for (const role of charter) {
+export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDescriptor[] {
+  for (const role of roles) {
     if ((OPERATION_CALL_SITES as readonly string[]).includes(role.id)) {
       throw new DuplicateCallSiteError(role.id)
     }
   }
 
   return [
-    ...charter.map((role) => ({ site: role.id, displayName: role.displayName, roleDescription: role.roleDescription })),
+    ...roles.map((role) => ({ site: role.id, displayName: role.displayName, roleDescription: role.roleDescription })),
     ...OPERATION_CALL_SITES.map((site) => ({ site, displayName: undefined, roleDescription: undefined })),
   ]
 }

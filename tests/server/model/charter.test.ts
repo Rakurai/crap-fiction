@@ -7,43 +7,55 @@ import { ShippedDataError } from '../../../src/server/store.js'
 
 describe('loadCharter', () => {
   let dir: string
+  let file: string
 
   beforeEach(() => {
     dir = mkdtempSync(path.join(tmpdir(), 'studio-charter-'))
+    file = path.join(dir, 'charter.yaml')
   })
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  function write(name: string, contents: string) {
-    writeFileSync(path.join(dir, name), contents, 'utf8')
-  }
+  const valid = [
+    'outcomes:',
+    '  noComment: a',
+    '  commentary: b',
+    '  applicableSuggestion: c',
+    'directQuestionOwedAnswer: d',
+    'noReasoningAboutTheAuthorsQuestion: e',
+    '',
+  ].join('\n')
 
-  it('loads a valid role definition', () => {
-    write('shape.yaml', 'id: shape\nhandle: shape\ndisplayName: Shape\nroleDescription: x\n')
-    expect(loadCharter(dir)).toEqual([{ id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' }])
+  it('loads a valid charter', () => {
+    writeFileSync(file, valid, 'utf8')
+    expect(loadCharter(file)).toEqual({
+      outcomes: { noComment: 'a', commentary: 'b', applicableSuggestion: 'c' },
+      directQuestionOwedAnswer: 'd',
+      noReasoningAboutTheAuthorsQuestion: 'e',
+    })
   })
 
-  it('fails startup, naming the file and the entry, when a role is missing a required field', () => {
-    write('shape.yaml', 'id: shape\nhandle: shape\nroleDescription: x\n')
-    expect(() => loadCharter(dir)).toThrowError(ShippedDataError)
-    expect(() => loadCharter(dir)).toThrowError(/displayName/)
+  it('fails startup, naming the file and the entry, when the charter is missing entirely', () => {
+    expect(() => loadCharter(file)).toThrowError(ShippedDataError)
+    expect(() => loadCharter(file)).toThrowError(/charter\.yaml/)
   })
 
-  it('fails startup when a handle is not one lowercase token', () => {
-    write('shape.yaml', 'id: shape\nhandle: "Shape One"\ndisplayName: Shape\nroleDescription: x\n')
-    expect(() => loadCharter(dir)).toThrowError(ShippedDataError)
+  it('fails startup, naming the entry, when an outcome is missing', () => {
+    writeFileSync(file, 'outcomes:\n  noComment: a\n  commentary: b\ndirectQuestionOwedAnswer: d\nnoReasoningAboutTheAuthorsQuestion: e\n', 'utf8')
+    expect(() => loadCharter(file)).toThrowError(ShippedDataError)
+    expect(() => loadCharter(file)).toThrowError(/applicableSuggestion/)
   })
 
-  it('fails startup when two role definitions share a handle', () => {
-    write('shape.yaml', 'id: shape\nhandle: same\ndisplayName: Shape\nroleDescription: x\n')
-    write('compression.yaml', 'id: compression\nhandle: same\ndisplayName: Compression\nroleDescription: y\n')
-    expect(() => loadCharter(dir)).toThrowError(ShippedDataError)
-    expect(() => loadCharter(dir)).toThrowError(/duplicate handle/)
+  it('fails startup when the shipped charter itself is missing a field', () => {
+    writeFileSync(file, 'outcomes:\n  noComment: a\n  commentary: b\n  applicableSuggestion: c\ndirectQuestionOwedAnswer: d\n', 'utf8')
+    expect(() => loadCharter(file)).toThrowError(ShippedDataError)
+    expect(() => loadCharter(file)).toThrowError(/noReasoningAboutTheAuthorsQuestion/)
   })
 
-  it('fails startup when no role definitions are shipped at all', () => {
-    expect(() => loadCharter(dir)).toThrowError(ShippedDataError)
+  it('loads the charter actually shipped with the application', () => {
+    const shipped = path.join(import.meta.dirname, '../../../src/server/model/charter.yaml')
+    expect(() => loadCharter(shipped)).not.toThrow()
   })
 })

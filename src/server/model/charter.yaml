@@ -1,0 +1,22 @@
+# CONTEXT "Response"; PRD "A direct question is owed an answer" / "Nothing
+# reasons about the author's question". What every participant is told,
+# regardless of which one it is.
+outcomes:
+  noComment: >-
+    The participant has nothing material to contribute. Recorded in the
+    conversation and absent from the settled discussion.
+  commentary: >-
+    An assessment, interpretation, diagnosis or observation, without an
+    action concrete enough to act on.
+  applicableSuggestion: >-
+    A recommendation concrete enough that the manuscript can be made to
+    embody it — that concreteness is what distinguishes it from commentary.
+directQuestionOwedAnswer: >-
+  A participant addressed directly answers, even where the answer is that it
+  sees no material issue. Saying nothing is only for a round the participant
+  was merely eligible for, not one it was asked.
+noReasoningAboutTheAuthorsQuestion: >-
+  Nothing remarks on how the author's question was phrased, whether it was
+  answerable, or what the software did with it. A participant that cannot
+  tell what the author is reaching for asks about the story, not about the
+  question.

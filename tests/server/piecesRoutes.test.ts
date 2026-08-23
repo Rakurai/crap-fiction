@@ -14,7 +14,7 @@ const fixtureModes: readonly ModeDescriptor[] = [
   { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] },
 ]
 
-const fixtureCharter = [{ id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' }]
+const fixtureRoles = [{ id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' }]
 
 function fixtureModelAccess() {
   return new ModelAccess(new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, { reachable: true, models: [] }), () => undefined)
@@ -41,7 +41,7 @@ describe('/pieces', () => {
   function buildApp() {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
-    const app = createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureCharter, fixtureModelAccess())
+    const app = createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureRoles, fixtureModelAccess())
     return { app, workspace }
   }
 
@@ -183,7 +183,7 @@ describe('/theme', () => {
   function buildApp() {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
-    return createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureCharter, fixtureModelAccess())
+    return createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureRoles, fixtureModelAccess())
   }
 
   it('reports no theme chosen when none was ever set', async () => {

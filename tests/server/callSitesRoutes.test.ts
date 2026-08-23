@@ -14,7 +14,7 @@ const fixtureModes: readonly ModeDescriptor[] = [
   { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] },
 ]
 
-const fixtureCharter = [
+const fixtureRoles = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn' },
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'the generalist' },
 ]
@@ -42,7 +42,7 @@ describe('call sites and models', () => {
     workspace.load()
     const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, runtimeStatus)
     const modelAccess = new ModelAccess(adapter, () => undefined)
-    return createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureCharter, modelAccess)
+    return createApp(env, workspace, fixtureModes, new DraftWriter(), fixtureRoles, modelAccess)
   }
 
   it('lists every call site, its role description where it has one, and no assignment yet', async () => {

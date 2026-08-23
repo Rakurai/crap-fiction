@@ -6,6 +6,7 @@ import { z } from 'zod'
 import {
   readYamlArtifact,
   readYamlDirectory,
+  readYamlFile,
   ShippedDataError,
   TolerantReadError,
   writeYamlArtifact,
@@ -151,5 +152,38 @@ describe('readYamlDirectory', () => {
 
     const schema = z.object({ tags: z.array(z.string()) })
     expect(() => readYamlDirectory(dir, schema)).toThrowError(ShippedDataError)
+  })
+})
+
+describe('readYamlFile', () => {
+  let dir: string
+  let file: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'studio-shipped-file-'))
+    file = path.join(dir, 'artifact.yaml')
+  })
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads a single shipped file, strictly validated', () => {
+    writeFileSync(file, 'title: A\n', 'utf8')
+    const schema = z.object({ title: z.string() })
+    expect(readYamlFile(file, schema)).toEqual({ title: 'A' })
+  })
+
+  it('states a failure naming the file when it is absent', () => {
+    const schema = z.object({ title: z.string() })
+    expect(() => readYamlFile(file, schema)).toThrowError(ShippedDataError)
+    expect(() => readYamlFile(file, schema)).toThrowError(/artifact\.yaml/)
+  })
+
+  it('states a failure naming the entry when the shipped file is invalid', () => {
+    writeFileSync(file, 'title: 42\n', 'utf8')
+    const schema = z.object({ title: z.string() })
+    expect(() => readYamlFile(file, schema)).toThrowError(ShippedDataError)
+    expect(() => readYamlFile(file, schema)).toThrowError(/title/)
   })
 })
