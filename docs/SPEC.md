@@ -135,6 +135,14 @@ interface is composed in. It is taken for the dialog's focus management and for 
 offers handles as the author types one — the completion surface only, since which participants a
 message addressed stays the room's reading of the text as stated above.
 
+**Where a model must be named, the runtime's reported models are offered through the platform's own
+datalist.** `GET /models` already carries them, so an author who has to type an identifier by hand is
+being asked for something the application knows: one character wrong is a call site that fails as
+unconfigured at the next round, discovered minutes later. It stays a text field against a list of
+suggestions rather than a closed choice, because a model the runtime does not hold yet is still one the
+author may be pointing a participant at. A datalist is what the platform has for exactly that shape, so
+`@ariakit/react`'s entry above does not widen to cover this surface.
+
 The container image and the base it is built on are Deployment's rather than this table's: they are
 how the application is run and not something it depends on to work.
 

@@ -3,9 +3,21 @@
   min-height: 0;
   overflow: auto;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   background: var(--bg);
   padding: 0 22px 30px;
+}
+
+/*
+ * 520px is the geometry the mockup uses for a place the author goes, as the room
+ * and the conversation do. A model identifier is a short value, and the surface
+ * spanned the window for it.
+ */
+.measure {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
 }
 
 .back {

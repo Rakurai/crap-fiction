@@ -13,30 +13,37 @@ export function CallSitesScreen({ onClose }: CallSitesScreenProps) {
 
   return (
     <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={onClose}>
-        ‹ pieces
-      </button>
-      {view.status === 'error' && (
-        <p className={styles.error} role="alert">
-          {view.message}
-        </p>
-      )}
-      {view.status === 'ready' && (
-        <>
-          <RuntimeStatusBanner runtime={view.runtime} />
-          {view.runtimeError !== undefined && (
-            <p className={styles.error} role="alert">
-              {view.runtimeError}
-            </p>
-          )}
-          {view.assignError !== undefined && (
-            <p className={styles.error} role="alert">
-              {view.assignError}
-            </p>
-          )}
-          <CallSiteList sites={view.sites} assigning={view.assigning} onAssign={view.assign} />
-        </>
-      )}
+      <div className={styles.measure}>
+        <button type="button" className={styles.back} onClick={onClose}>
+          ‹ pieces
+        </button>
+        {view.status === 'error' && (
+          <p className={styles.error} role="alert">
+            {view.message}
+          </p>
+        )}
+        {view.status === 'ready' && (
+          <>
+            <RuntimeStatusBanner runtime={view.runtime} />
+            {view.runtimeError !== undefined && (
+              <p className={styles.error} role="alert">
+                {view.runtimeError}
+              </p>
+            )}
+            {view.assignError !== undefined && (
+              <p className={styles.error} role="alert">
+                {view.assignError}
+              </p>
+            )}
+            <CallSiteList
+              sites={view.sites}
+              known={view.runtime?.reachable === true ? view.runtime.models : []}
+              assigning={view.assigning}
+              onAssign={view.assign}
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }
