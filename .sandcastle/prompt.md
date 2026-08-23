@@ -4,8 +4,11 @@
 
 !`gh api "repos/Rakurai/crap-fiction/issues?state=open&labels=ready-for-agent&per_page=100" --jq '[.[] | select(has("pull_request") | not) | select((.issue_dependencies_summary.blocked_by // 0) == 0) | select(.assignee == null) | {number, title, body, labels: [.labels[].name]}]'`
 
-This list is the sole source of truth for what work exists. Do not run a broader query to find
-more. If it is empty, there is nothing to do.
+This list is a snapshot taken before this iteration began, and it is the only place to look for
+work — do not run a broader query to find more.
+
+It goes out of date the moment you close a ticket, because closing one unblocks others. Treat it as
+"what was available when I started", never as "all the work there is".
 
 It is filtered on GitHub's native issue dependencies. That field is not guaranteed to be present in
 every API response, so before starting a ticket, confirm each blocker its body names is actually
@@ -60,7 +63,18 @@ Comment with the specific contradiction and move on.
 
 # Done
 
-When every ticket on the frontier is either complete or commented as blocked, or the frontier list
-at the top of this prompt is empty, output:
+Finishing a ticket is not being done. Ending the iteration there is correct and expected: the next
+one re-runs the query above and picks up whatever your work unblocked.
+
+Emit the completion signal only when the tracker itself has nothing left, established by running the
+frontier query again yourself, not by consulting the snapshot above:
+
+```
+gh api "repos/Rakurai/crap-fiction/issues?state=open&labels=ready-for-agent&per_page=100" --jq '[.[] | select(has("pull_request") | not) | select((.issue_dependencies_summary.blocked_by // 0) == 0) | select(.assignee == null) | .number]'
+```
+
+If that returns tickets, do not emit the signal — stop and let the next iteration take one. If it
+returns an empty list, or every ticket it returns is one you have already commented as blocked,
+output:
 
 <promise>COMPLETE</promise>
