@@ -1,6 +1,6 @@
 # crap-fiction
 
-A local, single-user studio for writing fiction with a team of specialized agents. Currently a design-stage repo: the four documents named below are the source of truth, and there is no implementation yet.
+A local, single-user studio for writing fiction with a team of specialized agents. Currently a design-stage repo: the design documents named below are the source of truth, and there is no implementation yet.
 
 ## Agent skills
 
@@ -15,3 +15,7 @@ The five canonical labels are used unchanged: `needs-triage`, `needs-info`, `rea
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. `CONTEXT.md` holds the domain model and is the authoritative glossary; the design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `SPEC.md`) governs behaviour in that order of precedence. See `docs/agents/domain.md`.
+
+## Engineering discipline
+
+`docs/CODING_STANDARDS.md` is binding on all code: module depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP response envelope, client shape, logging, testing. It owns no architecture facts and no product behaviour — where it appears to decide either, the design doc set governs. Read it before writing code, not after review.

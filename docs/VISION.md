@@ -118,17 +118,18 @@ Constraints any implementation must satisfy.
 **Local, and fully usable offline.** The tool runs on the author's machine, with no accounts
 and no service to sign in to. Nothing about opening, reading or writing one's own stories
 requires a network. Models on the author's machine are the expected arrangement; pointing a
-participant at a hosted endpoint is a configuration choice rather than a different
+participant at a hosted model is a configuration choice rather than a different
 architecture.
 
 **Plain files, authoritative.** The prose outlives any rewrite of this tool, is readable and
 editable in any editor, and is diffable under version control. The files are the record;
 nothing is derived from a history in order to be true.
 
-**Provider-agnostic models, assignable per collaborator.** Any participant may be pointed at
-a different endpoint, so prose quality is not capped by local hardware and weak
-differentiation between roles can be diagnosed as a design problem rather than confounded
-with model capacity.
+**Models assignable per collaborator, behind a replaceable layer.** Any participant may be pointed
+at a different model, so prose quality is not capped by local hardware and weak differentiation
+between roles can be diagnosed as a design problem rather than confounded with model capacity. Which
+runtime serves those models is one layer's business, and staying agnostic above it is what keeps that
+commitment from depending on any particular one.
 
 **A capable prose editing surface.** Judging rhythm and sound requires prose set as prose,
 with the editing conventions the author already knows, in both a rendered view and a

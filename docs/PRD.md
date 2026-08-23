@@ -183,23 +183,23 @@ failure is never presented as silence.
 **Know the room is working** — *per round*
 The room's calls happen one after another against one local model, so a round takes real time and
 the author watches it progress.
-*Done when:* each called participant's state is visible as it changes — waiting for its turn,
-working, or answered — the author can keep writing throughout, no interim state is composed by a
-model, and no response is rendered before it is complete.
+*Done when:* each called participant's state is visible as it changes — waiting for its turn, having
+its model prepared, working, or answered — the author can keep writing throughout, no interim state
+is composed by a model, and no response is rendered before it is complete.
 
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a round,
 an application, a context capture — cancelling the call in flight and making none of the calls the
 operation had not reached, responses that landed remain in the conversation, nothing holds the prose
-beyond the operation the author asked for, and an endpoint that never answers resolves itself
+beyond the operation the author asked for, and a model that never answers resolves itself
 without the author having to act.
 
 **Handle a bad response as housekeeping** — *per session*
 A response is incoherent, misreads the story, or the call failed outright. Local models do
 this regularly.
 *Done when:* a failure states plainly what came back, nothing looks authoritative merely because
-it was generated, a call that failed is retried without asking the author and is marked failed
-if it fails again, and the author's recourse to a response that succeeded and was useless is an
+it was generated, a call that failed is retried without asking the author and is marked failed once
+retrying is done with, and the author's recourse to a response that succeeded and was useless is an
 ordinary message rather than an affordance.
 
 **Change who is in the room** — *per piece*
@@ -312,10 +312,10 @@ choose it.
 work, and visible when something breaks.
 
 **Assign models to participants** — *rare*
-*Done when:* any participant can be pointed at a different endpoint without touching another,
-so weak differentiation is diagnosable as a design problem rather than confounded with model
-capacity, and applying a recommendation and capturing context are each pointed at an endpoint
-the same way without entering the room.
+*Done when:* any participant can be pointed at a different model without touching another, whether
+that model runs on the author's machine or is hosted, so weak differentiation is diagnosable as a
+design problem rather than confounded with model capacity, and applying a recommendation and
+capturing context are each assigned a model the same way without entering the room.
 
 ## Out of scope
 

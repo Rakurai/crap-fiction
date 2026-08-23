@@ -79,7 +79,9 @@ a participant missing, and the Story Editor waiting in its place is how the auth
 readings come before the judgment.
 
 **In flight, the round states only what is true**, as states and counts rather than composed
-sentences: which participant is working, which are waiting their turn, how long it has been.
+sentences: which participant is working, which is having its model prepared, which are waiting their
+turn, how long it has been. A participant whose model is loading is neither working nor merely
+waiting, and saying which it is costs less than an unexplained thirty seconds does.
 Because the room asks one participant at a time, the round fills in that order, and the interface
 says which participant is being asked rather than implying they are all at work. Nothing is
 attributed to a participant that has not answered, and no response is shown before it is complete.
@@ -258,8 +260,9 @@ and the models shape everything and are decided almost never.
 **These are the normal case.** Local models are slow, uneven and frequently wrong, so every
 composition here must be judged in these conditions before it is believed.
 
-**Nothing back yet.** The round shows who was called, which one is being asked, and which are
-waiting their turn. Nothing is attributed to a participant that has not answered.
+**Nothing back yet.** The round shows who was called, which one is being asked, whether its model is
+still being prepared, and which are waiting their turn. Nothing is attributed to a participant that
+has not answered.
 
 **A long round.** Because the room asks one participant at a time, a full cast and the Story Editor
 are five calls and a round can run for minutes. The round stays legible for its whole duration, the
@@ -300,7 +303,13 @@ for another piece is the one thing unavailable in this state, and it is unavaila
 confirmed: an author asked whether to discard their own prose has been asked the wrong question.
 
 **Models unreachable.** The manuscript opens, is writable, and stays writable. Only the room
-is unavailable, and it says so where the author would otherwise address it.
+is unavailable, and it says so where the author would otherwise address it. The ordinary cause is a
+program on this machine that is not running, which is recoverable in a way a network problem is not,
+so nothing about this state may compose as one.
+
+**One participant unavailable and the rest of the room fine.** A single participant's model cannot be
+served — it needs a network, a sign-in, or a machine that is asleep. Its failure is stated as its own
+and the round settles around it; nothing presents the room as down, because it isn't.
 
 ## Guardrails
 

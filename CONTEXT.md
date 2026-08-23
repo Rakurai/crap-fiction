@@ -128,6 +128,9 @@ A durable, resumable, multi-turn discussion about a piece. A piece may have seve
 Opening a piece resumes its most recent conversation. The author may start a new
 conversation, resume a prior one, or delete one.
 
+A conversation exists once its first round opens. Until then, starting one is an intention
+rather than a thing: nothing empty is kept, and nothing accumulates to be pruned.
+
 **Conversation history and manuscript state are independent.** A conversation does not
 version, own, or restore the draft. Where a discussion occurred against earlier prose and
 the draft has since changed, the historical discussion stands as it was said, and any new
@@ -178,6 +181,10 @@ would change.
 **Applicable suggestion** — a recommendation concrete enough that the manuscript can be made
 to embody it.
 
+A response that says anything says it in two parts. Its **claim** is one sentence stating the
+reading the participant commits to. Its **note** is elaboration, and is optional: a claim
+standing alone is a complete response.
+
 No participant is ever obliged to produce an applicable suggestion so that an action exists
 to offer. Most of what makes the room worth consulting is a reading rather than an edit.
 
@@ -215,10 +222,13 @@ against, or judges whether applying it remains wise. That judgment is the author
 **Apply is silent.** The manuscript changes, the conversation records that it happened, and
 no participant responds to it unless the author asks.
 
-**What an application changed is kept, and is not a version of the story.** The passages it altered,
-before and after, stay available so that the author returning to a conversation still sees what an
-application did. They carry no positions, nothing reapplies them, and no manuscript is reconstructed
-from them: a record of a change is not a state the story can be returned to.
+**Applied change** — what an application changed, kept, and not a version of the story. The
+passages it altered, before and after, stay available so that the author returning to a
+conversation still sees what an application did. An applied change carries no positions, nothing
+reapplies it, and no manuscript is reconstructed from it: a record of a change is not a state the
+story can be returned to. Where a change is unbounded, what is kept is the statement that the
+piece was rewritten whole, because keeping the prose either side of that change would be keeping
+a copy of the story.
 
 **Constraint** — optional author text supplied with an Apply, carried verbatim as an
 additional instruction. *Keep the opening image intact.*
