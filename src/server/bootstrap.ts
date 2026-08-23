@@ -4,6 +4,7 @@ import { createApp } from './app.js'
 import { loadEnv, type StudioEnv } from './env.js'
 import { createLogger, type Logger } from './logger.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
+import { DraftWriter } from './pieces.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -28,6 +29,7 @@ export function bootstrap(): Studio {
   const workspace = new WorkspaceRegistry(env.dataRoot)
   workspace.load()
   const modes = loadModes(path.join(import.meta.dirname, 'modes'))
-  const app = createApp(env, workspace, modes)
+  const draftWriter = new DraftWriter()
+  const app = createApp(env, workspace, modes, draftWriter)
   return { app, env, logger, workspace, modes }
 }

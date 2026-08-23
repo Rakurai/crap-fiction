@@ -5,7 +5,7 @@ import { fail, ok } from './envelope.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
-import { createPiece, getPiece, listPieces, PieceNotFoundError } from './pieces.js'
+import { createPiece, type DraftWriter, getPiece, listPieces, PieceNotFoundError } from './pieces.js'
 import { TolerantReadError } from './store.js'
 import { validateJson } from './validate.js'
 import { WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
@@ -13,12 +13,14 @@ import { WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.j
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: z.enum(['light', 'dark']) })
+const putDraftSchema = z.object({ draft: z.string() })
 
 /**
  * The room and every route SPEC's transport table names beyond `/workspace`,
- * `/pieces` and the interface theme belong to later tickets.
+ * `/pieces`, the piece draft and the interface theme belong to later
+ * tickets.
  */
-export function createApp(env: StudioEnv, workspace: WorkspaceRegistry, modes: readonly ModeDescriptor[]): Hono {
+export function createApp(env: StudioEnv, workspace: WorkspaceRegistry, modes: readonly ModeDescriptor[], draftWriter: DraftWriter): Hono {
   const allowedOrigin = `http://localhost:${env.port}`
   const app = new Hono()
   app.use('*', originGuard(allowedOrigin))
@@ -63,6 +65,16 @@ export function createApp(env: StudioEnv, workspace: WorkspaceRegistry, modes: r
       return c.json(fail('WORKSPACE_NOT_SET', 'no workspace is configured'), 400)
     }
     return c.json(ok(getPiece(dir, c.req.param('id'))))
+  })
+
+  app.put('/pieces/:id/draft', validateJson(putDraftSchema), async (c) => {
+    const dir = workspace.get()
+    if (dir === undefined) {
+      return c.json(fail('WORKSPACE_NOT_SET', 'no workspace is configured'), 400)
+    }
+    const { draft } = c.req.valid('json')
+    await draftWriter.save(dir, c.req.param('id'), draft)
+    return c.json(ok(null))
   })
 
   app.get('/theme', (c) => {

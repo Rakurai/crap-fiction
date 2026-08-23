@@ -26,6 +26,15 @@ export async function fetchPiece(id: string): Promise<PieceDetail> {
   return unwrap<PieceDetail>(res)
 }
 
+export async function saveDraft(id: string, draft: string): Promise<void> {
+  const res = await fetch(`/pieces/${encodeURIComponent(id)}/draft`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ draft }),
+  })
+  await unwrap<null>(res)
+}
+
 export type CreatePieceResult = { readonly ok: true; readonly piece: PieceSummary } | { readonly ok: false; readonly message: string }
 
 export async function createPiece(title: string): Promise<CreatePieceResult> {

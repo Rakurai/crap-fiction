@@ -1,8 +1,10 @@
 import { EditorContent } from '@tiptap/react'
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 
 type ManuscriptProps = {
+  readonly pieceId: string
   readonly title: string
   readonly draft: string
   readonly onClose: () => void
@@ -18,8 +20,9 @@ type ManuscriptProps = {
  * is not well-defined; the scroll ratio — where the author is looking — is
  * preserved across that switch instead.
  */
-export function Manuscript({ title, draft, onClose }: ManuscriptProps) {
+export function Manuscript({ pieceId, title, draft, onClose }: ManuscriptProps) {
   const manuscript = useManuscript(draft)
+  const autosave = useAutosave(pieceId, manuscript.markdown)
   const containerRef = useRef<HTMLDivElement>(null)
   const pendingScrollRatio = useRef<number | null>(null)
 
@@ -70,6 +73,7 @@ export function Manuscript({ title, draft, onClose }: ManuscriptProps) {
           <button type="button" onClick={manuscript.showReading}>
             reading
           </button>
+          {autosave.failed && <span role="status">Couldn't save — will retry</span>}
         </div>
       )}
 

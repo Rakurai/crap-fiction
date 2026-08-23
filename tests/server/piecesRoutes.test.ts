@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
+import { DraftWriter } from '../../src/server/pieces.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 
 const fixtureModes: readonly ModeDescriptor[] = [
@@ -32,7 +33,7 @@ describe('/pieces', () => {
   function buildApp() {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
-    const app = createApp(env, workspace, fixtureModes)
+    const app = createApp(env, workspace, fixtureModes, new DraftWriter())
     return { app, workspace }
   }
 
@@ -107,6 +108,46 @@ describe('/pieces', () => {
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'ARTIFACT_INVALID' } })
   })
+
+  it('saves a draft as Markdown and reports it back on the next open', async () => {
+    const { app, workspace } = buildApp()
+    const dir = await workspace.set('my-writing')
+    mkdirSync(path.join(dir, 'cups'), { recursive: true })
+    writeFileSync(path.join(dir, 'cups', 'piece.yaml'), 'title: Cups\nmode: flash\nstatus: drafting\n', 'utf8')
+
+    const putRes = await app.request('/pieces/cups/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ draft: 'Two small words.' }),
+    })
+    expect(putRes.status).toBe(200)
+    expect(await putRes.json()).toEqual({ success: true, data: null })
+
+    const getRes = await app.request('/pieces/cups')
+    expect(await getRes.json()).toMatchObject({ success: true, data: { draft: 'Two small words.' } })
+  })
+
+  it('reports saving a draft for a piece that does not exist as PIECE_NOT_FOUND', async () => {
+    const app = await withWorkspace()
+    const res = await app.request('/pieces/nothing-here/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ draft: 'text' }),
+    })
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
+  })
+
+  it('refuses to save a draft with no workspace configured', async () => {
+    const { app } = buildApp()
+    const res = await app.request('/pieces/cups/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ draft: 'text' }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
+  })
 })
 
 describe('/theme', () => {
@@ -130,7 +171,7 @@ describe('/theme', () => {
   function buildApp() {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
-    return createApp(env, workspace, fixtureModes)
+    return createApp(env, workspace, fixtureModes, new DraftWriter())
   }
 
   it('reports no theme chosen when none was ever set', async () => {

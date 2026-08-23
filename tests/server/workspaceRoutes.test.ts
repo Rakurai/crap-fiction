@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
+import { DraftWriter } from '../../src/server/pieces.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 
 const fixtureModes: readonly ModeDescriptor[] = [
@@ -32,7 +33,7 @@ describe('/workspace', () => {
   function buildApp() {
     const workspace = new WorkspaceRegistry(dataRoot)
     workspace.load()
-    return createApp(env, workspace, fixtureModes)
+    return createApp(env, workspace, fixtureModes, new DraftWriter())
   }
 
   it('reports no workspace configured', async () => {

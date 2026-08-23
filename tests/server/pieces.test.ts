@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createPiece, getPiece, listPieces, PieceNotFoundError } from '../../src/server/pieces.js'
+import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError } from '../../src/server/pieces.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 
 const flash: ModeDescriptor = {
@@ -108,5 +108,45 @@ describe('pieces', () => {
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
     expect(() => getPiece(workspaceDir, '../../etc')).toThrowError(PieceNotFoundError)
+  })
+})
+
+describe('DraftWriter', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('writes the draft to disk as Markdown', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const writer = new DraftWriter()
+
+    await writer.save(workspaceDir, piece.id, 'Two small words.')
+
+    expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('Two small words.')
+  })
+
+  it('reports a missing piece as a stated PieceNotFoundError rather than creating one', async () => {
+    const writer = new DraftWriter()
+    await expect(writer.save(workspaceDir, 'nothing-here', 'text')).rejects.toThrowError(PieceNotFoundError)
+  })
+
+  it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than writing outside it', async () => {
+    const writer = new DraftWriter()
+    await expect(writer.save(workspaceDir, '../../etc', 'text')).rejects.toThrowError(PieceNotFoundError)
+  })
+
+  it('serializes overlapping writes so the last one to start is the one left on disk', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const writer = new DraftWriter()
+
+    await Promise.all([writer.save(workspaceDir, piece.id, 'first'), writer.save(workspaceDir, piece.id, 'second')])
+
+    expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('second')
   })
 })

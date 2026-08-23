@@ -28,6 +28,7 @@ export type ManuscriptViewModel = {
   readonly view: ManuscriptView
   readonly sourceText: string
   readonly length: number
+  readonly markdown: string
   readonly setSourceText: (text: string) => void
   readonly showRendered: () => void
   readonly showSource: () => void
@@ -44,18 +45,21 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   const [view, setView] = useState<ManuscriptView>('rendered')
   const [sourceText, setSourceText] = useState('')
   const [length, setLength] = useState(() => countWords(initialMarkdown))
+  const [markdown, setMarkdown] = useState(initialMarkdown)
 
   const editor = useEditor({
     extensions: EXTENSIONS,
     content: markdownToEditorContent(initialMarkdown),
     onUpdate: ({ editor: current }) => {
       setLength(countWords(current.getText({ blockSeparator: '\n\n' })))
+      setMarkdown(editorContentToMarkdown(current.getJSON()))
     },
   })
 
   const updateSourceText = useCallback((text: string) => {
     setSourceText(text)
     setLength(countWords(text))
+    setMarkdown(text)
   }, [])
 
   const showRendered = useCallback(() => {
@@ -83,5 +87,5 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     setView('reading')
   }, [editor, view, sourceText])
 
-  return { editor, view, sourceText, length, setSourceText: updateSourceText, showRendered, showSource, showReading }
+  return { editor, view, sourceText, length, markdown, setSourceText: updateSourceText, showRendered, showSource, showReading }
 }

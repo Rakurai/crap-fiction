@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import slugify from '@sindresorhus/slugify'
+import { Mutex } from 'async-mutex'
+import writeFileAtomic from 'write-file-atomic'
 import { z } from 'zod'
 import { countWords } from '../shared/storyLength.js'
 import type { ModeDescriptor } from './modes.js'
@@ -138,10 +140,12 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
 }
 
 /**
- * SPEC "Transport": opening a piece returns its draft alongside its metadata,
- * unlike the listing, which reports only what a directory scan needs.
+ * The piece directory for an id that must already exist, refusing one that
+ * escapes the workspace the same way `getPiece` does: a `PieceNotFoundError`
+ * either way, since an author who typed a stray id gets no more information
+ * from a path-traversal attempt than from a piece that never existed.
  */
-export function getPiece(workspaceDir: string, id: string): PieceDetail {
+function resolvePieceDir(workspaceDir: string, id: string): string {
   let pieceDir: string
   try {
     pieceDir = resolveWithinRoot(workspaceDir, id)
@@ -156,5 +160,31 @@ export function getPiece(workspaceDir: string, id: string): PieceDetail {
     throw new PieceNotFoundError(id)
   }
 
+  return pieceDir
+}
+
+/**
+ * SPEC "Transport": opening a piece returns its draft alongside its metadata,
+ * unlike the listing, which reports only what a directory scan needs.
+ */
+export function getPiece(workspaceDir: string, id: string): PieceDetail {
+  const pieceDir = resolvePieceDir(workspaceDir, id)
   return { ...summarize(id, pieceDir), draft: readDraft(pieceDir) }
+}
+
+/**
+ * SPEC "Write semantics": the client is the manuscript's only writer, one
+ * write is in flight at a time, and an atomic rename makes a write
+ * indivisible but not ordered — two in flight could complete oldest-last and
+ * restore prose the author already replaced. A single mutex serializes every
+ * draft write through this instance so that cannot happen, regardless of
+ * what order the requests arrive in.
+ */
+export class DraftWriter {
+  readonly #lock = new Mutex()
+
+  async save(workspaceDir: string, id: string, draft: string): Promise<void> {
+    const pieceDir = resolvePieceDir(workspaceDir, id)
+    await this.#lock.runExclusive(() => writeFileAtomic(draftPath(pieceDir), draft))
+  }
 }
