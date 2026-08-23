@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FixtureModelAdapter } from '../../fixtures/modelAdapter.js'
+import { FixtureModelAdapter } from '../../support/modelAdapter.js'
 import { ModelAccess } from '../../../src/server/model/modelAccess.js'
 import { z } from 'zod'
 
@@ -8,7 +8,7 @@ const runtimeStatus = { reachable: true, models: [] } as const
 
 describe('ModelAccess.call', () => {
   it('fails as unconfigured without contacting the adapter when a call site has no assignment', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'value', value: { claim: 'x' } } }, runtimeStatus)
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'x' } } }, runtimeStatus)
     const access = new ModelAccess(adapter, () => undefined)
 
     const result = await access.call('shape', 'prompt', schema, new AbortController().signal)
@@ -17,7 +17,7 @@ describe('ModelAccess.call', () => {
   })
 
   it('never falls back to another assignment: an unconfigured site fails even when others are assigned', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'value', value: { claim: 'x' } } }, runtimeStatus)
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'x' } } }, runtimeStatus)
     const access = new ModelAccess(adapter, (site) => (site === 'story-editor' ? 'qwen-14b' : undefined))
 
     const result = await access.call('shape', 'prompt', schema, new AbortController().signal)
@@ -26,7 +26,7 @@ describe('ModelAccess.call', () => {
   })
 
   it('passes through a conforming value from the adapter', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
     const access = new ModelAccess(adapter, () => 'llama-3')
 
     const result = await access.call('shape', 'prompt', schema, new AbortController().signal)
@@ -36,7 +36,7 @@ describe('ModelAccess.call', () => {
 
   it('passes through each stated failure reason distinctly', async () => {
     for (const reason of ['unreachable', 'timeout', 'nonconforming'] as const) {
-      const adapter = new FixtureModelAdapter({ result: { outcome: 'failed', reason, returned: 'garbage' } }, runtimeStatus)
+      const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason, returned: 'garbage' } }, runtimeStatus)
       const access = new ModelAccess(adapter, () => 'llama-3')
 
       const result = await access.call('shape', 'prompt', schema, new AbortController().signal)
@@ -46,7 +46,7 @@ describe('ModelAccess.call', () => {
   })
 
   it('resolves cancellation as abandoned rather than as a failure', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
     const access = new ModelAccess(adapter, () => 'llama-3')
     const controller = new AbortController()
 
@@ -57,7 +57,7 @@ describe('ModelAccess.call', () => {
   })
 
   it('reports preparing before working, in order, ahead of the settled outcome', async () => {
-    const adapter = new FixtureModelAdapter(
+    const adapter = FixtureModelAdapter.uniform(
       { result: { outcome: 'value', value: { claim: 'x' } }, states: ['preparing', 'working'] },
       runtimeStatus,
     )
@@ -72,14 +72,14 @@ describe('ModelAccess.call', () => {
 
 describe('ModelAccess.status', () => {
   it('reports the runtime unreachable rather than throwing', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, { reachable: false })
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, { reachable: false })
     const access = new ModelAccess(adapter, () => undefined)
 
     expect(await access.status()).toEqual({ reachable: false })
   })
 
   it('reports what the runtime holds when it is reachable', async () => {
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, { reachable: true, models: ['llama-3'] })
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, { reachable: true, models: ['llama-3'] })
     const access = new ModelAccess(adapter, () => undefined)
 
     expect(await access.status()).toEqual({ reachable: true, models: ['llama-3'] })

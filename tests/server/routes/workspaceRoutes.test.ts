@@ -2,45 +2,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createApp } from '../../src/server/app.js'
-import type { StudioEnv } from '../../src/server/env.js'
-import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
-import { CHARTER_FIXTURE } from '../fixtures/charter.js'
-import { callSites } from '../../src/server/model/callSites.js'
-import { ModelAccess } from '../../src/server/model/modelAccess.js'
-import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
-import { Room } from '../../src/server/room/room.js'
-import { WorkspaceRegistry } from '../../src/server/workspace.js'
-
-const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
-
-const fixtureRoles = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
-]
-const fixtureSites = callSites(fixtureRoles)
-
-function fixtureModelAccess() {
-  return new ModelAccess(new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, { reachable: true, models: [] }), () => undefined)
-}
-
-function fixtureRoom() {
-  return new Room(fixtureModelAccess(), fixtureRoles, CHARTER_FIXTURE, fixtureMode)
-}
+import { buildTestApp } from '../../support/harness.js'
 
 describe('/workspace', () => {
   let dataRoot: string
-  let env: StudioEnv
 
   beforeEach(() => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-    env = Object.freeze({
-      dataRoot,
-      port: 4000,
-      modelRuntimeUrl: 'http://localhost:1234',
-      logLevel: 'silent' as const,
-    })
   })
 
   afterEach(() => {
@@ -48,9 +16,7 @@ describe('/workspace', () => {
   })
 
   function buildApp() {
-    const workspace = new WorkspaceRegistry(dataRoot)
-    workspace.load()
-    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, fixtureModelAccess(), fixtureRoom())
+    return buildTestApp(dataRoot).app
   }
 
   it('reports no workspace configured', async () => {

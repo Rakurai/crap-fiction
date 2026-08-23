@@ -1,8 +1,7 @@
-// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CallSiteAssignmentView } from '../../src/shared/callSiteViews.js'
-import { CallSiteList } from '../../src/client/CallSiteList.js'
+import type { CallSiteAssignmentView } from '../../../src/shared/callSiteViews.js'
+import { CallSiteList } from '../../../src/client/CallSiteList.js'
 
 const SITES: readonly CallSiteAssignmentView[] = [
   { site: 'story-editor', displayName: 'Story Editor', roleDescription: null, assignment: null },

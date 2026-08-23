@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { compileContext, renderPrompt } from '../../../src/server/room/context.js'
-import type { Charter } from '../../../src/server/model/charter.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { Conversation } from '../../../src/shared/conversationViews.js'
+import { CHARTER_FIXTURE } from '../../fixtures/charter.js'
 
 const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
 const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', roleDescription: 'reasons about omission' }
 
-const charter: Charter = {
-  outcomes: {
-    noComment: 'nothing material to contribute',
-    commentary: 'a reading without a concrete action',
-    applicableSuggestion: 'a recommendation concrete enough to apply',
-  },
-  directQuestionOwedAnswer: 'a participant addressed directly answers',
-  noReasoningAboutTheAuthorsQuestion: 'nothing remarks on how the question was phrased',
-}
+const charter = CHARTER_FIXTURE
 
 describe('compileContext', () => {
   it('carries the draft, the message and both durable contexts through untouched', () => {

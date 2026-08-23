@@ -1,16 +1,15 @@
-// @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const saveDraft = vi.fn<(id: string, text: string) => Promise<void>>()
 
-vi.mock('../../src/client/piecesClient.js', () => ({ saveDraft: (id: string, text: string) => saveDraft(id, text) }))
+vi.mock('../../../src/client/piecesClient.js', () => ({ saveDraft: (id: string, text: string) => saveDraft(id, text) }))
 
 // The header/reading/save-failure behaviour below is the piece under test;
 // the conversation panel Manuscript now renders beside it is exercised at
 // its own seams (roundProjection, Room). These are the two adapters it opens
 // on mount — a real fetch or EventSource has nothing to answer in jsdom.
-vi.mock('../../src/client/roomClient.js', () => ({
+vi.mock('../../../src/client/roomClient.js', () => ({
   subscribeToRoom: () => () => {},
   createConversation: async () => ({ ok: true, id: 'c1' }),
   fetchConversation: async () => ({ id: 'c1', rounds: [] }),
@@ -18,13 +17,13 @@ vi.mock('../../src/client/roomClient.js', () => ({
   abandonRound: async () => {},
 }))
 
-vi.mock('../../src/client/callSitesClient.js', () => ({
+vi.mock('../../../src/client/callSitesClient.js', () => ({
   fetchCallSites: async () => [],
   fetchRuntimeStatus: async () => ({ reachable: true, models: [] }),
   assignModel: async () => ({ ok: true, assignment: '' }),
 }))
 
-const { Manuscript } = await import('../../src/client/Manuscript.js')
+const { Manuscript } = await import('../../../src/client/Manuscript.js')
 
 /**
  * The source view is how a test types: it is a plain textarea, so changing it

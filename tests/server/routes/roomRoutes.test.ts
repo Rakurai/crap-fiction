@@ -2,36 +2,18 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createApp } from '../../src/server/app.js'
-import type { StudioEnv } from '../../src/server/env.js'
-import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
-import { CHARTER_FIXTURE } from '../fixtures/charter.js'
-import { callSites } from '../../src/server/model/callSites.js'
-import { ModelAccess } from '../../src/server/model/modelAccess.js'
-import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
-import { Room } from '../../src/server/room/room.js'
-import { WorkspaceRegistry } from '../../src/server/workspace.js'
+import { ModelAccess } from '../../../src/server/model/modelAccess.js'
+import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
+import { buildTestApp } from '../../support/harness.js'
+import { buildTestRoom } from '../../support/room.js'
 
-const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
-
-const fixtureRoles = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
-]
-const fixtureSites = callSites(fixtureRoles)
-
-// Conforms to both the eligible and the owed response schema, so one fixture
-// behaviour serves every call site in these routes-level tests.
 const CONFORMING_RESULT = { outcome: 'value' as const, value: { outcome: 'commentary' as const, claim: 'a reading' } }
 
 describe('the room over HTTP', () => {
   let dataRoot: string
-  let env: StudioEnv
 
   beforeEach(() => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-    env = Object.freeze({ dataRoot, port: 4000, modelRuntimeUrl: 'http://localhost:1234', logLevel: 'silent' as const })
   })
 
   afterEach(() => {
@@ -39,14 +21,12 @@ describe('the room over HTTP', () => {
   })
 
   function buildApp(delayMs?: number) {
-    const workspace = new WorkspaceRegistry(dataRoot)
-    workspace.load()
-    const behavior = delayMs === undefined ? { result: CONFORMING_RESULT } : { result: CONFORMING_RESULT, delayMs }
-    const adapter = new FixtureModelAdapter(behavior, { reachable: true, models: [] })
-    const modelAccess = new ModelAccess(adapter, (site) => site)
-    const room = new Room(modelAccess, fixtureRoles, CHARTER_FIXTURE, fixtureMode)
-    const app = createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, modelAccess, room)
-    return { app, workspace }
+    // Conforms to both the eligible and the owed response schema, so one
+    // fixture behaviour serves every call site in these routes-level tests.
+    const behavior: FixtureBehavior = delayMs === undefined ? { result: CONFORMING_RESULT } : { result: CONFORMING_RESULT, delayMs }
+    const modelAccess = new ModelAccess(FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] }), (site) => site)
+    const room = buildTestRoom({ modelAccess })
+    return buildTestApp(dataRoot, { room })
   }
 
   async function withPiece(delayMs?: number) {

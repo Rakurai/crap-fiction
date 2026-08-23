@@ -11,6 +11,7 @@ import {
   readSettings,
   resolveWorkspaceDirectory,
   writeConversation,
+  writePieceCast,
   writePieceMetadata,
   writeSettings,
 } from '../../../src/server/store/index.js'
@@ -139,6 +140,15 @@ describe("a piece's metadata", () => {
     expect(readPiece(workspaceDir, 'escaped')).toBeUndefined()
 
     rmSync(outside, { recursive: true, force: true })
+  })
+
+  it('sets only the cast, leaving title, mode and status untouched', async () => {
+    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+
+    await writePieceCast(workspaceDir, 'cups', ['shape', 'compression'])
+
+    const metadata = readPiece(workspaceDir, 'cups')?.metadata
+    expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape', 'compression'] })
   })
 })
 

@@ -2,16 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
-import { CHARTER_FIXTURE } from '../../fixtures/charter.js'
 import { ModelAccess } from '../../../src/server/model/modelAccess.js'
-import type { CallResult, CallState, ModelAdapter } from '../../../src/server/model/types.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
 import { readConversation, readPiece, writePieceCast } from '../../../src/server/store/index.js'
 import { conversationSchema } from '../../../src/shared/conversationViews.js'
-import type { RuntimeStatus } from '../../../src/shared/runtimeStatus.js'
 import { Room, RoomBusyError } from '../../../src/server/room/room.js'
+import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
+import { buildTestRoom } from '../../support/room.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
@@ -29,49 +27,17 @@ const fixtureRoles = [
 ]
 
 /**
- * Scripted per site (assignment), and a call can be held open until the test
- * releases it — the shape a busy-refusal test needs, which a fire-and-forget
- * fixture cannot give. `release` may be called before the round ever reaches
- * that site — calls are sequential, so a test releasing every site upfront
- * must not lose the release racing against `invoke` registering its gate.
+ * Every site held open until the test releases it — the shape a busy-refusal
+ * test needs, which an adapter that resolves on its own cannot give.
+ * `release` may be called before the round ever reaches that site — calls
+ * are sequential, so a test releasing every site upfront must not lose the
+ * release racing against `invoke` registering its gate.
  */
-class GatedAdapter implements ModelAdapter {
-  readonly #released = new Set<string>()
-  readonly #gates = new Map<string, () => void>()
-  readonly #results: Record<string, CallResult<unknown>>
-
-  constructor(results: Record<string, CallResult<unknown>>) {
-    this.#results = results
-  }
-
-  async invoke<T>(assignment: string, _prompt: string, schema: z.ZodType<T>, signal: AbortSignal, onState?: (state: CallState) => void): Promise<CallResult<T>> {
-    onState?.('working')
-    if (!this.#released.has(assignment)) {
-      await new Promise<void>((resolve) => {
-        this.#gates.set(assignment, resolve)
-        signal.addEventListener('abort', () => resolve(), { once: true })
-      })
-    }
-    if (signal.aborted) return { outcome: 'abandoned' }
-    const result = this.#results[assignment]
-    if (result === undefined) throw new Error(`no scripted result for "${assignment}"`)
-    if (result.outcome !== 'value') return result as CallResult<T>
-    return { outcome: 'value', value: schema.parse(result.value) }
-  }
-
-  release(assignment: string): void {
-    this.#released.add(assignment)
-    this.#gates.get(assignment)?.()
-  }
-
-  async status(): Promise<RuntimeStatus> {
-    return { reachable: true, models: [] }
-  }
-}
-
-function buildRoom(adapter: ModelAdapter) {
+function buildRoom(behaviors: Readonly<Record<string, FixtureBehavior>>): { room: Room; adapter: FixtureModelAdapter } {
+  const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
   const modelAccess = new ModelAccess(adapter, (site) => site)
-  return new Room(modelAccess, fixtureRoles, CHARTER_FIXTURE, fixtureMode)
+  const room = buildTestRoom({ mode: fixtureMode, roles: fixtureRoles, modelAccess })
+  return { room, adapter }
 }
 
 describe('Room', () => {
@@ -87,8 +53,11 @@ describe('Room', () => {
 
   it('refuses a second round while one is in flight for the same piece', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const adapter = new GatedAdapter({})
-    const room = buildRoom(adapter)
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
 
@@ -101,12 +70,11 @@ describe('Room', () => {
 
   it('creates the conversation file only once the first round has settled, not before', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const adapter = new GatedAdapter({
-      shape: { outcome: 'value', value: { outcome: 'noComment' } },
-      compression: { outcome: 'value', value: { outcome: 'noComment' } },
-      'story-editor': { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } },
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } }, held: true },
     })
-    const room = buildRoom(adapter)
 
     const { conversationId, roundId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
     expect(readConversation(workspaceDir, piece.id, conversationId, conversationSchema)).toBeUndefined()
@@ -125,12 +93,11 @@ describe('Room', () => {
 
   it('calls the enabled cast, then the Story Editor, on a round that names no one', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const adapter = new GatedAdapter({
-      shape: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } },
-      compression: { outcome: 'value', value: { outcome: 'noComment' } },
-      'story-editor': { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } },
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } }, held: true, states: ['working'] },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true, states: ['working'] },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true, states: ['working'] },
     })
-    const room = buildRoom(adapter)
 
     const events: string[] = []
     room.subscribe(piece.id, (event) => {
@@ -160,8 +127,9 @@ describe('Room', () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     await writePieceCast(workspaceDir, piece.id, ['compression'])
 
-    const adapter = new GatedAdapter({ shape: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } } })
-    const room = buildRoom(adapter)
+    const { room, adapter } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
+    })
 
     await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
     adapter.release('shape')
@@ -173,8 +141,11 @@ describe('Room', () => {
 
   it('persists an abandoned round to the conversation file rather than skipping the write', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const adapter = new GatedAdapter({})
-    const room = buildRoom(adapter)
+    const { room } = buildRoom({
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+    })
 
     const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
     room.abandon(piece.id)

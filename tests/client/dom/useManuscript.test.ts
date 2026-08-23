@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { useManuscript } from '../../src/client/useManuscript.js'
+import { useManuscript } from '../../../src/client/useManuscript.js'
 
 type Editor = NonNullable<ReturnType<typeof useManuscript>['editor']>
 

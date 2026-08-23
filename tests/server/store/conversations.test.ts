@@ -6,9 +6,7 @@ import { z } from 'zod'
 import {
   mostRecentConversationId,
   readConversation,
-  readPiece,
   writeConversation,
-  writePieceCast,
   writePieceMetadata,
 } from '../../../src/server/store/index.js'
 
@@ -47,25 +45,5 @@ describe('conversations', () => {
     await writeConversation(workspaceDir, 'cups', 'newer', { id: 'newer', rounds: [] })
 
     expect(mostRecentConversationId(workspaceDir, 'cups')).toBe('newer')
-  })
-})
-
-describe('writePieceCast', () => {
-  let workspaceDir: string
-
-  beforeEach(async () => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-  })
-
-  afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
-  })
-
-  it('sets only the cast, leaving title, mode and status untouched', async () => {
-    await writePieceCast(workspaceDir, 'cups', ['shape', 'compression'])
-
-    const metadata = readPiece(workspaceDir, 'cups')?.metadata
-    expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape', 'compression'] })
   })
 })

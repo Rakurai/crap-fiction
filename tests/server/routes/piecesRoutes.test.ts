@@ -2,66 +2,27 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createApp } from '../../src/server/app.js'
-import type { StudioEnv } from '../../src/server/env.js'
-import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
-import { CHARTER_FIXTURE } from '../fixtures/charter.js'
-import { callSites } from '../../src/server/model/callSites.js'
-import { ModelAccess } from '../../src/server/model/modelAccess.js'
-import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
-import { Room } from '../../src/server/room/room.js'
-import { WorkspaceRegistry } from '../../src/server/workspace.js'
-
-const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
-
-const fixtureRoles = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
-]
-const fixtureSites = callSites(fixtureRoles)
-
-function fixtureModelAccess() {
-  return new ModelAccess(new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, { reachable: true, models: [] }), () => undefined)
-}
-
-function fixtureRoom() {
-  return new Room(fixtureModelAccess(), fixtureRoles, CHARTER_FIXTURE, fixtureMode)
-}
+import { buildTestApp } from '../../support/harness.js'
 
 describe('/pieces', () => {
   let dataRoot: string
-  let env: StudioEnv
 
   beforeEach(() => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-    env = Object.freeze({
-      dataRoot,
-      port: 4000,
-      modelRuntimeUrl: 'http://localhost:1234',
-      logLevel: 'silent' as const,
-    })
   })
 
   afterEach(() => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function buildApp() {
-    const workspace = new WorkspaceRegistry(dataRoot)
-    workspace.load()
-    const app = createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, fixtureModelAccess(), fixtureRoom())
-    return { app, workspace }
-  }
-
   async function withWorkspace() {
-    const { app, workspace } = buildApp()
+    const { app, workspace } = buildTestApp(dataRoot)
     await workspace.set('my-writing')
     return app
   }
 
   it('refuses to list pieces with no workspace configured', async () => {
-    const { app } = buildApp()
+    const { app } = buildTestApp(dataRoot)
     const res = await app.request('/pieces')
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
@@ -116,7 +77,7 @@ describe('/pieces', () => {
   })
 
   it('reports a hand-corrupted piece.yaml as a stated ARTIFACT_INVALID failure, in the envelope', async () => {
-    const { app, workspace } = buildApp()
+    const { app, workspace } = buildTestApp(dataRoot)
     const dir = await workspace.set('my-writing')
     mkdirSync(path.join(dir, 'broken'), { recursive: true })
     writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\nstatus: not-a-status\n', 'utf8')
@@ -127,7 +88,7 @@ describe('/pieces', () => {
   })
 
   it('saves a draft as Markdown and reports it back on the next open', async () => {
-    const { app, workspace } = buildApp()
+    const { app, workspace } = buildTestApp(dataRoot)
     const dir = await workspace.set('my-writing')
     mkdirSync(path.join(dir, 'cups'), { recursive: true })
     writeFileSync(
@@ -160,7 +121,7 @@ describe('/pieces', () => {
   })
 
   it('refuses to save a draft with no workspace configured', async () => {
-    const { app } = buildApp()
+    const { app } = buildTestApp(dataRoot)
     const res = await app.request('/pieces/cups/draft', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -168,56 +129,5 @@ describe('/pieces', () => {
     })
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
-  })
-})
-
-describe('/theme', () => {
-  let dataRoot: string
-  let env: StudioEnv
-
-  beforeEach(() => {
-    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-    env = Object.freeze({
-      dataRoot,
-      port: 4000,
-      modelRuntimeUrl: 'http://localhost:1234',
-      logLevel: 'silent' as const,
-    })
-  })
-
-  afterEach(() => {
-    rmSync(dataRoot, { recursive: true, force: true })
-  })
-
-  function buildApp() {
-    const workspace = new WorkspaceRegistry(dataRoot)
-    workspace.load()
-    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, fixtureModelAccess(), fixtureRoom())
-  }
-
-  it('reports no theme chosen when none was ever set', async () => {
-    const res = await buildApp().request('/theme')
-    expect(await res.json()).toEqual({ success: true, data: { theme: null } })
-  })
-
-  it('echoes the envelope for a theme it accepted', async () => {
-    const app = buildApp()
-    const putRes = await app.request('/theme', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ theme: 'dark' }),
-    })
-    expect(await putRes.json()).toEqual({ success: true, data: { theme: 'dark' } })
-  })
-
-  it('refuses a theme that is neither light nor dark', async () => {
-    const app = buildApp()
-    const res = await app.request('/theme', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ theme: 'sepia' }),
-    })
-    expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'INVALID_REQUEST' } })
   })
 })

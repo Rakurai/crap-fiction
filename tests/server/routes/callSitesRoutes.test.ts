@@ -2,50 +2,28 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createApp } from '../../src/server/app.js'
-import type { StudioEnv } from '../../src/server/env.js'
-import { FixtureModelAdapter } from '../fixtures/modelAdapter.js'
-import { CHARTER_FIXTURE } from '../fixtures/charter.js'
-import { callSites } from '../../src/server/model/callSites.js'
-import { ModelAccess } from '../../src/server/model/modelAccess.js'
-import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
-import { Room } from '../../src/server/room/room.js'
-import { WorkspaceRegistry } from '../../src/server/workspace.js'
+import type { RoleDefinition } from '../../../src/server/model/roles.js'
+import type { RuntimeStatus } from '../../../src/shared/runtimeStatus.js'
+import { buildTestApp } from '../../support/harness.js'
 
-const fixtureMode: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
-
-const fixtureRoles = [
+const CALL_SITE_ROLES: readonly RoleDefinition[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn' },
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'the generalist' },
 ]
-const fixtureSites = callSites(fixtureRoles)
 
 describe('call sites and models', () => {
   let dataRoot: string
-  let env: StudioEnv
 
   beforeEach(() => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-    env = Object.freeze({
-      dataRoot,
-      port: 4000,
-      modelRuntimeUrl: 'http://localhost:1234',
-      logLevel: 'silent' as const,
-    })
   })
 
   afterEach(() => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function buildApp(runtimeStatus: { reachable: true; models: readonly string[] } | { reachable: false } = { reachable: true, models: [] }) {
-    const workspace = new WorkspaceRegistry(dataRoot)
-    workspace.load()
-    const adapter = new FixtureModelAdapter({ result: { outcome: 'abandoned' } }, runtimeStatus)
-    const modelAccess = new ModelAccess(adapter, () => undefined)
-    const room = new Room(modelAccess, fixtureRoles, CHARTER_FIXTURE, fixtureMode)
-    return createApp(env, workspace, fixtureMode, new DraftWriter(), fixtureSites, modelAccess, room)
+  function buildApp(runtimeStatus?: RuntimeStatus) {
+    return buildTestApp(dataRoot, { roles: CALL_SITE_ROLES, runtimeStatus }).app
   }
 
   it('lists every call site, its role description where it has one, and no assignment yet', async () => {
