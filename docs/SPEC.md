@@ -92,6 +92,10 @@ reasoning, and it is not repeated.
 | Prose editor | `@tiptap/*` over `prosemirror-*` |
 | Markdown parsing and serialization | `prosemirror-markdown` |
 | Before-and-after comparison of two manuscript states | `diff` |
+| Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
+| Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
+| Formatting when a conversation was last active | `date-fns` |
+| Holding the conversation at its latest response | `use-stick-to-bottom` |
 | Client store fed by the event stream | `zustand` |
 | Conversation and change identifiers | `nanoid` |
 | Piece directory slugs | `@sindresorhus/slugify` |
@@ -101,7 +105,7 @@ reasoning, and it is not repeated.
 | Test runner | `vitest` |
 | Browser tests | `@playwright/test` |
 
-Four entries carry a constraint on how they are used.
+Several entries carry a constraint on how they are used.
 
 **`zod` is the single declaration.** The type and the JSON Schema handed to a model call are both
 derived from it, so nothing in the repository holds a hand-written type beside a schema or a
@@ -118,9 +122,16 @@ library's output rather than a reason to compute the comparison here.
 repository's own.** They are a few lines each against rules stated in this document, and a package
 general enough to cover them would arrive with a policy the product has not chosen.
 
-**The UI component and token layer is deliberately unsettled here.** It follows the mockup rather
-than preceding it, and is named in this table once the mockup settles. Nothing may proceed by
-inventing one.
+**The token layer is the mockup's own.** `tokens.css` as the mockup settled it is the whole styling
+substrate — the two themes, the three type registers, the rules and the marks — applied through CSS
+Modules. Nothing supplies appearance from a package, and the values are read from the mockup rather
+than reinvented beside it.
+
+**`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
+is the condition of adopting it: a library carrying its own look would compete with the registers the
+interface is composed in. It is taken for the dialog's focus management and for the combobox that
+offers handles as the author types one — the completion surface only, since which participants a
+message addressed stays the room's reading of the text as stated above.
 
 The container image and the base it is built on are Deployment's rather than this table's: they are
 how the application is run and not something it depends on to work.
@@ -186,7 +197,7 @@ the workspaces rather than inside any of them.
 ```
 <data root>/
   config/
-    settings.yaml              model assignments, workspace path, interface preferences
+    settings.yaml              model assignments, workspace path, the interface theme
     author-context.yaml
   <workspace>/                 chosen by the author, inside the data root
     the-cups/
@@ -209,7 +220,18 @@ property of the author rather than of any story, so it does not live in a piece.
 likewise a property of the author's machine and the models they hold rather than of any story: a
 participant is pointed at a different model once, and every piece it works on uses it.
 
-Shipped data travels with the application: mode descriptors and role definitions. A role
+The interface theme sits there for the same reason, being a property of the machine the author writes
+on rather than of any story. With no theme written the interface follows the operating system: an
+absent key means the author has not chosen, which is a different thing from a value the application
+supplied on their behalf, and it is why nothing writes one until they pick.
+
+Shipped data travels with the application in three kinds: the participant charter, the role
+definitions, and the mode descriptors. The charter is what every participant is told whichever one it
+is — what the three outcomes mean and what makes a recommendation applicable rather than commentary,
+that a direct question is owed an answer, and that nothing reasons about the author's question
+instead of about the story. It is its own kind because repeating it inside every role definition
+would be as many places for it to drift, and because a correction to it is one edit rather than five.
+A role
 definition carries the participant's display name and its single-token handle, which are
 different things — a display name of more than one word cannot be recovered from a message.
 Conflating
@@ -471,8 +493,9 @@ conformed is a normal outcome plainly reported; a response that could not be mad
 failure.
 
 **Schemas are as small as the call allows, because that is what makes constrained decoding hold.**
-A specialist's response is two fields — its declared outcome and its prose — and a local model
-holds that reliably where it falls apart on a nested structure. Where a call would need a large
+A specialist's response is three flat fields — its declared outcome, its claim, and its note — and a
+local model holds that reliably where it falls apart on a nested structure. The note is optional, so
+a claim standing alone conforms and nothing has to be invented to fill a field. Where a call would need a large
 schema, several small calls are the better shape: context capture returning many proposals is the
 one case, and SPEC already declines to fix its call count. Shrinking the schema is always preferred
 to adding machinery that repairs what a larger one returned.
@@ -620,8 +643,9 @@ message is parsed for.** A sigil counts where it begins the message or follows w
 lowercased and prefix-matched against the participants' lowercased handles, so `@comp` reaches
 Compression. A token matching exactly one handle addresses that participant; a token matching none,
 or more than one, is ignored and stays ordinary text. Typo tolerance and fuzzy matching are not
-required, and an autocompletion package is acceptable only if adopting it costs nothing. The message
-itself reaches every call verbatim, sigils included.
+required. Offering handles as the author types one is the composer's own affair and is the roster's
+combobox; it never becomes a second authority on who was called, because the room reads the text the
+author actually sent. The message itself reaches every call verbatim, sigils included.
 
 **The room is the only parser, and a round that names its target is not parsed at all.** Replying to
 a participant and asking one for a concrete change each aim at a single participant without the
@@ -696,7 +720,14 @@ application computes the before-and-after presented to the author from the manus
 rather than trusting the model to describe its own edit. That before-and-after is the changed
 passages with a little prose around them and no positions of any kind — enough to show what
 happened, not enough to reapply it anywhere — and where the change is unbounded it is the statement
-that the piece was rewritten whole rather than a second copy of the story.
+that the piece was rewritten whole.
+
+**That last case is a rule about what the file may hold, not about how much the surface may show.**
+The conversation discloses a change on the author's action and is indifferent to its length, so
+nothing about screen space is doing the work here. What the rule prevents is storing the prose either
+side of a whole-manuscript rewrite, which is a complete prior state of the story sitting on disk for
+as long as the conversation lives — a manuscript snapshot whatever the file is called, and the one
+thing this product refuses to keep.
 
 **An application is abandonable on the same terms as a round.** In-flight call cancelled, lock
 released, manuscript untouched, recommendation still applicable. With the timeout in the model
@@ -904,7 +935,7 @@ edit that needs the image rebuilt, and the roster changing is the only thing tha
 
 **Everything else is picked up without a restart, and code changes without a rebuild.** The client is
 served by the Vite process the Hono application runs inside, so a client edit hot-reloads and a server
-edit reloads the module graph. Shipped data — mode descriptors and role definitions — travels in the
+edit reloads the module graph. Shipped data — the participant charter, the role definitions and the mode descriptors — travels in the
 repository bind, so correcting a role definition is an edit and a reload rather than a release; it is
 validated at startup, so it is a reload and not merely a save. Change notification over a Docker
 Desktop bind mount is not dependable, so the watcher polls. Nothing about that reaches author data,

@@ -32,6 +32,20 @@ input,textarea,select,button{font-family:inherit}
 <sc-if value="{{ firstRun }}" hint-placeholder-val="{{ false }}">
 <div style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg)">
 <div style="width:420px">
+<div style="font:400 17px/1.6 Spectral,serif;color:var(--ink);margin-bottom:10px">Where do your stories live?</div>
+<div style="font:400 12px/1.6 'Public Sans';color:var(--ink3);margin-bottom:22px">A directory inside the data root. Chosen once — this is not asked again.</div>
+<input value="{{ workspacePath }}" placeholder="writing" style="width:100%;box-sizing:border-box;font:400 12px/1 ui-monospace,Menlo,monospace;color:var(--ink);background:var(--paper);border:1px solid var(--rule2);border-radius:4px;padding:11px 12px;letter-spacing:.02em">
+<div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+<button style="font:600 11.5px/1 'Public Sans';color:var(--accentfg);background:var(--accent);border:none;border-radius:4px;padding:10px 15px;cursor:pointer">use this directory</button>
+<span style="font:400 10px/1 ui-monospace,Menlo,monospace;color:var(--ink4);letter-spacing:.06em">{{ workspaceFacts }}</span>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ pieceList }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg)">
+<div style="width:420px">
 <div style="font:400 10px/1 ui-monospace,Menlo,monospace;color:var(--ink4);letter-spacing:.08em;margin-bottom:16px">~/WRITING</div>
 <sc-for list="{{ workspace }}" as="f" hint-placeholder-count="3">
 <div style="display:flex;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--rule);cursor:pointer">
@@ -101,7 +115,7 @@ input,textarea,select,button{font-family:inherit}
 <sc-if value="{{ saveFailed }}" hint-placeholder-val="{{ false }}">
 <div style="flex:none;display:flex;align-items:baseline;gap:12px;padding:11px 30px;border-top:1px solid var(--rule2);background:var(--paper)">
 <span style="font:400 10px/1 ui-monospace,Menlo,monospace;color:var(--ink4);letter-spacing:.07em">NOT SAVED · 14:32</span>
-<span style="font:400 11.5px/1.45 'Public Sans';color:var(--ink2);flex:1">The last write to flats-at-low-water.md failed. Nothing has been discarded — keep writing.</span>
+<span style="font:400 11.5px/1.45 'Public Sans';color:var(--ink2);flex:1">The last write to draft.md failed. Nothing has been discarded — keep writing.</span>
 </div>
 </sc-if>
 </div>
@@ -367,6 +381,7 @@ const FAIL_LOAD = 'mistral-nemo failed to load: not enough memory to allocate th
 const STATES = [
   ['resting','Resting \u2014 settled round, mixed responses'],
   ['flight','A round in flight \u2014 every participant called visible'],
+  ['preparing','A participant whose model is being prepared'],
   ['uneven','Uneven load and latency'],
   ['field','Response actions \u2014 field empty and filled'],
   ['asking','Ask-for-a-change in flight on its response'],
@@ -390,7 +405,8 @@ const STATES = [
   ['source','Markdown source view'],
   ['savefail','A failed save'],
   ['offline','Models unreachable'],
-  ['firstrun','First run \u2014 the workspace directory']
+  ['firstrun','First run \u2014 the workspace directory'],
+  ['pieces','The pieces \u2014 where launching lands']
 ];
 
 class Component extends DCLogic {
@@ -437,8 +453,14 @@ class Component extends DCLogic {
     switch (s) {
       case 'flight':
         return hist.concat([{ message:'The ending still feels like a trick. What is actually missing?',
-          flight:true, facts:'4 WORKING \u00B7 1 QUEUED BEHIND 2 \u00B7 0:14',
-          responses: ORDER.map(k => pending(k, k === 'inter' ? 'QUEUED \u00B7 BEHIND 2' : 'WORKING')) }]);
+          flight:true, facts:'1 WORKING \u00B7 4 WAITING \u00B7 0:14',
+          responses: ORDER.map(k => pending(k, k === 'shape' ? 'WORKING \u00B7 0:14' : 'WAITING')) }]);
+      case 'preparing':
+        return hist.concat([{ message:'The ending still feels like a trick. What is actually missing?',
+          flight:true, facts:'1 PREPARING \u00B7 1 ANSWERED \u00B7 3 WAITING \u00B7 0:52',
+          responses:[ resp('shape', R.shapeOpen),
+            pending('reader','PREPARING MODEL \u00B7 0:31'),
+            pending('comp','WAITING'), pending('inter','WAITING'), pending('editor','WAITING') ] }]);
       case 'uneven':
         return hist.concat([{ message:'The ending still feels like a trick. What is actually missing?',
           flight:true, facts:'1 WORKING \u00B7 3 ANSWERED \u00B7 1:07',
@@ -463,7 +485,7 @@ class Component extends DCLogic {
       case 'applied':
         return hist.concat([{ message:current.message, when:current.when, responses:[
           resp('reader', R.readerOpen),
-          resp('comp', Object.assign({ actions:false }, R.compCut, { diff:{ facts:'APPLIED \u00B7 \u00B63 \u00B7 ONE SENTENCE',
+          resp('comp', Object.assign({ actions:false }, R.compCut, { diff:{ facts:'APPLIED \u00B7 ONE SENTENCE',
             before:'On the kitchen table: two cups, rinsed and set upside down on a towel. Ruth stood looking at them for a while.',
             after:'On the kitchen table: two cups, rinsed and set upside down on a towel.' } })),
           resp('editor', R.editorOpen) ] }]);
@@ -531,7 +553,7 @@ class Component extends DCLogic {
       + `--mark-teal:${tok.teal};--mark-indigo:${tok.indigo};--mark-clay:${tok.clay};--mark-olive:${tok.olive};`
       + 'position:relative;height:100vh;display:flex;flex-direction:column;background:var(--bg);overflow:hidden';
 
-    const busy = s === 'flight' || s === 'uneven' || s === 'applying' || s === 'asking' || s === 'capturing';
+    const busy = s === 'flight' || s === 'preparing' || s === 'uneven' || s === 'applying' || s === 'asking' || s === 'capturing';
     const held = s === 'applying';
     const applied = s === 'applied';
     const proseSize = this.props.proseSize ?? 17;
@@ -563,7 +585,7 @@ class Component extends DCLogic {
     const proposals = [
       { id:'a', dest:'STORY CONTEXT', text:'Ruth has not been to her mother\u2019s house in four years, and the estrangement is never named in the prose.' },
       { id:'b', dest:'STORY CONTEXT', text:'The two rinsed cups indicate the house is occupied; the reader is meant to know before Ruth admits it.' },
-      { id:'c', dest:'AUTHOR INTENT', text:'The ending should read as inevitable rather than as a reveal.' }
+      { id:'c', dest:'AUTHOR CONTEXT', text:'The ending should read as inevitable rather than as a reveal.' }
     ].map(p => ({ id:p.id, dest:p.dest, text:p.text,
       label: st.approved[p.id] ? 'approved' : 'approve',
       style:'flex:none;font:600 10.5px/1 \'Public Sans\';border-radius:3px;padding:7px 11px;cursor:pointer;border:'
@@ -581,8 +603,11 @@ class Component extends DCLogic {
       rootStyle, convRef: this.convRef, state: s, stateOptions: STATES.map(([id, label]) => ({ id, label })),
       themeLabel: dark ? 'light' : 'dark',
       firstRun: s === 'firstrun',
+      workspacePath: '',
+      workspaceFacts: 'INSIDE /DATA',
+      pieceList: s === 'pieces',
       readingView: s === 'reading',
-      studio: s !== 'firstrun' && s !== 'reading',
+      studio: s !== 'firstrun' && s !== 'pieces' && s !== 'reading',
       sourceView: s === 'source',
       renderedView: s !== 'source',
       viewLabel: s === 'source' ? 'rendered' : 'markdown',

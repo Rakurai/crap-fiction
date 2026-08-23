@@ -120,6 +120,15 @@ conversation.
 Every visible response carries the participant's identity, what it said, and its actions.
 Identity is identity only: it never encodes agreement, severity or confidence.
 
+**What a response says arrives in two parts.** Its **claim** is one sentence and is always visible.
+Its **note** elaborates and is optional. The two are typographically distinct, so the author can read
+a round's claims down the column and stop at the ones worth the elaboration — which is what keeps
+five calls scannable when one participant wrote three lines and another fifteen.
+
+Neither part is a generated summary of the other. The participant writes both, and a response that is
+a claim alone is complete rather than truncated: nothing marks it as missing something, and nothing
+composes a note to fill the space.
+
 ### Actions on a response
 
 **One small text field serves every action on the response**, and is optional for all of
@@ -151,7 +160,24 @@ preview to confirm, and no staged state in the editor.
 
 **The response that caused the change shows what changed**, as a before-and-after the
 application computed from the manuscript itself. The participant is not asked to describe its
-own edit, and the manuscript carries no marks of the change.
+own edit, and the manuscript carries no marks of the change. Showing it here is what keeps the
+manuscript clean: the author can see what an application did without the story being annotated to
+tell them.
+
+**It is set as prose, struck through and replaced.** The passage as it stood reads as withdrawn and
+the passage as it now stands reads as current, in the register the room's words are in — not as a
+code diff, because the author is reading sentences and judging whether they are better.
+
+**The before-and-after is disclosed on the author's action.** The claim and the note stay visible as
+on any other response; the change itself opens and closes, and closed it is a count of what was
+altered in the register facts about the machine are in. Length therefore does not constrain it — a
+long change is a closed line until the author wants it. This is the author operating a response they
+are looking at, not the interface deciding an earlier round has been dealt with.
+
+**It says what changed and never where.** No paragraph number, no position, and nothing that jumps
+to the passage in the prose. The author reads the change on the response and finds the prose by
+reading the story, which is the only relationship between the two that stays true after the next
+edit.
 
 **Reversal is the editor's own history**, reached by the keystroke the author already uses.
 An application counts as one history action however many places it touched.
@@ -203,6 +229,13 @@ no round counts, no participant rosters, no sizes. Starting a new conversation a
 are available from the same place. It is not a project-management surface: no titles to maintain,
 no organization, no metadata to curate.
 
+**Where the author wrote no opening words, the listing finds the first they did write.** A
+conversation that began by asking a participant for a concrete change has no author message in its
+first round, because none was supplied. The listing reads down to the first message the author
+actually wrote, wherever it falls; only where a conversation holds none at all does it show what the
+author did instead, stated as a fact about the machine beside the time. Nothing is ever recognizable
+by the room's words standing in for the author's.
+
 **A resumed conversation is presented exactly as it was said.** Nothing marks a passage as
 having been written against earlier prose, nothing warns that the manuscript has moved on, and
 nothing offers to reconcile them.
@@ -244,9 +277,16 @@ conversation; editing the room; capture context.
 
 **Owns the screen while it is being exercised, then gone** — reviewing context proposals.
 
-**A place the author goes** — model assignment, the workspace, other pieces.
+**A place the author goes** — model assignment, the workspace, other pieces, the interface theme.
 
 **Nearly invisible** — model status, saving, the mode once it is set.
+
+**The listing of pieces is that place**, and it holds the configuration that belongs to the author's
+machine rather than to any story: which model serves which participant, and which theme the interface
+is in. Both are properties of where the author writes rather than of what they are writing, both are
+decided rarely, and neither belongs in a surface the author is looking at while writing. It is also
+where launching the studio lands, so the one screen that precedes any open piece is the one that
+configures the machine.
 
 Three consequences: nothing needs two paths to it, unless one of them is the author's own
 sentence — addressing an absent specialist enables it, because typing to a collaborator is a
