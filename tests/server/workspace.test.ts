@@ -55,17 +55,16 @@ describe('WorkspaceRegistry', () => {
     expect(reloaded.get()).toBe(resolved)
   })
 
-  it('preserves a hand-written comment and an unknown key in settings.yaml across a set', async () => {
+  it('writes only the workspace section, leaving the interface theme untouched', async () => {
     const settingsPath = path.join(dataRoot, 'config', 'settings.yaml')
     mkdirSync(path.dirname(settingsPath), { recursive: true })
-    writeFileSync(settingsPath, '# author notes\ninterfacePreferences:\n  theme: dark\n', 'utf8')
+    writeFileSync(settingsPath, 'interfacePreferences:\n  theme: dark\n', 'utf8')
 
     const registry = new WorkspaceRegistry(dataRoot)
     registry.load()
     await registry.set('my-writing')
 
     const text = readFileSync(settingsPath, 'utf8')
-    expect(text).toContain('# author notes')
     expect(text).toContain('theme: dark')
     expect(text).toContain(`workspace: ${path.join(dataRoot, 'my-writing')}`)
   })

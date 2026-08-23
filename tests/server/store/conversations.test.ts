@@ -6,11 +6,11 @@ import { z } from 'zod'
 import {
   mostRecentConversationId,
   readConversation,
+  readPiece,
   writeConversation,
   writePieceCast,
   writePieceMetadata,
 } from '../../../src/server/store/index.js'
-import { readYamlArtifact } from '../../../src/server/store/yaml.js'
 
 const conversationSchema = z.object({ id: z.string(), rounds: z.array(z.object({ id: z.string() })) })
 
@@ -65,8 +65,7 @@ describe('writePieceCast', () => {
   it('sets only the cast, leaving title, mode and status untouched', async () => {
     await writePieceCast(workspaceDir, 'cups', ['shape', 'compression'])
 
-    const schema = z.object({ title: z.string(), mode: z.string(), status: z.string(), cast: z.array(z.string()) })
-    const metadata = readYamlArtifact(path.join(workspaceDir, 'cups', 'piece.yaml'), schema)
+    const metadata = readPiece(workspaceDir, 'cups')?.metadata
     expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape', 'compression'] })
   })
 })

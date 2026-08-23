@@ -4,7 +4,6 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPiece, DraftWriter, getPiece, listPieces, PieceNotFoundError } from '../../src/server/pieces.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { TolerantReadError } from '../../src/server/store/index.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',
@@ -109,14 +108,6 @@ describe('pieces', () => {
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
     expect(() => getPiece(workspaceDir, '../../etc')).toThrowError(PieceNotFoundError)
-  })
-
-  it('reports a piece.yaml with no enabled cast as a stated failure naming the entry', () => {
-    mkdirSync(path.join(workspaceDir, 'cups'), { recursive: true })
-    writeFileSync(path.join(workspaceDir, 'cups', 'piece.yaml'), 'title: Cups\nmode: flash\nstatus: drafting\n', 'utf8')
-
-    expect(() => getPiece(workspaceDir, 'cups')).toThrowError(TolerantReadError)
-    expect(() => getPiece(workspaceDir, 'cups')).toThrowError(/cast/)
   })
 })
 

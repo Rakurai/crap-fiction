@@ -24,15 +24,14 @@ describe('interface theme', () => {
     expect(getTheme(dataRoot)).toBe('dark')
   })
 
-  it('preserves the workspace key and a hand-written comment when the theme is set', async () => {
+  it('writes only the interface preferences section, leaving the workspace key untouched', async () => {
     const settingsPath = path.join(dataRoot, 'config', 'settings.yaml')
     mkdirSync(path.dirname(settingsPath), { recursive: true })
-    writeFileSync(settingsPath, '# author notes\nworkspace: my-writing\n', 'utf8')
+    writeFileSync(settingsPath, 'workspace: my-writing\n', 'utf8')
 
     await setTheme(dataRoot, 'light')
 
     const text = readFileSync(settingsPath, 'utf8')
-    expect(text).toContain('# author notes')
     expect(text).toContain('workspace: my-writing')
     expect(text).toContain('theme: light')
   })

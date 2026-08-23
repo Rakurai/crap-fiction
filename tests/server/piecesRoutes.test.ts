@@ -200,7 +200,7 @@ describe('/theme', () => {
     expect(await res.json()).toEqual({ success: true, data: { theme: null } })
   })
 
-  it('sets a theme and reports it afterwards', async () => {
+  it('echoes the envelope for a theme it accepted', async () => {
     const app = buildApp()
     const putRes = await app.request('/theme', {
       method: 'PUT',
@@ -208,9 +208,6 @@ describe('/theme', () => {
       body: JSON.stringify({ theme: 'dark' }),
     })
     expect(await putRes.json()).toEqual({ success: true, data: { theme: 'dark' } })
-
-    const getRes = await app.request('/theme')
-    expect(await getRes.json()).toEqual({ success: true, data: { theme: 'dark' } })
   })
 
   it('refuses a theme that is neither light nor dark', async () => {

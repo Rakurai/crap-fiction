@@ -328,13 +328,22 @@ would become a durable record nobody decided to keep.
 
 ## Testing
 
-**The interface is the test surface.** Tests and callers cross the same seam.
+**The interface is the test surface.** Tests and callers cross the same seam. Where a module is a
+directory, its index file is that interface and a sibling file behind it is internal — a test imports
+the index and never a sibling, on the same terms as product code.
 
 **Each property is asserted at exactly one boundary, and nowhere twice.** A rule asserted at two
-levels is a rule that will be changed at one.
+levels is a rule that will be changed at one. Where a property could be stated at more than one
+boundary, it is asserted at the deepest one able to state it in the product's own vocabulary — the
+boundary the mechanism belongs to, not the one nearest to the test.
 
 Prove the contracts and the core flows. Do not build exhaustive edge-case matrices; prefer a few
-high-signal tests at real seams over broad unit coverage.
+high-signal tests at real seams over broad unit coverage. Each test earns its place by naming a
+distinct failure it would catch; a second test catching the same failure at the same boundary is a
+duplicate, not extra coverage. A schema is not a behaviour — that a value parses is a different claim
+from what the code does with it, and a test that only re-states a schema adds nothing past the schema
+itself. A closed set or a regular expression the product declares once is imported by the test that
+needs it, never retyped: a copy drifts the moment the original changes and the test stops noticing.
 
 Assert observable outcomes through the interface, never internal state, so tests survive a refactor
 behind it.
@@ -342,9 +351,16 @@ behind it.
 Mock only adapters at seams. Never mock an internal function to make a test convenient. Use the real
 or local-substitute implementation for anything that has one.
 
-A fixture belongs to the test that needs it. There is no shared library of default outputs — a default
+**A harness is not a fixture.** A harness is the test infrastructure that stands a scenario up — a
+temporary directory, a scripted adapter class, a test server — and it supplies no default the product
+itself would not supply: it is plumbing, never a source of data a test forgot to provide. A fixture is
+the value one particular test hands that harness — the response it scripts, the artifact it
+hand-edits — and belongs to that test alone. There is no shared library of default outputs: a default
 response is accepted as evidence that something ought to be there, and then satisfies a check meant to
 catch its absence.
+
+A module that reads the current time takes it as a parameter rather than calling the clock itself, so
+a test controls it directly instead of racing it.
 
 When a module is deepened, the unit tests on the shallow modules it absorbed are waste. Delete them
 and test at the new interface.
@@ -421,5 +437,9 @@ mapping explicit.
 - [ ] Structured logs at the owning seam, through the project's logger; nothing written to the console.
 - [ ] Log lines carry operational facts only, never the content the work consists of.
 - [ ] Process configuration read once at startup; author-editable data re-read at use.
-- [ ] Tests cross real seams; each property asserted once; fixtures local to their test.
+- [ ] Tests cross a directory-module's index, never a sibling behind it.
+- [ ] Each property asserted once, at the deepest boundary able to state it; each test names a
+      distinct failure; no schema re-stated as a behaviour; closed sets and regexes imported, not copied.
+- [ ] Harnesses and fixtures kept distinct; a fixture is local to the test that needs it; a module
+      reading the clock takes it as a parameter.
 - [ ] Comments say why; no history in code.
