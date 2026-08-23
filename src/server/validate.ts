@@ -4,7 +4,7 @@ import { fail } from '../shared/envelope.js'
 import { firstSchemaIssue } from './schemaIssue.js'
 
 /**
- * SPEC "HTTP layer"/CODING_STANDARDS: every JSON response carries the one
+ * SPEC "Transport": every JSON response carries the one
  * envelope, so a request body that fails validation is translated into it
  * here, once, rather than by each route that validates a body.
  */

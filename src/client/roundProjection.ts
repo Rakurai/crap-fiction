@@ -41,7 +41,7 @@ function fromRecord(round: RoundRecord): ProjectedRound {
   }
 }
 
-/** SPEC "The client's projection...": a new round preserves earlier rounds — this is what a reload's settled history becomes before any live event lands. */
+/** SPEC "Seams": a new round preserves earlier rounds — this is what a reload's settled history becomes before any live event lands. */
 export function initialProjection(rounds: readonly RoundRecord[]): ConversationProjection {
   return { rounds: rounds.map(fromRecord) }
 }
@@ -79,7 +79,7 @@ function updateParticipant(round: ProjectedRound, participantId: string, update:
 }
 
 /**
- * SPEC "The client's projection of round events is a pure reducer": every
+ * SPEC "Seams": the projection is a pure reducer rather than a boundary, so every
  * load-bearing rule lives here rather than in the surface that renders it —
  * participants seeded in a stable order when a round opens, earlier rounds
  * preserved, abandonment adding nothing beyond what landed, a failed

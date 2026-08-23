@@ -5,8 +5,8 @@ import { participantResultSchema, roundParticipantRecordSchema } from './convers
  * SPEC "Model access": a call may report that it is preparing before it is
  * working. `waiting` is the room's own state for a participant the round
  * will call but has not reached yet, seeded from `round.opened` rather than
- * emitted as its own event (SPEC "The client's projection... participants
- * are seeded in a stable order when the round opens").
+ * emitted as its own event — SPEC "Seams" has the projection seeding
+ * participants in a stable order when the round opens.
  */
 export const participantRoundStateSchema = z.enum(['waiting', 'preparing', 'working'])
 

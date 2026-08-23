@@ -177,7 +177,7 @@ export async function writeDraft(workspaceDir: string, id: string, text: string)
 }
 
 /**
- * SPEC "Room": addressing a specialist that is not enabled is the same
+ * SPEC "The round": addressing a specialist that is not enabled is the same
  * durable write to `piece.yaml` as enabling it directly. Only the `cast` path
  * is set, so a piece's title, mode and status survive untouched.
  */

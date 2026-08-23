@@ -355,9 +355,7 @@ or local-substitute implementation for anything that has one.
 temporary directory, a scripted adapter class, a test server — and it supplies no default the product
 itself would not supply: it is plumbing, never a source of data a test forgot to provide. A fixture is
 the value one particular test hands that harness — the response it scripts, the artifact it
-hand-edits — and belongs to that test alone. There is no shared library of default outputs: a default
-response is accepted as evidence that something ought to be there, and then satisfies a check meant to
-catch its absence.
+hand-edits — and belongs to that test alone. SPEC "Test fixtures" states what this rule protects.
 
 A module that reads the current time takes it as a parameter rather than calling the clock itself, so
 a test controls it directly instead of racing it.

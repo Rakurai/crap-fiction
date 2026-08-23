@@ -39,7 +39,7 @@ export type RoomOverrides = Readonly<{
 }>
 
 /**
- * SPEC "Room": the one place a test builds a `Room` directly. The charter a
+ * The one place a test builds a `Room` directly. The charter a
  * room needs is `CHARTER_FIXTURE`, declared once beside this file,
  * rather than a literal repeated per file that must be kept in agreement with
  * it by hand.
