@@ -223,6 +223,14 @@ describe('the manuscript while an application is in flight', () => {
    * duration, drawn from the same `applying` state a control already refuses
    * from elsewhere in this file (`leaveControl().disabled`) — a decision the
    * component makes from a prop, so `jsdom` states it the same way.
+   *
+   * What is here is the source view's own field and the notice: markup this
+   * component writes, from a prop it was handed. The rendered editing surface's
+   * editability is not, and deliberately — it is set on the editor rather than
+   * written as an attribute, and whether the author's keystrokes actually stop
+   * and start again is `tests/e2e/applying.spec.ts`, over a real application in
+   * a real browser. Asserting it here as well would be the same rule kept in two
+   * places.
    */
   it('holds the source textarea read-only, and says so in the register, while an application runs', () => {
     renderManuscript({ applying: true })
@@ -230,12 +238,6 @@ describe('the manuscript while an application is in flight', () => {
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('READ-ONLY')).toBeTruthy()
-  })
-
-  it('leaves the rendered editing surface untouched by an application still starting elsewhere, absent the prop', () => {
-    renderManuscript({ applying: false })
-
-    expect(screen.getByLabelText('Manuscript').getAttribute('contenteditable')).toBe('true')
   })
 
   it('is editable again, with no trace of the notice, the instant the application is no longer applying', () => {

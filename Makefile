@@ -46,8 +46,9 @@ test:
 
 # The journey through a real browser, run by hand on the author's machine. It
 # drives Chrome itself rather than a bundled build, because what it is for is the
-# studio working in the browser the author uses. It brings up its own studio on
-# its own port against its own data root, so it neither needs $(STUDIO_ENV) nor
-# disturbs a studio already running.
+# studio working in the browser the author uses. It brings up the studios it needs
+# on their own ports against their own data roots — the deployed arrangement, and
+# the one answering from the fixture model implementation — so it neither needs
+# $(STUDIO_ENV) nor disturbs a studio already running.
 test-browser:
 	npm run test:e2e

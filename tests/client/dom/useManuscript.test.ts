@@ -78,6 +78,11 @@ describe('useManuscript', () => {
     const container = document.createElement('div')
     // The source and rendered views are different DOM content with different
     // heights; jsdom does no layout, so the heights are modelled explicitly.
+    // What is asserted here is therefore the arithmetic and the sequencing — a
+    // ratio captured on the way out, reapplied on the way in, with no caller
+    // ordering it. That the ratio refers to anything, against prose laid out in
+    // a real font at a real column width, is `tests/e2e/readingPosition.spec.ts`
+    // and is not restated here.
     Object.defineProperty(container, 'scrollHeight', {
       configurable: true,
       get: () => (latestView === 'source' ? 400 : 200),

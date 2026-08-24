@@ -1,10 +1,11 @@
 import { bootstrap } from '../../src/server/bootstrap.js'
+import { FIXTURE_ANSWERS } from './fixtureAnswers.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
 
 /**
  * SPEC "Verification": the running studio answering from the fixture model
- * implementation rather than from a runtime, for a journey that needs a round to
- * settle without a model on the machine.
+ * implementation rather than from a runtime, for the journeys that need a round
+ * to settle and an application to return prose without a model on the machine.
  *
  * It is a whole second entry point rather than a mode of the first, and it lives
  * under `tests/` rather than under `src/`, because the studio the author runs
@@ -16,17 +17,11 @@ import { FixtureModelAdapter } from './modelAdapter.js'
  * author's own workspace would be indistinguishable, afterwards, from readings a
  * runtime gave them.
  *
- * Every call site answers the same commentary: what the fixture is for is a
- * round that reaches every participant and settles, and a reading of the
- * author's actual prose is not something a fixture can have. Whether the
- * specialists produce genuinely different readings is a question for a real
- * runtime, and the studio the author runs is where it is asked.
+ * What it answers is `./fixtureAnswers.ts`, which the journeys read too — the
+ * prose a browser is about to look for is the prose scripted there, named once.
+ * Whether the specialists produce genuinely different readings is a question for
+ * a real runtime, and the studio the author runs is where it is asked.
  */
-const { app } = bootstrap(() =>
-  FixtureModelAdapter.uniform(
-    { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading from the fixture model implementation' } } },
-    { reachable: true, models: ['fixture'] },
-  ),
-)
+const { app } = bootstrap(() => FixtureModelAdapter.bySite(FIXTURE_ANSWERS, { reachable: true, models: ['fixture'] }))
 
 export default app

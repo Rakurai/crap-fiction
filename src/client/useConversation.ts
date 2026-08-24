@@ -85,12 +85,25 @@ export function useConversation(
   const [busy, setBusy] = useState(initialRoundInFlight !== null)
   const [error, setError] = useState<string | undefined>(undefined)
   const conversationIdRef = useRef<string | null>(initialConversationId)
+  /**
+   * The conversation this instance opened with, held rather than read from the
+   * prop on every render. The prop is a fact about the piece and this hook is
+   * one of the two things that changes it: the first round of a fresh
+   * conversation mints an id, and the surface above is told so the listing can
+   * mark that row current. Reading the prop below would make that report look
+   * like the author switching conversations — the effect would tear down the
+   * room's event stream and rebuild it in the moment the round is opening, and
+   * a round opened on a brand new conversation would be missed entirely. The
+   * author switching is a different instance (a remount), not a changed prop,
+   * so the value this one mounted with is the one it stays with.
+   */
+  const [openedWithConversationId] = useState(initialConversationId)
 
   useEffect(() => {
     let active = true
 
-    if (initialConversationId !== null) {
-      void fetchConversation(pieceId, initialConversationId).then((result) => {
+    if (openedWithConversationId !== null) {
+      void fetchConversation(pieceId, openedWithConversationId).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
           const loaded = initialProjection(result.value.rounds)
@@ -128,7 +141,7 @@ export function useConversation(
       active = false
       unsubscribe()
     }
-  }, [pieceId, initialConversationId])
+  }, [pieceId, openedWithConversationId])
 
   /**
    * Every round the author opens — an ordinary message, a reply sent to a
