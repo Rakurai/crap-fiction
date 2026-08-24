@@ -30,22 +30,22 @@ Not resolved by deleting them from the table, because the store can already writ
 the routes would each be a one-line adapter over a capability that exists. They stay in the document
 as the shape the write takes if a surface ever asks for it.
 
-## A response with a note and no claim
+## The conversation-cutover substrate exists ahead of its wiring
 
-`src/shared/participantResponse.ts` — `normalizeResponse` promotes a participant's note into the
-claim slot when the model returned no claim, and drops the note. This contradicts three statements:
-`CONTEXT.md` defines the claim as the reading the participant commits to, `UX_DESIGN.md` says the
-participant writes both and neither derives from the other, and `SPEC.md` says nothing is invented to
-fill a field the model left empty.
+`src/shared/conversationEntries.ts` defines the causally-linked durable entries — author messages,
+concrete-change requests, participant responses, no-comment outcomes, failures, applications — that
+issue #58 replaces rounds with, and `ConversationEntryStore` in `src/server/store/index.ts` gives
+them a serialized append operation. Both are exercised only by their own tests.
 
-It survives because a weak local model returning only a note is common, and promoting it salvages a
-response that would otherwise fail as nonconforming after its retries. That is a real cost being
-avoided, and it is being avoided by presenting a note to the author as a claim the participant did
-not make — which is exactly the substitution the documents refuse. The document is right and the
-code is wrong.
-
-The correct behaviour is that a claimless response does not conform, which puts the re-issue where it
-belongs: inside the model module, against the model that got it wrong.
+Nothing reads or writes them otherwise. `src/server/room/room.ts` still holds the single
+round-and-application-and-capture operation "Operation state" and "Seams" describe, `Conversation`
+in `src/shared/conversationViews.ts` is still the round-shaped record `readConversation` and
+`writeConversation` use, and a round still calls its participants one at a time. `SPEC.md` "Files"
+correctly names `conversations/<conversation-id>.json` as that round-shaped record; the entry store
+would write a different shape to the same path if anything called it, and nothing does. This is
+deliberate expand-step work for the wide refactor issue #58 specifies; the cutover that makes the
+entries and the store load-bearing, and updates "Files" and "The round" to describe them, is that
+issue's, not this entry's.
 
 ## Abandoning a context capture
 

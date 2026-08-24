@@ -222,7 +222,7 @@ describe('the round the room runs', () => {
     expect(outcome.records[2]).toEqual({ participantId: 'story-editor', result: { kind: 'response', outcome: 'noComment' } })
   })
 
-  it('records a reading the participant wrote into the note alone, rather than discarding it', async () => {
+  it('reports a reading the participant wrote into the note alone as nonconforming, rather than inventing a claim from it', async () => {
     const outcome = await round({
       shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', note: 'start with the light, not with her' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -231,9 +231,13 @@ describe('the round the room runs', () => {
 
     expect(outcome.records[0]).toEqual({
       participantId: 'shape',
-      result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'start with the light, not with her' },
+      result: {
+        kind: 'failed',
+        reason: 'nonconforming',
+        returned: '{"outcome":"applicableSuggestion","note":"start with the light, not with her"}',
+      },
     })
-    expect(outcome.adapter.promptFor('story-editor')).toContain('start with the light, not with her')
+    expect(outcome.adapter.promptFor('story-editor')).not.toContain('start with the light, not with her')
   })
 
   it('reports a reply that said nothing in either field as nonconforming, carrying what came back', async () => {

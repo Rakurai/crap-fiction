@@ -4,22 +4,23 @@ export const responseOutcomeSchema = z.enum(['noComment', 'commentary', 'applica
 
 export type ResponseOutcome = z.infer<typeof responseOutcomeSchema>
 
-// Guided decoding is driven by `z.toJSONSchema`, which carries neither a refinement nor a minimum
-// length, so no wire schema can oblige a runtime to write a claim. Both fields are optional here
-// and the requirement is applied by `normalizeResponse`.
-const responseWireSchema = z.object({
-  outcome: responseOutcomeSchema,
-  claim: z.string().optional(),
+// The claim is required and trimmed at the grammar itself — `z.toJSONSchema` carries `minLength`
+// into guided decoding, and `safeParse` enforces it on every runtime whether or not decoding is
+// guided there. A response missing it does not conform, and the model module retries and then
+// fails it rather than this module inventing a claim from the note.
+const substantiveValueSchema = z.object({
+  outcome: z.enum(['commentary', 'applicableSuggestion']),
+  claim: z.string().trim().min(1),
   note: z.string().optional(),
 })
 
-export const eligibleResponseValueSchema = responseWireSchema
+const noCommentValueSchema = z.object({ outcome: z.literal('noComment') })
 
-export const owedResponseValueSchema = responseWireSchema.extend({
-  outcome: z.enum(['commentary', 'applicableSuggestion']),
-})
+export const eligibleResponseValueSchema = z.union([noCommentValueSchema, substantiveValueSchema])
 
-export type ResponseValue = z.infer<typeof responseWireSchema>
+export const owedResponseValueSchema = substantiveValueSchema
+
+export type ResponseValue = z.infer<typeof eligibleResponseValueSchema>
 
 export function responseValueSchema(owesAnswer: boolean) {
   return owesAnswer ? owedResponseValueSchema : eligibleResponseValueSchema
@@ -35,11 +36,7 @@ function said(text: string | undefined): string | undefined {
   return trimmed.length === 0 ? undefined : trimmed
 }
 
-export function normalizeResponse(value: ResponseValue): NormalizedResponse | undefined {
+export function normalizeResponse(value: ResponseValue): NormalizedResponse {
   if (value.outcome === 'noComment') return { outcome: 'noComment' }
-
-  const claim = said(value.claim)
-  const note = said(value.note)
-  if (claim === undefined) return note === undefined ? undefined : { outcome: value.outcome, claim: note, note: undefined }
-  return { outcome: value.outcome, claim, note }
+  return { outcome: value.outcome, claim: value.claim, note: said(value.note) }
 }

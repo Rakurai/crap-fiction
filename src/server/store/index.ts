@@ -2,6 +2,8 @@ import path from 'node:path'
 import { Mutex } from 'async-mutex'
 import { z } from 'zod'
 import type { AppliedChange } from '../../shared/appliedChange.js'
+import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
+import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import { resolveWithinRoot } from './containment.js'
@@ -209,6 +211,29 @@ export function mostRecentConversationId(workspaceDir: string, pieceId: string):
 export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
   const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
   await deleteFile(conversationFile(pieceDir, conversationId))
+}
+
+export function readConversationEntries(workspaceDir: string, pieceId: string, conversationId: string): EntryConversation | undefined {
+  const pieceDir = pieceDirectory(workspaceDir, pieceId)
+  if (pieceDir === undefined) return undefined
+  return readJsonArtifact(conversationFile(pieceDir, conversationId), entryConversationSchema)
+}
+
+// The one serialized append operation the conversation-entry substrate exposes: read-modify-write
+// and the atomic replacement it produces happen under the same lock, so two entries accepted
+// while both are in flight still both land, in the order they were accepted.
+export class ConversationEntryStore {
+  readonly #lock = new Mutex()
+
+  async append(workspaceDir: string, pieceId: string, conversationId: string, entry: ConversationEntry): Promise<void> {
+    const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
+    const file = conversationFile(pieceDir, conversationId)
+    await this.#lock.runExclusive(async () => {
+      const existing = readJsonArtifact(file, entryConversationSchema)
+      const next: EntryConversation = { id: conversationId, entries: [...(existing?.entries ?? []), entry] }
+      await writeJsonArtifact(file, next)
+    })
+  }
 }
 
 const CHANGE_SUFFIX = '.json'

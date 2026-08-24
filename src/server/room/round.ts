@@ -28,7 +28,6 @@ export type RoundResult = Readonly<{
 
 function toParticipantResult(value: ResponseValue): ParticipantResult {
   const response = normalizeResponse(value)
-  if (response === undefined) return { kind: 'failed', reason: 'nonconforming', returned: JSON.stringify(value) }
   if (response.outcome === 'noComment') return { kind: 'response', outcome: 'noComment' }
   return { kind: 'response', outcome: response.outcome, claim: response.claim, note: response.note }
 }

@@ -68,6 +68,10 @@ export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
   readonly #logger: Logger
+  // Submissions may arrive independently and concurrently — the model seam promises callers
+  // nothing about their order. This runtime is configured for one call at a time, so every
+  // submission is chained onto the one before it rather than reaching the SDK together.
+  #queue: Promise<unknown> = Promise.resolve()
 
   constructor(baseUrl: string, getAssignment: GetAssignment, logger: Logger) {
     this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
@@ -88,7 +92,22 @@ export class LMStudioAdapter implements ModelAccess {
     return result
   }
 
-  async call<T>(
+  call<T>(
+    site: string,
+    prompt: string,
+    schema: z.ZodType<T>,
+    signal: AbortSignal,
+    onState?: (state: CallState) => void,
+  ): Promise<CallResult<T>> {
+    const run = this.#queue.then(() => this.#call(site, prompt, schema, signal, onState))
+    // A rejection here is already carried as a `CallResult`, never a thrown error, but the queue
+    // itself must never stall on a settled entry — the next submission runs whether this one
+    // resolved, or, in principle, threw.
+    this.#queue = run.catch(() => undefined)
+    return run
+  }
+
+  async #call<T>(
     site: string,
     prompt: string,
     schema: z.ZodType<T>,

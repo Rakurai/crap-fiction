@@ -149,10 +149,13 @@ describe('LMStudioAdapter.call', () => {
 
     const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, silent)
     const pending = adapter.call('shape', 'prompt', schema, new AbortController().signal)
+    // A submission is queued rather than started synchronously, so this waits for the call to
+    // actually reach the runtime — and so for `AbortSignal.timeout` to actually be asked for a
+    // signal — before aborting the bound it asked for.
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(120_000))
     timeout.abort()
 
     expect(await pending).toEqual({ outcome: 'failed', reason: 'timeout' })
-    expect(spy).toHaveBeenCalledWith(120_000)
   })
 
   it('reports an abandoned call as abandoned even where its own bound also elapsed', async () => {
@@ -221,6 +224,29 @@ describe('LMStudioAdapter.call', () => {
 
     expect(states).toEqual(['preparing', 'working', 'working'])
   })
+
+  it('submits independently but never lets the runtime hold two calls at once: a second submission waits for the first to settle', async () => {
+    modelFn.mockResolvedValue({ respond: respondFn })
+    let resolveFirst: (value: { nonReasoningContent: string }) => void = () => {}
+    respondFn.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+    respondFn.mockResolvedValueOnce({ nonReasoningContent: JSON.stringify({ claim: 'second' }) })
+
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, silent)
+    const first = adapter.call('shape', 'prompt one', schema, new AbortController().signal)
+    const second = adapter.call('compression', 'prompt two', schema, new AbortController().signal)
+
+    // Nothing about submission order is a promise the caller may lean on, but this runtime is
+    // configured for one call at a time regardless: the second submission must not reach it
+    // while the first is still held open.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(respondFn).toHaveBeenCalledTimes(1)
+
+    resolveFirst({ nonReasoningContent: JSON.stringify({ claim: 'first' }) })
+
+    expect(await first).toEqual({ outcome: 'value', value: { claim: 'first' } })
+    expect(await second).toEqual({ outcome: 'value', value: { claim: 'second' } })
+    expect(respondFn).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('what the adapter asks the runtime to generate', () => {
@@ -264,15 +290,16 @@ describe('what the adapter asks the runtime to generate', () => {
 })
 
 describe('LMStudioAdapter.call against the participant response schemas', () => {
-  it('carries a reply with fields the runtime left out or left blank, rather than spending its retries on it', async () => {
+  it('spends its retries on a substantive reply with no claim, then fails as nonconforming rather than inventing one', async () => {
     modelFn.mockResolvedValue({ respond: respondFn })
-    respondFn.mockResolvedValue({ nonReasoningContent: JSON.stringify({ outcome: 'commentary', claim: '', note: 'the opening is late' }) })
+    const returned = JSON.stringify({ outcome: 'commentary', note: 'the opening is late' })
+    respondFn.mockResolvedValue({ nonReasoningContent: returned })
 
     const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, silent)
     const result = await adapter.call('shape', 'prompt', eligibleResponseValueSchema, new AbortController().signal)
 
-    expect(result).toEqual({ outcome: 'value', value: { outcome: 'commentary', claim: '', note: 'the opening is late' } })
-    expect(respondFn).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned })
+    expect(respondFn).toHaveBeenCalledTimes(3)
   })
 
   it('refuses a no-comment reply from a participant that owes an answer', async () => {

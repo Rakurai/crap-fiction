@@ -1,15 +1,19 @@
-import { existsSync, mkdtempSync, rmSync, utimesSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  ConversationEntryStore,
   conversationActivity,
   deleteConversation,
   mostRecentConversationId,
   readConversation,
+  readConversationEntries,
+  TolerantReadError,
   writeConversation,
   writePieceMetadata,
 } from '../../../src/server/store/index.js'
+import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
 
 const oneRound: Conversation = {
@@ -87,5 +91,62 @@ describe('conversations', () => {
 
   it('deletes nothing and reports nothing wrong for a conversation not on disk', async () => {
     await expect(deleteConversation(workspaceDir, 'cups', 'never-written')).resolves.toBeUndefined()
+  })
+})
+
+describe('ConversationEntryStore.append', () => {
+  let workspaceDir: string
+
+  const authorMessage: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'does the opening earn its length', audience: [], brought: [] }
+  const response: ConversationEntry = {
+    id: 'e2',
+    kind: 'participantResponse',
+    participantId: 'shape',
+    causeId: 'e1',
+    outcome: 'commentary',
+    claim: 'the entry is late',
+  }
+
+  beforeEach(async () => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('reports a conversation nothing has appended to yet as a declared absence', () => {
+    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toBeUndefined()
+  })
+
+  it('appends the first entry to a conversation that does not exist on disk yet', async () => {
+    await new ConversationEntryStore().append(workspaceDir, 'cups', 'c1', authorMessage)
+
+    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage] })
+  })
+
+  it('appends behind what is already there rather than replacing it', async () => {
+    const store = new ConversationEntryStore()
+    await store.append(workspaceDir, 'cups', 'c1', authorMessage)
+    await store.append(workspaceDir, 'cups', 'c1', response)
+
+    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage, response] })
+  })
+
+  it('serializes two appends accepted together, so both entries survive in the order they were accepted', async () => {
+    const store = new ConversationEntryStore()
+
+    await Promise.all([store.append(workspaceDir, 'cups', 'c1', authorMessage), store.append(workspaceDir, 'cups', 'c1', response)])
+
+    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage, response] })
+  })
+
+  it('states a failure, rather than tolerating anything, when the JSON does not parse', () => {
+    const file = path.join(workspaceDir, 'cups', 'conversations', 'c1.json')
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, 'not json')
+
+    expect(() => readConversationEntries(workspaceDir, 'cups', 'c1')).toThrowError(TolerantReadError)
   })
 })

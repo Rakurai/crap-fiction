@@ -570,13 +570,21 @@ failure. This is what makes an owed answer enforceable without inspecting what a
 judging the content would take a second model call to do badly, and a model willing to declare
 silence on a direct question is common enough that the guarantee has to hold against it.
 
-**There is no scheduler.** Calls are issued one at a time and no runtime is ever asked to hold more
-than one. Local capacity is bounded by the loaded model, so concurrent calls against it are
-substantially serialized anyway and buy too little wall-clock to be worth the concurrency limits,
-queue positions and cancellation-of-queued-work they would add — and a runtime given more
-simultaneous calls than it is configured for fails rather than queues. A round therefore costs the
-sum of its calls, which is the standing cost concern arriving as an infrastructure fact and is why
-writing through a round is load-bearing rather than a nicety.
+**The interface permits independent submission and promises nothing about it.** A caller may
+submit a further call without awaiting the one before it, and the seam states plainly that it
+guarantees none of their relative start order, completion order, latency, progress or successful
+cancellation across submissions — each call carries its own signal and settles on its own. What an
+implementation owes its own runtime beyond that is the implementation's policy, never a caller's to
+coordinate.
+
+**There is no general scheduler.** Local capacity is bounded by the loaded model, and a runtime
+given more simultaneous calls than it is configured for fails rather than queues — so this runtime
+is never asked to hold more than one, a guarantee the production adapter keeps by queuing every
+submission and running them one at a time regardless of how its caller submitted them. That is a
+fixed, unconditional policy owned entirely by the adapter, not a configurable scheduler, a
+concurrency limit, or a residency abstraction serving several policies. A round still issues its
+calls one at a time and awaits each in turn, so a round still costs the sum of its calls; the seam's
+independence stands ready for a caller that has a reason to use it.
 
 ## Context compilation
 
@@ -1175,7 +1183,7 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | **context** | no specialist's compiled context contains another specialist's response from the round being formed, under either history policy; every specialist context is compiled before the round's first call is issued; the Story Editor's contains the round's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
 | **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
-| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
+| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text; a call submitted without awaiting an earlier one never reaches the runtime until that earlier one has settled, and one settling carries no bearing on the other's outcome |
 | **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
 | **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
 
