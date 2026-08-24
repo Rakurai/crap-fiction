@@ -528,40 +528,49 @@ describe('Room.capture', () => {
     expect(adapter.promptFor('capture')).toContain('cut the second paragraph')
 
     await room.capture(workspaceDir, piece.id, 'c2', 'text')
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds).toHaveLength(1)
   })
 
-  it('refuses while a round is in flight for the same piece', async () => {
+  it('CONTEXT "Capture context": proceeds while a round is in flight for the same piece, sharing the model seam but not the room\'s round-and-apply lock', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+      capture: { result: { outcome: 'value', value: { proposals: [] } } },
     })
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
 
-    await expect(room.capture(workspaceDir, piece.id, 'c1', 'draft text')).rejects.toThrowError(RoomBusyError)
+    const result = await room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    expect(result).toEqual({ outcome: 'value', value: { proposals: [] } })
 
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
   })
 
-  it('refuses to open a round while a capture is in flight', async () => {
+  it('does not block a round from opening for the same piece while it runs', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
 
     const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
 
-    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')).rejects.toThrowError(RoomBusyError)
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    await settlementOf(room, piece.id)
 
     adapter.release('capture')
     await capturing
   })
 
-  it('resolves as abandoned, and frees the room, when abandoned mid-call', async () => {
+  it('SPEC "Seams": is unaffected by abandon(), which targets the round-and-apply operation and never reaches capture', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
@@ -569,10 +578,44 @@ describe('Room.capture', () => {
 
     const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
     room.abandon(piece.id)
-    await expect(capturing).resolves.toEqual({ outcome: 'abandoned' })
 
-    expect(room.snapshot(piece.id)).toBeUndefined()
+    expect(room.captureSnapshot(piece.id)).toBeDefined()
+
     adapter.release('capture')
+    await expect(capturing).resolves.toEqual({ outcome: 'value', value: { proposals: [] } })
+  })
+
+  it('refuses a second capture for the same piece while one is already in flight', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+
+    await expect(room.capture(workspaceDir, piece.id, 'c1', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('capture')
+    await capturing
+  })
+
+  it('reports its own activity on captureSnapshot, independently of the round snapshot', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    expect(room.captureSnapshot(piece.id)).toBeUndefined()
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+
+    expect(room.captureSnapshot(piece.id)).toMatchObject({ conversationId: 'c1' })
+    expect(room.snapshot(piece.id)).toBeUndefined()
+
+    adapter.release('capture')
+    await capturing
+
+    expect(room.captureSnapshot(piece.id)).toBeUndefined()
   })
 
   it('reports a failed call as failed, proposing nothing', async () => {

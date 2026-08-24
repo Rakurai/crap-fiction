@@ -1,6 +1,7 @@
 import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
+import type { CaptureSnapshot } from '../shared/captureViews.js'
 import { conversationSchema, type Conversation, type ConversationSummary, type ConversationView } from '../shared/conversationViews.js'
 import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
@@ -121,6 +122,7 @@ export function getPiece(
   workspaceDir: string,
   id: string,
   roundInFlight: RoundSnapshot | null,
+  captureInFlight: CaptureSnapshot | null,
   specialists: readonly RoleDefinition[],
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
@@ -131,6 +133,7 @@ export function getPiece(
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     conversations: listConversations(workspaceDir, id),
     roundInFlight,
+    captureInFlight,
     cast: castView(specialists, piece.metadata.cast),
   }
 }

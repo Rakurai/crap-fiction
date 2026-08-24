@@ -102,7 +102,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -117,7 +117,7 @@ export function createApp(
       await setPieceCast(workspaceDir, id, room.specialists(), cast)
     }
 
-    return c.json(ok(getPiece(workspaceDir, id, room.snapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspaceDir, id, room.snapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {

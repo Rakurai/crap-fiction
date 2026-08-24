@@ -37,8 +37,8 @@ concrete-change requests, participant responses, no-comment outcomes, failures, 
 issue #58 replaces rounds with, and `ConversationEntryStore` in `src/server/store/index.ts` gives
 them a serialized append operation. Both are exercised only by their own tests.
 
-Nothing reads or writes them otherwise. `src/server/room/room.ts` still holds the single
-round-and-application-and-capture operation "Operation state" and "Seams" describe, `Conversation`
+Nothing reads or writes them otherwise. `src/server/room/room.ts` still holds the shared
+round-and-application operation "Operation state" and "Seams" describe, `Conversation`
 in `src/shared/conversationViews.ts` is still the round-shaped record `readConversation` and
 `writeConversation` use, and a round still calls its participants one at a time. `SPEC.md` "Files"
 correctly names `conversations/<conversation-id>.json` as that round-shaped record; the entry store
@@ -50,9 +50,11 @@ issue's, not this entry's.
 ## Abandoning a context capture
 
 `PRD.md` "Stop waiting" requires abandoning for as long as any model operation is in flight and names
-three; `SPEC.md` "Seams" states that a round, an application and a capture share one abandonment
-path. The room's side of this is built — capture registers as the operation holding the room and
-`POST /pieces/:id/abandon` reaches it — but the hook never asks, and the review surface has no state
-for an analysis still out, so it renders as an analysis that returned nothing.
+three: a round, an application, and a context capture. `SPEC.md` "Operation state" and "Seams" now
+give capture its own activity and abandonment identity, independent of the round-or-application
+state — issue #59 detached it so that capture no longer shares that state, that lock or that
+abandonment path. Nothing in the room, the transport or the client reaches a capture in flight to
+stop it: there is no route, no hook, and the review surface has no state for an analysis still out,
+so a reload or a wait renders as an analysis that returned nothing.
 
 Tracked as issue #55.

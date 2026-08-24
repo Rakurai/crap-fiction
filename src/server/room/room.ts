@@ -11,6 +11,7 @@ import {
   type CaptureDestination,
   type CaptureProposal,
 } from '../../shared/captureProposal.js'
+import type { CaptureSnapshot } from '../../shared/captureViews.js'
 import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
 import { ConversationNotFoundError, PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
@@ -69,7 +70,7 @@ export type RoomEvent =
 
 export class RoomBusyError extends Error {
   constructor(pieceId: string) {
-    super(`a round is already in flight for "${pieceId}"`)
+    super(`an operation is already in flight for "${pieceId}"`)
     this.name = 'RoomBusyError'
   }
 }
@@ -146,13 +147,17 @@ type ActiveApply = {
   readonly controller: AbortController
 }
 
+// Capture is not part of this union: it shares the model seam with a round and an application but
+// owns its own activity and abandonment identity, so it never occupies `#operation` and is never
+// reachable from `abandon()`.
 type ActiveCapture = {
-  readonly kind: 'capture'
   readonly pieceId: string
+  readonly conversationId: string
   readonly controller: AbortController
+  readonly openedAt: number
 }
 
-type ActiveOperation = RunningRound | ActiveApply | ActiveCapture
+type ActiveOperation = RunningRound | ActiveApply
 
 export class Room {
   readonly #modelAccess: ModelAccess
@@ -166,6 +171,7 @@ export class Room {
   readonly #storyEditor: RoleDefinition
   readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
   readonly #listeners = new Map<string, Set<Listener>>()
+  readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
 
   constructor(
@@ -224,6 +230,11 @@ export class Room {
       respondingTo: operation.ask?.respondingTo,
       clarification: operation.ask?.clarification,
     }
+  }
+
+  captureSnapshot(pieceId: string): CaptureSnapshot | undefined {
+    const capture = this.#captures.get(pieceId)
+    return capture === undefined ? undefined : { conversationId: capture.conversationId, openedAt: capture.openedAt }
   }
 
   async startRound(
@@ -324,6 +335,8 @@ export class Room {
     return operation?.kind === 'round' ? operation.settlement : undefined
   }
 
+  // Targets the round/apply operation only — a capture in flight has its own identity and is
+  // never reachable from here.
   abandon(pieceId: string): void {
     this.#operationFor(pieceId)?.controller.abort()
   }
@@ -386,8 +399,7 @@ export class Room {
     conversationId: string,
     draft: string,
   ): Promise<CallResult<{ proposals: readonly CaptureProposal[] }>> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    if (this.#captures.has(pieceId)) throw new RoomBusyError(pieceId)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
@@ -396,7 +408,7 @@ export class Room {
     const durableContext = this.#readDurableContext(workspaceDir, pieceId)
 
     const controller = new AbortController()
-    this.#operation = { kind: 'capture', pieceId, controller }
+    this.#captures.set(pieceId, { pieceId, conversationId, controller, openedAt: this.#now() })
 
     try {
       const context = compileCaptureContext({
@@ -411,7 +423,7 @@ export class Room {
 
       return { outcome: 'value', value: { proposals: toCaptureProposals(result.value.proposals) } }
     } finally {
-      this.#operation = undefined
+      this.#captures.delete(pieceId)
     }
   }
 

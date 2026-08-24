@@ -659,36 +659,50 @@ to the author.
 
 ## Operation state
 
-One author-initiated model operation runs at a time, so the application's interaction state is
-small enough to name exhaustively and is what the client's controls observe.
+One round-or-application operation runs at a time, so that part of the application's interaction
+state is small enough to name exhaustively and is what the client's controls observe.
 
 ```
 idle
   ├─ send a message, or ask a participant for a concrete change ─→ roundInFlight ─→ idle
-  ├─ apply a recommendation ────────────────────────────────────→ applying      ─→ idle
-  └─ capture context ───────────────────────────────────────────→ capturing     ─→ reviewing ─→ idle
+  └─ apply a recommendation ────────────────────────────────────→ applying      ─→ idle
 ```
 
 Manuscript editing is permitted in every state except `applying`. Abandonment applies to
-`roundInFlight`, `applying` and `capturing`, returning to `idle` with whatever landed kept.
+`roundInFlight` and `applying`, returning to `idle` with whatever landed kept.
+
+**Context capture is a second, independent operation, with a state of its own:**
+
+```
+capture context ─→ capturing ─→ reviewing ─→ idle
+```
+
 `reviewing` holds capture proposals with nothing in flight, and approving writes context files
-without a model call.
+without a model call. Capture may be entered while `roundInFlight` or `applying` holds, and neither
+of those waits on a capture in flight either — the round-or-application state and capture's own
+state are refused independently, never against each other. Reading the piece reports both: whatever
+round-or-application operation is in flight, and whether a capture is, so a client that reloaded
+knows what it is looking at without any new event.
 
-**The room holds this state and refuses to start an operation unless it is idle.** The client
-disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
-because the guard on the manuscript has to be where the state is, not in the surface that draws the
-buttons. A refused start is reported as an `error` and is never a question put to the author —
-nothing asks which of two operations to keep. Reading the piece reports whatever operation is in
-flight, so a client that reloaded knows what it is looking at without any new event.
+**The room holds the round-or-application state and refuses to start one unless it is idle.** The
+client disables the controls that would start one, so the refusal is unreachable in ordinary use; it
+exists because the guard on the manuscript has to be where the state is, not in the surface that
+draws the buttons. A refused start is reported as an `error` and is never a question put to the
+author — nothing asks which of two operations to keep. Capture is refused only by a capture already
+in flight for the same piece; a round or an application in flight is never a reason to refuse it.
 
-**The operation in flight has an identifier, and a result belonging to any other is discarded.** A
+**Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the
-one that replaced it. With a single operation at a time the identifier costs nothing, and it is the
-whole of what keeps an abandoned call from arriving as a live one.
+one that replaced it. With at most one round-or-application and one capture per piece at a time, the
+identifier costs nothing, and it is the whole of what keeps an abandoned call from arriving as a
+live one.
 
 **Serialization is a simplification, not a principle.** Local capacity is bounded by the loaded
-model, so overlapping operations buy little wall-clock while multiplying the states the interface
-has to compose. Nothing is built to make concurrency impossible; there is no requirement for it.
+model, so overlapping round-or-application operations would buy little wall-clock while multiplying
+the states the interface has to compose, and nothing is built to make that concurrency impossible —
+there is no requirement for it. Capture overlaps the other two anyway, on the same bounded capacity:
+gating a whole-story analysis the author invokes rarely on whatever the room happens to be doing
+would cost more in waiting than the shared capacity would ever save.
 
 ## The round
 
@@ -821,13 +835,15 @@ recommendation stays applicable.
 
 ## Context capture
 
-**One author-triggered operation.** Its input is the draft, the current conversation whole, and
-both existing contexts, as they stand when the author invokes it. The author keeps writing while
-it runs: the analysis holds no lock, and editing afterwards neither cancels it nor is reconciled
-against its proposals, which are advisory and individually approved. Its output is a set of
-proposals, each carrying its
-destination context, the operation it performs — add, revise, replace, remove — the entry it
-concerns where it concerns an existing one, and the proposed text.
+**One author-triggered operation, independent of a round or an application.** Its input is the
+draft, the current conversation whole, and both existing contexts, snapshotted as they stand when
+the author invokes it. The author keeps writing while it runs: the analysis holds no lock, and
+editing afterwards neither cancels it nor is reconciled against its proposals, which are advisory
+and individually approved. It may run while a round or an application is in flight for the same
+piece, and starting either of those never waits on a capture either — see "Operation state" and
+"Seams". Its output is a set of proposals, each carrying its destination context, the operation it
+performs — add, revise, replace, remove — the entry it concerns where it concerns an existing one,
+and the proposed text.
 
 **One call is the normal case and is not a contract.** Where a single call would need a schema large
 enough to defeat constrained decoding, the operation may issue several sequential calls instead —
@@ -896,10 +912,12 @@ a re-emission protocol are not required, and are worth adding only if a simpler 
 demonstrably fails.
 
 **What the piece reports about an operation in flight is what the surface needs in order to draw
-it**: which operation it is, its identifier, and for a round the participants it will call, their
-states, and the responses and failures that have already landed. A participant that settled while the
-client was disconnected is in that report, because the conversation file is not written until the
-round settles.
+it**: which round-or-application operation it is, its identifier, and for a round the participants
+it will call, their states, and the responses and failures that have already landed. A participant
+that settled while the client was disconnected is in that report, because the conversation file is
+not written until the round settles. A capture in flight is reported the same way but
+independently — its own identifier, never folded into the round-or-application report, since one
+of each can be true at once.
 
 **A dropped connection during an application or a capture is an ordinary failure.** Those results
 reach the client on the response to the request that started them, so a connection that dropped lost
@@ -935,7 +953,8 @@ one is reported. SSE frames are not wrapped; the event set above is the contract
 GET    /pieces                                     title, mode, status, modified
 POST   /pieces                                     title + mode; enables the mode's default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the operation in flight if there is one
+                                                   the round-or-application operation in flight if
+                                                   there is one, and whether a capture is
 PATCH  /pieces/:id                                 title, status, enabled cast
 PUT    /pieces/:id/draft
 PUT    /pieces/:id/story-context
@@ -945,7 +964,9 @@ DELETE /pieces/:id/conversations/:cid
 POST   /pieces/:id/conversations/:cid/rounds       the author's message, or a target and any
                                                    clarification
 POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
-POST   /pieces/:id/abandon                         whatever operation is in flight
+POST   /pieces/:id/abandon                         whichever round-or-application operation is in
+                                                   flight; never a capture, which has no abandon
+                                                   route of its own (issue #55)
 POST   /pieces/:id/capture                         returns proposals
 POST   /pieces/:id/capture/approve                 writes the approved proposals
 GET    /pieces/:id/events                          SSE
@@ -1125,12 +1146,16 @@ asserting nothing. A **room** boundary owns the operations the author starts —
 subscribe to its events — which is already the client's contract, so tests and the client cross the
 same surface.
 
-**The room owns all three operations rather than the round alone.** A round, an application and a
-capture share one state machine, one lock on the manuscript and one abandonment path, and a module
-each would leave three shallow modules agreeing about state none of them owns — the shape that
-produces a capture starting during an application. It is also what keeps every route a one-line
-adapter, since a route that decided whether an operation may start would be a route with a decision
-in it.
+**The room owns the round, the application and the capture, but not as one shared operation.** A
+round and an application share one state machine, one lock on the manuscript and one abandonment
+path, and a module each would leave two shallow modules agreeing about state neither owns — the
+shape that produces an application starting during a round it should have refused. Capture is a
+third path through the same room, sharing the model seam with both but owning its own snapshot,
+activity and completion independently of that state machine: nothing about starting, running or
+finishing a capture touches `roundInFlight` or `applying`, and abandoning that state never reaches
+capture. Keeping all three behind one room rather than splitting it into as many modules is also
+what keeps every route a one-line adapter, since a route that decided whether an operation may start
+would be a route with a decision in it.
 
 **`src/shared/` is deliberately not a seam.** It is a real contract — it is what makes the server's
 response shapes and the client's expectations one set of types rather than two that drift — but a

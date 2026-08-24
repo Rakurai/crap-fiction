@@ -349,9 +349,12 @@ describe('the room over HTTP', () => {
       expect(data.proposals[0]).toMatchObject({ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' })
     })
 
-    it('refuses to capture while a round is in flight, with ROOM_BUSY', async () => {
+    it('CONTEXT "Capture context": proceeds while a round is in flight, sharing the model seam rather than the room\'s round-and-apply lock', async () => {
       const behavior: FixtureBehavior = { result: CONFORMING_RESULT, delayMs: 50 }
-      const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
+      const modelAccess = FixtureModelAdapter.bySite(
+        { shape: behavior, 'story-editor': behavior, capture: { result: { outcome: 'value', value: { proposals: [] } } } },
+        { reachable: true, models: [] },
+      )
       const room = buildTestRoom(dataRoot, { modelAccess })
       const { app, workspace } = buildTestApp(dataRoot, { room })
       await workspace.set('my-writing')
@@ -371,10 +374,45 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ conversationId: 'c1', draft: 'text' }),
       })
-      expect(res.status).toBe(409)
-      expect(await res.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ success: true, data: { outcome: 'captured', proposals: [] } })
 
       await settlementOf(room, 'cups')
+    })
+
+    it('reports capture activity on the piece independently of the round in flight, and clears it once capture settles', async () => {
+      const modelAccess = FixtureModelAdapter.bySite(
+        { capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true } },
+        { reachable: true, models: [] },
+      )
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+
+      const capturing = app.request('/pieces/cups/capture', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'c1', draft: 'text' }),
+      })
+      // Lets the request reach the point where the room registers its capture snapshot, without
+      // waiting for the held model call the assertion below needs still in flight.
+      await new Promise((resolve) => setImmediate(resolve))
+
+      const pieceRes = await app.request('/pieces/cups')
+      const pieceBody = await pieceRes.json()
+      expect(pieceBody.data.roundInFlight).toBeNull()
+      expect(pieceBody.data.captureInFlight).toMatchObject({ conversationId: 'c1' })
+
+      modelAccess.release('capture')
+      await capturing
+
+      const settledRes = await app.request('/pieces/cups')
+      expect((await settledRes.json()).data.captureInFlight).toBeNull()
     })
 
     it('writes only the approved proposals, reporting which destinations landed', async () => {

@@ -111,7 +111,7 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
-    const opened = getPiece(workspaceDir, created.id, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
     expect(opened).toEqual({
       ...created,
       draft: '',
@@ -119,6 +119,7 @@ describe('pieces', () => {
       currentConversationId: null,
       conversations: [],
       roundInFlight: null,
+      captureInFlight: null,
       cast: [
         { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
         { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
@@ -134,7 +135,7 @@ describe('pieces', () => {
       'utf8',
     )
 
-    expect(getPiece(workspaceDir, created.id, null, specialists).storyContext).toEqual({
+    expect(getPiece(workspaceDir, created.id, null, null, specialists).storyContext).toEqual({
       Premise: ['two cups, one left behind'],
       'Point of view': ['close third, past tense'],
     })
@@ -144,16 +145,16 @@ describe('pieces', () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
 
-    const opened = getPiece(workspaceDir, created.id, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
     expect(opened.draft).toBe('Two small words.')
   })
 
   it('reports a missing piece as a stated PieceNotFoundError', () => {
-    expect(() => getPiece(workspaceDir, 'nothing-here', null, specialists)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, 'nothing-here', null, null, specialists)).toThrowError(PieceNotFoundError)
   })
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
-    expect(() => getPiece(workspaceDir, '../../etc', null, specialists)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, '../../etc', null, null, specialists)).toThrowError(PieceNotFoundError)
   })
 })
 
@@ -177,7 +178,7 @@ describe('setPieceCast', () => {
       { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
       { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, specialists).cast).toEqual(view)
+    expect(getPiece(workspaceDir, created.id, null, null, specialists).cast).toEqual(view)
   })
 
   it('re-enables a specialist disabled earlier, simply making it eligible again', async () => {
@@ -219,7 +220,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(workspaceDir, 'cups', null, specialists).title).toBe('The Cups')
+    expect(getPiece(workspaceDir, 'cups', null, null, specialists).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {

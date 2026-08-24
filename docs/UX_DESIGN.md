@@ -189,20 +189,24 @@ have to compose.
 ## An operation in flight
 
 Three things the author starts take real model time: a round, an application, and capturing
-context. One of them runs at a time.
+context. A round and an application cannot overlap each other. Capturing context is independent of
+both — it may run alongside either, and neither waits for it.
 
-**Controls that would start another are disabled while one runs.** Nothing queues, warns, or asks
-the author to choose between the operation they started and the one they are starting, because
-the state that would need explaining is unreachable.
+**Controls that would start a second round or application are disabled while one runs.** Nothing
+queues, warns, or asks the author to choose between the operation they started and the one they are
+starting, because the state that would need explaining is unreachable. Capture's own control is
+never part of that exclusion in either direction: a round or an application in flight never disables
+it, and it never disables them.
 
 **Abandoning is available for as long as an operation is in flight**, and is not offered once it
 has produced its result — a round that came back is not one the author is abandoning.
 
-**The three share one register for work under way and are not one state.** During a round and
-during a capture the prose is fully editable and a live cursor stays in it. During an application
-the prose is visibly read-only, and reads as the manuscript being held for a moment rather than
-as the application being busy. One undifferentiated *something is happening* treatment would tell
-the author to stop typing when they do not have to.
+**A round, an application and a capture do not share one register for work under way.** During a
+round and during a capture the prose is fully editable and a live cursor stays in it. During an
+application the prose is visibly read-only, and reads as the manuscript being held for a moment
+rather than as the application being busy. One undifferentiated *something is happening* treatment
+would tell the author to stop typing when they do not have to — and would also collapse a round and
+a capture running together into a single busy signal neither of them alone produced.
 
 **A locked manuscript is accounted for by the response being applied**, so what the author cannot
 type into is explained by something they just did.
