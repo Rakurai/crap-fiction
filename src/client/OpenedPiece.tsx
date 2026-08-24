@@ -3,14 +3,25 @@ import type { ConversationSummary } from '../shared/conversationViews.js'
 import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
+import { ContextReview } from './ContextReview.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
 import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
 import { RoomEditor } from './RoomEditor.js'
-import { abandonOperation, applyRecommendation, createConversation, fetchConversation, startRound, subscribeToRoom } from './roomClient.js'
+import {
+  abandonOperation,
+  applyRecommendation,
+  approveCapture,
+  captureContext,
+  createConversation,
+  fetchConversation,
+  startRound,
+  subscribeToRoom,
+} from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
+import { useCapture } from './useCapture.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
 import { useRoster } from './useRoster.js'
@@ -83,9 +94,10 @@ function Surfaces({
   const [probe] = useLoaded(fetchRuntimeStatus, [])
   // UX_DESIGN "Prominence": editing the room owns no permanent space — it
   // arrives on the one action that reaches it and leaves on the one that
-  // closes it. Conversations and the room are the same tier and never both
-  // open at once, so one flag names which — if either — is up.
-  const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
+  // closes it. Conversations, the room and capture context's review are the
+  // same tier and never more than one open at once, so one flag names which
+  // — if any — is up.
+  const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
   // SPEC "Applying a recommendation": the manuscript's own read-only lock,
   // held for exactly the duration of the call — a fact `Conversation` learns
   // first, since applying is one of the actions a response offers, and
@@ -105,6 +117,10 @@ function Surfaces({
   // conversation or starting another is what actually needs a clean
   // instance, and each is its own explicit action below.
   const [session, setSession] = useState(0)
+  // #18 "Capture context": the analysis's own draft is read the same way
+  // `Conversation` reads it for a round or an application — a closure over
+  // the manuscript's current text, since the room never reads it from disk.
+  const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
 
   function switchTo(conversationId: string | null): void {
     setActiveConversationId(conversationId)
@@ -130,6 +146,13 @@ function Surfaces({
         onOpenConversations={() => {
           conversations.onRefresh()
           setPanel('conversations')
+        }}
+        onOpenCapture={() => {
+          setPanel('capture')
+          // Reopening a review already in progress must not restart the
+          // analysis underneath it — only a review with nothing pending asks
+          // for a fresh one.
+          if (!capture.capturing && capture.proposals.length === 0) capture.capture()
         }}
         lifecycle={lifecycle}
         applying={applying}
@@ -174,6 +197,25 @@ function Surfaces({
           }}
           onDelete={deleteConversation}
           onClose={() => setPanel('none')}
+        />
+      )}
+      {panel === 'capture' && (
+        <ContextReview
+          proposals={capture.proposals}
+          approved={capture.approved}
+          closing={capture.closing}
+          error={capture.error}
+          onToggle={capture.toggle}
+          onClose={() => {
+            // `close` finishes after this handler returns, so the panel is
+            // left rather than watched for it to empty itself. A partial
+            // failure leaves its proposals and its error sitting in the
+            // hook regardless — reopening "capture context" shows exactly
+            // that state again rather than starting a fresh analysis, since
+            // `onOpenCapture` below only asks for one when nothing is pending.
+            capture.close()
+            setPanel('none')
+          }}
         />
       )}
       {room.error !== undefined && (

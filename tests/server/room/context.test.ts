@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   compileApplyContext,
+  compileCaptureContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
+  renderCapturePrompt,
   renderPrompt,
   type ApplyContextInput,
+  type CaptureContextInput,
   type ContextInput,
   type HistoryPolicy,
 } from '../../../src/server/room/context.js'
@@ -167,6 +170,84 @@ describe('renderApplyPrompt', () => {
     )
 
     expect(renderApplyPrompt(context, charter)).toContain('The cups sat where she left them.')
+  })
+})
+
+function captureContextInput(overrides: Partial<CaptureContextInput> = {}): CaptureContextInput {
+  return {
+    authorContext: undefined,
+    storyContext: undefined,
+    draft: 'text',
+    conversation: undefined,
+    ...overrides,
+  }
+}
+
+describe('compileCaptureContext', () => {
+  it('carries the draft and both durable contexts through untouched', () => {
+    const context = compileCaptureContext(
+      captureContextInput({
+        authorContext: 'prefers short sentences',
+        storyContext: 'a flash piece about a breakup',
+        draft: 'The cups sat where she left them.',
+      }),
+    )
+
+    expect(context.authorContext).toBe('prefers short sentences')
+    expect(context.storyContext).toBe('a flash piece about a breakup')
+    expect(context.draft).toBe('The cups sat where she left them.')
+  })
+
+  it('is empty of history where no conversation exists yet', () => {
+    const context = compileCaptureContext(captureContextInput())
+
+    expect(context.history).toEqual([])
+  })
+
+  it('reads the conversation whole, past any one round — unlike an application, it has none to stop at', () => {
+    const context = compileCaptureContext(captureContextInput({ conversation: conversationWithTwoRounds }))
+
+    expect(context.history).toEqual([
+      { kind: 'message', text: 'first question' },
+      { kind: 'response', participantId: 'shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
+      { kind: 'message', text: 'a later question' },
+      { kind: 'response', participantId: 'compression', claim: 'the ending still drags', note: undefined },
+    ])
+  })
+})
+
+describe('renderCapturePrompt', () => {
+  it('always carries the manuscript, unexcerpted', () => {
+    const context = compileCaptureContext(captureContextInput({ draft: 'The cups sat where she left them.' }))
+
+    expect(renderCapturePrompt(context)).toContain('The cups sat where she left them.')
+  })
+
+  it('includes a context section, heading and body, once the author has written it', () => {
+    const context = compileCaptureContext(
+      captureContextInput({ authorContext: 'prefers short sentences', storyContext: 'a flash piece about a breakup' }),
+    )
+
+    const prompt = renderCapturePrompt(context)
+    expect(prompt).toContain('Author context')
+    expect(prompt).toContain('prefers short sentences')
+    expect(prompt).toContain('Story context')
+    expect(prompt).toContain('a flash piece about a breakup')
+  })
+
+  it('omits an unwritten context section entirely, rather than sending an empty heading', () => {
+    const prompt = renderCapturePrompt(compileCaptureContext(captureContextInput()))
+
+    expect(prompt).not.toContain('Author context')
+    expect(prompt).not.toContain('Story context')
+  })
+
+  it('states the threshold asymmetry between the two destinations', () => {
+    const prompt = renderCapturePrompt(compileCaptureContext(captureContextInput()))
+
+    expect(prompt).toContain('story context')
+    expect(prompt).toContain('author context')
+    expect(prompt).toMatch(/rare/)
   })
 })
 

@@ -5,9 +5,25 @@ import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
 import type { CallResult, ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
+import {
+  captureResultSchema,
+  type CaptureApproveOutcome,
+  type CaptureDestination,
+  type CaptureProposal,
+} from '../../shared/captureProposal.js'
+import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
 import { ConversationNotFoundError, PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
-import { readConversation, readPiece, TolerantReadError, writeAppliedChange, writeConversation, writePieceCast } from '../store/index.js'
+import {
+  readConversation,
+  readPiece,
+  readStoryContext,
+  TolerantReadError,
+  writeAppliedChange,
+  writeConversation,
+  writePieceCast,
+  writeStoryContext,
+} from '../store/index.js'
 import {
   conversationSchema,
   substantiveResponse,
@@ -26,18 +42,21 @@ import type {
   RoundSnapshot,
 } from '../../shared/roundEvents.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
+import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
 import {
   compileApplyContext,
+  compileCaptureContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
+  renderCapturePrompt,
   renderPrompt,
   type ContextInput,
   type HistoryPolicy,
   type SpecialistCriteria,
 } from './context.js'
-import type { CompiledDurableContext, ReadDurableContext } from './durableContext.js'
+import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom, type AskContext, type RoundPlan, type RoundResult } from './round.js'
 import type { RoomRoster } from './roster.js'
 
@@ -168,11 +187,23 @@ type ActiveApply = {
 }
 
 /**
+ * A context capture under way. SPEC "Operation state": `capturing` is
+ * abandonable and outlives nothing beyond the call itself — once it settles,
+ * the proposals it returned travel to the client on the same response and the
+ * room is free again, on the same terms `ActiveApply` is.
+ */
+type ActiveCapture = {
+  readonly kind: 'capture'
+  readonly pieceId: string
+  readonly controller: AbortController
+}
+
+/**
  * SPEC "Operation state": one author-initiated model operation at a time,
  * whichever kind it is — the lock is the room's single `#operation` field
  * regardless, and only a round has more to say about itself while it runs.
  */
-type ActiveOperation = RunningRound | ActiveApply
+type ActiveOperation = RunningRound | ActiveApply | ActiveCapture
 
 /**
  * SPEC "Seams": the room boundary owns the operations the author starts —
@@ -183,6 +214,7 @@ type ActiveOperation = RunningRound | ActiveApply
 export class Room {
   readonly #modelAccess: ModelAccess
   readonly #readDurableContext: ReadDurableContext
+  readonly #authorContextStore: AuthorContextStore
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
@@ -205,6 +237,7 @@ export class Room {
   constructor(
     modelAccess: ModelAccess,
     readDurableContext: ReadDurableContext,
+    authorContextStore: AuthorContextStore,
     roster: RoomRoster,
     charter: Charter,
     policy: HistoryPolicy,
@@ -213,6 +246,7 @@ export class Room {
   ) {
     this.#modelAccess = modelAccess
     this.#readDurableContext = readDurableContext
+    this.#authorContextStore = authorContextStore
     this.#logger = logger
     this.#now = now
     this.#charter = charter
@@ -474,6 +508,102 @@ export class Room {
     } finally {
       this.#operation = undefined
     }
+  }
+
+  /**
+   * CONTEXT "Capture context"/SPEC "Context capture": one call, its
+   * proposals reached by the request that asked for it, on the same terms
+   * `apply` is — no round opens, no participant is called, and the lock is
+   * held only for the call's own duration. Unlike `apply`, nothing here holds
+   * the manuscript read-only: "the author keeps writing while it runs" is
+   * true by construction, because this method never touches the editor's
+   * lock at all.
+   *
+   * `conversation` absent — a piece with no rounds yet — reads as no history,
+   * the same declared absence `compileCaptureContext` already has a branch
+   * for, rather than a refusal: CONTEXT "Capture context" asks nothing of a
+   * conversation that a fresh piece cannot answer.
+   */
+  async capture(
+    workspaceDir: string,
+    pieceId: string,
+    conversationId: string,
+    draft: string,
+  ): Promise<CallResult<{ proposals: readonly CaptureProposal[] }>> {
+    const holder = this.#operation
+    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+
+    const piece = readPiece(workspaceDir, pieceId)
+    if (piece === undefined) throw new PieceNotFoundError(pieceId)
+
+    const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
+
+    const controller = new AbortController()
+    this.#operation = { kind: 'capture', pieceId, controller }
+
+    try {
+      const context = compileCaptureContext({
+        authorContext: durableContext.authorContext,
+        storyContext: durableContext.storyContext,
+        draft,
+        conversation,
+      })
+      const prompt = renderCapturePrompt(context)
+      const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
+      if (result.outcome !== 'value') return result
+
+      return { outcome: 'value', value: { proposals: toCaptureProposals(result.value.proposals) } }
+    } finally {
+      this.#operation = undefined
+    }
+  }
+
+  /**
+   * CONTEXT "Capture context"/SPEC "Context capture": "only approved
+   * proposals are written... each destination is its own write". No model
+   * call and no lock: this is a plain persistence operation, on the same
+   * terms a draft save is, because there is nothing here for `#operation` to
+   * protect — reading and writing a context file races with nothing else
+   * that touches it.
+   *
+   * Each destination is read fresh and written independently, so a failure
+   * on one leaves the other's write standing rather than rolling it back —
+   * there is no transaction over the two files to roll back with.
+   */
+  async approveCapture(workspaceDir: string, pieceId: string, approved: readonly CaptureProposal[]): Promise<CaptureApproveOutcome> {
+    const piece = readPiece(workspaceDir, pieceId)
+    if (piece === undefined) throw new PieceNotFoundError(pieceId)
+
+    const byDestination = new Map<CaptureDestination, CaptureProposal[]>()
+    for (const proposal of approved) {
+      const forDestination = byDestination.get(proposal.destination)
+      if (forDestination === undefined) byDestination.set(proposal.destination, [proposal])
+      else forDestination.push(proposal)
+    }
+
+    const written: CaptureDestination[] = []
+    const failures: { destination: CaptureDestination; message: string }[] = []
+
+    for (const destination of ['authorContext', 'storyContext'] as const) {
+      const proposals = byDestination.get(destination)
+      if (proposals === undefined) continue
+
+      try {
+        if (destination === 'authorContext') {
+          const next = applyProposals(this.#authorContextStore.read(), proposals)
+          await this.#authorContextStore.write(next)
+        } else {
+          const current: DurableContext = readStoryContext(workspaceDir, pieceId, durableContextSchema) ?? {}
+          await writeStoryContext(workspaceDir, pieceId, applyProposals(current, proposals))
+        }
+        written.push(destination)
+      } catch (err) {
+        failures.push({ destination, message: err instanceof Error ? err.message : 'the write failed' })
+      }
+    }
+
+    return { written, failures }
   }
 
   /**

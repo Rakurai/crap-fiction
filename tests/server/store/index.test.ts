@@ -13,11 +13,13 @@ import {
   readSettingsSection,
   readStoryContext,
   resolveWorkspaceDirectory,
+  writeAuthorContext,
   writeConversation,
   writePieceCast,
   writePieceDetails,
   writePieceMetadata,
   writeSettingsSection,
+  writeStoryContext,
 } from '../../../src/server/store/index.js'
 import { durableContextSchema } from '../../../src/shared/durableContext.js'
 
@@ -207,7 +209,7 @@ describe('the durable contexts', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function writeAuthorContext(text: string): void {
+  function handWriteAuthorContext(text: string): void {
     mkdirSync(path.join(dataRoot, 'config'), { recursive: true })
     writeFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), text, 'utf8')
   }
@@ -223,7 +225,7 @@ describe('the durable contexts', () => {
   })
 
   it('reads the sections the author named, with a hand-written scalar entry as a one-item list', () => {
-    writeAuthorContext('Prose tendencies:\n  - overwrites dialogue tags\nPatterns disliked: rhetorical questions\n')
+    handWriteAuthorContext('Prose tendencies:\n  - overwrites dialogue tags\nPatterns disliked: rhetorical questions\n')
 
     expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
       'Prose tendencies': ['overwrites dialogue tags'],
@@ -232,13 +234,13 @@ describe('the durable contexts', () => {
   })
 
   it('trims surrounding whitespace from a hand-edited entry', () => {
-    writeAuthorContext('Voice:\n  - "  wry and close  "\n')
+    handWriteAuthorContext('Voice:\n  - "  wry and close  "\n')
 
     expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
   })
 
   it('states a failure naming the section when an entry is the wrong kind', () => {
-    writeAuthorContext('Voice:\n  - nested:\n      - not prose\n')
+    handWriteAuthorContext('Voice:\n  - nested:\n      - not prose\n')
 
     expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(TolerantReadError)
     expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(/Voice/)
@@ -253,6 +255,37 @@ describe('the durable contexts', () => {
     writeFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), '# what this is about\nPremise:\n  - two cups, one left behind\n', 'utf8')
 
     expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+  })
+
+  /**
+   * #18 "Capture context": the review's own writes, going through
+   * `writeYamlArtifact` the same way every other hand-editable artifact does
+   * — a hand-written comment survives a write that touched a different
+   * section entirely.
+   */
+  it("writes the author context whole, keeping a hand-written comment beside a section a write did not touch", async () => {
+    handWriteAuthorContext('# author notes\nVoice:\n  - wry and close\n')
+
+    await writeAuthorContext(dataRoot, { Voice: ['wry and close'], 'Patterns disliked': ['rhetorical questions'] })
+
+    const text = readFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), 'utf8')
+    expect(text).toContain('# author notes')
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
+      Voice: ['wry and close'],
+      'Patterns disliked': ['rhetorical questions'],
+    })
+  })
+
+  it("writes a piece's story context the same way", async () => {
+    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+
+    await writeStoryContext(workspaceDir, 'cups', { Premise: ['two cups, one left behind'] })
+
+    expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+  })
+
+  it('refuses to write a story context for an id that would escape the workspace', async () => {
+    await expect(writeStoryContext(workspaceDir, '../../etc', { Premise: ['x'] })).rejects.toThrowError(PathEscapesRootError)
   })
 })
 

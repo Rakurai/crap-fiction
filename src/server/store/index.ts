@@ -98,6 +98,17 @@ export function readAuthorContext<T>(dataRoot: string, schema: z.ZodType<T>): T 
 }
 
 /**
+ * SPEC "Context capture": "only approved proposals are written, as an
+ * ordinary atomic write to the destination context file" — this is that
+ * write for the author context, going through `writeYamlArtifact` so a
+ * hand-written comment or section order survives it, on the same terms as
+ * every other hand-editable artifact this boundary owns.
+ */
+export async function writeAuthorContext(dataRoot: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
+  await writeYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), { ...context })
+}
+
+/**
  * Resolves the directory the author named as their workspace, refusing one
  * that lands outside the data root. A workspace directory is the one path the
  * product above this boundary holds, because the author names it and it is
@@ -163,6 +174,11 @@ export function readStoryContext<T>(workspaceDir: string, id: string, schema: z.
   const pieceDir = pieceDirectory(workspaceDir, id)
   if (pieceDir === undefined) return undefined
   return readYamlArtifact(storyContextFile(pieceDir), schema)
+}
+
+/** SPEC "Context capture": the matching write for a piece's own story context. */
+export async function writeStoryContext(workspaceDir: string, id: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
+  await writeYamlArtifact(storyContextFile(resolveWithinRoot(workspaceDir, id)), { ...context })
 }
 
 /**

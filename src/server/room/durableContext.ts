@@ -1,5 +1,5 @@
 import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
-import { readAuthorContext, readStoryContext } from '../store/index.js'
+import { readAuthorContext, readStoryContext, writeAuthorContext } from '../store/index.js'
 
 /**
  * The two durable contexts as a call's context wants them: text, since SPEC
@@ -55,4 +55,28 @@ export function durableContextReader(dataRoot: string): ReadDurableContext {
     authorContext: renderDurableContext(readAuthorContext(dataRoot, durableContextSchema)),
     storyContext: renderDurableContext(readStoryContext(workspaceDir, pieceId, durableContextSchema)),
   })
+}
+
+/**
+ * #18 "Capture context"'s review reads and writes the author context in its
+ * raw, structured form — a proposal concerns one entry in one section, and a
+ * rendered string has no addressable entries left to apply one against. Bound
+ * to the data root the same way `durableContextReader` is and for the same
+ * reason: the room never holds it, since where the author context lives is
+ * process configuration the composition root already owns.
+ *
+ * The piece's own story context needs no equivalent binding — every room
+ * method already receives `workspaceDir` as a call-time parameter, so a
+ * caller reads and writes it through the store directly.
+ */
+export type AuthorContextStore = Readonly<{
+  read: () => DurableContext
+  write: (context: DurableContext) => Promise<void>
+}>
+
+export function authorContextStore(dataRoot: string): AuthorContextStore {
+  return {
+    read: () => readAuthorContext(dataRoot, durableContextSchema) ?? {},
+    write: (context) => writeAuthorContext(dataRoot, context),
+  }
 }

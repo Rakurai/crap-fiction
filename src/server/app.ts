@@ -4,6 +4,8 @@ import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
 import type { ApplyOutcome } from '../shared/applyViews.js'
+import { captureProposalSchema } from '../shared/captureProposal.js'
+import type { CaptureOutcome } from '../shared/captureViews.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
 import { themeSchema } from '../shared/theme.js'
@@ -62,6 +64,8 @@ const postApplySchema = z.object({
   constraint: z.string().min(1).optional(),
   draft: z.string(),
 })
+const postCaptureSchema = z.object({ conversationId: z.string().min(1), draft: z.string() })
+const postCaptureApproveSchema = z.object({ approved: z.array(captureProposalSchema) })
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
@@ -206,6 +210,36 @@ export function createApp(
         : result.outcome === 'abandoned'
           ? { outcome: 'abandoned' }
           : { outcome: 'failed', reason: result.reason, returned: result.returned }
+    return c.json(ok(outcome))
+  })
+
+  /**
+   * CONTEXT "Capture context"/SPEC "Context capture": one call, its
+   * proposals reached by this request — there is no round to open and no
+   * event to subscribe to, on the same terms `/apply` is thin. The route's
+   * only work beyond delegating is the same `CallResult`-to-wire translation
+   * `/apply` does, with proposals in place of a manuscript.
+   */
+  app.post('/pieces/:id/capture', body(postCaptureSchema), async (c) => {
+    const { conversationId, draft } = c.req.valid('json')
+    const result = await room.capture(workspace.require(), c.req.param('id'), conversationId, draft)
+    const outcome: CaptureOutcome =
+      result.outcome === 'value'
+        ? { outcome: 'captured', proposals: [...result.value.proposals] }
+        : result.outcome === 'abandoned'
+          ? { outcome: 'abandoned' }
+          : { outcome: 'failed', reason: result.reason, returned: result.returned }
+    return c.json(ok(outcome))
+  })
+
+  /**
+   * SPEC "Context capture": the author's own proposals, sent back whole —
+   * the review holds nothing server-side between the two requests, so this is
+   * what "only approved proposals are written" reads from.
+   */
+  app.post('/pieces/:id/capture/approve', body(postCaptureApproveSchema), async (c) => {
+    const { approved } = c.req.valid('json')
+    const outcome = await room.approveCapture(workspace.require(), c.req.param('id'), approved)
     return c.json(ok(outcome))
   })
 

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
+import { captureApproveOutcomeSchema, type CaptureApproveOutcome, type CaptureProposal } from '../shared/captureProposal.js'
+import { captureOutcomeSchema, type CaptureOutcome } from '../shared/captureViews.js'
 import { conversationViewSchema, type ConversationView } from '../shared/conversationViews.js'
 import {
   participantSettledEventSchema,
@@ -105,6 +107,45 @@ export function applyRecommendation(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ roundId, participantId, draft, constraint }),
+    signal: signal ?? null,
+  })
+}
+
+/**
+ * CONTEXT "Capture context"/SPEC "Context capture": the draft and the
+ * conversation the analysis reads, named by the client because the room
+ * never reads the manuscript from disk to serve a call — the same reason
+ * `startRound` and `applyRecommendation` carry `draft` rather than leaving
+ * the room to find it.
+ */
+export function captureContext(
+  pieceId: string,
+  conversationId: string,
+  draft: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<CaptureOutcome>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/capture`, captureOutcomeSchema, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ conversationId, draft }),
+    signal: signal ?? null,
+  })
+}
+
+/**
+ * SPEC "Context capture": the review holds nothing server-side between the
+ * two requests, so the approved proposals travel here whole, exactly as the
+ * capture call returned them.
+ */
+export function approveCapture(
+  pieceId: string,
+  approved: readonly CaptureProposal[],
+  signal?: AbortSignal,
+): Promise<RequestResult<CaptureApproveOutcome>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/capture/approve`, captureApproveOutcomeSchema, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ approved }),
     signal: signal ?? null,
   })
 }

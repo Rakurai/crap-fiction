@@ -16,6 +16,7 @@ const DEFAULT_PROPS = {
   onClose: vi.fn(),
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
+  onOpenCapture: vi.fn(),
   lifecycle: {
     status: 'drafting' as const,
     retitling: false,
@@ -48,6 +49,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       autosave={autosave}
       onOpenRoom={props.onOpenRoom}
       onOpenConversations={props.onOpenConversations}
+      onOpenCapture={props.onOpenCapture}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />
@@ -174,6 +176,19 @@ describe('editing the room', () => {
     fireEvent.click(screen.getByRole('button', { name: 'room' }))
 
     expect(onOpenRoom).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('capture context', () => {
+  afterEach(cleanup)
+
+  it('is one action away, and knows nothing beyond that it was reached', () => {
+    const onOpenCapture = vi.fn()
+    renderManuscript({ onOpenCapture })
+
+    fireEvent.click(screen.getByRole('button', { name: 'capture context' }))
+
+    expect(onOpenCapture).toHaveBeenCalledTimes(1)
   })
 })
 

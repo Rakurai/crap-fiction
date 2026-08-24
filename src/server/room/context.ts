@@ -182,13 +182,17 @@ export type ApplyContext = Readonly<{
  * nothing from a round that followed. The recommendation is interpreted
  * against what the author had read when it was made, not against exchanges
  * that came after.
+ *
+ * `throughRoundId` absent reads every round the conversation holds —
+ * `compileCaptureContext` below has no round to stop at, since CONTEXT
+ * "Capture context" reads "the current conversation" whole.
  */
-function historyThrough(conversation: Conversation, throughRoundId: string): readonly HistoryEntry[] {
+function historyThrough(conversation: Conversation, throughRoundId: string | undefined): readonly HistoryEntry[] {
   const entries: HistoryEntry[] = []
   for (const round of conversation.rounds) {
     if (round.message !== undefined) entries.push({ kind: 'message', text: round.message })
     entries.push(...substantiveResponses(round))
-    if (round.id === throughRoundId) break
+    if (throughRoundId !== undefined && round.id === throughRoundId) break
   }
   return entries
 }
@@ -318,6 +322,68 @@ export function renderPrompt(context: Context, charter: Charter): string {
     evidenceText(context.evidence),
     section("Author's message", context.message),
     section('Asked for a concrete change', askText(context.ask)),
+  ]
+  return parts.filter((part) => part.length > 0).join('')
+}
+
+/** Everything a context capture's call is built from — CONTEXT "Capture context": the draft, the current conversation whole, and both existing contexts, as they stand when the author invokes it. */
+export type CaptureContextInput = Readonly<{
+  authorContext: string | undefined
+  storyContext: string | undefined
+  draft: string
+  conversation: Conversation | undefined
+}>
+
+export type CaptureContext = Readonly<{
+  authorContext: string | undefined
+  storyContext: string | undefined
+  draft: string
+  history: readonly HistoryEntry[]
+}>
+
+/**
+ * SPEC "Context compilation": `compileContext`'s third call kind — a context
+ * capture, alongside a participant's and an application's. It reads the
+ * conversation whole rather than through any one round, unlike
+ * `compileApplyContext`: CONTEXT "Capture context" names no round to stop at.
+ */
+export function compileCaptureContext(input: CaptureContextInput): CaptureContext {
+  return {
+    authorContext: input.authorContext,
+    storyContext: input.storyContext,
+    draft: input.draft,
+    history: input.conversation === undefined ? [] : historyThrough(input.conversation, undefined),
+  }
+}
+
+/**
+ * CONTEXT "Capture context"/SPEC "Context capture": what the call is asked
+ * to do, stated once rather than left for the model to infer from the shape
+ * of its schema — granular, individually approvable proposals, each naming
+ * its destination, with the threshold asymmetry between the two stated
+ * plainly rather than left to be inferred. An existing entry is asked for
+ * verbatim because that is how a proposal is matched back to it once
+ * approved (`applyProposals` reads it as an exact string).
+ */
+const CAPTURE_INSTRUCTION = `Read the manuscript and the conversation below, together with the durable contexts that already stand, and propose granular changes to those contexts — nothing more than what the material actually supports.
+
+Each proposal names its destination: story context, for what appears settled or intentionally decided about this piece, or author context, for a preference that genuinely generalizes beyond it. The bar for author context is substantially higher than for story context — most proposals belong to story context, and an author-context proposal should be rare, offered only where the evidence that a preference holds beyond this one piece is strong.
+
+A proposal may add a new entry, revise or replace an existing one that no longer holds as stated, or remove one that is no longer true. Where a proposal concerns an existing entry, quote it exactly as it already appears, under the section it already belongs to. State only what should change, not everything the material mentions.`
+
+/**
+ * SPEC "Model access": the prompt crosses as text, on the same terms every
+ * other call's does. No charter section applies here — the charter states
+ * what every participant is told regardless of which one it is, and a
+ * capture is not a participant.
+ */
+export function renderCapturePrompt(context: CaptureContext): string {
+  const parts = [
+    section('What to do', CAPTURE_INSTRUCTION),
+    section('Author context', context.authorContext),
+    section('Story context', context.storyContext),
+    section('Manuscript', context.draft),
+    historyText(context.history),
   ]
   return parts.filter((part) => part.length > 0).join('')
 }

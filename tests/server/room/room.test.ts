@@ -1,13 +1,24 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModelAccess } from '../../../src/server/model/types.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
-import { createPiece } from '../../../src/server/pieces.js'
-import { readAppliedChanges, readConversation, readPiece, writeConversation, writePieceCast } from '../../../src/server/store/index.js'
+import { createPiece, PieceNotFoundError } from '../../../src/server/pieces.js'
+import {
+  readAppliedChanges,
+  readAuthorContext,
+  readConversation,
+  readPiece,
+  readStoryContext,
+  writeConversation,
+  writePieceCast,
+  writeStoryContext,
+} from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
+import type { CaptureProposal } from '../../../src/shared/captureProposal.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
+import { durableContextSchema } from '../../../src/shared/durableContext.js'
 import {
   CommentaryNotFoundError,
   ParticipantNotFoundError,
@@ -520,6 +531,206 @@ describe('Room.apply', () => {
     if (result.outcome !== 'value') throw new Error('expected the application to settle')
     expect(result.value.change).toBeUndefined()
     expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([])
+  })
+})
+
+describe('Room.capture', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-capture-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('gives each of the model\'s proposals an identity, calling no participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: {
+        result: {
+          outcome: 'value',
+          value: { proposals: [{ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }] },
+        },
+      },
+    })
+
+    const result = await room.capture(workspaceDir, piece.id, 'c1', 'The cups sat where she left them.')
+
+    if (result.outcome !== 'value') throw new Error('expected the capture to settle')
+    expect(result.value.proposals).toEqual([
+      { id: expect.any(String), destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+    ])
+    expect(adapter.promptFor('shape')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+  })
+
+  it('carries the draft and the conversation into the call, and reads an absent conversation as no history', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } } },
+    })
+
+    await room.capture(workspaceDir, piece.id, 'c1', 'The cups sat where she left them.')
+    expect(adapter.promptFor('capture')).toContain('The cups sat where she left them.')
+    expect(adapter.promptFor('capture')).toContain('cut the second paragraph')
+
+    // A conversation id naming nothing yet — CONTEXT "Conversation": starting
+    // one is an intention until its first round opens — is no refusal, since
+    // #18 asks nothing of it a fresh piece cannot answer.
+    await room.capture(workspaceDir, piece.id, 'c2', 'text')
+  })
+
+  it('refuses while a round is in flight for the same piece', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+
+    await expect(room.capture(workspaceDir, piece.id, 'c1', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('refuses to open a round while a capture is in flight', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+
+    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('capture')
+    await capturing
+  })
+
+  it('resolves as abandoned, and frees the room, when abandoned mid-call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    room.abandon(piece.id)
+    await expect(capturing).resolves.toEqual({ outcome: 'abandoned' })
+
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    adapter.release('capture')
+  })
+
+  it('reports a failed call as failed, proposing nothing', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'failed', reason: 'unconfigured' } },
+    })
+
+    const result = await room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+})
+
+describe('Room.approveCapture', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-approve-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    chmodSync(workspaceDir, 0o700)
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  function approvedProposal(overrides: Partial<CaptureProposal> & Pick<CaptureProposal, 'id' | 'destination' | 'section' | 'operation'>): CaptureProposal {
+    return { entry: undefined, text: undefined, ...overrides }
+  }
+
+  it('writes an approved proposal to the destination it names, and nothing to the other', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }),
+    ])
+
+    expect(outcome).toEqual({ written: ['storyContext'], failures: [] })
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
+  })
+
+  it('writes both destinations in one call when proposals approve both', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }),
+      approvedProposal({ id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
+    ])
+
+    expect(outcome.written.sort()).toEqual(['authorContext', 'storyContext'])
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
+  })
+
+  it('reads the context fresh rather than from anything the capture call saw, so a hand edit in between is not overwritten', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeStoryContext(workspaceDir, piece.id, { Premise: ['an old premise'] })
+    const { room } = buildRoom(dataRoot, {})
+
+    await room.approveCapture(workspaceDir, piece.id, [
+      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
+    ])
+
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({
+      Premise: ['an old premise'],
+      Voice: ['wry and close'],
+    })
+  })
+
+  it('SPEC "Context capture": keeps the destination that succeeded when the other write fails, naming which one', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+    // The piece's own directory, made unwritable so the story context write
+    // fails while the author context — beside the workspace, not inside the
+    // piece — is untouched by it.
+    chmodSync(path.join(workspaceDir, piece.id), 0o500)
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      approvedProposal({ id: 'p1', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
+      approvedProposal({ id: 'p2', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups' }),
+    ])
+
+    expect(outcome.written).toEqual(['authorContext'])
+    expect(outcome.failures).toHaveLength(1)
+    expect(outcome.failures[0]?.destination).toBe('storyContext')
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
+
+    // Restored before cleanup: `rmSync` needs to unlink files inside this
+    // directory, which needs write permission on the directory itself.
+    chmodSync(path.join(workspaceDir, piece.id), 0o700)
+  })
+
+  it('refuses for a piece that does not exist', async () => {
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(room.approveCapture(workspaceDir, 'no-such-piece', [])).rejects.toThrowError(PieceNotFoundError)
   })
 })
 

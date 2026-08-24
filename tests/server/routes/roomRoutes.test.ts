@@ -334,4 +334,94 @@ describe('the room over HTTP', () => {
       await settlementOf(room, 'cups')
     })
   })
+
+  describe('capturing context', () => {
+    it('returns the proposals the call made, each with an identity, on the same request', async () => {
+      const modelAccess = FixtureModelAdapter.bySite(
+        {
+          capture: {
+            result: {
+              outcome: 'value',
+              value: { proposals: [{ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }] },
+            },
+          },
+        },
+        { reachable: true, models: [] },
+      )
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+
+      const res = await app.request('/pieces/cups/capture', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'c1', draft: 'The cups sat where she left them.' }),
+      })
+
+      expect(res.status).toBe(200)
+      const { data } = await res.json()
+      expect(data.outcome).toBe('captured')
+      expect(data.proposals).toHaveLength(1)
+      expect(typeof data.proposals[0].id).toBe('string')
+      expect(data.proposals[0]).toMatchObject({ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' })
+    })
+
+    it('refuses to capture while a round is in flight, with ROOM_BUSY', async () => {
+      const behavior: FixtureBehavior = { result: CONFORMING_RESULT, delayMs: 50 }
+      const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+      await app.request('/pieces/cups/conversations/c1/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'a message', draft: 'text' }),
+      })
+
+      const res = await app.request('/pieces/cups/capture', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'c1', draft: 'text' }),
+      })
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
+
+      await settlementOf(room, 'cups')
+    })
+
+    it('writes only the approved proposals, reporting which destinations landed', async () => {
+      const { app, workspace } = buildTestApp(dataRoot)
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+
+      const res = await app.request('/pieces/cups/capture/approve', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          approved: [{ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }],
+        }),
+      })
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ success: true, data: { written: ['storyContext'], failures: [] } })
+
+      const pieceRes = await app.request('/pieces/cups')
+      const pieceBody = await pieceRes.json()
+      expect(pieceBody.data.storyContext).toEqual({ Premise: ['two cups, one left behind'] })
+    })
+  })
 })

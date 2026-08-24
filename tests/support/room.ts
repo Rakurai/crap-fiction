@@ -6,7 +6,7 @@ import type { ModelAccess } from '../../src/server/model/types.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { SHIPPED_HISTORY_POLICY, type HistoryPolicy } from '../../src/server/room/context.js'
-import { durableContextReader } from '../../src/server/room/durableContext.js'
+import { authorContextStore, durableContextReader } from '../../src/server/room/durableContext.js'
 import { Room } from '../../src/server/room/room.js'
 import { resolveRoster } from '../../src/server/room/roster.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -77,6 +77,7 @@ export function buildTestRoom(dataRoot: string, overrides: RoomOverrides = {}): 
   return new Room(
     overrides.modelAccess ?? unscriptedModelAccess(),
     durableContextReader(dataRoot),
+    authorContextStore(dataRoot),
     resolveRoster(overrides.mode ?? MODE_FIXTURE, overrides.roles ?? ROLES_FIXTURE),
     overrides.charter ?? CHARTER_FIXTURE,
     overrides.policy ?? SHIPPED_HISTORY_POLICY,

@@ -9,7 +9,7 @@ import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
 import { DraftWriter } from './pieces.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
-import { durableContextReader } from './room/durableContext.js'
+import { authorContextStore, durableContextReader } from './room/durableContext.js'
 import { Room } from './room/room.js'
 import { resolveRoster } from './room/roster.js'
 import { DraftStore } from './store/index.js'
@@ -68,6 +68,15 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   // The clock is the room's last argument for the same reason the logger is one at
   // all: reading the wall clock is a dependency, and the composition root is where
   // the studio's real one is named (CODING_STANDARDS "Time").
-  const room = new Room(modelAccess, durableContextReader(env.dataRoot), roster, charter, SHIPPED_HISTORY_POLICY, logger, Date.now)
+  const room = new Room(
+    modelAccess,
+    durableContextReader(env.dataRoot),
+    authorContextStore(env.dataRoot),
+    roster,
+    charter,
+    SHIPPED_HISTORY_POLICY,
+    logger,
+    Date.now,
+  )
   return { app: createApp(env, workspace, mode, draftWriter, sites, modelAccess, room, logger) }
 }
