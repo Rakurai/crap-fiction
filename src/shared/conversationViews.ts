@@ -98,3 +98,23 @@ export const conversationViewSchema = z.object({
 })
 
 export type ConversationView = z.infer<typeof conversationViewSchema>
+
+/**
+ * UX_DESIGN "Conversations": what the listing shows of one conversation and
+ * nothing else — no round counts, no participant rosters, no sizes.
+ * `opening` is the author's own first message, read down through the
+ * conversation's rounds to find one where the first round carried none
+ * (CONTEXT "Round": asking a participant for a concrete change opens a round
+ * with no message). It is absent only where the conversation holds no
+ * author message anywhere in it, which the listing shows as a fact about the
+ * machine rather than standing the room's own words in for the author's.
+ */
+export const conversationSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    opening: z.string().min(1).optional(),
+    lastActivity: z.number(),
+  })
+  .readonly()
+
+export type ConversationSummary = z.infer<typeof conversationSummarySchema>

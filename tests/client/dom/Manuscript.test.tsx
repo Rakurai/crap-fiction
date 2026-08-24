@@ -15,6 +15,7 @@ const DEFAULT_PROPS = {
   draft: 'First light of the day.',
   onClose: vi.fn(),
   onOpenRoom: vi.fn(),
+  onOpenConversations: vi.fn(),
   lifecycle: {
     status: 'drafting' as const,
     retitling: false,
@@ -46,6 +47,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       manuscript={manuscript}
       autosave={autosave}
       onOpenRoom={props.onOpenRoom}
+      onOpenConversations={props.onOpenConversations}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />

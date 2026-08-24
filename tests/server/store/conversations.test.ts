@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, utimesSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  conversationActivity,
+  deleteConversation,
   mostRecentConversationId,
   readConversation,
   writeConversation,
@@ -65,5 +67,32 @@ describe('conversations', () => {
     await writeConversation(workspaceDir, 'cups', 'newer', { id: 'newer', rounds: [] })
 
     expect(mostRecentConversationId(workspaceDir, 'cups')).toBe('newer')
+  })
+
+  it('reports every conversation a piece holds with its last activity, unordered', async () => {
+    await writeConversation(workspaceDir, 'cups', 'c1', { id: 'c1', rounds: [] })
+    await writeConversation(workspaceDir, 'cups', 'c2', { id: 'c2', rounds: [] })
+
+    const activity = conversationActivity(workspaceDir, 'cups')
+    expect(activity.map((entry) => entry.id)).toEqual(expect.arrayContaining(['c1', 'c2']))
+    expect(activity.every((entry) => typeof entry.modifiedMs === 'number')).toBe(true)
+  })
+
+  it('reports no conversation activity for a piece that holds none', () => {
+    expect(conversationActivity(workspaceDir, 'cups')).toEqual([])
+  })
+
+  it('deletes a conversation\'s one file', async () => {
+    await writeConversation(workspaceDir, 'cups', 'c1', oneRound)
+    const file = path.join(workspaceDir, 'cups', 'conversations', 'c1.json')
+    expect(existsSync(file)).toBe(true)
+
+    await deleteConversation(workspaceDir, 'cups', 'c1')
+
+    expect(existsSync(file)).toBe(false)
+  })
+
+  it('deletes nothing and reports nothing wrong for a conversation not on disk', async () => {
+    await expect(deleteConversation(workspaceDir, 'cups', 'never-written')).resolves.toBeUndefined()
   })
 })

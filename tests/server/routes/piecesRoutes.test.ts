@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildTestApp } from '../../support/harness.js'
+import { writeAppliedChange, writeConversation } from '../../../src/server/store/index.js'
 
 describe('/pieces', () => {
   let dataRoot: string
@@ -253,5 +254,81 @@ describe('/pieces', () => {
     })
     expect(res.status).toBe(404)
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
+  })
+})
+
+describe('/pieces/:id/conversations/:cid', () => {
+  let dataRoot: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  async function withPiece() {
+    const { app, workspace } = buildTestApp(dataRoot)
+    const dir = await workspace.set('my-writing')
+    await app.request('/pieces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Cups' }),
+    })
+    return { app, dir }
+  }
+
+  it('reports the piece\'s conversations, in the listing GET /pieces/:id already carries', async () => {
+    const { app, dir } = await withPiece()
+    await writeConversation(dir, 'cups', 'c1', {
+      id: 'c1',
+      rounds: [{ id: 'r1', message: 'does the opening earn its length', addressed: [], brought: [], outcome: 'settled', participants: [] }],
+    })
+
+    const res = await app.request('/pieces/cups')
+    const body = await res.json()
+    expect(body.data.conversations).toEqual([{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }])
+  })
+
+  it('deletes a conversation and the change files its applications name', async () => {
+    const { app, dir } = await withPiece()
+    await writeConversation(dir, 'cups', 'c1', {
+      id: 'c1',
+      rounds: [
+        {
+          id: 'r1',
+          addressed: [],
+          brought: [],
+          outcome: 'settled',
+          participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' } }],
+        },
+      ],
+    })
+    await writeAppliedChange(dir, 'cups', {
+      id: 'change1',
+      roundId: 'r1',
+      participantId: 'shape',
+      content: { kind: 'passages', passages: [{ before: 'it', after: '' }] },
+    })
+
+    const delRes = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
+    expect(delRes.status).toBe(200)
+    expect(await delRes.json()).toEqual({ success: true, data: null })
+
+    const getRes = await app.request('/pieces/cups/conversations/c1')
+    expect(getRes.status).toBe(404)
+    expect(await getRes.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
+
+    const pieceRes = await app.request('/pieces/cups')
+    expect((await pieceRes.json()).data.conversations).toEqual([])
+  })
+
+  it('reports deleting a conversation nothing has written yet as CONVERSATION_NOT_FOUND', async () => {
+    const { app } = await withPiece()
+
+    const res = await app.request('/pieces/cups/conversations/never-written', { method: 'DELETE' })
+    expect(res.status).toBe(404)
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
   })
 })

@@ -6,6 +6,7 @@ import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import { resolveWithinRoot } from './containment.js'
 import {
+  deleteFile,
   directoryNames,
   fileExists,
   fileModifiedMs,
@@ -314,23 +315,42 @@ export async function writeConversation(
 
 /**
  * SPEC "Files": a conversation's last activity is its last round's, a fact
- * about the file rather than a counter the application maintains — this is
- * that fact for whichever conversation is most recently active, which is the
- * one opening a piece resumes (CONTEXT "Conversation").
+ * about the file rather than a counter the application maintains
+ * (CONTEXT "Conversation"). Every conversation a piece holds, each with that
+ * fact, unordered — #17's listing sorts it, and `mostRecentConversationId`
+ * below reads only its first entry once sorted.
  */
-export function mostRecentConversationId(workspaceDir: string, pieceId: string): string | undefined {
+export function conversationActivity(workspaceDir: string, pieceId: string): readonly { readonly id: string; readonly modifiedMs: number }[] {
   const pieceDir = pieceDirectory(workspaceDir, pieceId)
-  if (pieceDir === undefined) return undefined
+  if (pieceDir === undefined) return []
 
   const dir = conversationsDirectory(pieceDir)
-  const names = fileNames(dir, CONVERSATION_SUFFIX)
-  if (names.length === 0) return undefined
+  return fileNames(dir, CONVERSATION_SUFFIX).map((name) => ({
+    id: name.slice(0, -CONVERSATION_SUFFIX.length),
+    modifiedMs: fileModifiedMs(path.join(dir, name)),
+  }))
+}
 
-  const [mostRecent] = names
-    .map((name) => ({ id: name.slice(0, -CONVERSATION_SUFFIX.length), modifiedMs: fileModifiedMs(path.join(dir, name)) }))
-    .sort((a, b) => b.modifiedMs - a.modifiedMs)
-
+/**
+ * The conversation most recently active, which is the one opening a piece
+ * resumes (CONTEXT "Conversation").
+ */
+export function mostRecentConversationId(workspaceDir: string, pieceId: string): string | undefined {
+  const [mostRecent] = [...conversationActivity(workspaceDir, pieceId)].sort((a, b) => b.modifiedMs - a.modifiedMs)
   return mostRecent?.id
+}
+
+/**
+ * SPEC "Files"/"Conversations": deleting a conversation is deleting its one
+ * file. Which change files its applications name is a join the caller makes
+ * — CONTEXT "Applied change" ties a change to a round and participant, not
+ * to a conversation, so this boundary has no way to answer that on its own —
+ * and `deleteAppliedChange` below is the matching call for each one the
+ * caller finds.
+ */
+export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
+  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
+  await deleteFile(conversationFile(pieceDir, conversationId))
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +389,17 @@ export function readAppliedChanges<T>(workspaceDir: string, pieceId: string, sch
     const change = readJsonArtifact(path.join(dir, name), schema)
     return change === undefined ? [] : [change]
   })
+}
+
+/**
+ * SPEC "Conversations": "deleting a conversation deletes the change files
+ * its applications name" — this is that one deletion, by the change's own
+ * id, called once per change the caller has already matched to the
+ * conversation being deleted.
+ */
+export async function deleteAppliedChange(workspaceDir: string, pieceId: string, changeId: string): Promise<void> {
+  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
+  await deleteFile(changeFile(pieceDir, changeId))
 }
 
 // ---------------------------------------------------------------------------

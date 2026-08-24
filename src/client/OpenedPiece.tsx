@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import type { ConversationSummary } from '../shared/conversationViews.js'
 import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
+import { ConversationSwitcher } from './ConversationSwitcher.js'
 import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
@@ -36,6 +38,15 @@ type LifecycleProps = {
   readonly onSetStatus: (status: PieceStatus) => void
 }
 
+/** #17 "Conversations": the listing and its two actions, bundled the same way `RoomProps` bundles the cast toggle. */
+type ConversationsProps = {
+  readonly conversations: readonly ConversationSummary[]
+  readonly onRefresh: () => void
+  readonly deletingId: string | undefined
+  readonly error: string | undefined
+  readonly onDelete: (id: string) => Promise<readonly ConversationSummary[] | undefined>
+}
+
 /**
  * UX_DESIGN "Design thesis": two surfaces are always present, the prose and the
  * conversation about it. This is the one place that knows they are two — it owns
@@ -54,11 +65,13 @@ function Surfaces({
   piece,
   room,
   lifecycle,
+  conversations,
   onClose,
 }: {
   readonly piece: PieceDetail
   readonly room: RoomProps
   readonly lifecycle: LifecycleProps
+  readonly conversations: ConversationsProps
   readonly onClose: () => void
 }) {
   const manuscript = useManuscript(piece.draft)
@@ -70,13 +83,40 @@ function Surfaces({
   const [probe] = useLoaded(fetchRuntimeStatus, [])
   // UX_DESIGN "Prominence": editing the room owns no permanent space — it
   // arrives on the one action that reaches it and leaves on the one that
-  // closes it.
-  const [roomOpen, setRoomOpen] = useState(false)
+  // closes it. Conversations and the room are the same tier and never both
+  // open at once, so one flag names which — if either — is up.
+  const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
   // SPEC "Applying a recommendation": the manuscript's own read-only lock,
   // held for exactly the duration of the call — a fact `Conversation` learns
   // first, since applying is one of the actions a response offers, and
   // mirrored here because `Manuscript` is the surface the lock is drawn on.
   const [applying, setApplying] = useState(false)
+  // #17 "Conversations": which conversation this session is addressing —
+  // the piece's own most-recently-active one at first (CONTEXT
+  // "Conversation": opening a piece resumes it), and afterwards whichever
+  // the author chose from the listing or started fresh. `null` is an
+  // intention rather than a conversation, same as the piece's own report.
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
+  // `Conversation` mints its own id the moment a fresh one's first round
+  // opens, and reports it back here purely so the listing can mark it
+  // current — that report must not itself force a remount, or a round just
+  // opened against a brand new conversation would be torn down mid-flight.
+  // `session` is the deliberate signal: switching to a different
+  // conversation or starting another is what actually needs a clean
+  // instance, and each is its own explicit action below.
+  const [session, setSession] = useState(0)
+
+  function switchTo(conversationId: string | null): void {
+    setActiveConversationId(conversationId)
+    setSession((current) => current + 1)
+  }
+
+  async function deleteConversation(conversationId: string): Promise<void> {
+    const remaining = await conversations.onDelete(conversationId)
+    if (remaining !== undefined && activeConversationId === conversationId) {
+      switchTo(remaining[0]?.id ?? null)
+    }
+  }
 
   return (
     <div className={styles.row}>
@@ -86,15 +126,20 @@ function Surfaces({
         onClose={onClose}
         manuscript={manuscript}
         autosave={autosave}
-        onOpenRoom={() => setRoomOpen(true)}
+        onOpenRoom={() => setPanel('room')}
+        onOpenConversations={() => {
+          conversations.onRefresh()
+          setPanel('conversations')
+        }}
         lifecycle={lifecycle}
         applying={applying}
       />
       {manuscript.view !== 'reading' && roster.settled && (
         <Conversation
+          key={session}
           pieceId={piece.id}
-          currentConversationId={piece.currentConversationId}
-          roundInFlight={piece.roundInFlight}
+          currentConversationId={activeConversationId}
+          roundInFlight={piece.roundInFlight?.conversationId === activeConversationId ? piece.roundInFlight : null}
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
           room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation, applyRecommendation }}
@@ -105,10 +150,30 @@ function Surfaces({
           clock={Date.now}
           onApplied={manuscript.applyRecommendation}
           onApplyingChange={setApplying}
+          onConversationIdChange={setActiveConversationId}
         />
       )}
-      {roomOpen && (
-        <RoomEditor members={room.cast} toggling={room.toggling} onToggle={room.onToggle} onClose={() => setRoomOpen(false)} />
+      {panel === 'room' && (
+        <RoomEditor members={room.cast} toggling={room.toggling} onToggle={room.onToggle} onClose={() => setPanel('none')} />
+      )}
+      {panel === 'conversations' && (
+        <ConversationSwitcher
+          conversations={conversations.conversations}
+          activeId={activeConversationId}
+          deletingId={conversations.deletingId}
+          error={conversations.error}
+          clock={Date.now}
+          onSelect={(conversationId) => {
+            if (conversationId !== activeConversationId) switchTo(conversationId)
+            setPanel('none')
+          }}
+          onStartNew={() => {
+            if (activeConversationId !== null) switchTo(null)
+            setPanel('none')
+          }}
+          onDelete={deleteConversation}
+          onClose={() => setPanel('none')}
+        />
       )}
       {room.error !== undefined && (
         <p className={styles.error} role="alert">
@@ -147,6 +212,13 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
           settingStatus: piece.settingStatus,
           statusError: piece.statusError,
           onSetStatus: piece.setStatus,
+        }}
+        conversations={{
+          conversations: piece.piece.conversations,
+          onRefresh: piece.refreshConversations,
+          deletingId: piece.deletingConversationId,
+          error: piece.conversationsError,
+          onDelete: piece.deleteConversation,
         }}
         onClose={leave}
       />

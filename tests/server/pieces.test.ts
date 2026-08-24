@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   ConversationNotFoundError,
   createPiece,
+  deleteConversation,
   DraftWriter,
   getConversation,
   getPiece,
+  listConversations,
   listPieces,
   PieceNotFoundError,
   setPieceCast,
@@ -16,8 +18,8 @@ import {
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftStore, writeAppliedChange, writeConversation } from '../../src/server/store/index.js'
-import type { AppliedChange } from '../../src/shared/appliedChange.js'
+import { DraftStore, readAppliedChanges, writeAppliedChange, writeConversation } from '../../src/server/store/index.js'
+import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',
@@ -115,6 +117,7 @@ describe('pieces', () => {
       draft: '',
       storyContext: {},
       currentConversationId: null,
+      conversations: [],
       roundInFlight: null,
       cast: [
         { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
@@ -323,5 +326,119 @@ describe('getConversation', () => {
     const compression = round?.participants.find((participant) => participant.participantId === 'compression')
     expect(shape?.appliedChanges).toEqual([change])
     expect(compression?.appliedChanges).toEqual([])
+  })
+})
+
+describe('listConversations', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('reports none for a piece with no conversations', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    expect(listConversations(workspaceDir, piece.id)).toEqual([])
+  })
+
+  it('shows the author\'s own opening words, from the first round that carries a message', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'c1', {
+      id: 'c1',
+      rounds: [
+        { id: 'r1', message: 'does the opening earn its length', addressed: [], brought: [], outcome: 'settled', participants: [] },
+      ],
+    })
+
+    const [summary] = listConversations(workspaceDir, piece.id)
+    expect(summary).toMatchObject({ id: 'c1', opening: 'does the opening earn its length' })
+  })
+
+  it('reads down through earlier message-less rounds to the first the author actually wrote', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'c1', {
+      id: 'c1',
+      rounds: [
+        { id: 'r1', addressed: [], brought: [], outcome: 'settled', participants: [] },
+        { id: 'r2', message: 'what would you change about it', addressed: [], brought: [], outcome: 'settled', participants: [] },
+      ],
+    })
+
+    const [summary] = listConversations(workspaceDir, piece.id)
+    expect(summary?.opening).toBe('what would you change about it')
+  })
+
+  it('reports no opening words for a conversation that carries no author message at all', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'c1', {
+      id: 'c1',
+      rounds: [{ id: 'r1', addressed: [], brought: [], outcome: 'settled', participants: [] }],
+    })
+
+    const [summary] = listConversations(workspaceDir, piece.id)
+    expect(summary?.opening).toBeUndefined()
+  })
+
+  it('orders the listing by last activity, most recent first', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'older', { id: 'older', rounds: [] })
+    const past = new Date(Date.now() - 10_000)
+    utimesSync(path.join(workspaceDir, piece.id, 'conversations', 'older.json'), past, past)
+    await writeConversation(workspaceDir, piece.id, 'newer', { id: 'newer', rounds: [] })
+
+    expect(listConversations(workspaceDir, piece.id).map((c) => c.id)).toEqual(['newer', 'older'])
+  })
+})
+
+describe('deleteConversation', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await expect(deleteConversation(workspaceDir, piece.id, 'never-written')).rejects.toThrowError(ConversationNotFoundError)
+  })
+
+  it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'c1', {
+      id: 'c1',
+      rounds: [
+        {
+          id: 'r1',
+          addressed: [],
+          brought: [],
+          outcome: 'settled',
+          participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' } }],
+        },
+      ],
+    })
+    await writeConversation(workspaceDir, piece.id, 'c2', { id: 'c2', rounds: [] })
+    const ownChange: AppliedChange = {
+      id: 'change1',
+      roundId: 'r1',
+      participantId: 'shape',
+      content: { kind: 'passages', passages: [{ before: 'it', after: '' }] },
+    }
+    const unrelatedChange: AppliedChange = { id: 'change2', roundId: 'r9', participantId: 'shape', content: { kind: 'rewrittenWhole' } }
+    await writeAppliedChange(workspaceDir, piece.id, ownChange)
+    await writeAppliedChange(workspaceDir, piece.id, unrelatedChange)
+
+    await deleteConversation(workspaceDir, piece.id, 'c1')
+
+    expect(() => getConversation(workspaceDir, piece.id, 'c1')).toThrowError(ConversationNotFoundError)
+    expect(listConversations(workspaceDir, piece.id).map((c) => c.id)).toEqual(['c2'])
+    expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([unrelatedChange])
   })
 })

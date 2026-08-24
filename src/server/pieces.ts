@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
-import { conversationSchema, type ConversationView } from '../shared/conversationViews.js'
+import { conversationSchema, type Conversation, type ConversationSummary, type ConversationView } from '../shared/conversationViews.js'
 import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
@@ -9,6 +9,9 @@ import { countWords } from '../shared/storyLength.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import {
+  conversationActivity,
+  deleteAppliedChange,
+  deleteConversation as deleteConversationFile,
   mostRecentConversationId,
   pieceExists,
   pieceIds,
@@ -92,6 +95,40 @@ function castView(specialists: readonly RoleDefinition[], enabled: readonly stri
 }
 
 /**
+ * UX_DESIGN "Conversations": the author's own opening words, read down
+ * through the conversation's rounds for the first one that carries a
+ * message — a conversation whose first round asked a participant for a
+ * concrete change has none there (CONTEXT "Round"), and the listing reads
+ * past it to the first one the author actually wrote. `undefined` is a
+ * conversation that holds no author message anywhere in it, which the
+ * listing shows as a fact about the machine rather than the room's words
+ * standing in for the author's.
+ */
+function openingWords(conversation: Conversation): string | undefined {
+  for (const round of conversation.rounds) {
+    if (round.message !== undefined) return round.message
+  }
+  return undefined
+}
+
+/**
+ * #17 "Conversations: list, start, resume, delete": the listing SPEC's
+ * transport table calls the piece's "conversation index" — every
+ * conversation the piece holds, ordered by last activity, which is also the
+ * order that decides which one `mostRecentConversationId` names. Nothing
+ * else is in it: no round counts, no participant rosters, no sizes.
+ */
+export function listConversations(workspaceDir: string, pieceId: string): readonly ConversationSummary[] {
+  return conversationActivity(workspaceDir, pieceId)
+    .map(({ id, modifiedMs }) => {
+      const conversation = readConversation(workspaceDir, pieceId, id, conversationSchema)
+      const opening = conversation === undefined ? undefined : openingWords(conversation)
+      return { id, opening, lastActivity: modifiedMs }
+    })
+    .sort((a, b) => b.lastActivity - a.lastActivity)
+}
+
+/**
  * SPEC "Files": the piece directory is the piece's identity, derived from
  * the title and disambiguated at creation — never afterwards, since a
  * retitle does not rename the directory.
@@ -159,6 +196,7 @@ export function getPiece(
     // room is working from, and #18 proposes changes against these entries.
     storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
+    conversations: listConversations(workspaceDir, id),
     roundInFlight,
     cast: castView(specialists, piece.metadata.cast),
   }
@@ -247,6 +285,28 @@ export function getConversation(workspaceDir: string, pieceId: string, conversat
       })),
     })),
   }
+}
+
+/**
+ * #17 "Conversations: list, start, resume, delete"/SPEC "Files": "deleting a
+ * conversation deletes the change files its applications name" — found here
+ * by the conversation's own round ids, since CONTEXT "Applied change" ties a
+ * change to a round and a participant rather than to a conversation. The
+ * changes are removed before the conversation file itself, so a failure
+ * partway through leaves the source that names them still readable rather
+ * than an orphaned change nothing can any longer account for.
+ */
+export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
+  const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+  if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
+
+  const roundIds = new Set(conversation.rounds.map((round) => round.id))
+  const changes = readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema).filter((change) => roundIds.has(change.roundId))
+  for (const change of changes) {
+    await deleteAppliedChange(workspaceDir, pieceId, change.id)
+  }
+
+  await deleteConversationFile(workspaceDir, pieceId, conversationId)
 }
 
 /**

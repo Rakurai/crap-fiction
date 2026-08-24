@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { conversationSummarySchema } from './conversationViews.js'
 import { durableContextSchema } from './durableContext.js'
 import { roundSnapshotSchema } from './roundEvents.js'
 
@@ -50,12 +51,18 @@ export type CastMemberView = z.infer<typeof castMemberViewSchema>
  * has only named the piece (SPEC "Files"). `cast` is every specialist the mode's
  * cast admits for this piece, not only the enabled ones, since the room-editing
  * surface (#13) lists a specialist to enable it as readily as to disable one.
+ *
+ * `conversations` is #17's listing — every conversation the piece holds, in the
+ * order that decides which one `currentConversationId` names (UX_DESIGN
+ * "Conversations": "ordered by last activity, which is also the order that
+ * decides which one opening the piece lands in").
  */
 export const pieceDetailSchema = pieceSummaryShape
   .extend({
     draft: z.string(),
     storyContext: durableContextSchema,
     currentConversationId: z.string().nullable(),
+    conversations: z.array(conversationSummarySchema).readonly(),
     roundInFlight: roundSnapshotSchema.nullable(),
     cast: z.array(castMemberViewSchema).readonly(),
   })

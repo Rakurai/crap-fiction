@@ -17,6 +17,7 @@ import { originGuard } from './originGuard.js'
 import {
   ConversationNotFoundError,
   createPiece,
+  deleteConversation,
   type DraftWriter,
   getConversation,
   getPiece,
@@ -138,6 +139,16 @@ export function createApp(
 
   app.get('/pieces/:id/conversations/:cid', (c) => {
     return c.json(ok(getConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))))
+  })
+
+  /**
+   * #17 "Conversations: list, start, resume, delete"/SPEC "Files": deletes
+   * the conversation's one file and the change files its applications name,
+   * leaving nothing on disk for the author to prune.
+   */
+  app.delete('/pieces/:id/conversations/:cid', async (c) => {
+    await deleteConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))
+    return c.json(ok(null))
   })
 
   app.post('/pieces/:id/conversations/:cid/rounds', body(postRoundSchema), async (c) => {

@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
@@ -254,4 +255,13 @@ export function readJsonArtifact<T>(filePath: string, schema: z.ZodType<T>): T |
 export async function writeJsonArtifact(filePath: string, value: unknown): Promise<void> {
   mkdirSync(path.dirname(filePath), { recursive: true })
   await writeFileAtomic(filePath, JSON.stringify(value, null, 2))
+}
+
+/**
+ * Deletes one artifact. A file already gone is not this call's failure to
+ * report — `force` leaves it silent, the same declared absence a read of it
+ * would have reported.
+ */
+export async function deleteFile(filePath: string): Promise<void> {
+  await rm(filePath, { force: true })
 }

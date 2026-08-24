@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react'
+import type { ConversationSummary } from '../shared/conversationViews.js'
 import type { PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { useLoaded } from './load.js'
 import { fetchPiece, updatePiece } from './piecesClient.js'
 import { failureMessage } from './request.js'
+import { deleteConversation as deleteConversationRequest } from './roomClient.js'
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
@@ -21,6 +23,18 @@ export type PieceViewModel =
       readonly settingStatus: boolean
       readonly statusError: string | undefined
       readonly setStatus: (status: PieceStatus) => void
+      /**
+       * #17 "Conversations": re-reads the piece so the listing reflects
+       * rounds that settled since it was last opened — the listing is a
+       * fact about the files, and nothing here keeps it live across a round
+       * the way `Conversation`'s own subscription does.
+       */
+      readonly refreshConversations: () => void
+      /** The conversation a deletion is in flight for, so the listing disables that one row alone. */
+      readonly deletingConversationId: string | undefined
+      readonly conversationsError: string | undefined
+      /** Resolves with the conversations remaining once the deletion has settled, or `undefined` where it was refused — so a caller reassigning the conversation it was showing knows what is left to fall back to. */
+      readonly deleteConversation: (conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
     }
   | { readonly status: 'error'; readonly message: string }
 
@@ -42,6 +56,8 @@ export function usePiece(id: string): PieceViewModel {
   const [retitleError, setRetitleError] = useState<string | undefined>(undefined)
   const [settingStatus, setSettingStatus] = useState(false)
   const [statusError, setStatusError] = useState<string | undefined>(undefined)
+  const [deletingConversationId, setDeletingConversationId] = useState<string | undefined>(undefined)
+  const [conversationsError, setConversationsError] = useState<string | undefined>(undefined)
 
   const toggleCast = useCallback(
     (memberId: string) => {
@@ -105,6 +121,52 @@ export function usePiece(id: string): PieceViewModel {
     [id],
   )
 
+  /**
+   * #17 "Conversations": a fresh read of the piece, applied whole
+   * (CODING_STANDARDS "Client": projecting the server's own response) —
+   * the listing is the only thing this is for, but the piece carries no
+   * narrower view of itself to ask for instead.
+   */
+  const refreshConversations = useCallback(() => {
+    setConversationsError(undefined)
+    void fetchPiece(id).then((result) => {
+      if (result.outcome === 'value') {
+        setState({ kind: 'ready', value: result.value })
+        return
+      }
+      setConversationsError(failureMessage(result))
+    })
+  }, [id])
+
+  /**
+   * #17 "Conversations": removes the row from what was already loaded
+   * rather than asking for the piece again — the same reasoning `usePieces`
+   * applies to a creation's result, since a deletion's own answer is
+   * everything a second read would report. Resolves with what remains, so
+   * a caller showing the conversation just deleted knows what to fall back
+   * to without a second read of its own.
+   */
+  const deleteConversation = useCallback(
+    (conversationId: string): Promise<readonly ConversationSummary[] | undefined> => {
+      if (state.kind !== 'ready') return Promise.resolve(undefined)
+      const piece = state.value
+
+      setDeletingConversationId(conversationId)
+      setConversationsError(undefined)
+      return deleteConversationRequest(id, conversationId).then((result) => {
+        setDeletingConversationId(undefined)
+        if (result.outcome !== 'value') {
+          setConversationsError(failureMessage(result))
+          return undefined
+        }
+        const remaining = piece.conversations.filter((c) => c.id !== conversationId)
+        setState({ kind: 'ready', value: { ...piece, conversations: remaining } })
+        return remaining
+      })
+    },
+    [id, state],
+  )
+
   if (state.kind === 'loading') return { status: 'loading' }
   if (state.kind === 'error') return { status: 'error', message: state.message }
   return {
@@ -119,5 +181,9 @@ export function usePiece(id: string): PieceViewModel {
     settingStatus,
     statusError,
     setStatus,
+    refreshConversations,
+    deletingConversationId,
+    conversationsError,
+    deleteConversation,
   }
 }

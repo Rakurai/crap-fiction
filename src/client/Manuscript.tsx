@@ -25,6 +25,8 @@ type ManuscriptProps = {
   readonly autosave: AutosaveViewModel
   /** UX_DESIGN "Prominence": editing the room is one action away, reached from here like the other view controls — this surface knows nothing else about it. */
   readonly onOpenRoom: () => void
+  /** UX_DESIGN "Prominence": choosing or starting a conversation is one action away too — this surface knows nothing about which conversation is current, only that reaching the listing is a control beside the others. */
+  readonly onOpenConversations: () => void
   readonly lifecycle: LifecycleProps
   /**
    * SPEC "Applying a recommendation": the manuscript is read-only for exactly
@@ -104,7 +106,7 @@ function EditableTitle({ title, saving, onRetitle }: { readonly title: string; r
  * disabled control carries no second explanation of its own. The manuscript
  * stays editable throughout, and the next write that succeeds clears both.
  */
-export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, lifecycle, applying }: ManuscriptProps) {
+export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, lifecycle, applying }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
   useEffect(() => {
@@ -153,6 +155,9 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
             </button>
             <button type="button" className={styles.control} onClick={manuscript.showReading}>
               reading
+            </button>
+            <button type="button" className={styles.control} onClick={onOpenConversations}>
+              conversations
             </button>
             <button type="button" className={styles.control} onClick={onOpenRoom}>
               room

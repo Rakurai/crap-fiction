@@ -1,5 +1,5 @@
 import * as Ariakit from '@ariakit/react'
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AppliedChange } from '../shared/appliedChange.js'
 import type { Clock } from '../shared/clock.js'
 import { countWords } from '../shared/storyLength.js'
@@ -46,6 +46,8 @@ type ConversationProps = {
   readonly onApplied?: (markdown: string) => void
   /** SPEC "Applying a recommendation": whether the manuscript's own read-only lock should be held, for the surface that draws it. */
   readonly onApplyingChange?: (applying: boolean) => void
+  /** #17 "Conversations": the conversation this surface is addressing, once its first round has minted one — so the switcher beside it can tell which listing row is current without holding a second copy of the fact. */
+  readonly onConversationIdChange?: (conversationId: string) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -402,6 +404,7 @@ export function Conversation({
   clock,
   onApplied = () => {},
   onApplyingChange = () => {},
+  onConversationIdChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -430,6 +433,11 @@ export function Conversation({
 
   const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
   const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, conversation.attachAppliedChange, room)
+
+  useEffect(() => {
+    if (conversation.conversationId !== null) onConversationIdChange(conversation.conversationId)
+  }, [conversation.conversationId, onConversationIdChange])
+
   const counting = conversation.projection.rounds.some((round) => round.outcome === 'inFlight')
   const nowMs = useNow(counting, clock)
   // SPEC "Operation state": one operation at a time, whichever kind — the

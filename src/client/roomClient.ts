@@ -40,6 +40,18 @@ export function fetchConversation(
   })
 }
 
+/**
+ * #17 "Conversations": deletes the conversation and the change files its
+ * applications name — one call, the studio's own answer to "nothing left on
+ * disk for the author to prune".
+ */
+export function deleteConversation(pieceId: string, conversationId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, z.null(), {
+    method: 'DELETE',
+    signal: signal ?? null,
+  })
+}
+
 const startRoundResultSchema = z.object({ conversationId: z.string(), roundId: z.string() })
 
 /**
