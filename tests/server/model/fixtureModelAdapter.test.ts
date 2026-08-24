@@ -16,15 +16,15 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
   })
 
   it('reports a scripted value that does not conform as nonconforming, carrying what it was', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'commentary' } } }, runtimeStatus)
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'muttered' } } }, runtimeStatus)
 
     const result = await adapter.call('shape', 'prompt', eligibleResponseValueSchema, new AbortController().signal)
 
-    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned: '{"outcome":"commentary"}' })
+    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned: '{"outcome":"muttered"}' })
   })
 
   it('states each failure reason distinctly', async () => {
-    for (const reason of ['unconfigured', 'unreachable', 'timeout', 'nonconforming'] as const) {
+    for (const reason of ['unconfigured', 'unreachable', 'timeout', 'malformed', 'nonconforming'] as const) {
       const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason } }, runtimeStatus)
 
       const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)

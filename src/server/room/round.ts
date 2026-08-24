@@ -1,7 +1,7 @@
 import type { ModelAccess } from '../model/types.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { substantiveResponse, type ParticipantResult, type RoundParticipantRecord } from '../../shared/conversationViews.js'
-import { responseValueSchema, type EligibleResponseValue, type OwedResponseValue } from '../../shared/participantResponse.js'
+import { normalizeResponse, responseValueSchema, type ResponseValue } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
 export type AskContext = Readonly<{
@@ -26,11 +26,11 @@ export type RoundResult = Readonly<{
   outcome: 'settled' | 'abandoned'
 }>
 
-function toParticipantResult(value: EligibleResponseValue | OwedResponseValue): ParticipantResult {
-  if (value.outcome === 'noComment') return { kind: 'response', outcome: 'noComment' }
-  // Unreachable: the schema refines a claim onto every non-noComment outcome, which the inferred type cannot express.
-  if (value.claim === undefined) return { kind: 'failed', reason: 'nonconforming' }
-  return { kind: 'response', outcome: value.outcome, claim: value.claim, note: value.note }
+function toParticipantResult(value: ResponseValue): ParticipantResult {
+  const response = normalizeResponse(value)
+  if (response === undefined) return { kind: 'failed', reason: 'nonconforming', returned: JSON.stringify(value) }
+  if (response.outcome === 'noComment') return { kind: 'response', outcome: 'noComment' }
+  return { kind: 'response', outcome: response.outcome, claim: response.claim, note: response.note }
 }
 
 export async function callParticipant(

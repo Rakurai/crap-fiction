@@ -4,8 +4,8 @@ import type { CaptureProposal } from '../../../src/shared/captureProposal.js'
 import { ContextReview } from '../../../src/client/ContextReview.js'
 
 const PROPOSALS: readonly CaptureProposal[] = [
-  { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', entry: undefined, text: 'two cups, one left behind' },
-  { id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'remove', entry: 'overwrites dialogue tags', text: undefined },
+  { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+  { id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'remove', entry: 'overwrites dialogue tags' },
 ]
 
 describe('the context capture review', () => {

@@ -16,7 +16,6 @@ import {
   writeStoryContext,
 } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
-import type { CaptureProposal } from '../../../src/shared/captureProposal.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
 import { durableContextSchema } from '../../../src/shared/durableContext.js'
 import {
@@ -603,16 +602,12 @@ describe('Room.approveCapture', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function approvedProposal(overrides: Partial<CaptureProposal> & Pick<CaptureProposal, 'id' | 'destination' | 'section' | 'operation'>): CaptureProposal {
-    return { entry: undefined, text: undefined, ...overrides }
-  }
-
   it('writes an approved proposal to the destination it names, and nothing to the other', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom(dataRoot, {})
 
     const outcome = await room.approveCapture(workspaceDir, piece.id, [
-      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }),
+      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
     ])
 
     expect(outcome).toEqual({ written: ['storyContext'], failures: [] })
@@ -625,8 +620,8 @@ describe('Room.approveCapture', () => {
     const { room } = buildRoom(dataRoot, {})
 
     const outcome = await room.approveCapture(workspaceDir, piece.id, [
-      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }),
-      approvedProposal({ id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
+      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+      { id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' },
     ])
 
     expect(outcome.written.sort()).toEqual(['authorContext', 'storyContext'])
@@ -640,7 +635,7 @@ describe('Room.approveCapture', () => {
     const { room } = buildRoom(dataRoot, {})
 
     await room.approveCapture(workspaceDir, piece.id, [
-      approvedProposal({ id: 'p1', destination: 'storyContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
+      { id: 'p1', destination: 'storyContext', section: 'Voice', operation: 'add', text: 'wry and close' },
     ])
 
     expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({
@@ -655,8 +650,8 @@ describe('Room.approveCapture', () => {
     chmodSync(path.join(workspaceDir, piece.id), 0o500)
 
     const outcome = await room.approveCapture(workspaceDir, piece.id, [
-      approvedProposal({ id: 'p1', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' }),
-      approvedProposal({ id: 'p2', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups' }),
+      { id: 'p1', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' },
+      { id: 'p2', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups' },
     ])
 
     expect(outcome.written).toEqual(['authorContext'])

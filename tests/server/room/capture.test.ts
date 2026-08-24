@@ -18,8 +18,10 @@ describe('toCaptureProposals', () => {
   })
 })
 
-function proposal(overrides: Partial<CaptureProposal> & Pick<CaptureProposal, 'section' | 'operation'>): CaptureProposal {
-  return { id: 'p1', destination: 'storyContext', entry: undefined, text: undefined, ...overrides }
+type Unaddressed<T> = T extends unknown ? Omit<T, 'destination'> : never
+
+function proposal(value: Unaddressed<CaptureProposalValue>): CaptureProposal {
+  return { ...value, destination: 'storyContext', id: 'p1' }
 }
 
 describe('applyProposals', () => {

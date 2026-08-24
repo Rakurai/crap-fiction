@@ -14,18 +14,18 @@ export function applyProposals(context: DurableContext, proposals: readonly Capt
     const section = sections[proposal.section] ?? (sections[proposal.section] = [])
 
     if (proposal.operation === 'add') {
-      section.push(proposal.text as string)
+      section.push(proposal.text)
       continue
     }
 
-    const index = section.indexOf(proposal.entry as string)
+    const index = section.indexOf(proposal.entry)
     if (proposal.operation === 'remove') {
       if (index !== -1) section.splice(index, 1)
       continue
     }
 
-    if (index !== -1) section[index] = proposal.text as string
-    else section.push(proposal.text as string)
+    if (index !== -1) section[index] = proposal.text
+    else section.push(proposal.text)
   }
 
   return sections

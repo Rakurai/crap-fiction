@@ -8,24 +8,21 @@ export const captureOperationSchema = z.enum(['add', 'revise', 'replace', 'remov
 
 export type CaptureOperation = z.infer<typeof captureOperationSchema>
 
-const captureProposalFieldsSchema = z.object({
-  destination: captureDestinationSchema,
-  section: z.string().min(1),
-  operation: captureOperationSchema,
-  entry: z.string().min(1).optional(),
-  text: z.string().min(1).optional(),
-})
+const common = { destination: captureDestinationSchema, section: z.string().min(1) }
 
-function checkProposalFields(value: { operation: CaptureOperation; entry?: string | undefined; text?: string | undefined }, ctx: z.RefinementCtx): void {
-  if (value.operation !== 'add' && value.entry === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'revise, replace and remove name the entry they concern', path: ['entry'] })
-  }
-  if (value.operation !== 'remove' && value.text === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'add, revise and replace propose text', path: ['text'] })
-  }
+// A discriminated union rather than optional fields refined afterwards: `z.toJSONSchema` carries the
+// per-operation `required` into the wire schema, so guided decoding obliges a runtime to write the
+// fields the operation needs. A refinement is dropped in that conversion and would only reject after.
+function proposalBranches<Extra extends z.ZodRawShape>(extra: Extra) {
+  return [
+    z.object({ ...common, ...extra, operation: z.literal('add'), text: z.string().min(1) }),
+    z.object({ ...common, ...extra, operation: z.literal('revise'), entry: z.string().min(1), text: z.string().min(1) }),
+    z.object({ ...common, ...extra, operation: z.literal('replace'), entry: z.string().min(1), text: z.string().min(1) }),
+    z.object({ ...common, ...extra, operation: z.literal('remove'), entry: z.string().min(1) }),
+  ] as const
 }
 
-export const captureProposalValueSchema = captureProposalFieldsSchema.superRefine(checkProposalFields)
+export const captureProposalValueSchema = z.discriminatedUnion('operation', proposalBranches({}))
 
 export type CaptureProposalValue = z.infer<typeof captureProposalValueSchema>
 
@@ -33,7 +30,7 @@ export const captureResultSchema = z.object({ proposals: z.array(captureProposal
 
 export type CaptureResult = z.infer<typeof captureResultSchema>
 
-export const captureProposalSchema = captureProposalFieldsSchema.extend({ id: z.string().min(1) }).superRefine(checkProposalFields)
+export const captureProposalSchema = z.discriminatedUnion('operation', proposalBranches({ id: z.string().min(1) }))
 
 export type CaptureProposal = Readonly<z.infer<typeof captureProposalSchema>>
 

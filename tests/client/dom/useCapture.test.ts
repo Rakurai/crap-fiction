@@ -1,12 +1,12 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { CaptureApproveOutcome, CaptureProposal } from '../../../src/shared/captureProposal.js'
+import type { CaptureApproveOutcome, CaptureDestination, CaptureProposal } from '../../../src/shared/captureProposal.js'
 import type { CaptureOutcome } from '../../../src/shared/captureViews.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import { useCapture, type CaptureAdapters } from '../../../src/client/useCapture.js'
 
-function proposal(overrides: Partial<CaptureProposal> & Pick<CaptureProposal, 'id' | 'destination'>): CaptureProposal {
-  return { section: 'Voice', operation: 'add', entry: undefined, text: 'wry and close', ...overrides }
+function proposal(identity: { id: string; destination: CaptureDestination; section?: string }): CaptureProposal {
+  return { section: 'Voice', operation: 'add', text: 'wry and close', ...identity }
 }
 
 function adapters(overrides: Partial<CaptureAdapters> = {}): CaptureAdapters {

@@ -3,10 +3,16 @@ import pRetry from 'p-retry'
 import { z } from 'zod'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
+import { APPLY_CALL_SITE } from './callSites.js'
 import type { CallResult, CallState, ModelAccess } from './types.js'
 
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
+
+// A runtime that stalls inside an unclosed JSON structure generates until something stops it, so
+// every call carries a bound. Applying a recommendation returns a whole manuscript; nothing else does.
+const RESPONSE_MAX_TOKENS = 2_000
+const MANUSCRIPT_MAX_TOKENS = 32_000
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -36,6 +42,16 @@ function requireReachable(baseUrl: string): string {
   }
 
   return baseUrl
+}
+
+class MalformedError extends Error {
+  readonly returned: string
+
+  constructor(returned: string) {
+    super('response was not JSON')
+    this.name = 'MalformedError'
+    this.returned = returned
+  }
 }
 
 class NonConformingError extends Error {
@@ -87,15 +103,29 @@ export class LMStudioAdapter implements ModelAccess {
     const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS)
     const combined = AbortSignal.any([signal, timeoutSignal])
     const jsonSchema = z.toJSONSchema(schema)
+    const maxTokens = site === APPLY_CALL_SITE ? MANUSCRIPT_MAX_TOKENS : RESPONSE_MAX_TOKENS
+
+    // A retried attempt loads nothing the first one did not, so `preparing` is stated once.
+    let preparing = false
+    const announce = (state: CallState): void => {
+      if (state === 'preparing') {
+        if (preparing) return
+        preparing = true
+      }
+      onState?.(state)
+    }
 
     try {
-      const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, combined, onState), {
+      const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, maxTokens, combined, announce), {
         retries: RETRIES,
         signal: combined,
       })
       return this.#logged(site, assignment, { outcome: 'value', value })
     } catch (error) {
       if (signal.aborted) return this.#logged(site, assignment, { outcome: 'abandoned' })
+      if (error instanceof MalformedError) {
+        return this.#logged(site, assignment, { outcome: 'failed', reason: 'malformed', returned: error.returned })
+      }
       if (error instanceof NonConformingError) {
         return this.#logged(site, assignment, { outcome: 'failed', reason: 'nonconforming', returned: error.returned })
       }
@@ -109,24 +139,30 @@ export class LMStudioAdapter implements ModelAccess {
     prompt: string,
     schema: z.ZodType<T>,
     jsonSchema: object,
+    maxTokens: number,
     signal: AbortSignal,
-    onState?: (state: CallState) => void,
+    announce: (state: CallState) => void,
   ): Promise<T> {
-    onState?.('preparing')
+    announce('preparing')
     const model = await this.#client.llm.model(assignment, { signal })
-    onState?.('working')
-    const result = await model.complete(prompt, { structured: { type: 'json', jsonSchema }, signal })
+    announce('working')
+    // `respond` rather than `complete`: the completion endpoint applies no prompt template, and an
+    // instruct-tuned model handed a bare prompt completes the schema instead of answering it.
+    const result = await model.respond(prompt, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
+
+    // A reasoning model puts its reasoning in `content` ahead of the JSON. Only this field is the answer.
+    const returned = result.nonReasoningContent
 
     let raw: unknown
     try {
-      raw = JSON.parse(result.content)
+      raw = JSON.parse(returned)
     } catch {
-      throw new NonConformingError(result.content)
+      throw new MalformedError(returned)
     }
 
     const parsed = schema.safeParse(raw)
     if (!parsed.success) {
-      throw new NonConformingError(result.content)
+      throw new NonConformingError(returned)
     }
     return parsed.data
   }

@@ -1,7 +1,11 @@
 import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
 import type { RoleDefinition } from './roles.js'
 
-export const OPERATION_CALL_SITES = ['apply', 'capture'] as const
+export const APPLY_CALL_SITE = 'apply'
+
+export const CAPTURE_CALL_SITE = 'capture'
+
+export const OPERATION_CALL_SITES = [APPLY_CALL_SITE, CAPTURE_CALL_SITE] as const
 
 export type OperationCallSite = (typeof OPERATION_CALL_SITES)[number]
 
