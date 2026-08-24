@@ -35,6 +35,11 @@ on the issue naming the document and the statement, and leave the ticket open.
   model result exists.
 - **No Docker inside this container.** The deployment container cannot be built or run here. A
   ticket that needs it is blocked, and saying so is the correct outcome.
+- **No browser.** `make test` is the whole gate here and does not run one; `npm run test:e2e` cannot
+  work and its failure is not a finding. Do not write a `.spec.ts`. SPEC "Verification" bounds the
+  browser suite to three guarantees and assigns it to the final pass, which runs interactively — a
+  property it names is not yours to assert a second time from a ticket. Everything else, including
+  what a component decides and what a hook computes, is reachable through `jsdom`.
 - **Network goes through a proxy** and reaches the npm registry, GitHub and AWS. A host that will
   not resolve is an environment fact, not something to code around.
 

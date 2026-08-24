@@ -1,0 +1,84 @@
+# One container, run by Docker Desktop on the author's Mac, with two host binds
+# and one published port (SPEC "Deployment"). `docker compose up` is the whole
+# of starting the studio; the values below come from .env, which is the author's
+# own file and is not committed.
+#
+# A dependency change is the one edit that needs the image rebuilt, and because
+# the installed tree lives in a named volume seeded from the image, it needs that
+# volume replaced too: `docker compose down -v` then `docker compose up --build`.
+# Everything else — client code, server code, shipped data — is picked up through
+# the repository bind without a rebuild.
+
+name: crap-fiction
+
+services:
+  studio:
+    build: .
+
+    # An init process makes the runtime a child rather than PID 1, so stopping
+    # the container stops it promptly and open event streams close.
+    init: true
+
+    # The studio is up when Docker Desktop is, unless the author stopped it.
+    restart: unless-stopped
+
+    # Compose supplies every operational value explicitly, and none of them has
+    # a value here: an unset one is refused by name before anything is built,
+    # which is the same refusal `loadEnv` makes inside the process.
+    environment:
+      STUDIO_DATA_ROOT: ${STUDIO_DATA_ROOT:?the absolute path of the data root}
+      STUDIO_PORT: ${STUDIO_PORT:?the port served, and the port published}
+      # LM Studio runs as the author's ordinary Mac application, because Docker
+      # Desktop passes no GPU through and a model answering from the CPU would
+      # make the room too slow to consult. The container reaches it as a host
+      # the deployment supplies, so the URL is not the one the host itself uses.
+      STUDIO_MODEL_RUNTIME_URL: ${STUDIO_CONTAINER_MODEL_RUNTIME_URL:?where the container reaches LM Studio, through host.docker.internal rather than its own loopback}
+      STUDIO_LOG_LEVEL: ${STUDIO_LOG_LEVEL:?the logger's level}
+      # Change notification over a Docker Desktop bind mount is not dependable,
+      # so the watcher polls. This is chokidar's own global override rather than
+      # a fifth STUDIO_* variable: the set the process reads stays closed.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+
+    # Published to loopback on the author's machine only, so the surface is
+    # narrowed by construction. The server binds every interface inside this
+    # namespace, which is what makes the published binding the whole of what
+    # keeps the studio off the network.
+    ports:
+      - "127.0.0.1:${STUDIO_PORT}:${STUDIO_PORT}"
+
+    volumes:
+      # The repository, so a fix is iterated without rebuilding.
+      - .:/app
+      # The installed dependencies, so the tree the container installed against
+      # is the one it runs against. Without this the macOS working tree would
+      # shadow them, and the failure that produces is a native build for the
+      # wrong platform reported as a missing module.
+      - dependencies:/app/node_modules
+      # The author's work, at the same path inside the container as outside, so
+      # one variable carries the data root for both arrangements and no path in
+      # a settings file means two different directories.
+      - ${STUDIO_DATA_ROOT}:${STUDIO_DATA_ROOT}
+
+    # The healthcheck requests the workspace, which answers whether or not one
+    # is configured and contacts no model: a check that went to the runtime
+    # would report the studio broken when the author has merely not started
+    # LM Studio.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$$STUDIO_PORT/workspace > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+    # The logger writes to stderr and the log driver captures it with a bounded
+    # size, which is the same refusal to keep a durable record arriving as a
+    # deployment setting — safe only because a log line carries no prose.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  dependencies:

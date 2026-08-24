@@ -1,0 +1,6 @@
+.banner {
+  font: 400 10px/1.6 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .06em;
+  margin: 0 0 16px;
+}

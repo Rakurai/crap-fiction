@@ -1,0 +1,54 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  padding: 14px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.name {
+  font: 600 11.5px/1 var(--font-ui);
+  color: var(--ink);
+}
+
+.role {
+  font: 400 11.5px/1.5 var(--font-ui);
+  color: var(--ink2);
+  margin: 5px 0 10px;
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .06em;
+}
+
+.input {
+  flex: 1;
+  font: 400 11.5px/1 var(--font-facts);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 7px 9px;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.note {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+  margin: 8px 0 0;
+}

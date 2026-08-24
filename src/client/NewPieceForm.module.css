@@ -1,0 +1,65 @@
+.reveal {
+  font: 500 11px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+.reveal:hover {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  flex: none;
+}
+
+.input {
+  flex: 1;
+  font: 400 12px/1 var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 7px 9px;
+}
+
+.submit {
+  font: 500 11px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 7px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.submit:hover {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.submit:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.error {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+  margin: 8px 0 0;
+}

@@ -1,0 +1,29 @@
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+[contenteditable] {
+  outline: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: var(--ink4);
+}

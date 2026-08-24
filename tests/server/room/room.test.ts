@@ -1,0 +1,785 @@
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { ModelAccess } from '../../../src/server/model/types.js'
+import type { ModeDescriptor } from '../../../src/server/modes.js'
+import { createPiece, PieceNotFoundError } from '../../../src/server/pieces.js'
+import {
+  readAppliedChanges,
+  readAuthorContext,
+  readConversation,
+  readPiece,
+  readStoryContext,
+  writeConversation,
+  writePieceCast,
+  writeStoryContext,
+} from '../../../src/server/store/index.js'
+import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
+import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
+import { durableContextSchema } from '../../../src/shared/durableContext.js'
+import {
+  CommentaryNotFoundError,
+  ParticipantNotFoundError,
+  RecommendationNotFoundError,
+  Room,
+  RoomBusyError,
+  type RoomEvent,
+} from '../../../src/server/room/room.js'
+import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
+import { buildTestRoom } from '../../support/room.js'
+
+const fixtureMode: ModeDescriptor = {
+  id: 'flash',
+  name: 'Flash',
+  cast: [
+    { id: 'shape', attendsTo: 'x', defect: 'y' },
+    { id: 'compression', attendsTo: 'x', defect: 'y' },
+  ],
+}
+
+const fixtureRoles = [
+  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
+  { id: 'compression', handle: 'compression', displayName: 'Compression', roleDescription: 'y' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'z' },
+]
+
+function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureBehavior>>): { room: Room; adapter: FixtureModelAdapter } {
+  const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
+  const modelAccess = adapter
+  const room = buildTestRoom(dataRoot, { mode: fixtureMode, roles: fixtureRoles, modelAccess })
+  return { room, adapter }
+}
+
+describe('Room', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('refuses a second round while one is in flight for the same piece', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+
+    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'another message', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('SPEC "Model access": refuses a round for a second piece while one is in flight, since no runtime holds more than one call', async () => {
+    const cups = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, cups.id, 'c1', 'a message', 'draft text')
+
+    await expect(room.startRound(workspaceDir, other.id, 'c2', 'a message', 'draft text')).rejects.toThrowError(
+      new RoomBusyError(cups.id),
+    )
+    expect(room.snapshot(other.id)).toBeUndefined()
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('CONTEXT "Round": opens a round with no author message, reading nothing for addressing and calling the enabled cast', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text')
+    await settlementOf(room, piece.id)
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.rounds[0]?.message).toBeUndefined()
+    expect(conversation?.rounds[0]?.addressed).toEqual([])
+    expect(conversation?.rounds[0]?.participants).toHaveLength(3)
+    expect(adapter.promptFor('shape')).not.toContain("Author's message")
+  })
+
+  it('closes the round as failed, naming the failure, when the conversation on disk cannot be read', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    mkdirSync(path.join(workspaceDir, piece.id, 'conversations'), { recursive: true })
+    writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'c1.json'), '{ "id": 7 }', 'utf8')
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    await room.settlement(piece.id)
+
+    expect(events.map((event) => event.type)).toEqual(['round.opened', 'error', 'round.closed'])
+    const failure = events.find((event) => event.type === 'error')
+    expect(failure?.data).toMatchObject({ code: 'CONVERSATION_UNREADABLE' })
+    const closed = events.find((event) => event.type === 'round.closed')
+    expect(closed?.data).toMatchObject({ outcome: 'failed' })
+
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
+  it('owns the round\'s own collapse: a seam that throws instead of failing closes the round and is stated, not rethrown into nothing', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const broken: ModelAccess = {
+      call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
+      status: () => Promise.resolve({ reachable: true, models: [] }),
+    }
+    const room = buildTestRoom(dataRoot, { mode: fixtureMode, roles: fixtureRoles, modelAccess: broken })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+
+    await expect(settlementOf(room, piece.id)).resolves.toBeUndefined()
+
+    expect(events.map((event) => event.type)).toEqual(['round.opened', 'error', 'round.closed'])
+    expect(events.find((event) => event.type === 'error')?.data).toMatchObject({
+      code: 'UNEXPECTED_FAILURE',
+      message: 'the seam broke in a way nothing named',
+    })
+    expect(events.find((event) => event.type === 'round.closed')?.data).toMatchObject({ outcome: 'failed' })
+
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    expect(readConversation(workspaceDir, piece.id, 'c1', conversationSchema)).toBeUndefined()
+  })
+
+  it('creates the conversation file only once the first round has settled, not before', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } }, held: true },
+    })
+
+    const { conversationId, roundId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    expect(readConversation(workspaceDir, piece.id, conversationId, conversationSchema)).toBeUndefined()
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settled
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.id).toBe('c1')
+    expect(conversation?.rounds).toHaveLength(1)
+    expect(conversation?.rounds[0]?.id).toBe(roundId)
+    expect(conversation?.rounds[0]?.outcome).toBe('settled')
+  })
+
+  it('calls the enabled cast, then the Story Editor, on a round that names no one', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } }, held: true, states: ['working'] },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true, states: ['working'] },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true, states: ['working'] },
+    })
+
+    const events: string[] = []
+    room.subscribe(piece.id, (event) => {
+      if (event.type === 'round.opened') events.push(`opened:${event.data.participants.join(',')}`)
+      if (event.type === 'participant.state') events.push(`state:${event.data.participantId}:${event.data.state}`)
+      if (event.type === 'participant.settled') events.push(`settled:${event.data.participantId}`)
+      if (event.type === 'round.closed') events.push(`closed:${event.data.outcome}`)
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    expect(events[0]).toBe('opened:shape,compression,story-editor')
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settled
+
+    expect(events[events.length - 1]).toBe('closed:settled')
+    for (const participantId of ['shape', 'compression', 'story-editor']) {
+      expect(events.indexOf(`state:${participantId}:working`)).toBeLessThan(events.indexOf(`settled:${participantId}`))
+    }
+  })
+
+  it('durably enables a specialist that was addressed but not part of the enabled cast', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writePieceCast(workspaceDir, piece.id, ['compression'])
+
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    adapter.release('shape')
+    await settled
+
+    const updated = readPiece(workspaceDir, piece.id)
+    expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.brought).toEqual(['shape'])
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[0]?.brought).toEqual(['shape'])
+  })
+
+  it('leaves `brought` empty when addressing names only specialists already in the cast', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', '@shape a direct question', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    adapter.release('shape')
+    await settled
+
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.brought).toEqual([])
+  })
+
+  it('UX_DESIGN "Every specialist call failed... that call fails too": settles and persists a round with nothing in it at all, without ever emitting an error event', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
+      compression: { result: { outcome: 'failed', reason: 'unreachable' } },
+      'story-editor': { result: { outcome: 'failed', reason: 'nonconforming', returned: 'not json' } },
+    })
+
+    const events: string[] = []
+    room.subscribe(piece.id, (event) => {
+      events.push(event.type)
+    })
+
+    const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    await settlementOf(room, piece.id)
+
+    expect(events).not.toContain('error')
+    expect(events[events.length - 1]).toBe('round.closed')
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.rounds[0]?.outcome).toBe('settled')
+    expect(conversation?.rounds[0]?.participants).toHaveLength(3)
+  })
+
+  it('persists an abandoned round to the conversation file rather than skipping the write', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+    })
+
+    const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+    const settled = settlementOf(room, piece.id)
+    room.abandon(piece.id)
+    await settled
+
+    const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
+    expect(conversation?.rounds[0]?.outcome).toBe('abandoned')
+  })
+})
+
+function conversationWithRecommendation(): Conversation {
+  return {
+    id: 'c1',
+    rounds: [
+      {
+        id: 'r1',
+        message: 'does the opening earn its length',
+        addressed: [],
+        brought: [],
+        outcome: 'settled',
+        participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } }],
+      },
+    ],
+  }
+}
+
+describe('Room.apply', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-apply-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('produces the manuscript the model returned, calling no participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'The cups sat where she left them, twice.')
+
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.manuscript).toBe('The cups sat where she left them.')
+    expect(adapter.promptFor('shape')).toBeUndefined()
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+    expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
+  })
+
+  it('carries the recommendation and the author\'s constraint, verbatim, into the call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
+    })
+
+    await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', 'keep the last line', 'draft text')
+
+    expect(adapter.promptFor('apply')).toContain('cut the second paragraph')
+    expect(adapter.promptFor('apply')).toContain('keep the last line')
+    expect(adapter.promptFor('apply')).toContain('draft text')
+  })
+
+  it('refuses when no such applicable suggestion stands at that identity', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(room.apply(workspaceDir, piece.id, 'c1', 'r1', 'compression', undefined, 'draft')).rejects.toThrowError(
+      RecommendationNotFoundError,
+    )
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
+  it('refuses to apply while a round is in flight for the same piece', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c2', 'a message', 'draft text')
+
+    await expect(room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('refuses to open a round while an application is in flight', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+    })
+
+    const applying = room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft')
+
+    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('apply')
+    await applying
+  })
+
+  it('resolves as abandoned, and leaves the recommendation applicable, when abandoned mid-call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+    })
+
+    const applying = room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    room.abandon(piece.id)
+    await expect(applying).resolves.toEqual({ outcome: 'abandoned' })
+
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    adapter.release('apply')
+    const second = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    if (second.outcome !== 'value') throw new Error('expected the second application to settle')
+    expect(second.value.manuscript).toBe('revised')
+  })
+
+  it('changes nothing on a failed call, and leaves the recommendation applicable', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'failed', reason: 'unconfigured' } },
+    })
+
+    const failed = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
+    expect(failed).toEqual({ outcome: 'failed', reason: 'unconfigured' })
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
+  })
+
+  it('persists the change a settled call actually made, naming the response it came from', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'The cups sat where she left them, twice.')
+
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.change).toMatchObject({ roundId: 'r1', participantId: 'shape' })
+
+    const [onDisk] = readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)
+    expect(onDisk).toEqual(result.value.change)
+  })
+
+  it('carries no change where the application returned the manuscript unchanged', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'unchanged text' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'unchanged text')
+
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.change).toBeUndefined()
+    expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([])
+  })
+})
+
+describe('Room.capture', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-capture-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('gives each of the model\'s proposals an identity, calling no participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: {
+        result: {
+          outcome: 'value',
+          value: { proposals: [{ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }] },
+        },
+      },
+    })
+
+    const result = await room.capture(workspaceDir, piece.id, 'c1', 'The cups sat where she left them.')
+
+    if (result.outcome !== 'value') throw new Error('expected the capture to settle')
+    expect(result.value.proposals).toEqual([
+      { id: expect.any(String), destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+    ])
+    expect(adapter.promptFor('shape')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+  })
+
+  it('carries the draft and the conversation into the call, and reads an absent conversation as no history', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } } },
+    })
+
+    await room.capture(workspaceDir, piece.id, 'c1', 'The cups sat where she left them.')
+    expect(adapter.promptFor('capture')).toContain('The cups sat where she left them.')
+    expect(adapter.promptFor('capture')).toContain('cut the second paragraph')
+
+    await room.capture(workspaceDir, piece.id, 'c2', 'text')
+  })
+
+  it('refuses while a round is in flight for the same piece', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
+
+    await expect(room.capture(workspaceDir, piece.id, 'c1', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+  })
+
+  it('refuses to open a round while a capture is in flight', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+
+    await expect(room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')).rejects.toThrowError(RoomBusyError)
+
+    adapter.release('capture')
+    await capturing
+  })
+
+  it('resolves as abandoned, and frees the room, when abandoned mid-call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    room.abandon(piece.id)
+    await expect(capturing).resolves.toEqual({ outcome: 'abandoned' })
+
+    expect(room.snapshot(piece.id)).toBeUndefined()
+    adapter.release('capture')
+  })
+
+  it('reports a failed call as failed, proposing nothing', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {
+      capture: { result: { outcome: 'failed', reason: 'unconfigured' } },
+    })
+
+    const result = await room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+})
+
+describe('Room.approveCapture', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-approve-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    chmodSync(workspaceDir, 0o700)
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('writes an approved proposal to the destination it names, and nothing to the other', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+    ])
+
+    expect(outcome).toEqual({ written: ['storyContext'], failures: [] })
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
+  })
+
+  it('writes both destinations in one call when proposals approve both', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+      { id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' },
+    ])
+
+    expect(outcome.written.sort()).toEqual(['authorContext', 'storyContext'])
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
+  })
+
+  it('reads the context fresh rather than from anything the capture call saw, so a hand edit in between is not overwritten', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeStoryContext(workspaceDir, piece.id, { Premise: ['an old premise'] })
+    const { room } = buildRoom(dataRoot, {})
+
+    await room.approveCapture(workspaceDir, piece.id, [
+      { id: 'p1', destination: 'storyContext', section: 'Voice', operation: 'add', text: 'wry and close' },
+    ])
+
+    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({
+      Premise: ['an old premise'],
+      Voice: ['wry and close'],
+    })
+  })
+
+  it('SPEC "Context capture": keeps the destination that succeeded when the other write fails, naming which one', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+    chmodSync(path.join(workspaceDir, piece.id), 0o500)
+
+    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+      { id: 'p1', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' },
+      { id: 'p2', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups' },
+    ])
+
+    expect(outcome.written).toEqual(['authorContext'])
+    expect(outcome.failures).toHaveLength(1)
+    expect(outcome.failures[0]?.destination).toBe('storyContext')
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
+
+    // `rmSync` at cleanup cannot unlink inside a directory it has no write permission on.
+    chmodSync(path.join(workspaceDir, piece.id), 0o700)
+  })
+
+  it('refuses for a piece that does not exist', async () => {
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(room.approveCapture(workspaceDir, 'no-such-piece', [])).rejects.toThrowError(PieceNotFoundError)
+  })
+})
+
+function conversationWithCommentary(): Conversation {
+  return {
+    id: 'c1',
+    rounds: [
+      {
+        id: 'r1',
+        message: 'does the opening earn its length',
+        addressed: [],
+        brought: [],
+        outcome: 'settled',
+        participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'The entry is late.', note: 'By a paragraph.' } }],
+      },
+    ],
+  }
+}
+
+describe('Room.startRound — a round the author opened from a particular response', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('replying addresses the named participant by the act, reading the message for nothing', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    await room.startRound(workspaceDir, piece.id, 'c1', 'say more about that, @compression', 'draft text', { kind: 'targeted', target: 'shape' })
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('shape')).toContain('say more about that, @compression')
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[0]?.addressed).toEqual(['shape'])
+    expect(conversation?.rounds[0]?.message).toBe('say more about that, @compression')
+  })
+
+  it('replying to an unknown participant is refused, not opened against nobody', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(
+      room.startRound(workspaceDir, piece.id, 'c1', 'a reply', 'draft text', { kind: 'targeted', target: 'no-such-participant' }),
+    ).rejects.toThrowError(ParticipantNotFoundError)
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
+  it('asking for a concrete change opens a round with no message, calling only the response\'s own participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithCommentary())
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the aside' } } },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text', {
+      kind: 'ask',
+      respondingTo: { roundId: 'r1', participantId: 'shape' },
+      clarification: 'what would you cut',
+    })
+    await settlementOf(room, piece.id)
+
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.participants).toEqual(['shape'])
+    expect(opened?.type === 'round.opened' && opened.data.message).toBeUndefined()
+
+    expect(adapter.promptFor('shape')).toContain('The entry is late.')
+    expect(adapter.promptFor('shape')).toContain('what would you cut')
+    expect(adapter.promptFor('shape')).not.toContain("Author's message")
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[1]?.message).toBeUndefined()
+    expect(conversation?.rounds[1]?.respondingTo).toEqual({ roundId: 'r1', participantId: 'shape' })
+    expect(conversation?.rounds[1]?.clarification).toBe('what would you cut')
+  })
+
+  it('refuses where no commentary stands at the named response', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithCommentary())
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(
+      room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text', {
+        kind: 'ask',
+        respondingTo: { roundId: 'r1', participantId: 'compression' },
+        clarification: undefined,
+      }),
+    ).rejects.toThrowError(CommentaryNotFoundError)
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+})
+
+function settlementOf(room: Room, pieceId: string): Promise<void> {
+  const settlement = room.settlement(pieceId)
+  if (settlement === undefined) throw new Error(`no round in flight for "${pieceId}"`)
+  return settlement
+}

@@ -45,8 +45,11 @@ projection of round state.
 **Not Electron** — a localhost URL is sufficient, and packaging is a cost with no return here.
 **No database** — everything a piece needs is in the piece's directory.
 
-Client state is a small event-fed store. This is a local event-stream application; modelling
-it as remote data fetching would be a category error.
+Client state is fed by the event stream rather than fetched. This is a local event-stream
+application; modelling it as remote data fetching would be a category error. The shape that
+satisfies it is a hook per concern over React's own state, with the round's accumulation held in
+a pure reducer the hook feeds events to — a store library would be a second state authority
+above the one the framework already supplies.
 
 **`pino` is the logger, and it writes to stderr and nowhere else.** No file transport, no log directory
 and no second destination, so nothing the logger emits outlives the process — which is what makes the
@@ -79,7 +82,7 @@ reasoning, and it is not repeated.
 | Capability | Package |
 |---|---|
 | Language, client framework, client build | `typescript`, `react`, `vite` |
-| HTTP server and routing | `hono`, served by `@hono/vite-dev-server`, or by `@hono/node-server` where Deployment's streaming contingency applies |
+| HTTP server and routing | `hono`, served by `@hono/vite-dev-server` |
 | Request body validation at a route | `@hono/zod-validator` |
 | SSE framing on the server | `hono`'s `streamSSE` |
 | SSE on the client | the platform's `EventSource` |
@@ -91,19 +94,27 @@ reasoning, and it is not repeated.
 | Timeout, and composing it with the author's abandon signal | the platform's `AbortSignal.timeout` and `AbortSignal.any` |
 | Prose editor | `@tiptap/*` over `prosemirror-*` |
 | Markdown parsing and serialization | `prosemirror-markdown` |
+| The document model `prosemirror-markdown` parses into and serializes from | `prosemirror-model` |
+| The tokenizer `prosemirror-markdown`'s parser is constructed with | `markdown-it` |
 | Before-and-after comparison of two manuscript states | `diff` |
 | Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
-| Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
-| Formatting when a conversation was last active | `date-fns` |
-| Holding the conversation at its latest response | `use-stick-to-bottom` |
-| Client store fed by the event stream | `zustand` |
+| The prose and interface typefaces | latin-subset `woff2` under `src/client/fonts/`, in this repository |
+| The combobox behind inline handle completion | `@ariakit/react` |
+| Relative time — when a conversation was last active, when a piece last changed | `date-fns` |
 | Conversation and change identifiers | `nanoid` |
 | Piece directory slugs | `@sindresorhus/slugify` |
 | Story length | the platform's `Intl.Segmenter` |
 | Logging | `pino` |
 | Model runtime | `@lmstudio/sdk` |
 | Test runner | `vitest` |
+| A DOM for tests that need one, without a browser | `jsdom` |
+| Rendering a hook or a surface under that DOM | `@testing-library/react` |
 | Browser tests | `@playwright/test` |
+
+**The roster names capabilities, not every line of `package.json`.** A package named here brings with
+it the type declarations it does not ship (`@types/*`) and the piece it is unusable without — `react-dom`
+under `react`, `@vitejs/plugin-react` under `vite` — and nothing further. Anything installed that is
+neither an entry above nor one of those is a document change argued here first.
 
 Several entries carry a constraint on how they are used.
 
@@ -127,11 +138,36 @@ substrate — the two themes, the three type registers, the rules and the marks 
 Modules. Nothing supplies appearance from a package, and the values are read from the mockup rather
 than reinvented beside it.
 
+**The typefaces are files in this repository.** Spectral for the prose and Public Sans for the
+interface travel with the application as latin-subset `woff2` under `src/client/fonts/`, declared in
+`tokens.css` and served by the app. The mockup gets them from a Google Fonts `<link>`, which is mockup
+scaffolding: VISION "Local, and fully usable offline" rules out a runtime network fetch, and a font
+that fails to arrive leaves the author on a face nobody chose. Only the weights the mockup's own
+request names are carried — Spectral 300/400/500/600 and 400 italic, Public Sans 400/500/600 — since
+the geometry in the CSS modules was settled against those metrics. Both faces are OFL and the licences
+sit beside them.
+
+**The facts register composes on the platform's own monospace stack**, and names no face. It is the
+register the machine speaks in, where the local terminal face is the right voice and a shipped one
+would be a change to the composition rather than a fix to it. This is the one register whose face the
+browser chooses, and it is chosen deliberately.
+
 **`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
 is the condition of adopting it: a library carrying its own look would compete with the registers the
-interface is composed in. It is taken for the dialog's focus management and for the combobox that
-offers handles as the author types one — the completion surface only, since which participants a
-message addressed stays the room's reading of the text as stated above.
+interface is composed in. It is taken for the combobox that offers handles as the author types one —
+the completion surface only, since which participants a message addressed stays the room's reading of
+the text as stated above. It is taken for nothing else: the interface has no dialog, so the focus
+management that would otherwise be the second reason to carry it is unused.
+
+**Where a model must be named, the model is chosen from the runtime's reported models rather than
+typed.** `GET /models` already carries them, so an author who has to type an identifier by hand is
+being asked for something the application knows: one character wrong is a call site that fails as
+unconfigured at the next round, discovered minutes later. It is a closed choice over what the runtime
+holds, plus whatever the site is already assigned — an assignment the runtime no longer reports stays
+offered and stays selected, so a model that is merely not loaded right now is never silently dropped
+from a site the author configured. That is the whole of what a free-text field would have bought, and a
+closed choice cannot be got wrong by a keystroke. The platform's own `<select>` is what this shape is,
+so `@ariakit/react`'s entry above does not widen to cover this surface.
 
 The container image and the base it is built on are Deployment's rather than this table's: they are
 how the application is run and not something it depends on to work.
@@ -145,21 +181,21 @@ over exactly the document model this needs. ProseMirror remains underneath, so t
 level control is available where the application genuinely needs it.
 
 **The document schema is constrained to what round-trips through Markdown semantically.** The
-manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them, and
-thematic breaks where a piece marks a scene division. Lists, tables, block quotes, links, images,
+manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them,
+thematic breaks where a piece marks a scene division, and hard line breaks where a piece holds two
+lines apart inside one paragraph. Lists, tables, block quotes, links, images,
 inline code, raw HTML and front matter are not in the schema, and Markdown source offering one of
 them is read as the prose it contains rather than refused — a story the author brought from
 elsewhere opens.
 Perfect preservation of every syntactically equivalent Markdown spelling is not a requirement;
 preserving meaning is.
 
-**Markdown fidelity is validated before it is depended on.** TipTap's Markdown support is the
-one part of this choice that has to be proven rather than assumed, so it is exercised against
-the real schema early. If it proves inadequate, `prosemirror-markdown` replaces that extension
-over the same constrained schema, without disturbing anything else. That replacement is a
-node-and-mark spec table rather than a parser: the constrained schema is a subset of the document
-that package already serializes, so the work is configuration, and nothing here reads or emits
-Markdown by hand under any outcome.
+**Markdown is `prosemirror-markdown`'s over the constrained schema, not TipTap's.** This was the
+one part of the editor choice that had to be proven rather than assumed, and exercising it early is
+what settled it: the parser and serializer are configured directly against the schema, from a
+node-and-mark spec table with `markdown-it` as the tokenizer. The constrained schema is a subset of
+the document that package already serializes, so this is configuration rather than a parser, it
+disturbs nothing else in the editor integration, and nothing here reads or emits Markdown by hand.
 
 **The rendered view and the Markdown source view are two editing views over the same
 manuscript.** How representation switching is implemented is left to the editor integration;
@@ -210,6 +246,13 @@ the workspaces rather than inside any of them.
         <change-id>.json       the passages one application changed, before and after
 ```
 
+**This layout is the store boundary's, and only its.** Every artifact above is reached by asking for
+the artifact — a piece's metadata, a piece's draft, the settings file — never by handing the store a
+path, so no module outside it composes one, and moving a file is one edit inside the boundary rather
+than a search across the modules that happened to read it. The workspace directory is the one
+exception, because the author names it and it is afterwards the root every piece is addressed
+against; the boundary is what resolves it and what refuses one that escapes.
+
 The workspace the author names is rejected unless it lands inside the data root. The data root
 itself is never asked for, because whoever ran the application already said where it is — and
 config living under it rather than in a per-user home directory is what makes the author's
@@ -226,7 +269,9 @@ absent key means the author has not chosen, which is a different thing from a va
 supplied on their behalf, and it is why nothing writes one until they pick.
 
 Shipped data travels with the application in three kinds: the participant charter, the role
-definitions, and the mode descriptors. The charter is what every participant is told whichever one it
+definitions, and the mode descriptors. It sits beside the application's own source rather than under
+the data root, and where exactly is the store boundary's like the rest of the layout: the modules
+that read modes, roles and the charter state what each must contain and never where it is. The charter is what every participant is told whichever one it
 is — what the three outcomes mean and what makes a recommendation applicable rather than commentary,
 that a direct question is owed an answer, and that nothing reasons about the author's question
 instead of about the story. It is its own kind because repeating it inside every role definition
@@ -352,6 +397,17 @@ the unwritten state stays in memory, the failure is stated where the author can 
 stays stated until it clears, the next ordinary write retries it, and nothing resolves it
 optimistically.
 
+**The notice claims no retry, because none is scheduled.** The retry rides the next ordinary write,
+so a notice promising one describes behaviour the client does not have: an author who reads it and
+stops typing is never written. The notice carries the moment the write failed — one that persists
+cannot otherwise be told from one that arrived a second ago — and what came back from the write, in
+the facts register rather than inside the sentence about the author's prose.
+
+**Leaving the piece is refused while a draft write is failing**, and refused rather than confirmed.
+The control that leaves cannot be operated, the notice is the single place that says why and names
+the manuscript it is holding, and the next write that succeeds makes leaving available again. Nothing
+asks the author to confirm discarding anything, and the manuscript stays editable throughout.
+
 ## Model access
 
 **One narrow internal interface for every model call**, and every call in the product goes
@@ -372,7 +428,7 @@ CallResult<T> =
   | { outcome: 'abandoned' }
   | { outcome: 'failed';    reason: FailureReason; returned?: string }
 
-FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'nonconforming'
+FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
 ```
 
 **Three outcomes, and they are three types.** A value, an abandonment, and a failure carrying which
@@ -424,9 +480,16 @@ composition then owes.
 
 **The failure taxonomy is the product's.** No status code, runtime error class or SDK exception type
 crosses the boundary. A call fails because there is no assignment for that call site, because the
-runtime could not be reached or the model could not be served, because the configured wait elapsed, or
-because the answer could not be made to conform — and each of those means something different to the
-author or to the room.
+runtime could not be reached or the model could not be served, because the configured wait elapsed,
+because what came back was not the structure it was asked for at all, or because it was that structure
+and still did not conform — and each of those means something different to the author or to the room.
+
+**A malformed answer and a nonconforming one are two reasons, not one.** Text that is not the
+requested structure says the runtime is not honouring the constraint it was given — the wrong model,
+or one whose reasoning ran into the answer — while a value that parsed and then failed the schema says
+the model understood the shape and got the content wrong. The first is a setup the author can fix and
+the second is a model that is too weak for the role, so collapsing them would leave the author reading
+one message for two different problems.
 
 **Abandonment is its own outcome and is not in that taxonomy.** The room records an abandoned
 participant as abandoned rather than as failed: conflating them would tell the author their model broke
@@ -520,12 +583,20 @@ writing through a round is load-bearing rather than a nicety.
 **This is the seam the central bet lives in.** Everything else in the orchestration is
 plumbing.
 
-A call is assembled from three things the runtime holds, none of which is an intrinsic property
+A call is assembled from four things the runtime holds, none of which is an intrinsic property
 of the participant:
 
 ```
-role definition + model configuration + selected context compilation policy → participant call
+role definition + the mode's criteria for that participant + model configuration
+  + selected context compilation policy → participant call
 ```
+
+**The mode's criteria are named here because they are what make the specialists differ.** CONTEXT
+"Mode" has a mode supplying the criteria each specialist applies at that scale — what it attends to
+and the defect it is alert to — and a compilation that dropped them would separate four participants
+by one sentence of role description each, which is not the room the bet describes. The Story Editor
+has no such criteria, being no part of the cast, and is told what it is for by its role definition
+instead.
 
 ```
 compileContext(call, piece, conversation, policy) → Context
@@ -778,10 +849,27 @@ a frame around one.**
 | Event | Carries |
 |---|---|
 | `round.opened` | The conversation, the author's message verbatim, the participants called |
-| `participant.state` | Participant, and whether it is waiting for its call, having its model prepared, or working |
+| `participant.state` | Participant, and whether it is having its model prepared or working |
 | `participant.settled` | Participant, its response and outcome, or its failure |
-| `round.closed` | How it ended — settled or abandoned |
+| `round.closed` | How it ended — settled, abandoned, or failed |
 | `error` | A room failure belonging to no participant, in terms the author can act on |
+
+**An event names a participant by its identity and never by its display name.** A name is roster
+data, it is the same for every round, and putting it on every frame would make the stream a second
+place a participant's name is stated — one that would go stale the moment a role definition was
+edited and reloaded. The client resolves names through the roster, and the surface a round is drawn on
+does not render until the roster has landed, so there is no window in which a round could be drawn in
+identities.
+
+**A participant waiting for its call is the projection's, not the stream's.** The opened event already
+names every participant the round will call, so waiting is what a named participant that has neither
+reported a state nor settled *is* — deriving it costs a line and emitting it would be an event per
+participant carrying nothing the client did not already have.
+
+**A round closes as failed where the room itself failed**, distinctly from a round the author
+abandoned and from one that settled with failures inside it: a participant's failure is a response the
+author reads, while a room failure is the round not having happened. The close is accompanied by an
+`error` frame, which is where the reason is, so the outcome stays a single word.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the response envelope is the shape of a reply to a request, and a frame on a stream is not
@@ -856,6 +944,8 @@ GET    /pieces/:id/events                          SSE
 PUT    /author-context
 GET    /workspace                                  the configured directory, or that there is none
 PUT    /workspace                                  the directory the author chose
+GET    /theme                                      the author's chosen appearance, or that they have not chosen
+PUT    /theme                                      the appearance the author chose
 GET    /call-sites                                 every site, its role description where it has one,
                                                    and its current assignment
 PUT    /call-sites/:site/assignment                the model assigned to one site
@@ -947,12 +1037,12 @@ not tested, and packaging a build to serve a page to a browser on the same machi
 That the studio's daily arrangement includes a development server is a consequence worth naming rather
 than hiding.
 
-**Streaming through that server is proven early, for the same reason Markdown fidelity is.** It is the
+**Streaming through that server is proven, for the same reason Markdown fidelity was.** It was the
 one part of this arrangement the product depends on and does not control: a round's events reach the
 client as server-sent events, and a dev server that buffered them would break the surface the author
-watches a round in. Where it cannot be made to stream, the Hono application is served by an ordinary
-Node adapter and the client build is served beside it — which costs the reload behaviour above and
-nothing else.
+watches a round in. It streams, held there by a test that puts frames through the real dev server
+rather than through a mock of it, so the contingency of serving the Hono application from an ordinary
+Node adapter beside a client build is not taken and its adapter is not on the roster.
 
 **The model runtime stays on the host.** Docker Desktop passes no GPU through on macOS, so a model
 served from inside the container would answer from the CPU and the room would be too slow to consult —
@@ -976,6 +1066,14 @@ image ships none of them with a value.**
 Compose supplies each one explicitly. An absent or malformed value is a startup failure naming it,
 because a deployment value defaulted in an image is a value nobody chose and the author would be the
 one to discover it.
+
+**What counts as malformed is settled where the value is used, not where it is read.** The
+environment loader knows that the runtime URL is a URL and nothing further: which schemes actually
+reach the runtime is the model module's fact, so the model module validates what it is handed before
+it calls anything, and states the failure naming the variable. The alternative is an environment
+loader that names a transport, and a plausible wrong value — the port LM Studio's own interface shows,
+written with `http://` in front of it — that passes startup validation and then exits with a vendor
+stack trace.
 
 **The container runs as a non-root user**, and Docker Desktop's file sharing maps ownership so the
 prose it writes is prose the author can edit, commit and diff on the host. A studio whose output the
@@ -1009,8 +1107,13 @@ Two are load-bearing and the rest of the orchestration is internal.
 | **model** | a call site, a prompt, a schema and an abort signal in; a conforming value, an abandonment, or a stated failure out | the LM Studio implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
 Two further interfaces are expected and useful without being doctrine. A **store** boundary
-concentrates atomic writes and artifact access, and gives tests an in-memory implementation. A
-**room** boundary owns the operations the author starts — start one, abandon the current one,
+concentrates atomic writes and artifact access, and owns the file layout "Files" draws: its entry
+points name artifacts — the settings file, a piece's metadata, a piece's draft, the three kinds of
+shipped data — so no module above it composes a path or holds a file handle, and containment against
+the workspace root is part of that ownership rather than a check a caller remembers to make. It is
+not a seam tests substitute: they cross the real implementation against a temporary directory, which
+is the real thing, and a second implementation with no variation behind it would be a premature seam
+asserting nothing. A **room** boundary owns the operations the author starts — start one, abandon the current one,
 subscribe to its events — which is already the client's contract, so tests and the client cross the
 same surface.
 
@@ -1020,6 +1123,13 @@ each would leave three shallow modules agreeing about state none of them owns �
 produces a capture starting during an application. It is also what keeps every route a one-line
 adapter, since a route that decided whether an operation may start would be a route with a decision
 in it.
+
+**`src/shared/` is deliberately not a seam.** It is a real contract — it is what makes the server's
+response shapes and the client's expectations one set of types rather than two that drift — but a
+contract with one possible implementation is not a boundary anything could be substituted at, and
+declaring it one would invite an adapter with nothing on the other side of it. What it owes is
+independence rather than substitutability: nothing in it may import from either side, which is a
+property of the import graph and is asserted there.
 
 Behind those, the round loop, the application call, the capture call, the lock, the state machine,
 per-call abort, the tolerant parser and the role registry are internal, with one implementation
@@ -1051,6 +1161,12 @@ satisfy a check that was meant to catch its absence.
 **Vitest**, sharing the client's transform pipeline so there is no second configuration, with
 the editor's document tested headless.
 
+**A DOM without a browser where a hook or a surface is the boundary**, through `jsdom` and
+`@testing-library/react`, per-file rather than as the suite's environment: the server and the pure
+rules are the larger part of the suite and have no use for one. It is for what the component itself
+decides — a control refused, a field that arrives on an action, what a notice says — and not for what
+only the running application settles, which is the browser tests' few purposes below.
+
 **The boundaries are the test surface.** Each property is asserted at exactly one of them, and
 nowhere twice — a rule asserted at two levels is a rule that will be changed at one.
 
@@ -1059,17 +1175,31 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | **context** | no specialist's compiled context contains another specialist's response from the round being formed, under either history policy; every specialist context is compiled before the round's first call is issued; the Story Editor's contains the round's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
 | **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
-| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
-| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; the reading view preserves position |
+| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
+| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
 | **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
 
 **A small number of browser tests over the fixture implementation**, and the count is a ceiling on
-purpose. Several guarantees live at the integration of editor, state and interface where no
-single seam can prove them: that typing stays possible while a round lands, that the manuscript
-is read-only while an application is in flight and editable the moment it settles, that applying
-a recommendation changes the visible manuscript, that the editor's undo restores it, that
-switching between the rendered and Markdown views preserves the manuscript, that the reading
-view restores position, and that abandoning a round updates the conversation.
+purpose. A browser earns a test only where the thing that can break is a browser: real layout, real
+keystrokes, and the surface reacting to a state a real stream delivered. Where a hook or a component
+can state the property against a modelled DOM, it owns it and the browser does not repeat it.
+
+- Typing stays possible while a round lands, with the keystrokes reaching the editor while the
+  stream is delivering.
+- Applying a recommendation changes the visible manuscript; the manuscript is read-only for the
+  duration and editable the moment it settles; and the editor's own undo keystroke restores it.
+- The reading view restores position against real layout, where the element the browser scrolls and
+  the moment it has a height are the browser's to decide and not the test's to model.
+
+Beside them, one journey through the deployed arrangement — naming a workspace, making a piece,
+writing prose and finding it still there after a reload — because nothing below the browser can say
+that the parts were assembled at all.
+
+The three above need the studio answering from the fixture model implementation rather than from a
+runtime, which is its own way of standing the studio up: a second Vite configuration that substitutes
+the fixture at the model seam and nothing else, so the arrangement under test is the real one down to
+that boundary. It is a development entry point and not a mode of the application — nothing shipped
+reads it, nothing branches on it, and a test in the import graph holds it that way.
 
 **No screenshot regression farm and no browser test per response state.** How the interface composes
 under lopsided and late responses is design work judged against the mockup, not a thing tests

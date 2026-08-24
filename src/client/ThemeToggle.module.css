@@ -1,0 +1,24 @@
+.group {
+  display: flex;
+  gap: 7px;
+  flex: none;
+}
+
+.toggle {
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink3);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--ink);
+}
+
+.toggle[aria-pressed='true'] {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
