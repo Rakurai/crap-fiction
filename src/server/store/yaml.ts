@@ -6,14 +6,6 @@ import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
 import { firstSchemaIssue } from '../schemaIssue.js'
 
-/**
- * The persistence boundary's inner layer: reading and writing one artifact at a
- * path, and the tolerances a hand-edited file gets on the way in. Everything
- * here takes a path, which is why none of it is the boundary's interface —
- * `./index.js` is, and it names artifacts. Nothing outside `src/server/store/`
- * imports this file.
- */
-
 export class TolerantReadError extends Error {
   constructor(file: string, entry: string, reason: string) {
     super(`${file}: ${entry}: ${reason}`)
@@ -28,17 +20,7 @@ export class ShippedDataError extends Error {
   }
 }
 
-/**
- * SPEC "Files": the closed list of tolerances a hand-edited file gets, applied
- * to the parsed value before it reaches the schema. Everything else — a value
- * of the wrong kind, YAML that does not parse — is left for the schema to
- * reject as a stated failure. An unknown key needs no entry here: it is never
- * rejected by an unstrict object schema, and surviving a write is a property
- * of writeYamlArtifact operating on the parsed Document rather than of this
- * transform. `ZodDefault` is deliberately not unwrapped: a default is a value
- * the schema would supply, not one the tolerant reader is entitled to invent
- * in its place.
- */
+// `ZodDefault` is deliberately not unwrapped here.
 function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
   let core: z.core.$ZodType = schema
   let optionalSection = false
@@ -58,10 +40,6 @@ function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
     return items.map((item) => tolerate(core.element, item))
   }
 
-  // A record's keys are the author's own, so every one of them is tolerated
-  // against the same value schema — which is how a scalar written where a
-  // section's list belongs reads as a one-item list in a file whose section
-  // names no schema knows in advance.
   if (core instanceof z.ZodRecord) {
     if (!isPlainObject(raw)) return raw
     const result: Record<string, unknown> = {}
@@ -88,13 +66,6 @@ function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
   return raw
 }
 
-/**
- * Reads a hand-editable YAML artifact through the tolerances SPEC's "Files"
- * section closes the list on, then validates. A missing file is a declared,
- * meaningful absence — `undefined` — never an empty object standing in for
- * one. Anything else wrong is a TolerantReadError naming the file and the
- * entry, never a value the author did not write.
- */
 export function readYamlArtifact<T>(filePath: string, schema: z.ZodType<T>): T | undefined {
   if (!existsSync(filePath)) return undefined
 
@@ -131,15 +102,6 @@ function setPaths(document: Document, prefix: readonly string[], values: Record<
   }
 }
 
-/**
- * Writes a hand-editable YAML artifact atomically: reads the existing
- * document when there is one and sets only the paths named in `values`,
- * which is what lets a comment, a key's order and a key the schema does not
- * know survive the write (SPEC "Files"). Callers name typed domain values to
- * write; the parsed document never crosses this interface. The temp file
- * lands beside the target, per `write-file-atomic`'s default, and nowhere
- * else.
- */
 export async function writeYamlArtifact(filePath: string, values: Record<string, unknown>): Promise<void> {
   const document = existsSync(filePath) ? parseDocument(readFileSync(filePath, 'utf8')) : new Document({})
   setPaths(document, [], values)
@@ -157,12 +119,6 @@ function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {
   return result.data
 }
 
-/**
- * Reads every `.yaml` file in `dir` as one shipped-data entry, validated
- * strictly against `schema`: the author never hand-edits shipped data, so
- * none of readYamlArtifact's tolerances apply, and invalid or absent shipped
- * data is a startup failure naming the file and the entry (SPEC "Files").
- */
 export function readYamlDirectory<T>(dir: string, schema: z.ZodType<T>): readonly T[] {
   const files = readdirSync(dir).filter((name) => name.endsWith('.yaml'))
   const items = files.map((name) => parseShippedYaml(path.join(dir, name), schema))
@@ -174,11 +130,6 @@ export function readYamlDirectory<T>(dir: string, schema: z.ZodType<T>): readonl
   return items
 }
 
-/**
- * Reads a single shipped-data file, validated strictly against `schema` on
- * the same terms as `readYamlDirectory`: an absent or invalid file is a
- * startup failure naming the file and the entry (SPEC "Files").
- */
 export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
   if (!existsSync(filePath)) {
     throw new ShippedDataError(filePath, '(file)', 'not found')
@@ -186,16 +137,11 @@ export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
   return parseShippedYaml(filePath, schema)
 }
 
-/**
- * Reads a plain-text artifact and the moment it was last written, in one
- * read, or `undefined` for a declared, meaningful absence.
- */
 export function readTextArtifact(filePath: string): { text: string; modifiedMs: number } | undefined {
   if (!existsSync(filePath)) return undefined
   return { text: readFileSync(filePath, 'utf8'), modifiedMs: statSync(filePath).mtimeMs }
 }
 
-/** Writes a plain-text artifact atomically, creating its directory if needed. */
 export async function writeTextArtifact(filePath: string, text: string): Promise<void> {
   mkdirSync(path.dirname(filePath), { recursive: true })
   await writeFileAtomic(filePath, text)
@@ -209,7 +155,6 @@ export function fileModifiedMs(filePath: string): number {
   return statSync(filePath).mtimeMs
 }
 
-/** The subdirectory names directly inside `dir`, or none if `dir` does not exist. */
 export function directoryNames(dir: string): readonly string[] {
   if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true })
@@ -217,7 +162,6 @@ export function directoryNames(dir: string): readonly string[] {
     .map((entry) => entry.name)
 }
 
-/** The file names directly inside `dir` ending in `suffix`, or none if `dir` does not exist. */
 export function fileNames(dir: string, suffix: string): readonly string[] {
   if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true })
@@ -225,13 +169,6 @@ export function fileNames(dir: string, suffix: string): readonly string[] {
     .map((entry) => entry.name)
 }
 
-/**
- * Reads a JSON artifact validated against `schema`, or `undefined` for a
- * declared, meaningful absence. Conversations are JSON rather than
- * hand-edited YAML (SPEC "Files"), so no tolerance applies here — anything
- * that fails to parse or validate is a stated `TolerantReadError` naming the
- * file and the entry, on the same terms as a corrupted YAML artifact.
- */
 export function readJsonArtifact<T>(filePath: string, schema: z.ZodType<T>): T | undefined {
   if (!existsSync(filePath)) return undefined
 
@@ -251,17 +188,11 @@ export function readJsonArtifact<T>(filePath: string, schema: z.ZodType<T>): T |
   return result.data
 }
 
-/** Writes a JSON artifact atomically, creating its directory if needed. */
 export async function writeJsonArtifact(filePath: string, value: unknown): Promise<void> {
   mkdirSync(path.dirname(filePath), { recursive: true })
   await writeFileAtomic(filePath, JSON.stringify(value, null, 2))
 }
 
-/**
- * Deletes one artifact. A file already gone is not this call's failure to
- * report — `force` leaves it silent, the same declared absence a read of it
- * would have reported.
- */
 export async function deleteFile(filePath: string): Promise<void> {
   await rm(filePath, { force: true })
 }

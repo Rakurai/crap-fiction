@@ -5,7 +5,6 @@ import type { assignModel as assignModelFn, fetchCallSites as fetchCallSitesFn, 
 import { useLoaded } from './load.js'
 import { failureMessage } from './request.js'
 
-/** The call-site roster's adapters, reached by whoever composes this hook rather than imported here. */
 export type CallSiteAdapters = Readonly<{
   fetchCallSites: typeof fetchCallSitesFn
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
@@ -25,19 +24,6 @@ export type CallSitesViewModel =
       readonly assign: (site: string, model: string) => void
     }
 
-/**
- * PRD "Assign models to participants": owns the call-site listing, the
- * runtime's reachability, and assigning one site at a time. A site being
- * saved is tracked by its own id rather than a single boolean, since the
- * one-at-a-time contract still allows a second row's assignment to be read
- * while the first is in flight.
- *
- * Readiness waits on both requests. It used to derive from the roster alone,
- * which meant every mount reported `ready` with the runtime still unknown — so
- * the models a row could offer were briefly empty for reasons the surface had no
- * way to distinguish from a runtime that is genuinely not running. An unreachable
- * runtime is still ready: it is an answer, and the banner is what says so.
- */
 export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
   const { fetchCallSites, fetchRuntimeStatus, assignModel } = adapters
   const [sites, setSites] = useLoaded(fetchCallSites, [])

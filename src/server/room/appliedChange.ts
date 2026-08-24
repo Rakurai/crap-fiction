@@ -2,24 +2,14 @@ import { diffWordsWithSpace, type Change } from 'diff'
 import type { AppliedChangeContent } from '../../shared/appliedChange.js'
 import { countWords } from '../../shared/storyLength.js'
 
-/** "A little prose around" a changed passage — enough to place it, never a paragraph's worth. */
 const CONTEXT_WORDS = 8
 
-/**
- * SPEC "Applying a recommendation": where a change touches most of the
- * manuscript, showing it as passages would mean showing most of the
- * manuscript — which is keeping a copy of the story under another name. Past
- * this fraction of either side's own words, the change counts as the whole
- * rather than as passages in it. SPEC states the two cases and leaves the
- * boundary between them to the implementation; this is that boundary.
- */
 const UNBOUNDED_FRACTION = 0.5
 
 function wordsOf(parts: readonly Change[], select: (part: Change) => boolean | undefined): number {
   return parts.filter(select).reduce((sum, part) => sum + countWords(part.value), 0)
 }
 
-/** The last `maxWords` words of `text`, kept whole rather than cut mid-word. */
 function tailWords(text: string, maxWords: number): string {
   const segments = [...new Intl.Segmenter(undefined, { granularity: 'word' }).segment(text)]
   let seen = 0
@@ -34,7 +24,6 @@ function tailWords(text: string, maxWords: number): string {
   return text.slice(from)
 }
 
-/** The first `maxWords` words of `text`, kept whole rather than cut mid-word. */
 function headWords(text: string, maxWords: number): string {
   const segments = [...new Intl.Segmenter(undefined, { granularity: 'word' }).segment(text)]
   let seen = 0
@@ -49,13 +38,6 @@ function headWords(text: string, maxWords: number): string {
 
 type Hunk = { removed: string; added: string; leading: string; trailing: string }
 
-/**
- * Groups `diff`'s parts into hunks — a maximal run of added and removed parts
- * — each carrying the unchanged text immediately before and after it, which
- * becomes the passage's "a little prose around it". Two changes with nothing
- * unchanged between them are one hunk, since there is no boundary to place
- * between them.
- */
 function hunksFrom(parts: readonly Change[]): readonly Hunk[] {
   const hunks: Hunk[] = []
   let i = 0
@@ -90,17 +72,6 @@ function hunksFrom(parts: readonly Change[]): readonly Hunk[] {
   return hunks
 }
 
-/**
- * SPEC "Applying a recommendation"/"Dependencies": `diff` produces the
- * comparison and this is the only place that reads it. It is asked only for
- * `diffWordsWithSpace`'s plain parts — never for a patch or a hunk header —
- * so there is no position-bearing shape to strip; there is simply none here
- * to begin with.
- *
- * The caller guarantees `before !== after`: this function does not check,
- * because a call with identical text is a call the applier should not have
- * made rather than a shape this function reads meaning out of.
- */
 export function computeAppliedChangeContent(before: string, after: string): AppliedChangeContent {
   const parts = diffWordsWithSpace(before, after)
 

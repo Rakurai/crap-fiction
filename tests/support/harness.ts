@@ -22,19 +22,6 @@ export type HarnessOverrides = Readonly<{
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
 
-/**
- * SPEC "Seams": the one place every route test builds `createApp`'s
- * collaborators. `dataRoot` is the test's own temp directory; the mode, the
- * roles, the runtime status the `/models` route reports, and the room are
- * named overrides for the test that cares what one of them says. Nothing
- * here fabricates a response, an assignment or a model for a room a test
- * never overrides — that room's own model access cannot resolve a call at all.
- * The harness's own model access answers `/models` with `runtimeStatus`, which
- * is the whole of what any route reaches it for, and a test that never says what
- * the runtime reports gets a `/models` that fails rather than a reachable
- * runtime nobody scripted; `call` is scripted for no site, so a call that
- * somehow reached it would fail the same way.
- */
 export function buildTestApp(dataRoot: string, overrides: HarnessOverrides = {}): TestApp {
   const mode = overrides.mode ?? MODE_FIXTURE
   const roles = overrides.roles ?? ROLES_FIXTURE

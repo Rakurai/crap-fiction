@@ -4,14 +4,6 @@ import { readSettingsSection, writeSettingsSection } from './store/index.js'
 
 const preferencesSchema = z.object({ theme: themeSchema.optional() })
 
-/**
- * SPEC "Files": interface preferences are author-editable data, re-read at
- * the moment they are used rather than cached from startup (CODING_STANDARDS
- * "HTTP layer") — unlike the workspace path, nothing about the theme is
- * process configuration. No key written means the author has not chosen,
- * and `undefined` is what carries that rather than a default value nobody
- * picked.
- */
 export function getTheme(dataRoot: string): Theme | undefined {
   return readSettingsSection(dataRoot, 'interfacePreferences', preferencesSchema)?.theme
 }

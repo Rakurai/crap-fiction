@@ -23,13 +23,6 @@ import {
 } from '../../../src/server/store/index.js'
 import { durableContextSchema } from '../../../src/shared/durableContext.js'
 
-/**
- * SPEC "Files"' closed tolerance list and the failures beside it, asserted
- * against the two artifacts the store actually owns rather than against a
- * schema invented for the mechanism: `settings.yaml` and a piece's
- * `piece.yaml`. A store entry point that skipped the tolerant reader would
- * fail one of these.
- */
 describe('the settings file', () => {
   let dataRoot: string
 
@@ -77,8 +70,6 @@ describe('the settings file', () => {
     await writeSettingsSection(dataRoot, 'modelAssignments', { shape: 'a-model' })
     await writeSettingsSection(dataRoot, 'interfacePreferences', { theme: 'dark' })
 
-    // Three unrelated concerns share the file, and a write to one is not a
-    // read-modify-write over the rest (SPEC "Files").
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readSettingsSection(dataRoot, 'modelAssignments', z.record(z.string(), z.string()))).toEqual({ shape: 'a-model' })
   })
@@ -188,13 +179,6 @@ describe("a piece's metadata", () => {
   })
 })
 
-/**
- * The two durable contexts, which are the same shape in two places (SPEC
- * "Files"): the author's beside the workspaces, a piece's inside the piece. The
- * tolerances apply to them as to any hand-edited file — and a context's section
- * names are the author's own, so the scalar-where-a-list-belongs tolerance has to
- * reach a key no schema knew in advance.
- */
 describe('the durable contexts', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -257,12 +241,6 @@ describe('the durable contexts', () => {
     expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
   })
 
-  /**
-   * #18 "Capture context": the review's own writes, going through
-   * `writeYamlArtifact` the same way every other hand-editable artifact does
-   * — a hand-written comment survives a write that touched a different
-   * section entirely.
-   */
   it("writes the author context whole, keeping a hand-written comment beside a section a write did not touch", async () => {
     handWriteAuthorContext('# author notes\nVoice:\n  - wry and close\n')
 
@@ -311,12 +289,6 @@ describe('a conversation', () => {
   })
 })
 
-/**
- * SPEC "Write semantics", asserted at the writer that owns the artifact. Both of
- * these were properties of code above the boundary before the store owned the
- * draft, which is why they are here: the guarantee is the writer's, so the writer
- * is where it is checked.
- */
 describe("a piece's draft", () => {
   let workspaceDir: string
 
@@ -338,9 +310,6 @@ describe("a piece's draft", () => {
   it('serializes overlapping writes, so the one that started last is the one left on disk', async () => {
     const drafts = new DraftStore()
 
-    // An atomic rename makes a write indivisible but not ordered: without the
-    // writer's own lock these two could complete oldest-last and restore prose the
-    // author had already replaced.
     await Promise.all([drafts.write(workspaceDir, 'cups', 'first'), drafts.write(workspaceDir, 'cups', 'second')])
 
     expect(readFileSync(path.join(workspaceDir, 'cups', 'draft.md'), 'utf8')).toBe('second')

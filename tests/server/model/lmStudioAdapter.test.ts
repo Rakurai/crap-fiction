@@ -20,14 +20,8 @@ const { LMStudioAdapter, ModelRuntimeUrlError } = await import('../../../src/ser
 
 const schema = z.object({ claim: z.string() })
 
-/** Every site assigned the same model, for a test about something other than assignment. */
 const assigned = () => 'llama-3'
 
-/**
- * The product's own logger at the level the studio silences with. Every test here
- * is about what a call *returns*; what it writes to stderr is the same decision
- * made in the same place, and asserting it here would be asserting pino.
- */
 const silent = createLogger('silent')
 
 beforeEach(() => {
@@ -123,15 +117,9 @@ describe('LMStudioAdapter.call', () => {
     const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned: 'still not json' })
-    expect(completeFn).toHaveBeenCalledTimes(3) // one attempt plus two retries
+    expect(completeFn).toHaveBeenCalledTimes(3)
   })
 
-  /**
-   * A runtime that never answers is the failure the author meets when LM Studio
-   * is not running, and it is `unreachable` rather than `nonconforming`: nothing
-   * came back to not conform. The retry policy is exhausted first, so a single
-   * dropped connection is not reported as an absent runtime.
-   */
   it('fails as unreachable, and only after exhausting its retry policy, when the runtime never answers', async () => {
     modelFn.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'))
 
@@ -139,7 +127,7 @@ describe('LMStudioAdapter.call', () => {
     const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'unreachable' })
-    expect(modelFn).toHaveBeenCalledTimes(3) // one attempt plus two retries
+    expect(modelFn).toHaveBeenCalledTimes(3)
   })
 
   it('states nothing about the runtime it could not reach beyond the reason', async () => {
@@ -151,13 +139,8 @@ describe('LMStudioAdapter.call', () => {
     expect(Object.keys(result)).toEqual(['outcome', 'reason'])
   })
 
-  /**
-   * The timeout is this module's own policy and is not a parameter on a call, so
-   * the platform's timeout factory is what a test substitutes rather than the
-   * adapter's construction — which also lets the stated bound itself be
-   * asserted. Fake timers would not reach it: `AbortSignal.timeout` is timed
-   * inside the platform rather than on the JavaScript timer queue.
-   */
+  // `AbortSignal.timeout` is timed inside the platform rather than on the JavaScript timer
+  // queue, so fake timers do not reach it and the factory itself is substituted.
   it('fails as timeout, distinctly from unreachable, when its own bound elapses', async () => {
     const timeout = new AbortController()
     const spy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal)
@@ -259,11 +242,6 @@ describe('LMStudioAdapter.status', () => {
     expect(await adapter.status()).toEqual({ reachable: false })
   })
 
-  /**
-   * The models a reachable runtime holds are reported by the key a call site is
-   * assigned by, not by the display name the runtime also carries — an author
-   * choosing from this list is choosing the value an assignment is written with.
-   */
   it('reports each downloaded model by the key an assignment names it with', async () => {
     listModelsFn.mockResolvedValue([
       { modelKey: 'llama-3.2-3b', displayName: 'Llama 3.2 3B' },

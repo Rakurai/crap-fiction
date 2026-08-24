@@ -21,15 +21,7 @@ describe('the room over HTTP', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  /**
-   * The app under test, and the room it was built with. The room is held so a
-   * test can wait on a round it started over HTTP: the response comes back as
-   * soon as the round opens, and re-requesting the piece until it reports nothing
-   * in flight would be a polling loop asserting nothing.
-   */
   async function withPiece(delayMs?: number): Promise<{ app: Hono; room: Room }> {
-    // Conforms to both the eligible and the owed response schema, so one
-    // fixture behaviour serves every call site in these routes-level tests.
     const behavior: FixtureBehavior = delayMs === undefined ? { result: CONFORMING_RESULT } : { result: CONFORMING_RESULT, delayMs }
     const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, { modelAccess })
@@ -105,13 +97,6 @@ describe('the room over HTTP', () => {
     await settlementOf(room, 'cups')
   })
 
-  /**
-   * Abandonment is idempotent and the room, not the store, is the authority on what
-   * is in flight — so abandoning nothing is a legitimate 200. Before a workspace
-   * exists it is not: this route answers the same way every other `/pieces/...`
-   * route does rather than reporting a request carried out in a place the author
-   * has not chosen yet.
-   */
   it('refuses to abandon before a workspace is set, and abandons nothing afterwards without complaint', async () => {
     const bare = buildTestApp(dataRoot).app
 
@@ -142,7 +127,6 @@ describe('the room over HTTP', () => {
   })
 
   describe('replying and asking for a concrete change', () => {
-    /** The first round settled over HTTP, so the piece holds a commentary at a real round and participant id. */
     async function withCommentary(): Promise<{ app: Hono; room: Room; conversationId: string; roundId: string }> {
       const { app, room } = await withPiece()
 
@@ -171,7 +155,6 @@ describe('the room over HTTP', () => {
       const { data: conversation } = await conversationRes.json()
       const round = conversation.rounds[1]
       expect(round.message).toBe('say more, @story-editor')
-      // The sigil in the reply's own text addresses nobody: a supplied target is the whole of the addressing.
       expect(round.addressed).toEqual(['shape'])
     })
 
@@ -220,11 +203,6 @@ describe('the room over HTTP', () => {
   })
 
   describe('applying a recommendation', () => {
-    /**
-     * A round settled over HTTP first, so the piece holds an applicable
-     * suggestion at a real round and participant id — the identity an
-     * `/apply` request names.
-     */
     async function withRecommendation(): Promise<{ app: Hono; room: Room; roundId: string }> {
       const modelAccess = FixtureModelAdapter.bySite(
         {

@@ -11,8 +11,6 @@ describe('computeAppliedChangeContent', () => {
     expect(content.kind).toBe('passages')
     if (content.kind !== 'passages') return
     expect(content.passages).toHaveLength(1)
-    // The unchanged tail either side of the cut is what places the passage —
-    // it appears on both sides, since it never changed.
     expect(content.passages[0]?.before).toContain('Ruth stood looking at them for a while.')
     expect(content.passages[0]?.after).not.toContain('Ruth stood')
     expect(content.passages[0]?.before).toContain('upside down on a towel.')

@@ -12,9 +12,6 @@ import {
 } from '../../../src/server/store/index.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
 
-// The record the store is asked to carry is the product's own, declared once and
-// imported: a shape retyped here would stop noticing the day the real one grows
-// a field.
 const oneRound: Conversation = {
   id: 'c1',
   rounds: [
@@ -56,11 +53,7 @@ describe('conversations', () => {
 
   it('reports the most recently written conversation as the most recent one', async () => {
     await writeConversation(workspaceDir, 'cups', 'older', { id: 'older', rounds: [] })
-    // The one place a test outside the store composes a path the store owns,
-    // and it is deliberate: "most recent" is a claim about modification times,
-    // and the store offers no way to age a file it has written. Writing the two
-    // in order instead would rest on the filesystem's timestamp resolution
-    // rather than on anything the store promises.
+    // Aged explicitly: writing the two in order would rest on the filesystem's timestamp resolution.
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, 'cups', 'conversations', 'older.json'), past, past)
 

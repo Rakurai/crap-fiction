@@ -12,14 +12,6 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 import { editorContentToMarkdown, markdownToEditorContent } from '../document/markdown.js'
 import { countWords } from '../shared/storyLength.js'
 
-/**
- * The extension set is the interactive twin of `documentSchema`
- * (src/document/schema.ts): the same node and mark types, plus History,
- * which contributes editor behaviour rather than a schema type. Nothing
- * here parses or serializes Markdown by hand — that stays behind
- * `markdownToEditorContent`/`editorContentToMarkdown`, so a `Node` built by
- * one schema instance never crosses into an editor built from another.
- */
 const EXTENSIONS = [Document, Text, Paragraph, Heading, Bold, Italic, HorizontalRule, History]
 
 export type ManuscriptView = 'rendered' | 'source' | 'reading'
@@ -35,22 +27,9 @@ export type ManuscriptViewModel = {
   readonly showRendered: () => void
   readonly showSource: () => void
   readonly showReading: () => void
-  /**
-   * CONTEXT "Apply": makes the manuscript embody a recommendation, applied to
-   * the editor as one transaction so the editor's own undo reverses it as one
-   * action — the same mechanism a round trip through the source view already
-   * reaches the editor with, reused rather than reinvented.
-   */
   readonly applyRecommendation: (markdown: string) => void
 }
 
-/**
- * Replaces the editor's content with the source text's meaning as one
- * transaction, and places a history boundary on it explicitly rather than
- * relying on the editor's own idle-time grouping — which the SPEC calls
- * trivial machinery, not custom machinery, and which would otherwise let a
- * fast round trip merge into whatever the author typed just before it.
- */
 function applySourceText(editor: Editor, text: string) {
   editor
     .chain()
@@ -62,15 +41,6 @@ function applySourceText(editor: Editor, text: string) {
     .run()
 }
 
-/**
- * Owns the one thing SPEC "The prose surface" asks of the editing surface
- * beyond what TipTap already carries: which of the three ways to see the
- * manuscript is current, and moving between them without losing meaning or
- * the reading/scroll position. Selection, clipboard, history and formatting
- * stay the editor's own. Each `showX` is the one call a caller makes to
- * enter that view — it captures the outgoing scroll ratio and restores it
- * itself, so nothing outside this hook sequences the switch.
- */
 export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   const [view, setView] = useState<ManuscriptView>('rendered')
   const [sourceText, setSourceText] = useState('')
@@ -95,12 +65,6 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const editor = useEditor({
     extensions: EXTENSIONS,
-    // The rendered view's editing surface says what it is the way the source
-    // view's textarea does by being one: a named, multi-line text field. A bare
-    // contenteditable division is a division as far as anything reading the
-    // page is concerned, so the prose surface would be addressable only by
-    // where it sits — by assistive technology, and by anything else that
-    // reaches the studio the way an author does.
     editorProps: { attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Manuscript' } },
     content: markdownToEditorContent(initialMarkdown),
     onUpdate: ({ editor: current }) => {

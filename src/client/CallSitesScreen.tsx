@@ -8,7 +8,6 @@ type CallSitesScreenProps = {
   readonly onClose: () => void
 }
 
-/** PRD "Assign models to participants": the place the author goes, one action away from the piece list. */
 export function CallSitesScreen({ onClose }: CallSitesScreenProps) {
   const view = useCallSites({ fetchCallSites, fetchRuntimeStatus, assignModel })
 

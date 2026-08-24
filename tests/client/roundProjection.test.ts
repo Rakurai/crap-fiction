@@ -15,10 +15,6 @@ import type { AppliedChange } from '../../src/shared/appliedChange.js'
 import type { RoundRecord, RoundView } from '../../src/shared/conversationViews.js'
 import type { RoundClosedEvent, RoundSnapshot } from '../../src/shared/roundEvents.js'
 
-/**
- * The moment a round opened, stated rather than read from a clock — the room
- * stamps it, and every count the interface shows is measured from it.
- */
 const OPENED_AT = 1_700_000_000_000
 
 function opened(roundId: string, participants: readonly string[], message?: string, brought: readonly string[] = []): RoundEvent {
@@ -33,7 +29,6 @@ function settled(roundId: string, participantId: string, result: RoundRecord['pa
   return { type: 'participant.settled', data: { roundId, participantId, result } }
 }
 
-/** The outcome comes from the event's own closed set rather than being retyped here. */
 function closed(roundId: string, outcome: RoundClosedEvent['outcome']): RoundEvent {
   return { type: 'round.closed', data: { roundId, outcome } }
 }
@@ -97,8 +92,6 @@ describe('projectRoundEvent', () => {
     projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'response', outcome: 'commentary', claim: 'landed' }))
     projection = projectRoundEvent(projection, closed('r1', 'failed'))
 
-    // The room's own failure is not a participant's, so nothing is invented for
-    // the participants the round never reached — but the round is over.
     expect(projection.rounds[0]?.outcome).toBe('failed')
     expect(projection.rounds[0]?.participants.find((p) => p.participantId === 'shape')?.result).toEqual({
       kind: 'response',
@@ -154,8 +147,6 @@ describe('initialProjection', () => {
       {
         roundId: 'r1',
         message: '@shape does the opening earn its length',
-        // A settled round read back from the file has no opening stamp and needs
-        // none: there is no count still running to measure from it.
         openedAt: undefined,
         outcome: 'settled',
         participants: [
@@ -291,13 +282,6 @@ describe('withRoundInFlight', () => {
   })
 })
 
-/**
- * SPEC "Operation state": a client that reloaded mid-round is looking at the same
- * round, and it has to be looking at the same thing. The two paths into a round in
- * flight are otherwise independent code — one folds four kinds of event, the other
- * reads one snapshot — so nothing but an assertion keeps them agreeing, and a
- * divergence would be invisible until an author reloaded during a round.
- */
 describe('a resumed round and a live one', () => {
   it('project identically', () => {
     const participants = ['shape', 'compression', 'interiority', 'story-editor']

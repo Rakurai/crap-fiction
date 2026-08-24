@@ -3,15 +3,6 @@ import { z } from 'zod'
 import { eligibleResponseValueSchema } from '../../../src/shared/participantResponse.js'
 import { FixtureModelAdapter } from '../../support/modelAdapter.js'
 
-/**
- * The fixture model implementation is load-bearing rather than incidental: every
- * scripted test of the room reaches its model through it, so a property it
- * cannot express is a property no test above it can assert. That makes its own
- * conformance to the seam worth stating here — most of all that it *reports* a
- * value that does not conform instead of throwing, because a throwing fixture
- * would silently leave every schema a caller selects unprotected.
- */
-
 const schema = z.object({ claim: z.string() })
 const runtimeStatus = { reachable: true, models: [] } as const
 

@@ -10,7 +10,6 @@ type ContextReviewProps = {
   readonly onClose: () => void
 }
 
-/** CONTEXT "Story context"/"Author context": the two destinations, in the order the review lists them. */
 const DESTINATIONS: readonly CaptureDestination[] = ['storyContext', 'authorContext']
 
 const DESTINATION_LABEL: Readonly<Record<CaptureDestination, string>> = {
@@ -18,7 +17,6 @@ const DESTINATION_LABEL: Readonly<Record<CaptureDestination, string>> = {
   authorContext: 'Author context',
 }
 
-/** What a proposal would change, stated once for every operation it can be. */
 function describe(proposal: CaptureProposal): string {
   switch (proposal.operation) {
     case 'add':
@@ -31,16 +29,6 @@ function describe(proposal: CaptureProposal): string {
   }
 }
 
-/**
- * UX_DESIGN "Capture context": the temporary review surface — a short list
- * of granular changes, each stating what it would change and which durable
- * context it belongs to, each approved or ignored on its own. Grouped by
- * destination because "the review is where the distinction between the two
- * contexts is visible... the destination is the consequential part of a
- * proposal." Ignoring is the default: nothing here is checked until the
- * author checks it, and "done" is the review's only exit — CONTEXT "Capture
- * context": closing writes only what was approved.
- */
 export function ContextReview({ proposals, approved, closing, error, onToggle, onClose }: ContextReviewProps) {
   return (
     <div className={styles.panel} role="dialog" aria-label="Capture context">

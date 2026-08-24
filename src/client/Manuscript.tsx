@@ -6,7 +6,6 @@ import styles from './Manuscript.module.css'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
 
-/** #19 "Piece lifecycle": retitling and marking a piece finished or abandoned, bundled the way `OpenedPiece` composes it. */
 type LifecycleProps = {
   readonly status: PieceStatus
   readonly retitling: boolean
@@ -23,28 +22,13 @@ type ManuscriptProps = {
   readonly onClose: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
-  /** UX_DESIGN "Prominence": editing the room is one action away, reached from here like the other view controls — this surface knows nothing else about it. */
   readonly onOpenRoom: () => void
-  /** UX_DESIGN "Prominence": choosing or starting a conversation is one action away too — this surface knows nothing about which conversation is current, only that reaching the listing is a control beside the others. */
   readonly onOpenConversations: () => void
-  /** UX_DESIGN "Prominence": capture context is one action away, on the same tier — this surface starts it and knows nothing about what it returns. */
   readonly onOpenCapture: () => void
   readonly lifecycle: LifecycleProps
-  /**
-   * SPEC "Applying a recommendation": the manuscript is read-only for exactly
-   * the duration of that call — a fact about the response being applied, not
-   * about anything this surface decided, so it arrives as a prop rather than
-   * from a control drawn here.
-   */
   readonly applying: boolean
 }
 
-/**
- * #19 "Piece lifecycle": the title in place, reached and left in one action
- * each way — the same reveal-on-click, escape-to-withdraw shape
- * `NewPieceForm` uses for naming a piece the first time. Retitling never
- * renames the piece's directory, so nothing here needs to know it has one.
- */
 function EditableTitle({ title, saving, onRetitle }: { readonly title: string; readonly saving: boolean; readonly onRetitle: (title: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
@@ -85,29 +69,6 @@ function EditableTitle({ title, saving, onRetitle }: { readonly title: string; r
   )
 }
 
-/**
- * SPEC "The prose surface": three ways to see the manuscript, switched in
- * one action, with position intact. Rendered and reading share one editor
- * instance and one scroll container — kept mounted across that switch
- * rather than rebuilt, which is what keeps position intact for free. The
- * source view is a different representation entirely (raw Markdown text
- * rather than rendered prose), so an exact cursor mapping between the two
- * is not well-defined; the scroll ratio — where the author is looking — is
- * preserved across that switch instead.
- *
- * This is the prose surface and nothing else. The manuscript's text and its
- * autosave are handed in rather than owned here, because the conversation beside
- * it needs both — and while this surface owned them, it also had to carry the
- * conversation's adapters through, which made the prose surface the place the
- * room's collaborators were wired. `OpenedPiece` is that place now.
- *
- * UX_DESIGN "A failed save": leaving is free everywhere else because everything
- * written is already on disk, and while a save is failing it is refused rather
- * than confirmed — an author asked whether to discard their own prose has been
- * asked the wrong question. The notice is the one place that says why, so the
- * disabled control carries no second explanation of its own. The manuscript
- * stays editable throughout, and the next write that succeeds clears both.
- */
 export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, onOpenCapture, lifecycle, applying }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
 
@@ -120,11 +81,6 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [manuscript.view, manuscript.showRendered])
 
-  // Layered on top of the view's own editable rule rather than folded into
-  // it: which view is current and whether an application holds the
-  // manuscript are independent facts, and `showRendered`/`showReading`
-  // already state the first. `reading` wins regardless of `applying` — an
-  // application settling mid-read must not make the reading view editable.
   useEffect(() => {
     manuscript.editor?.setEditable(!reading && !applying)
   }, [manuscript.editor, reading, applying])

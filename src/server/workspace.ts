@@ -17,17 +17,6 @@ export class WorkspaceNotSetError extends Error {
 
 const workspacePathSchema = z.string().min(1)
 
-/**
- * SPEC "Files": the workspace path is process configuration, read once, not
- * re-read per request the way author-editable data is — this registry is
- * that one read, held for the life of the process and updated in memory the
- * moment the author sets it, so nothing after startup asks the file again.
- *
- * `openAt` is the only way to get one, because a registry that had not read the
- * file yet was indistinguishable from one that read it and found no workspace
- * configured — the same `undefined` for two different facts, and a caller that
- * forgot the second step would be told the author never chose a workspace.
- */
 export class WorkspaceRegistry {
   readonly #dataRoot: string
   #workspace: string | undefined
@@ -45,7 +34,6 @@ export class WorkspaceRegistry {
     return this.#workspace
   }
 
-  /** The configured workspace, or a declared `WorkspaceNotSetError` for a route to translate. */
   require(): string {
     if (this.#workspace === undefined) throw new WorkspaceNotSetError()
     return this.#workspace

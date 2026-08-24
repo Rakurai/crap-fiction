@@ -5,20 +5,6 @@ import path from 'node:path'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-/**
- * SPEC "Deployment": streaming through the dev server is proven early, because
- * it is the one part of the studio's arrangement the product depends on and does
- * not control. A server that buffered a round's events until the connection
- * closed would leave the author watching a blank room and then a finished one,
- * and no test of the room or its route could see it — the buffering happens
- * below both.
- *
- * So this drives the studio's own application through the same
- * `@hono/vite-dev-server` transport `make run` uses, and watches a real round on
- * the real events route. The round needs no model runtime: no call site is
- * assigned one, so every participant fails as unconfigured without the runtime
- * being contacted, and the events that frame a round are emitted either way.
- */
 describe('a round\'s events through the dev server', () => {
   let server: ViteDevServer
   let baseUrl: string
@@ -71,8 +57,6 @@ describe('a round\'s events through the dev server', () => {
     const piece = (await post('/pieces', { title: 'Cups' })) as { id: string }
     const conversation = (await post(`/pieces/${piece.id}/conversations`)) as { id: string }
 
-    // Subscribed before the round opens, so the frame that opens it is one this
-    // reader has to be handed rather than one it could find in a closed body.
     const stream = await fetch(`${baseUrl}/pieces/${piece.id}/events`)
     expect(stream.status).toBe(200)
     if (stream.body === null) throw new Error('the events response carried no body')
@@ -83,10 +67,6 @@ describe('a round\'s events through the dev server', () => {
       draft: 'The cups sat where she left them.',
     })
 
-    // The events route closes only when the client goes away, so every frame
-    // below arrives while the stream is open by construction: a transport that
-    // buffered until close would hand this reader nothing and the test would
-    // fail by timing out, with no wall-clock margin to tune.
     const decoder = new TextDecoder()
     let received = ''
     let names: readonly string[] = []

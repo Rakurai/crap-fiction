@@ -41,14 +41,6 @@ const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
-/**
- * SPEC "Transport": the author's message, or a round the author opened from a
- * particular response — a target and the reply sent to it, or the response
- * being asked for a concrete change and any clarification. The three are
- * mutually exclusive rather than one shape with every field optional
- * (CODING_STANDARDS "Types"): which round this opens is a fact about the
- * request, not a state a caller could half-supply.
- */
 const postRoundSchema = z.union([
   z.strictObject({ message: z.string().min(1), draft: z.string() }),
   z.strictObject({ target: z.string().min(1), message: z.string().min(1), draft: z.string() }),
@@ -72,11 +64,6 @@ const patchPieceSchema = z.object({
   cast: z.array(z.string().min(1)).optional(),
 })
 
-/**
- * Every route SPEC's transport table names beyond `/workspace`, `/pieces`,
- * the piece draft, the interface theme, the model seam and the room belongs
- * to later tickets.
- */
 export function createApp(
   env: StudioEnv,
   workspace: WorkspaceRegistry,
@@ -87,15 +74,10 @@ export function createApp(
   room: Room,
   logger: Logger,
 ): Hono {
-  // SPEC "Local exposure": the server binds every interface, and a browser
-  // may reach the published port as either loopback hostname.
   const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]
   const app = new Hono()
   app.use('*', originGuard(allowedOrigins, logger))
 
-  // Body validation is the same decision at every route that takes one, and the
-  // logger is not part of that decision, so it is bound here once rather than
-  // named at each route beside the schema that is the actual difference.
   const body = <T extends z.ZodType>(schema: T) => validateJson(schema, logger)
 
   app.get('/workspace', (c) => {
@@ -123,15 +105,6 @@ export function createApp(
     return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null, room.specialists())))
   })
 
-  /**
-   * #13 "The room"/#19 "Piece lifecycle": one route, three independent
-   * lightweight writes — enabling and disabling specialists takes effect on
-   * the next unaddressed round, and retitling or marking a piece finished or
-   * abandoned gates nothing. Each field is applied only when the author sent
-   * it, and the answer is the piece as it now stands, on the same terms as
-   * opening it, so a caller never has to reconcile two response shapes for
-   * one route.
-   */
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
     const { title, status, cast } = c.req.valid('json')
     const id = c.req.param('id')
@@ -161,11 +134,6 @@ export function createApp(
     return c.json(ok(getConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))))
   })
 
-  /**
-   * #17 "Conversations: list, start, resume, delete"/SPEC "Files": deletes
-   * the conversation's one file and the change files its applications name,
-   * leaving nothing on disk for the author to prune.
-   */
   app.delete('/pieces/:id/conversations/:cid', async (c) => {
     await deleteConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))
     return c.json(ok(null))
@@ -191,16 +159,6 @@ export function createApp(
     return c.json(ok(result))
   })
 
-  /**
-   * SPEC "Applying a recommendation"/"Transport": one call, its whole result
-   * reached by this request — there is no round to open and no event to
-   * subscribe to. The route's own part is thin: validate, delegate to the
-   * room, and translate the room's `CallResult` into the wire's own
-   * `ApplyOutcome` taxonomy, unwrapped from the envelope's own success path
-   * because a failed or an abandoned call are not a request that failed —
-   * they are answers the room composed, the same way a round's failed
-   * participant is.
-   */
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
     const { roundId, participantId, constraint, draft } = c.req.valid('json')
     const result = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), roundId, participantId, constraint, draft)
@@ -213,13 +171,6 @@ export function createApp(
     return c.json(ok(outcome))
   })
 
-  /**
-   * CONTEXT "Capture context"/SPEC "Context capture": one call, its
-   * proposals reached by this request — there is no round to open and no
-   * event to subscribe to, on the same terms `/apply` is thin. The route's
-   * only work beyond delegating is the same `CallResult`-to-wire translation
-   * `/apply` does, with proposals in place of a manuscript.
-   */
   app.post('/pieces/:id/capture', body(postCaptureSchema), async (c) => {
     const { conversationId, draft } = c.req.valid('json')
     const result = await room.capture(workspace.require(), c.req.param('id'), conversationId, draft)
@@ -232,25 +183,12 @@ export function createApp(
     return c.json(ok(outcome))
   })
 
-  /**
-   * SPEC "Context capture": the author's own proposals, sent back whole —
-   * the review holds nothing server-side between the two requests, so this is
-   * what "only approved proposals are written" reads from.
-   */
   app.post('/pieces/:id/capture/approve', body(postCaptureApproveSchema), async (c) => {
     const { approved } = c.req.valid('json')
     const outcome = await room.approveCapture(workspace.require(), c.req.param('id'), approved)
     return c.json(ok(outcome))
   })
 
-  /**
-   * The workspace is required here as it is on every other `/pieces/...` route,
-   * even though the room — not the store — is the authority on what is in flight
-   * and abandoning nothing is a legitimate answer. Reachability before a workspace
-   * exists is the part that is not about idempotence: a route that answers 200 with
-   * no workspace configured tells the author their request was carried out in a
-   * place that does not exist yet.
-   */
   app.post('/pieces/:id/abandon', (c) => {
     workspace.require()
     room.abandon(c.req.param('id'))
@@ -293,15 +231,6 @@ export function createApp(
     return c.json(ok(await modelAccess.status()))
   })
 
-  /**
-   * The envelope's `code` names a failure in the product's own taxonomy while its
-   * `message` is text safe to show (CODING_STANDARDS "HTTP layer"). No surface
-   * branches on the code — UX_DESIGN "Degraded and absent states" never asks the
-   * interface to tell one HTTP failure from another — so this is the code's
-   * reader: the seam that answered the request records which failure it named, and
-   * an author reporting "it refused to save" has a line saying which of nine
-   * refusals it was.
-   */
   app.onError((err, c) => {
     const refused = (code: string, status: 400 | 404 | 409 | 500) => {
       logger.warn({ code, method: c.req.method, path: c.req.path }, 'request refused')
@@ -320,9 +249,6 @@ export function createApp(
     if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)
 
-    // Nothing here names it, so nothing here can tell the author what it was. It
-    // is logged before it propagates, because the alternative is the one failure
-    // mode with no record anywhere of having happened.
     logger.error({ err, method: c.req.method, path: c.req.path }, 'request failed')
     throw err
   })

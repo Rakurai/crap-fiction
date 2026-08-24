@@ -4,20 +4,11 @@ import styles from './CallSiteList.module.css'
 
 type CallSiteListProps = {
   readonly sites: readonly CallSiteAssignmentView[]
-  /** What the runtime reports it holds, offered so the author need not type one. */
   readonly known: readonly string[]
   readonly assigning: string | undefined
   readonly onAssign: (site: string, model: string) => void
 }
 
-/**
- * One form per site, so a site is assignable one at a time. The models the
- * runtime reports are offered through the platform's own datalist: an identifier
- * typed with a character wrong is a call site that fails as unconfigured at the
- * next round, discovered minutes later. It stays a text field rather than a
- * closed list, because a model the runtime does not hold yet is still one the
- * author may be pointing a participant at.
- */
 export function CallSiteList({ sites, known, assigning, onAssign }: CallSiteListProps) {
   const [empty, setEmpty] = useState<string | undefined>(undefined)
 

@@ -29,13 +29,6 @@ const DEFAULT_PROPS = {
   applying: false,
 }
 
-/**
- * The prose surface receives its manuscript and its autosave rather than owning
- * them — `OpenedPiece` is where both are constructed, because the conversation
- * beside it needs the same two. This is that composition, minus the conversation:
- * these tests are about the prose surface, and the room is exercised at its own
- * seams (roundProjection, Room).
- */
 function Harness(props: typeof DEFAULT_PROPS) {
   const manuscript = useManuscript(props.draft)
   const autosave = useAutosave(props.pieceId, manuscript.markdown, (text) => saveDraft(props.pieceId, text))
@@ -56,16 +49,10 @@ function Harness(props: typeof DEFAULT_PROPS) {
   )
 }
 
-/** Every test renders the manuscript through here, overriding only what it cares about. */
 function renderManuscript(overrides: Partial<typeof DEFAULT_PROPS> = {}) {
   return render(<Harness {...DEFAULT_PROPS} {...overrides} />)
 }
 
-/**
- * The source view is how a test types: it is a plain textarea, so changing it
- * moves the manuscript's text the same way the editor does and the autosave
- * controller cannot tell the difference.
- */
 function type(text: string) {
   if (screen.queryByLabelText('Manuscript source') === null) {
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
@@ -73,7 +60,6 @@ function type(text: string) {
   fireEvent.change(screen.getByLabelText('Manuscript source'), { target: { value: text } })
 }
 
-/** Past the autosave debounce and past the write's own settling, in one step. */
 async function settle() {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(2000)
@@ -87,14 +73,6 @@ function leaveControl(): HTMLButtonElement {
 describe('the piece header', () => {
   afterEach(cleanup)
 
-  /**
-   * The register's wording is `facts.ts`'s own and is asserted there. What the
-   * header claims is narrower: that the mode and the length reach the chrome as
-   * one composed fact rather than as two strings the surface joined itself. So the
-   * expectation is composed the way the header composes it — a change to the
-   * separator or to the pluralisation is a change to one module, and this test is
-   * not a second place it has to be made.
-   */
   it('states the mode and the length as one composed fact', () => {
     renderManuscript({ draft: 'First light of the day.' })
 
@@ -218,20 +196,6 @@ describe('the reading view', () => {
 describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 
-  /**
-   * SPEC "Applying a recommendation": read-only for exactly the call's
-   * duration, drawn from the same `applying` state a control already refuses
-   * from elsewhere in this file (`leaveControl().disabled`) — a decision the
-   * component makes from a prop, so `jsdom` states it the same way.
-   *
-   * What is here is the source view's own field and the notice: markup this
-   * component writes, from a prop it was handed. The rendered editing surface's
-   * editability is not, and deliberately — it is set on the editor rather than
-   * written as an attribute, and whether the author's keystrokes actually stop
-   * and start again is `tests/e2e/applying.spec.ts`, over a real application in
-   * a real browser. Asserting it here as well would be the same rule kept in two
-   * places.
-   */
   it('holds the source textarea read-only, and says so in the register, while an application runs', () => {
     renderManuscript({ applying: true })
 
@@ -279,7 +243,7 @@ describe('the manuscript while a save is failing', () => {
     expect(screen.getByText(/^NOT SAVED · \d\d:\d\d$/)).toBeTruthy()
     expect(screen.getByText('EACCES: PERMISSION DENIED')).toBeTruthy()
     expect(leaveControl().disabled).toBe(true)
-    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false) // the manuscript stays editable
+    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false)
 
     type('First light. Then none. Then light again.')
 

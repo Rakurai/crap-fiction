@@ -8,18 +8,8 @@ import type { CallResult, CallState, ModelAccess } from './types.js'
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
 
-/** Which model a call site is assigned, or `undefined` where the author has assigned none. */
 export type GetAssignment = (site: string) => string | undefined
 
-/**
- * SPEC "Deployment": an absent or malformed `STUDIO_MODEL_RUNTIME_URL` is a
- * startup failure naming it. Which values are malformed is this module's fact
- * and not `env.ts`'s — the variable is described as where the model module
- * reaches the runtime precisely so the shape stays opaque above this seam
- * (CODING_STANDARDS "Contain vendor concepts in the module that owns the
- * vendor") — so the check lives here and states the failure in the product's
- * own words rather than letting a vendor stack trace be what the author reads.
- */
 export class ModelRuntimeUrlError extends Error {
   constructor(value: string, reason: string) {
     super(`STUDIO_MODEL_RUNTIME_URL cannot be reached: ${reason} (the value was "${value}")`)
@@ -58,21 +48,6 @@ class NonConformingError extends Error {
   }
 }
 
-/**
- * SPEC "Model access": `@lmstudio/sdk` used natively and fully, never
- * wrapped in a provider abstraction. It owns loading, holding and evicting
- * models — residency is the SDK's `llm.model()`, which loads only what is
- * not already resident — and this adapter owns retry and timeout on top of
- * it, since those are policy owned by the module that knows the reliability
- * of the runtime it calls. Reasoning never crosses out of this file: only
- * `result.content`, parsed against the caller's schema, ever leaves
- * `#attempt`.
- *
- * Assignment lookup is this adapter's own business for the same reason: a site
- * with no assignment fails as unconfigured without the runtime ever being
- * contacted, and nothing here falls back to another model. An assignment's
- * shape is therefore never named above this file.
- */
 export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
@@ -84,14 +59,6 @@ export class LMStudioAdapter implements ModelAccess {
     this.#logger = logger
   }
 
-  /**
-   * One line per call, at the seam that owns the call: which site asked, which
-   * model it was assigned, and how it ended. Never the prompt and never what came
-   * back (CODING_STANDARDS "Logging") — those are the material the studio exists
-   * to handle, and a log line is where they would become a durable record nobody
-   * decided to keep. Every return path goes through here so there is exactly one
-   * such line and no path that quietly has none.
-   */
   #logged<T>(site: string, assignment: string | undefined, result: CallResult<T>): CallResult<T> {
     this.#logger.info(
       {
@@ -169,9 +136,6 @@ export class LMStudioAdapter implements ModelAccess {
       const models = await this.#client.system.listDownloadedModels('llm')
       return { reachable: true, models: models.map((model) => model.modelKey) }
     } catch (err) {
-      // The one place the runtime's absence is discovered, so the one place it is
-      // recorded: the author is shown `reachable: false` and nothing more, and
-      // whatever the SDK threw is a diagnostic fact that belongs on stderr.
       this.#logger.warn({ err }, 'model runtime unreachable')
       return { reachable: false }
     }

@@ -22,8 +22,6 @@ describe('resolving who is in the room', () => {
     const roster = resolveRoster(mode([{ id: 'shape', attendsTo: 'the arc', defect: 'a late entry' }]), [SHAPE, EDITOR])
 
     expect(roster.criteria.get('shape')).toEqual({ attendsTo: 'the arc', defect: 'a late entry' })
-    // Absent rather than empty: the Story Editor is no part of the cast, and a
-    // blank criterion would read as one the mode wrote.
     expect(roster.criteria.get('story-editor')).toBeUndefined()
   })
 

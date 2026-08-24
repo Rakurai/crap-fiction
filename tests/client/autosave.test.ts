@@ -6,16 +6,9 @@ const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
 
 const clock = () => FAILED_AT_MS
 
-/**
- * A write answers in the one convention every client request answers in, so
- * these are what the adapter hands back rather than a resolved or rejected
- * promise. A failing write is a studio that refused: the server states what went
- * wrong writing draft.md, and that sentence is what the notice quotes.
- */
 const WROTE: RequestResult<null> = { outcome: 'value', value: null }
 const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: 'ARTIFACT_INVALID', message })
 
-/** `vi.fn` typed to the seam, so a test cannot hand the controller something it would not receive. */
 function saver() {
   return vi.fn<SaveDraft>()
 }
@@ -66,7 +59,7 @@ describe('createAutosaveController', () => {
 
     controller.update('second')
     vi.advanceTimersByTime(1000)
-    expect(save).toHaveBeenCalledTimes(1) // the write in flight is not joined by a second one
+    expect(save).toHaveBeenCalledTimes(1)
 
     resolveFirst?.(WROTE)
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
@@ -85,7 +78,7 @@ describe('createAutosaveController', () => {
     await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true, message: 'disk unhappy', atMs: FAILED_AT_MS }))
 
     vi.advanceTimersByTime(60_000)
-    expect(save).toHaveBeenCalledTimes(1) // no hidden retry loop while nothing new was written
+    expect(save).toHaveBeenCalledTimes(1)
 
     controller.update('second')
     vi.advanceTimersByTime(1000)
@@ -108,7 +101,7 @@ describe('createAutosaveController', () => {
     vi.advanceTimersByTime(1000)
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
 
-    expect(onStateChange).toHaveBeenCalledTimes(1) // the failure is not cleared by a write that never reported
+    expect(onStateChange).toHaveBeenCalledTimes(1)
   })
 
   it('stamps the failure with the moment the write came back, not the moment it was scheduled', async () => {

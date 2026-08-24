@@ -6,7 +6,6 @@ const { doc, paragraph, heading, horizontalRule, hardBreak } = documentSchema.no
 const { bold, italic } = documentSchema.marks
 const text = documentSchema.text.bind(documentSchema)
 
-/** Meaning survives a round trip; the exact Markdown spelling need not (SPEC). */
 function roundTripsThrough(built: ReturnType<typeof doc.createChecked>): void {
   const markdown = documentToMarkdown(built)
   const reparsed = markdownToDocument(markdown)
@@ -142,12 +141,6 @@ describe('markdown round-trip over the constrained schema', () => {
     roundTripsThrough(built)
   })
 
-  /**
-   * A break with nothing after it has no line to break. Markdown has no spelling
-   * for one, so it is written away rather than written as an escape of the
-   * newline the paragraph already ends with — which is what a bare backslash
-   * there would read back as.
-   */
   it('drops a hard line break with nothing after it', () => {
     const built = doc.createChecked(null, [
       paragraph.createChecked(null, [text('a line, and then the page ends'), hardBreak.createChecked()]),
@@ -162,8 +155,6 @@ describe('markdown round-trip over the constrained schema', () => {
     const source = ['| who | wanted |', '| --- | --- |', '| Ada | the ending |', ''].join('\n')
     const result = markdownToDocument(source)
 
-    // 'commonmark' has no table rule at all, so the pipes arrive as the literal
-    // text an author typed. Nothing is lost and nothing is refused.
     expect(result.textContent).toContain('Ada')
     expect(result.textContent).toContain('the ending')
     for (let i = 0; i < result.childCount; i++) {
@@ -174,8 +165,6 @@ describe('markdown round-trip over the constrained schema', () => {
   it('opens raw HTML as the literal text it is written as', () => {
     const result = markdownToDocument('She said <em>nothing</em> at all.\n')
 
-    // `html: false` leaves the tags inert, so they are prose rather than markup:
-    // the words survive, the emphasis the author did not write in Markdown does not.
     expect(result.child(0).textContent).toBe('She said <em>nothing</em> at all.')
     expect(result.child(0).child(0).marks.length).toBe(0)
   })
@@ -184,21 +173,11 @@ describe('markdown round-trip over the constrained schema', () => {
     const source = ['---', 'title: The Ending', '---', '', 'The first line of the piece.', ''].join('\n')
     const result = markdownToDocument(source)
 
-    // No front-matter rule either: the opening fence reads as a thematic break
-    // and the keys read as prose. The manuscript holds no metadata — that lives
-    // in the piece's own artifacts — so there is nothing here to preserve.
     expect(result.child(0).type.name).toBe('horizontalRule')
     expect(result.textContent).toContain('title: The Ending')
     expect(result.textContent).toContain('The first line of the piece.')
   })
 
-  /**
-   * The write-back is what the author reads next time the piece is opened, so the
-   * loss the parser accepts has to be visible here too: the address, the image
-   * reference and the code fencing are gone from the file, not merely from the
-   * document in memory. The HTML tags stay, because inert tags are text and text
-   * is the one thing the manuscript never rewrites.
-   */
   it('writes back a manuscript with the address, the image and the code fencing gone', () => {
     const source = 'Read the [full letter](https://example.com/letter), see ![her](photo.png), and <b>note</b> `this`.\n'
 

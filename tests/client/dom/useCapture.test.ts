@@ -113,8 +113,6 @@ describe('useCapture', () => {
 
     await act(async () => result.current.close())
 
-    // "p2" was never approved and its destination failed, so it stays too —
-    // the review for story context has not concluded.
     expect(result.current.proposals.map((proposal) => proposal.id)).toEqual(['p1', 'p2'])
     expect(result.current.approved).toEqual(new Set(['p1']))
     expect(result.current.error).toContain('disk is full')

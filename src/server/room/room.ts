@@ -74,7 +74,6 @@ export class RoomBusyError extends Error {
   }
 }
 
-/** No applicable suggestion stands at the named place — a stale identity, or an outcome that was never one. */
 export class RecommendationNotFoundError extends Error {
   constructor(pieceId: string, roundId: string, participantId: string) {
     super(`no applicable suggestion from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
@@ -82,7 +81,6 @@ export class RecommendationNotFoundError extends Error {
   }
 }
 
-/** No commentary stands at the named place — a stale identity, or an outcome that was never one to ask a concrete change about. */
 export class CommentaryNotFoundError extends Error {
   constructor(pieceId: string, roundId: string, participantId: string) {
     super(`no commentary from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
@@ -90,7 +88,6 @@ export class CommentaryNotFoundError extends Error {
   }
 }
 
-/** A round the author opened by an act — replying to a response — named a participant the room does not have. */
 export class ParticipantNotFoundError extends Error {
   constructor(pieceId: string, participantId: string) {
     super(`no participant "${participantId}" in the room for piece "${pieceId}"`)
@@ -100,17 +97,10 @@ export class ParticipantNotFoundError extends Error {
 
 type Listener = (event: RoomEvent) => void
 
-/**
- * What the author is told when the round failed rather than a participant's call
- * failing. The fallback names the room's own ignorance rather than guessing at a
- * cause: something that is not an `Error` reached a catch, and a sentence
- * inventing why would be worse than one admitting nothing is known.
- */
 function failureText(err: unknown): string {
   return err instanceof Error ? err.message : 'the round stopped for a reason the studio cannot name'
 }
 
-/** The applicable suggestion the author named, or `undefined` — a stale identity, or a response that never was one. */
 function findRecommendation(conversation: Conversation, roundId: string, participantId: string) {
   const round = conversation.rounds.find((candidate) => candidate.id === roundId)
   const record = round?.participants.find((candidate) => candidate.participantId === participantId)
@@ -119,12 +109,6 @@ function findRecommendation(conversation: Conversation, roundId: string, partici
   return response?.outcome === 'applicableSuggestion' ? response : undefined
 }
 
-/**
- * The commentary the author is asking a concrete change about, or `undefined`
- * — a stale identity, or a response that was never a reading without an action
- * (UX_DESIGN "Actions on a response": asking is offered only there — an
- * applicable suggestion already names one).
- */
 function findCommentary(conversation: Conversation, roundId: string, participantId: string) {
   const round = conversation.rounds.find((candidate) => candidate.id === roundId)
   const record = round?.participants.find((candidate) => candidate.participantId === participantId)
@@ -133,18 +117,10 @@ function findCommentary(conversation: Conversation, roundId: string, participant
   return response?.outcome === 'commentary' ? response : undefined
 }
 
-/**
- * What `startRound` takes beyond the author's own message, for the two rounds
- * SPEC "The round" has addressed by the act rather than by the words: replying
- * to a response names a participant directly, and asking one for a concrete
- * change names the response it is asking about instead of carrying a message
- * at all. Absent, the message (if any) is read for addressing the ordinary way.
- */
 export type RoundOpening =
   | Readonly<{ kind: 'targeted'; target: string }>
   | Readonly<{ kind: 'ask'; respondingTo: RespondingTo; clarification: string | undefined }>
 
-/** A round under way, as the room tracks it while it runs. */
 type ActiveRound = {
   readonly kind: 'round'
   readonly pieceId: string
@@ -156,61 +132,28 @@ type ActiveRound = {
   readonly states: Map<string, 'preparing' | 'working'>
   readonly settled: RoundParticipantRecord[]
   readonly controller: AbortController
-  /** Stamped once, where the round opens, so the event and the snapshot agree. */
   readonly openedAt: number
-  /** Present exactly where this round is asking its one participant for a concrete change. */
   readonly ask: AskContext | undefined
 }
 
 type RunningRound = ActiveRound & {
-  /**
-   * The round's own completion, held by the object that represents the round: a
-   * round outlives the request that opened it, so a caller that needs to know it
-   * is over can await this instead of watching for its absence. It settles rather
-   * than rejects however the round ended — the room handles its own failure — so
-   * awaiting it is never itself a way to be handed an unowned rejection.
-   */
   readonly settlement: Promise<void>
 }
 
-/**
- * An application under way. Unlike a round it outlives nothing — the request
- * that started it is the request that reads its result — so there is no
- * settlement to hold and nothing to snapshot: a client that reloaded mid-call
- * has no `applying` state to restore, only the request it is already waiting
- * on.
- */
 type ActiveApply = {
   readonly kind: 'apply'
   readonly pieceId: string
   readonly controller: AbortController
 }
 
-/**
- * A context capture under way. SPEC "Operation state": `capturing` is
- * abandonable and outlives nothing beyond the call itself — once it settles,
- * the proposals it returned travel to the client on the same response and the
- * room is free again, on the same terms `ActiveApply` is.
- */
 type ActiveCapture = {
   readonly kind: 'capture'
   readonly pieceId: string
   readonly controller: AbortController
 }
 
-/**
- * SPEC "Operation state": one author-initiated model operation at a time,
- * whichever kind it is — the lock is the room's single `#operation` field
- * regardless, and only a round has more to say about itself while it runs.
- */
 type ActiveOperation = RunningRound | ActiveApply | ActiveCapture
 
-/**
- * SPEC "Seams": the room boundary owns the operations the author starts —
- * start one, abandon the current one, subscribe to its events. SPEC
- * "Operation state": one round is in flight per piece at a time; a second
- * start is refused rather than queued.
- */
 export class Room {
   readonly #modelAccess: ModelAccess
   readonly #readDurableContext: ReadDurableContext
@@ -223,15 +166,6 @@ export class Room {
   readonly #storyEditor: RoleDefinition
   readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
   readonly #listeners = new Map<string, Set<Listener>>()
-  /**
-   * SPEC "Model access": there is no scheduler, and no runtime is ever asked to
-   * hold more than one call. The room is one object for the whole studio, so
-   * that bound is the room's to keep rather than each piece's — two pieces open
-   * at once would otherwise issue concurrent calls against the single local
-   * model. Hence one operation and not a map: the piece it belongs to is a
-   * field on it, so that a snapshot or an abandon naming a different piece
-   * finds nothing rather than reaching this one.
-   */
   #operation: ActiveOperation | undefined = undefined
 
   constructor(
@@ -256,12 +190,6 @@ export class Room {
     this.#criteria = roster.criteria
   }
 
-  /**
-   * The room's own roster, for the one surface outside a round that needs to
-   * name who could ever be in it (#13: listing a piece's specialists to enable
-   * or disable them). The Story Editor is never part of this — CONTEXT "Room":
-   * "the Story Editor is always present and is not one of them".
-   */
   specialists(): readonly RoleDefinition[] {
     return this.#specialists
   }
@@ -298,25 +226,6 @@ export class Room {
     }
   }
 
-  /**
-   * SPEC "The room is the only parser, and a round that names its target is not
-   * parsed at all": `opening` absent reads the ordinary way — addressing is
-   * parsed out of `message`, and is the only thing it is parsed for. `opening`
-   * present is a round the author opened from a particular response — replying
-   * to it, addressed to that participant by the act rather than by the words
-   * (`message` still carries the author's own text verbatim, sent rather than
-   * parsed), or asking it for a concrete change, which carries no message at
-   * all and resolves the response being asked about here, once, so nothing
-   * downstream reads the conversation a second time to find it. Addressing a
-   * specialist that is not enabled enables it — the same durable write to
-   * `piece.yaml` as enabling it directly — before the round opens, on the same
-   * terms whichever way the round was addressed.
-   *
-   * `message` is optional because a round can be opened by an act rather than
-   * by something the author typed, and CONTEXT "Round" keeps the record honest
-   * about which it was rather than composing words on the author's behalf.
-   * There is then nothing to read for addressing, so nothing is read.
-   */
   async startRound(
     workspaceDir: string,
     pieceId: string,
@@ -398,20 +307,6 @@ export class Room {
     })
     this.#logger.info({ pieceId, conversationId, roundId, participants, brought }, 'round opened')
 
-    // The round is under way before there is a promise to represent it, so the
-    // operation is completed rather than mutated: the states map and the settled
-    // list are the same objects the running round writes into, so what a
-    // snapshot reads is the round's own progress and not a copy of its start.
-    // Clearing the operation is what frees the room, so it happens whichever way
-    // the round ended.
-    //
-    // The rejection handler is what makes the round owned rather than floating
-    // (CODING_STANDARDS "Async work and cancellation"). The round is the room's
-    // own operation and nothing above the room can act on its collapse — the
-    // request that opened it was answered long before — so the room is the seam
-    // that handles it: it states the failure to whoever is watching the piece,
-    // and the settlement resolves rather than rejects, so a caller holding it is
-    // told the round is over and not handed a second unowned rejection.
     const settlement = this.#run(workspaceDir, pieceId, conversationId, plan, draft, round)
       .catch((err: unknown) => {
         this.#fail(pieceId, roundId, 'UNEXPECTED_FAILURE', failureText(err), err)
@@ -424,12 +319,6 @@ export class Room {
     return { conversationId, roundId }
   }
 
-  /**
-   * The round in flight for a piece, as something to wait on. A round settles
-   * after the request that opened it has already been answered, so a caller that
-   * needs the round finished — rather than merely started — has nothing else to
-   * hold; watching for the round's absence would be a polling loop.
-   */
   settlement(pieceId: string): Promise<void> | undefined {
     const operation = this.#operationFor(pieceId)
     return operation?.kind === 'round' ? operation.settlement : undefined
@@ -439,25 +328,6 @@ export class Room {
     this.#operationFor(pieceId)?.controller.abort()
   }
 
-  /**
-   * CONTEXT "Apply"/SPEC "Applying a recommendation": one call, its result
-   * reached by the request that asked for it — there is no round to open and
-   * no participant is called, so nothing here touches the room's own event
-   * stream. The manuscript's read-only lock is this method's own duration:
-   * held from the moment the operation is claimed to the `finally` that
-   * releases it, whichever way the call ends.
-   *
-   * Everything the call is compiled from is read before the lock is taken —
-   * a piece, a conversation or a recommendation this method cannot find is a
-   * refusal that never touches `#operation`, on the same terms `startRound`
-   * refuses before touching it.
-   *
-   * CONTEXT "Applied change": a settled call that actually changed the
-   * manuscript is also the one place that change is computed and persisted —
-   * from the manuscript states either side, never from anything a
-   * participant returned. A call whose manuscript came back identical to the
-   * draft it started from has nothing to keep a record of.
-   */
   async apply(
     workspaceDir: string,
     pieceId: string,
@@ -510,20 +380,6 @@ export class Room {
     }
   }
 
-  /**
-   * CONTEXT "Capture context"/SPEC "Context capture": one call, its
-   * proposals reached by the request that asked for it, on the same terms
-   * `apply` is — no round opens, no participant is called, and the lock is
-   * held only for the call's own duration. Unlike `apply`, nothing here holds
-   * the manuscript read-only: "the author keeps writing while it runs" is
-   * true by construction, because this method never touches the editor's
-   * lock at all.
-   *
-   * `conversation` absent — a piece with no rounds yet — reads as no history,
-   * the same declared absence `compileCaptureContext` already has a branch
-   * for, rather than a refusal: CONTEXT "Capture context" asks nothing of a
-   * conversation that a fresh piece cannot answer.
-   */
   async capture(
     workspaceDir: string,
     pieceId: string,
@@ -559,18 +415,6 @@ export class Room {
     }
   }
 
-  /**
-   * CONTEXT "Capture context"/SPEC "Context capture": "only approved
-   * proposals are written... each destination is its own write". No model
-   * call and no lock: this is a plain persistence operation, on the same
-   * terms a draft save is, because there is nothing here for `#operation` to
-   * protect — reading and writing a context file races with nothing else
-   * that touches it.
-   *
-   * Each destination is read fresh and written independently, so a failure
-   * on one leaves the other's write standing rather than rolling it back —
-   * there is no transaction over the two files to roll back with.
-   */
   async approveCapture(workspaceDir: string, pieceId: string, approved: readonly CaptureProposal[]): Promise<CaptureApproveOutcome> {
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
@@ -606,18 +450,6 @@ export class Room {
     return { written, failures }
   }
 
-  /**
-   * A failure of the room's own, rather than of a participant's call. Both
-   * events go out and in this order: the code is the notice the author is shown,
-   * and the close is what stops the round being drawn as still running (SPEC
-   * "Operation state"). Emitting one without the other is how a round becomes
-   * permanently in flight in the client's projection.
-   *
-   * This is also the one place the room logs a failure, so the log and the notice
-   * cannot disagree about what happened. `cause` is carried for the log alone —
-   * the author reads `message`, and a stack trace is a diagnostic fact that
-   * belongs to stderr.
-   */
   #fail(pieceId: string, roundId: string, code: RoomFailureCode, message: string, cause: unknown): void {
     this.#logger.error({ pieceId, roundId, code, err: cause }, 'round failed')
     this.#emit(pieceId, { type: 'error', data: { code, message } })
@@ -636,9 +468,6 @@ export class Room {
     try {
       existing = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
     } catch (err) {
-      // A conversation file the store cannot read is the one failure the round
-      // meets before it has done anything, and it is the author's to act on —
-      // the round never opens against a record the studio would then overwrite.
       if (err instanceof TolerantReadError) {
         this.#fail(pieceId, plan.roundId, 'CONVERSATION_UNREADABLE', err.message, err)
         return
@@ -646,12 +475,6 @@ export class Room {
       throw err
     }
 
-    // Both durable contexts, read before the round's first prompt is compiled
-    // (SPEC "Files"). A hand-edited file the store refuses is the author's to
-    // act on and is stated in the same breath as an unreadable conversation:
-    // running the round without it would put every participant to work without
-    // the standing instructions they are supposed to answer from, and say
-    // nothing about it.
     let durableContext: CompiledDurableContext
     try {
       durableContext = this.#readDurableContext(workspaceDir, pieceId)
@@ -663,11 +486,6 @@ export class Room {
       throw err
     }
 
-    // Nothing is caught around the round itself. Every outcome a participant call
-    // can have is already a record the round returns, so anything thrown here is
-    // something the room has no vocabulary for — and the handler on this
-    // promise's own settlement is what owns it, closing the round and naming the
-    // failure once, rather than each throwing site doing half of that.
     const result: RoundResult = await this.#runRound(pieceId, plan, draft, durableContext, existing, operation)
 
     const record: RoundRecord = {
@@ -686,10 +504,6 @@ export class Room {
         rounds: [...(existing?.rounds ?? []), record],
       })
     } catch (err) {
-      // The round happened and cannot be un-happened, but it is not on disk, so
-      // the author is told rather than left to discover on the next reload that
-      // the exchange they just read is gone. The close carries `failed` for the
-      // same reason: what settled did not become part of the record.
       this.#fail(
         pieceId,
         plan.roundId,
@@ -704,20 +518,6 @@ export class Room {
     this.#logger.info({ pieceId, roundId: plan.roundId, outcome: result.outcome }, 'round closed')
   }
 
-  /**
-   * SPEC "The round": compiles every eligible specialist's context before any
-   * call is issued, calls them one at a time in the cast's order, then — where
-   * the round will reach it — compiles and calls the Story Editor over what
-   * settled. Abandonment stops the round at the call in flight: calls not yet
-   * issued are never issued and never appear in the result, and no Story Editor
-   * call is attempted.
-   *
-   * Every one of those promises is announced or observed at the room's own event
-   * stream: `round.opened` carries the roster in the order the round will call
-   * it, each `participant.settled` lands in the order the calls settled, and
-   * `round.closed` carries the outcome. That is why the loop is private — the
-   * interface a caller has already states everything it does.
-   */
   async #runRound(
     pieceId: string,
     plan: RoundPlan,
@@ -753,10 +553,6 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.settled', data: { roundId: plan.roundId, participantId, result: record.result } })
     }
 
-    // Every specialist's prompt, complete, before the first call goes out. The
-    // list is built rather than a map keyed by id so that iterating it needs no
-    // lookup and therefore no branch for a lookup that missed — a `continue` on
-    // an absent prompt would silently drop a specialist from the round.
     const calls = plan.specialists.map((role) => {
       const owesAnswer = plan.addressedIds.includes(role.id)
       return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
@@ -788,11 +584,6 @@ export class Room {
         abandoned = true
       } else {
         const evidence = evidenceFrom(records)
-        // Addressed directly, it owes an answer for the ordinary reason. With no
-        // readings to weigh it owes one too: SPEC "The round" has the round that
-        // produced no answer saying so, and a Story Editor free to return no
-        // comment on a quiet round would leave the author with a round that
-        // reported nothing and explained nothing.
         const owesAnswer = plan.addressedIds.includes(storyEditor.id) || evidence.length === 0
         const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence), this.#charter)
         const record = await callParticipant(storyEditor, prompt, owesAnswer, this.#modelAccess, signal, (state) =>

@@ -12,23 +12,8 @@ type PiecesScreenProps = {
   readonly workspace: string
 }
 
-/**
- * PRD "Move on to the next piece"/"Say where the work lives": the screen the
- * studio launches into. Model assignment is a place the author goes from
- * here (UX_DESIGN "Prominence"), alongside the theme, creating, listing and
- * opening pieces.
- *
- * The workspace directory heads it in the facts register, because this is the
- * one screen where which directory the author is looking at is the standing
- * question. The listing itself is the list: creating a piece is a control under
- * the closing rule, and the field arrives when the author reaches for it rather
- * than standing empty above their own stories.
- */
 export function PiecesScreen({ workspace }: PiecesScreenProps) {
   const [openedId, setOpenedId] = useState<string | undefined>(undefined)
-  // Bumped on return from an opened piece, so the listing re-scans rather
-  // than going on showing whatever it read before that piece was retitled,
-  // marked finished or abandoned, or simply written to.
   const [refreshKey, setRefreshKey] = useState(0)
   const pieces = usePieces(refreshKey)
   const theme = useTheme()

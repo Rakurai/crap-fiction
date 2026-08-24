@@ -45,13 +45,6 @@ const fixtureRoles = [
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'z' },
 ]
 
-/**
- * Every site held open until the test releases it — the shape a busy-refusal
- * test needs, which an adapter that resolves on its own cannot give.
- * `release` may be called before the round ever reaches that site — calls
- * are sequential, so a test releasing every site upfront must not lose the
- * release racing against `invoke` registering its gate.
- */
 function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureBehavior>>): { room: Room; adapter: FixtureModelAdapter } {
   const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
   const modelAccess = adapter
@@ -60,9 +53,6 @@ function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureB
 }
 
 describe('Room', () => {
-  // The workspace sits inside the data root, as SPEC "Files" draws it: the
-  // author's durable context is beside the workspace rather than in it, so a
-  // room reading one needs the two nested the way the product has them.
   let dataRoot: string
   let workspaceDir: string
 
@@ -104,8 +94,6 @@ describe('Room', () => {
 
     await room.startRound(workspaceDir, cups.id, 'c1', 'a message', 'draft text')
 
-    // The refusal names the piece holding the round rather than the one asked
-    // for, because that is the one the author has to finish or abandon.
     await expect(room.startRound(workspaceDir, other.id, 'c2', 'a message', 'draft text')).rejects.toThrowError(
       new RoomBusyError(cups.id),
     )
@@ -131,8 +119,6 @@ describe('Room', () => {
     expect(conversation?.rounds[0]?.message).toBeUndefined()
     expect(conversation?.rounds[0]?.addressed).toEqual([])
     expect(conversation?.rounds[0]?.participants).toHaveLength(3)
-    // No message means no "Author's message" section reached any participant —
-    // nothing composes words the author did not write.
     expect(adapter.promptFor('shape')).not.toContain("Author's message")
   })
 
@@ -144,8 +130,6 @@ describe('Room', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
 
-    // The one artifact the round reads before it does anything, hand-broken:
-    // a conversation file the store will refuse rather than parse.
     mkdirSync(path.join(workspaceDir, piece.id, 'conversations'), { recursive: true })
     writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'c1.json'), '{ "id": 7 }', 'utf8')
 
@@ -153,31 +137,19 @@ describe('Room', () => {
     room.subscribe(piece.id, (event) => events.push(event))
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
-    // The record is the first thing the round reads, so this round may already be
-    // over before the call that started it returns; awaiting whatever settlement
-    // is still there covers both orders rather than depending on one.
     await room.settlement(piece.id)
 
-    // The author is told what happened in the product's own vocabulary, and the
-    // round stops being in flight — a failure that closed nothing would leave it
-    // drawn as running for the rest of the session.
     expect(events.map((event) => event.type)).toEqual(['round.opened', 'error', 'round.closed'])
     const failure = events.find((event) => event.type === 'error')
     expect(failure?.data).toMatchObject({ code: 'CONVERSATION_UNREADABLE' })
     const closed = events.find((event) => event.type === 'round.closed')
     expect(closed?.data).toMatchObject({ outcome: 'failed' })
 
-    // Nothing was called and nothing was written: the round never ran against a
-    // record the studio would then have overwritten, and the room is free again.
     expect(room.snapshot(piece.id)).toBeUndefined()
   })
 
   it('owns the round\'s own collapse: a seam that throws instead of failing closes the round and is stated, not rethrown into nothing', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    // A model seam that throws rather than returning one of the four stated
-    // failure reasons — the one thing `RoundResult` has no room for. Nothing
-    // above the room can act on it: the request that opened the round was
-    // answered before this happened, so if the room does not own it, nobody does.
     const broken: ModelAccess = {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
@@ -189,9 +161,6 @@ describe('Room', () => {
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
 
-    // The settlement resolves. That is the whole of "the promise has an owner":
-    // a rejection here would be the unhandled rejection that takes the process
-    // down and every open subscription with it.
     await expect(settlementOf(room, piece.id)).resolves.toBeUndefined()
 
     expect(events.map((event) => event.type)).toEqual(['round.opened', 'error', 'round.closed'])
@@ -201,8 +170,6 @@ describe('Room', () => {
     })
     expect(events.find((event) => event.type === 'round.closed')?.data).toMatchObject({ outcome: 'failed' })
 
-    // The room is free and nothing was written: a round that collapsed is not a
-    // round the author has to abandon before writing again.
     expect(room.snapshot(piece.id)).toBeUndefined()
     expect(readConversation(workspaceDir, piece.id, 'c1', conversationSchema)).toBeUndefined()
   })
@@ -249,8 +216,6 @@ describe('Room', () => {
 
     await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
     const settled = settlementOf(room, piece.id)
-    // The room announces the round's full roster at open — the cast's own
-    // call order is the round's fact and is proven there, not here.
     expect(events[0]).toBe('opened:shape,compression,story-editor')
 
     adapter.release('shape')
@@ -283,8 +248,6 @@ describe('Room', () => {
     const updated = readPiece(workspaceDir, piece.id)
     expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
 
-    // UX_DESIGN "Where the author speaks": the room says it now holds one more,
-    // at the round that brought the specialist in and in the record it left behind.
     const opened = events.find((event) => event.type === 'round.opened')
     expect(opened?.type === 'round.opened' && opened.data.brought).toEqual(['shape'])
 
@@ -326,15 +289,9 @@ describe('Room', () => {
     const { conversationId } = await room.startRound(workspaceDir, piece.id, 'c1', 'a message', 'draft text')
     await settlementOf(room, piece.id)
 
-    // Nothing landed anywhere in the round, and that reads as information at
-    // the boundary the author actually sees: a settled round, never the
-    // room's own `error` event.
     expect(events).not.toContain('error')
     expect(events[events.length - 1]).toBe('round.closed')
 
-    // What each participant's record holds is the round's own fact, proven at
-    // `round.test.ts`; this asserts the room writes such a round rather than
-    // treating an empty one as nothing worth persisting.
     const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
     expect(conversation?.rounds[0]?.outcome).toBe('settled')
     expect(conversation?.rounds[0]?.participants).toHaveLength(3)
@@ -353,15 +310,11 @@ describe('Room', () => {
     room.abandon(piece.id)
     await settled
 
-    // What an abandoned round keeps is the round's own fact, proven at
-    // `round.test.ts`; this asserts only that the room writes the record at
-    // all, on the same terms as a settled one.
     const conversation = readConversation(workspaceDir, piece.id, conversationId, conversationSchema)
     expect(conversation?.rounds[0]?.outcome).toBe('abandoned')
   })
 })
 
-/** A conversation whose first round left one applicable suggestion behind, ready to apply. */
 function conversationWithRecommendation(): Conversation {
   return {
     id: 'c1',
@@ -406,7 +359,6 @@ describe('Room.apply', () => {
     expect(adapter.promptFor('shape')).toBeUndefined()
     expect(adapter.promptFor('compression')).toBeUndefined()
     expect(adapter.promptFor('story-editor')).toBeUndefined()
-    // The room only ever reads the draft from the request, and it never writes one.
     expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
   })
 
@@ -429,11 +381,9 @@ describe('Room.apply', () => {
     await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
     const { room } = buildRoom(dataRoot, {})
 
-    // "compression" said nothing in this round at all — no participant record to find.
     await expect(room.apply(workspaceDir, piece.id, 'c1', 'r1', 'compression', undefined, 'draft')).rejects.toThrowError(
       RecommendationNotFoundError,
     )
-    // A refused apply never touches the lock: the room is free for the next thing the author does.
     expect(room.snapshot(piece.id)).toBeUndefined()
   })
 
@@ -481,8 +431,6 @@ describe('Room.apply', () => {
     room.abandon(piece.id)
     await expect(applying).resolves.toEqual({ outcome: 'abandoned' })
 
-    // The lock released, and the recommendation was never touched — a second
-    // attempt reaches the model the same way the first did.
     expect(room.snapshot(piece.id)).toBeUndefined()
     adapter.release('apply')
     const second = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
@@ -580,9 +528,6 @@ describe('Room.capture', () => {
     expect(adapter.promptFor('capture')).toContain('The cups sat where she left them.')
     expect(adapter.promptFor('capture')).toContain('cut the second paragraph')
 
-    // A conversation id naming nothing yet — CONTEXT "Conversation": starting
-    // one is an intention until its first round opens — is no refusal, since
-    // #18 asks nothing of it a fresh piece cannot answer.
     await room.capture(workspaceDir, piece.id, 'c2', 'text')
   })
 
@@ -707,9 +652,6 @@ describe('Room.approveCapture', () => {
   it('SPEC "Context capture": keeps the destination that succeeded when the other write fails, naming which one', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom(dataRoot, {})
-    // The piece's own directory, made unwritable so the story context write
-    // fails while the author context — beside the workspace, not inside the
-    // piece — is untouched by it.
     chmodSync(path.join(workspaceDir, piece.id), 0o500)
 
     const outcome = await room.approveCapture(workspaceDir, piece.id, [
@@ -722,8 +664,7 @@ describe('Room.approveCapture', () => {
     expect(outcome.failures[0]?.destination).toBe('storyContext')
     expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
 
-    // Restored before cleanup: `rmSync` needs to unlink files inside this
-    // directory, which needs write permission on the directory itself.
+    // `rmSync` at cleanup cannot unlink inside a directory it has no write permission on.
     chmodSync(path.join(workspaceDir, piece.id), 0o700)
   })
 
@@ -734,7 +675,6 @@ describe('Room.approveCapture', () => {
   })
 })
 
-/** A conversation whose first round left one reading behind, worth asking a concrete change about. */
 function conversationWithCommentary(): Conversation {
   return {
     id: 'c1',
@@ -751,11 +691,6 @@ function conversationWithCommentary(): Conversation {
   }
 }
 
-/**
- * #16 "Reply, and ask for a concrete change": both open ordinary rounds
- * addressed by the act rather than by the words (SPEC "The room is the only
- * parser, and a round that names its target is not parsed at all").
- */
 describe('Room.startRound — a round the author opened from a particular response', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -778,9 +713,6 @@ describe('Room.startRound — a round the author opened from a particular respon
       'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
     })
 
-    // The message names "@compression" — were it parsed the ordinary way, that
-    // sigil alone would address compression instead. A supplied target is the
-    // whole of the addressing, so it is not parsed at all.
     await room.startRound(workspaceDir, piece.id, 'c1', 'say more about that, @compression', 'draft text', { kind: 'targeted', target: 'shape' })
     await settlementOf(room, piece.id)
 
@@ -823,9 +755,6 @@ describe('Room.startRound — a round the author opened from a particular respon
     expect(opened?.type === 'round.opened' && opened.data.participants).toEqual(['shape'])
     expect(opened?.type === 'round.opened' && opened.data.message).toBeUndefined()
 
-    // The reading and the author's clarification reach the call, but the
-    // deterministic instruction that makes it concrete is never carried as
-    // the author's own message — CONTEXT "Round" keeps that record honest.
     expect(adapter.promptFor('shape')).toContain('The entry is late.')
     expect(adapter.promptFor('shape')).toContain('what would you cut')
     expect(adapter.promptFor('shape')).not.toContain("Author's message")
@@ -843,7 +772,6 @@ describe('Room.startRound — a round the author opened from a particular respon
     await writeConversation(workspaceDir, piece.id, 'c1', conversationWithCommentary())
     const { room } = buildRoom(dataRoot, {})
 
-    // "compression" said nothing in round "r1" at all — no participant record to find.
     await expect(
       room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text', {
         kind: 'ask',
@@ -855,12 +783,6 @@ describe('Room.startRound — a round the author opened from a particular respon
   })
 })
 
-/**
- * A round settles after the call that started it has already returned, so a test
- * that asserts on what the round left behind waits on the room's own settlement
- * rather than polling for the round's absence. An absent one means the round was
- * never in flight, which is the test's own failure to start it.
- */
 function settlementOf(room: Room, pieceId: string): Promise<void> {
   const settlement = room.settlement(pieceId)
   if (settlement === undefined) throw new Error(`no round in flight for "${pieceId}"`)

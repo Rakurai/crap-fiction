@@ -1,12 +1,6 @@
 import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
 import type { RoleDefinition } from './roles.js'
 
-/**
- * SPEC "Model access": applying a recommendation and capturing context are
- * each assigned a model the same way a participant is, without being
- * participants themselves — so neither carries a role description or a
- * handle: an operation is never something the author addresses.
- */
 export const OPERATION_CALL_SITES = ['apply', 'capture'] as const
 
 export type OperationCallSite = (typeof OPERATION_CALL_SITES)[number]
@@ -32,12 +26,6 @@ export type CallSiteDescriptor = Readonly<{
   roleDescription: string | null
 }>
 
-/**
- * SPEC "Files"/"Model access": the call site is the whole of what the model
- * interface knows about the caller — a participant, or one of the two
- * operations. This is every site that may be assigned a model, participants
- * first, in the role roster's order.
- */
 export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDescriptor[] {
   for (const role of roles) {
     if (OPERATION_CALL_SITES.some((site) => site === role.id)) {
@@ -51,7 +39,6 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
   ]
 }
 
-/** The named call site, or a declared `UnknownCallSiteError` for a route to translate. */
 export function requireCallSite(sites: readonly CallSiteDescriptor[], site: string): CallSiteDescriptor {
   const found = sites.find((candidate) => candidate.site === site)
   if (found === undefined) throw new UnknownCallSiteError(site)

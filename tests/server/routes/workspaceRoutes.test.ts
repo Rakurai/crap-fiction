@@ -44,11 +44,6 @@ describe('/workspace', () => {
     })
   })
 
-  /**
-   * That a directory outside the data root is refused and that nothing is left set
-   * are the registry's, asserted at `server/workspace.test.ts`. What the route owes
-   * is the status and the code that refusal becomes on the wire.
-   */
   it('refuses a workspace outside the data root as a 400 naming the reason', async () => {
     const putRes = await buildApp().request('/workspace', {
       method: 'PUT',

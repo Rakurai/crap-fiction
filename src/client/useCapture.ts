@@ -10,25 +10,16 @@ export type CaptureAdapters = Readonly<{
 
 export type CaptureViewModel = Readonly<{
   capturing: boolean
-  /** The proposals the review currently holds — CONTEXT "Capture context": nothing survives a closed review, so this is empty outside one. */
   proposals: readonly CaptureProposal[]
   approved: ReadonlySet<string>
   closing: boolean
   error: string | undefined
   capture: () => void
   toggle: (id: string) => void
-  /** SPEC "Context capture": writes only the approved proposals, then discards the rest — or, with nothing approved, discards without a request at all. */
   close: () => void
-  /** Leaves the review with nothing written, on the same terms ignoring every proposal individually would. */
   discard: () => void
 }>
 
-/**
- * CONTEXT "Capture context"/SPEC "Context capture": one call, its proposals
- * held here for the life of the review and nowhere else — the room keeps no
- * memory of them between the capture request and the approval, so a reload
- * mid-review loses this state and the author invokes the analysis again.
- */
 export function useCapture(pieceId: string, conversationId: string | null, getDraft: () => string, adapters: CaptureAdapters): CaptureViewModel {
   const { captureContext, approveCapture } = adapters
   const [capturing, setCapturing] = useState(false)
@@ -61,7 +52,6 @@ export function useCapture(pieceId: string, conversationId: string | null, getDr
         setError(`the analysis did not settle — ${outcome.reason}`)
         return
       }
-      // Abandoned: nothing is said, on the same terms an abandoned apply is silent.
     }
 
     void run().catch((err: unknown) => {
@@ -109,11 +99,6 @@ export function useCapture(pieceId: string, conversationId: string | null, getDr
         return
       }
 
-      // SPEC "Context capture": "the review stays open with the failure
-      // stated and its proposals still approved" — every proposal for a
-      // destination that failed stays, approved or not, since that
-      // destination's review has not concluded; a destination that landed
-      // is gone regardless of what it held.
       const failed: ReadonlySet<CaptureDestination> = new Set(outcome.failures.map((failure) => failure.destination))
       const stillOpen = proposals.filter((proposal) => failed.has(proposal.destination))
       setProposals(stillOpen)

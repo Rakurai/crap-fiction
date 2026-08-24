@@ -8,7 +8,6 @@ export type ApplyAdapters = Readonly<{
   abandonOperation: typeof abandonOperationFn
 }>
 
-/** The response mid-application, identified the way a response is: the round and the participant it came from. */
 export type ApplyingResponse = Readonly<{ roundId: string; participantId: string }>
 
 export type ApplyViewModel = Readonly<{
@@ -18,17 +17,6 @@ export type ApplyViewModel = Readonly<{
   abandon: () => void
 }>
 
-/**
- * CONTEXT "Apply"/SPEC "Applying a recommendation": one call, reached by the
- * request that asked for it rather than by an event. Nothing new is said on
- * success beyond the manuscript changing and, where it did, the applied
- * change presented on the response that caused it (`onChangeApplied`) —
- * and it is silent on abandonment too, which UX_DESIGN "Degraded and absent
- * states" leaves identical to the author's eye. Only a failure says
- * anything, and even then the recommendation stays applicable: nothing here
- * disables it, remembers that this attempt happened, or reasons about
- * whether trying again is wise.
- */
 export function useApply(
   pieceId: string,
   conversationId: string | null,
@@ -73,13 +61,9 @@ export function useApply(
         stop(`the application did not settle — ${outcome.reason}`)
         return
       }
-      // Abandoned: nothing is said, on the same terms a settled abandon is silent.
       stop(undefined)
     }
 
-    // See `useConversation.sendMessage`: nothing above returns a rejected
-    // promise for any outcome the studio can have, so this catch is for the
-    // one case left — something here threw before the request was even sent.
     void run().catch((err: unknown) => {
       stop(err instanceof Error ? err.message : 'the application was not sent')
     })

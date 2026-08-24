@@ -7,7 +7,6 @@ type WorkspacePromptProps = {
   readonly onSubmit: (candidate: string) => void
 }
 
-/** The only surface on screen while no workspace is configured (SPEC "Files"). */
 export function WorkspacePrompt({ error, submitting, onSubmit }: WorkspacePromptProps) {
   const [path, setPath] = useState('')
 

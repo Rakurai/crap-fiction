@@ -12,12 +12,6 @@ function isInside(root: string, target: string): boolean {
   return target === root || target.startsWith(root + path.sep)
 }
 
-/**
- * Resolves `candidate` against `root` and refuses anything that lands
- * outside it, lexically or through a symlink (SPEC "Local exposure").
- * Symlink resolution only applies once a path exists — nothing about to
- * be created has a real path to check yet.
- */
 export function resolveWithinRoot(root: string, candidate: string): string {
   const resolvedRoot = path.resolve(root)
   const resolvedCandidate = path.resolve(resolvedRoot, candidate)

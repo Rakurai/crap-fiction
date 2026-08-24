@@ -4,19 +4,6 @@ import { MarkdownParser, MarkdownSerializer } from 'prosemirror-markdown'
 import type { Node } from 'prosemirror-model'
 import { documentSchema } from './schema.js'
 
-/**
- * Constructs not in the document schema are read as the prose they contain
- * rather than refused (SPEC "Markdown source offering one of them is read
- * as the prose it contains rather than refused"). This is the enumerated,
- * closed list of tolerances, applied at this parsing seam only:
- *
- * - lists and block quotes lose their wrapper; their paragraphs remain
- * - links lose their href; their text remains
- * - images and inline code become the plain text they carry (alt, code)
- * - raw HTML is inert with `html: false`, so it reads as literal text
- *
- * A hard break is not among them: it is in the schema and is parsed as itself.
- */
 function tolerateUnadmittedLeaves(state: StateCore): void {
   for (const token of state.tokens) {
     if (token.type !== 'inline' || !token.children) continue
@@ -66,14 +53,8 @@ const serializer = new MarkdownSerializer(
       state.write('---')
       state.closeBlock(node)
     },
-    /**
-     * A backslash before the newline, which is the one CommonMark spelling of a hard
-     * break that survives being read again — two trailing spaces are invisible in
-     * the source view and are stripped by anything that trims lines. A break at the
-     * end of a paragraph is written as nothing, because there is no following line
-     * for it to break and the newline the paragraph already ends with would read as
-     * an escape of it.
-     */
+    // A backslash is the only hard-break spelling that survives a round trip;
+    // two trailing spaces are stripped by anything that trims lines.
     hardBreak(state, node, parent, index) {
       for (let after = index + 1; after < parent.childCount; after++) {
         if (parent.child(after).type !== node.type) {
@@ -92,22 +73,14 @@ const serializer = new MarkdownSerializer(
   },
 )
 
-/** Parses Markdown into the manuscript's document model. */
 export function markdownToDocument(markdown: string): Node {
   return parser.parse(markdown)
 }
 
-/** Serializes the manuscript's document model back into Markdown. */
 export function documentToMarkdown(document: Node): string {
   return serializer.serialize(document)
 }
 
-/**
- * The editor integration's own view of the manuscript: TipTap's `content`
- * option and `getJSON()` both traffic in this shape rather than a
- * ProseMirror `Node`, so the seam between the document model and the editor
- * is JSON, never a `Node` built by one schema instance handed to another's.
- */
 export function markdownToEditorContent(markdown: string): JSONContent {
   return markdownToDocument(markdown).toJSON()
 }

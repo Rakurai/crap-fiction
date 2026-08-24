@@ -4,24 +4,6 @@ import { substantiveResponse, type ParticipantResult, type RoundParticipantRecor
 import { responseValueSchema, type EligibleResponseValue, type OwedResponseValue } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
-/**
- * The round's own vocabulary — the plan it runs to, the result it reaches, and
- * the two steps every round takes for each participant. The loop itself is the
- * room's private method rather than a function here: SPEC "Seams" makes the
- * round loop internal to the room boundary, and everything it guarantees is
- * observable at the room's own event stream, so an exported loop would be a
- * second surface making the same promises one module further from the interface
- * that carries them.
- */
-
-/**
- * SPEC "The room"/"The round": what a round asking for a concrete change carries
- * that no other round does — the response it is asking about, resolved to the
- * claim and note that made it worth asking, and the author's own clarification
- * where they gave one. `respondingTo` is kept here rather than derived again at
- * render time because it is what the conversation record and the live event both
- * name the response by.
- */
 export type AskContext = Readonly<{
   claim: string
   note: string | undefined
@@ -32,15 +14,10 @@ export type AskContext = Readonly<{
 export type RoundPlan = Readonly<{
   roundId: string
   message: string | undefined
-  /** Ids the author's message (or the act that opened the round) addressed. Empty means the round names no one. */
   addressedIds: readonly string[]
-  /** Ids addressing durably enabled for this round — a subset of `addressedIds`, and ordinarily empty. */
   brought: readonly string[]
-  /** The specialists this round will call, in the order it will call them. */
   specialists: readonly RoleDefinition[]
-  /** Present, and last, exactly where the round will reach the Story Editor (CONTEXT "Round"). */
   storyEditor: RoleDefinition | undefined
-  /** Present exactly where this round asks the one participant it addresses for a concrete change. */
   ask: AskContext | undefined
 }>
 
@@ -49,32 +26,13 @@ export type RoundResult = Readonly<{
   outcome: 'settled' | 'abandoned'
 }>
 
-/**
- * Carries a parsed response into the discriminated shape the conversation
- * record and every reader of it use.
- *
- * The claim-absent branch is unreachable by contract:
- * `eligibleResponseValueSchema` refuses a claimless response that says
- * something, and the owed schema types the claim as present. It is still
- * written, because SPEC "Model access" keeps that schema three flat fields for
- * constrained decoding's sake rather than a union, so the guarantee lives in a
- * `.refine` the inferred type cannot express. Reaching it would mean the schema
- * and its refinement had come apart — which is a response that does not conform,
- * and `nonconforming` is what the model boundary already calls that. A claim
- * invented here instead would be prose the author never received.
- */
 function toParticipantResult(value: EligibleResponseValue | OwedResponseValue): ParticipantResult {
   if (value.outcome === 'noComment') return { kind: 'response', outcome: 'noComment' }
+  // Unreachable: the schema refines a claim onto every non-noComment outcome, which the inferred type cannot express.
   if (value.claim === undefined) return { kind: 'failed', reason: 'nonconforming' }
   return { kind: 'response', outcome: value.outcome, claim: value.claim, note: value.note }
 }
 
-/**
- * One participant's call, from the schema its eligibility selects through to the
- * record the conversation keeps. Which schema that is — whether a reply saying
- * nothing is admissible at all — is the whole of what owing an answer changes at
- * the model boundary, so it is decided here and nowhere else.
- */
 export async function callParticipant(
   role: RoleDefinition,
   prompt: string,
@@ -96,10 +54,6 @@ export async function callParticipant(
   return { participantId: role.id, result: participantResult }
 }
 
-/**
- * The readings a round produced, as the Story Editor weighs them. A no-comment
- * outcome and a failure are not readings and never appear (CONTEXT "Response").
- */
 export function evidenceFrom(records: readonly RoundParticipantRecord[]): readonly ParticipantEvidence[] {
   return records.flatMap((record) => {
     const response = substantiveResponse(record.result)

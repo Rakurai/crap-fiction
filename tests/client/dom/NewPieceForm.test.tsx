@@ -12,7 +12,7 @@ describe('creating a piece', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'new piece' }))
 
-    expect(screen.getByLabelText('title')).toBe(screen.getByRole('textbox')) // named on screen, not only to assistive technology
+    expect(screen.getByLabelText('title')).toBe(screen.getByRole('textbox'))
   })
 
   it('withdraws the field on the keystroke that leaves everything else', () => {

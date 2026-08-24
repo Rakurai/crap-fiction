@@ -14,12 +14,6 @@ const HANDLES = [
   { handle: 'editor', displayName: 'Story Editor' },
 ]
 
-/**
- * What a fixture built as `RoundRecord`s reads back as once `getConversation`
- * has resolved it — CONTEXT "Applied change": a conversation fresh off disk
- * names no applied change until the store attaches one, which is exactly
- * what a bare fixture is.
- */
 function toView(conversation: ConversationRecord): ConversationView {
   return {
     id: conversation.id,
@@ -30,11 +24,6 @@ function toView(conversation: ConversationRecord): ConversationView {
   }
 }
 
-/**
- * The room, stood still: this surface is being read, not driven, so the stream
- * yields nothing and the conversation is whatever the fixture recorded. Sending a
- * message is exercised where it is decided — `useConversation` and `Room`.
- */
 function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null })): RoomAdapters {
   return {
     subscribeToRoom: () => () => {},
@@ -48,10 +37,6 @@ function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAda
 
 const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
 
-/**
- * A moment, stated. The elapsed count is read from `clock`, so a test that wants
- * `0:14` on screen says which fourteen seconds rather than sleeping through them.
- */
 const OPENED_AT = 1_700_000_000_000
 
 function renderConversation(round: RoundRecord, extra: Partial<ComponentProps<typeof Conversation>> = {}) {
@@ -75,7 +60,6 @@ function renderConversation(round: RoundRecord, extra: Partial<ComponentProps<ty
   )
 }
 
-/** The block a response was drawn in: what carries its identity and what it said. */
 function blockContaining(text: string): HTMLElement {
   const said = screen.getByText(text)
   const block = said.parentElement
@@ -155,9 +139,6 @@ describe('a settled round in the conversation', () => {
 
     await waitFor(() => expect(screen.getByText(/did not answer/)).toBeTruthy())
 
-    // What came back is said in the machine's register rather than folded into a
-    // sentence about the author's work, and it stands under the participant's own
-    // identity rather than as an unattributed silence.
     expect(screen.getByText('did not answer — TIMEOUT')).toBeTruthy()
     expect(blockContaining('did not answer — TIMEOUT').textContent).toContain('Shape')
   })
@@ -171,8 +152,6 @@ describe('a settled round in the conversation', () => {
       outcome: 'settled',
     })
 
-    // Verbatim, not summarised and not re-cased: it is the only account the author
-    // has of what the model did, and SPEC "Model access" carries it for that.
     await waitFor(() => expect(screen.getByText('{"claim": "the ending')).toBeTruthy())
   })
 
@@ -191,7 +170,6 @@ describe('a settled round in the conversation', () => {
 
     await waitFor(() => expect(screen.getByText('Every call failed. Nothing came back, and there is no answer to show you.')).toBeTruthy())
     expect(screen.getAllByText(/Every call failed/)).toHaveLength(1)
-    // Each call still says what happened to it: the round's account does not replace them.
     expect(screen.getByText('did not answer — TIMEOUT')).toBeTruthy()
     expect(screen.getByText('did not answer — UNREACHABLE')).toBeTruthy()
   })
@@ -240,8 +218,6 @@ describe('a round in flight', () => {
       clock: () => OPENED_AT,
     })
 
-    // The mockup's own line, in its own order, with the counts that are zero left
-    // out — `0 PREPARING` is a fact about nothing.
     await waitFor(() => expect(screen.getByText('1 WORKING · 2 WAITING · 0:14')).toBeTruthy())
   })
 
@@ -260,7 +236,6 @@ describe('a round in flight', () => {
 
     const input = await screen.findByLabelText('Message the room')
 
-    // Sending is what waits, and the button is where that is said.
     expect((input as HTMLInputElement).disabled).toBe(false)
     expect((screen.getByRole('button', { name: '…' }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -312,8 +287,6 @@ describe('a room that cannot be reached', () => {
 
     await screen.findByText('It holds.')
 
-    // A probe that has not answered is not an unreachable room, and a notice drawn
-    // from it would tell the author the room is down on this client's own silence.
     expect(screen.queryByText('ROOM UNAVAILABLE')).toBeNull()
   })
 })
@@ -346,7 +319,6 @@ describe('a specialist the addressing brought into the room', () => {
   })
 })
 
-/** A settled round with one applicable suggestion, ready to apply. */
 const ROUND_WITH_RECOMMENDATION: RoundRecord = {
   id: 'r1',
   addressed: [],
@@ -482,7 +454,6 @@ describe('replying to a response', () => {
     )
     expect((field as HTMLInputElement).value).toBe('')
 
-    // The reply went straight to the room rather than into the main input.
     expect((screen.getByLabelText('Message the room') as HTMLTextAreaElement).value).toBe('')
   })
 })

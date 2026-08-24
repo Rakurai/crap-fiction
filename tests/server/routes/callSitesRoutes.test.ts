@@ -26,12 +26,6 @@ describe('call sites and models', () => {
     return buildTestApp(dataRoot, { roles: CALL_SITE_ROLES, runtimeStatus }).app
   }
 
-  /**
-   * Which call sites there are, what each carries and where an assignment shows as
-   * `null` are `callSites`'s own, asserted at `model/callSites.test.ts`. What the
-   * route owes is that the composed view reaches the author in the envelope's data
-   * field, whole and in the order the module built it.
-   */
   it('carries the composed call-site view in the envelope', async () => {
     const res = await buildApp().request('/call-sites')
 
@@ -71,13 +65,6 @@ describe('call sites and models', () => {
     expect(await res.json()).toMatchObject({ success: false, error: { code: 'CALL_SITE_NOT_FOUND' } })
   })
 
-  /**
-   * That an unanswering runtime reads as `{ reachable: false }` rather than as a
-   * thrown error is the adapter's, asserted at `model/lmStudioAdapter.test.ts`. The
-   * route's own claim is the one this asserts: a runtime that cannot be reached is
-   * still an answer, so it travels the envelope's success channel with a 200 and is
-   * never turned into a refusal the author would read as their own mistake.
-   */
   it('reports an unreachable runtime on the success channel rather than as a refusal', async () => {
     const res = await buildApp({ reachable: false }).request('/models')
 

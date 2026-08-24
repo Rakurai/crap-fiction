@@ -5,9 +5,7 @@ import styles from './ConversationSwitcher.module.css'
 
 type ConversationSwitcherProps = {
   readonly conversations: readonly ConversationSummary[]
-  /** `null` reads as the conversation still an intention (CONTEXT "Conversation") — nothing in the list is marked current. */
   readonly activeId: string | null
-  /** The conversation a deletion is in flight for, so its row alone is disabled. */
   readonly deletingId: string | undefined
   readonly error: string | undefined
   readonly clock: Clock
@@ -17,17 +15,8 @@ type ConversationSwitcherProps = {
   readonly onClose: () => void
 }
 
-/** UX_DESIGN "Conversations": the row shown where the conversation holds no author message at all — a fact about the machine, never the room's words standing in for the author's. */
 const NO_AUTHOR_MESSAGE = machineWords('asked for a concrete change')
 
-/**
- * UX_DESIGN "Conversations"/"Prominence": reached and left in one action,
- * offering the piece's conversations by the author's own opening words and
- * when each was last active, ordered by that activity. No round counts, no
- * participant rosters, no sizes, no titles to maintain — starting a new
- * conversation and deleting one live in the same place because there is
- * nothing else here to manage.
- */
 export function ConversationSwitcher({
   conversations,
   activeId,

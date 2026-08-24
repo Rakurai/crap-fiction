@@ -8,12 +8,6 @@ type RoomEditorProps = {
   readonly onClose: () => void
 }
 
-/**
- * CONTEXT "Room"/UX_DESIGN "The room": a short list of the piece's specialists
- * with their static role descriptions, reached and left in one action each
- * way. No rationale is generated and no lifecycle is presented — a specialist
- * is enabled or it is not, and this is the whole of what says so.
- */
 export function RoomEditor({ members, toggling, onToggle, onClose }: RoomEditorProps) {
   return (
     <div className={styles.panel} role="dialog" aria-label="The room">

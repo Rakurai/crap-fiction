@@ -14,12 +14,6 @@ export type WorkspaceViewModel =
     }
   | { readonly status: 'set'; readonly workspace: string }
 
-/**
- * Owns the one thing the client asks about the workspace: whether it is
- * configured yet, and setting it when it is not. SPEC "Files" holds the
- * workspace path as process configuration once it is set, so nothing here
- * re-fetches after a successful submit.
- */
 export function useWorkspace(): WorkspaceViewModel {
   const [load, setLoad] = useLoaded(fetchWorkspace, [])
   const [error, setError] = useState<string | undefined>(undefined)

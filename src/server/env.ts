@@ -32,10 +32,6 @@ export type StudioEnv = Readonly<{
   logLevel: z.infer<typeof logLevelSchema>
 }>
 
-/**
- * No entry here supplies a default: an absent STUDIO_* variable is a startup
- * failure naming it, never a value nobody chose (SPEC "Deployment").
- */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): StudioEnv {
   const missing = VARIABLES.filter((name) => !source[name])
   if (missing.length > 0) {

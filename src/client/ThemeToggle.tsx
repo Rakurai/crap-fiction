@@ -6,12 +6,6 @@ type ThemeToggleProps = {
   readonly onChoose: (theme: Theme) => void
 }
 
-/**
- * SPEC "Files": with no theme chosen, `theme` is `null` — the control marks
- * neither option pressed rather than guessing one, and the token layer's
- * `prefers-color-scheme` default is what the author actually sees. Pressed
- * state comes from what is on disk, never from a value computed here.
- */
 export function ThemeToggle({ theme, onChoose }: ThemeToggleProps) {
   if (theme === undefined) return null
 

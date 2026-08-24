@@ -23,12 +23,6 @@ function snapshot(roundId: string): RoundSnapshot {
   return { conversationId: 'c1', roundId, message: 'the live one', participants: ['shape'], brought: [], states: {}, settled: [], openedAt: OPENED_AT }
 }
 
-/**
- * The room's adapters, with the conversation read held open: the merge this file is
- * about happens between a fetch that has not answered yet and events that are
- * already arriving, so the test has to be able to put an event between the request
- * and its answer. Nothing here is scripted that a test does not use.
- */
 function roomWithHeldConversation(conversation: ConversationView) {
   let deliver: (event: RoomEvent) => void = () => {
     throw new Error('the room was never subscribed to')
@@ -65,15 +59,6 @@ function roomWithHeldConversation(conversation: ConversationView) {
   }
 }
 
-/**
- * SPEC "Seams": a new round preserves earlier rounds. Opening a piece reads two
- * different accounts of the same conversation — the durable file, over a request
- * that takes as long as it takes, and the live stream, which starts delivering
- * immediately — and this hook is the only place the two become one list. The order
- * is what the author reads as the history of the piece, so a round that arrived
- * while the file was still being read must not land in front of the rounds that
- * came before it, and must not be dropped when the file finally answers.
- */
 describe('merging the conversation on disk with the one being streamed', () => {
   it('keeps a round that opened while the file was still being read, behind the rounds that preceded it', async () => {
     const { room, stream, answerTheConversationRead } = roomWithHeldConversation({
@@ -97,7 +82,6 @@ describe('merging the conversation on disk with the one being streamed', () => {
       data: { conversationId: 'c1', roundId: 'r3', message: 'and now', participants: ['shape'], brought: [], openedAt: OPENED_AT },
     })
 
-    // Until the file answers, the live round is the whole of what is known.
     expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r3'])
     expect(result.current.busy).toBe(true)
 
@@ -123,8 +107,6 @@ describe('merging the conversation on disk with the one being streamed', () => {
       ),
     )
 
-    // The piece said a round was in flight, so the composer is busy before any
-    // event has arrived and before the file has answered.
     expect(result.current.busy).toBe(true)
     expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r2'])
 
@@ -136,12 +118,6 @@ describe('merging the conversation on disk with the one being streamed', () => {
   })
 })
 
-/**
- * UX_DESIGN "An operation in flight": abandoning is offered for as long as one
- * is running and asks the room to stop it — the actual stop is reported back
- * through `round.closed`, which the merge tests above already cover, so this
- * is only the asking.
- */
 describe('abandoning an operation', () => {
   function idleRoom(
     abandonOperation: RoomAdapters['abandonOperation'] = vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),

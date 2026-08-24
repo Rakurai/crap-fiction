@@ -32,12 +32,6 @@
   margin: 0 0 4px;
 }
 
-/*
- * UX_DESIGN "Where the author speaks": a specialist addressing durably brought
- * in, said beside the round that caused it rather than left for the author to
- * notice on their own. The tint is neutral — never the accent, which stays
- * for the one affirmative action the interface has.
- */
 .roomChanged {
   display: flex;
   align-items: baseline;
@@ -60,12 +54,6 @@
   color: var(--ink2);
 }
 
-/*
- * A response is a discrete block with a rule above it. Filling in order must not
- * read as a chain (UX_DESIGN "A round in flight"), and the rule is the mechanism
- * for that rather than decoration: without it five responses are one column of
- * paragraphs, which reads as continuous text taking up the one above.
- */
 .participant {
   display: flex;
   flex-direction: column;
@@ -80,7 +68,6 @@
   gap: 7px;
 }
 
-/* Identity only: never agreement, severity or confidence. */
 .mark {
   flex: none;
   width: 9px;
@@ -93,7 +80,6 @@
   color: var(--ink);
 }
 
-/* The room's own voice: the prose register, sharing a family with the manuscript. */
 .claim {
   font: 400 15px/1.55 var(--font-prose);
   color: var(--ink);
@@ -101,7 +87,6 @@
   text-wrap: pretty;
 }
 
-/* The elaboration, a step quieter and in a different family, in its own block. */
 .note {
   font: 400 12.5px/1.65 var(--font-ui);
   color: var(--ink2);
@@ -114,11 +99,6 @@
   margin: 0;
 }
 
-/*
- * What the call returned, verbatim. Monospaced and wrapped rather than clipped:
- * it is the machine's own bytes, it may be long, and an ellipsis here would hide
- * the one thing the author was given to look at.
- */
 .returned {
   font: 400 10.5px/1.5 var(--font-facts);
   color: var(--ink3);
@@ -134,7 +114,6 @@
   margin: 0 0 4px;
 }
 
-/* What the round says about itself while it runs: counts and a clock, not a sentence. */
 .roundFacts {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
@@ -191,7 +170,6 @@
   cursor: default;
 }
 
-/* UX_DESIGN "Actions on a response": the same row shape Apply uses, for Reply and Ask for a concrete change. */
 .actions {
   display: flex;
   align-items: center;
@@ -232,13 +210,6 @@
   cursor: default;
 }
 
-/*
- * UX_DESIGN "Actions on a response": a round asking for a concrete change has
- * no author message to show in its place, so the foot of the conversation
- * names what it is answering — the same tinted register `roomChanged` uses,
- * because both are the room stating a fact about itself rather than the
- * author's own words.
- */
 .asked {
   display: flex;
   align-items: baseline;
@@ -268,12 +239,6 @@
   flex: 1;
 }
 
-/*
- * UX_DESIGN "Applying, and seeing what it did": the applied change, in the
- * room's own registers rather than a code diff — the facts line names what
- * happened and, for a bounded change, opens onto the passage; a
- * whole-manuscript rewrite has no passage to open onto.
- */
 .change {
   display: flex;
   flex-direction: column;
@@ -313,7 +278,6 @@
   gap: 4px;
 }
 
-/* The passage as it stood, read as withdrawn. */
 .changeBefore {
   font: 400 13.5px/1.55 var(--font-prose);
   color: var(--ink3);
@@ -322,7 +286,6 @@
   text-wrap: pretty;
 }
 
-/* The passage as it now stands, read as current — highlighted over the same neutral tint the room's own line uses, never the accent. */
 .changeAfter {
   font: 400 13.5px/1.55 var(--font-prose);
   color: var(--ink);
@@ -383,7 +346,6 @@
   margin: 0;
 }
 
-/* At the composer, above it, in the mockup's two registers: the state, then what is still true. */
 .unavailable {
   flex: none;
   display: flex;
@@ -430,11 +392,6 @@
   padding: 8px 10px;
 }
 
-/*
- * SPEC "@ariakit/react supplies behaviour and never appearance": the popover
- * carries no look of its own, so every rule here is this interface's, in the
- * completion surface's own ground (`--panel`) rather than the conversation's.
- */
 .mentions {
   background: var(--panel);
   border: 1px solid var(--rule2);

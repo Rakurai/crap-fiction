@@ -21,12 +21,6 @@ const compression: RoleDefinition = { id: 'compression', handle: 'compression', 
 
 const charter = CHARTER_FIXTURE
 
-/**
- * Everything a call is compiled from, with only what a test is about left to
- * name. Written out rather than defaulted anywhere in the product: this is the
- * test's own value, and the fields it does not name are named here as absent
- * rather than absent by omission.
- */
 function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition }): ContextInput {
   return {
     criteria: undefined,
@@ -42,7 +36,6 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
   }
 }
 
-/** One `## `-headed section of a rendered prompt, from its heading to the next one. */
 function sectionOf(prompt: string, heading: string): string {
   const [, body] = prompt.split(`## ${heading}\n`)
   if (body === undefined) throw new Error(`no "${heading}" section in the prompt`)
@@ -314,11 +307,6 @@ describe('compileSpecialistContext', () => {
     for (const policy of ['shared', 'stricter'] as const) {
       const context = compileSpecialistContext(contextInput({ role: shape, conversation: conversationWithMixedHistory, policy }))
 
-      // The invariant is that this list is empty for every specialist, always:
-      // the round's own readings reach one participant only, and it is not this
-      // one. `ContextInput` has no `evidence` field for a caller to pass, so this
-      // is the constructed object agreeing with the type rather than a filter
-      // that could be forgotten.
       expect(context.evidence).toEqual([])
     }
   })
@@ -390,12 +378,6 @@ describe('renderPrompt', () => {
     expect(prompt).toContain('a flash piece about a breakup')
   })
 
-  /**
-   * SPEC "Context compilation": the mode's criteria for a participant are part of
-   * what a call is assembled from, and CONTEXT "Mode" is where they come from —
-   * what this specialist attends to at this scale and the defect it is alert to.
-   * Without them four specialists differ by one sentence of role description each.
-   */
   it('states the mode\'s criteria for this specialist beside its role description', () => {
     const context = compileSpecialistContext(
       contextInput({
@@ -404,9 +386,6 @@ describe('renderPrompt', () => {
       }),
     )
 
-    // Under the role heading rather than merely somewhere in the prompt: what a
-    // participant is for is one statement, and criteria arriving under their own
-    // heading would read as a second job.
     const roleSection = sectionOf(renderPrompt(context, charter), 'Your role')
     expect(roleSection).toContain(shape.roleDescription)
     expect(roleSection).toContain('Entry point, the turn, the inevitability of the close')
@@ -439,12 +418,6 @@ describe('renderPrompt', () => {
     expect(renderPrompt(eligible, charter)).not.toContain(charter.directQuestionOwedAnswer)
   })
 
-  /**
-   * #16 "Reply, and ask for a concrete change"/SPEC "The round": the
-   * deterministic instruction stands where "Author's message" would, because
-   * CONTEXT "Round" has this round carrying no message at all — the two never
-   * appear together.
-   */
   it('carries the reading being asked about and the author\'s clarification, never as the author\'s own message', () => {
     const context = compileSpecialistContext(
       contextInput({ role: shape, ask: { claim: 'the entry is late', note: 'by a paragraph', clarification: 'what would you cut' } }),

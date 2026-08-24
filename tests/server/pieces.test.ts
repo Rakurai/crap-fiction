@@ -251,12 +251,6 @@ describe('DraftWriter', () => {
     rmSync(workspaceDir, { recursive: true, force: true })
   })
 
-  /**
-   * How a draft is written and how overlapping writes are ordered are the store's
-   * properties, asserted where the store is (CODING_STANDARDS "Each property is
-   * asserted at exactly one boundary"). What is this module's is which pieces may
-   * be written to at all.
-   */
   function draftWriter(): DraftWriter {
     return new DraftWriter(new DraftStore())
   }
