@@ -52,6 +52,24 @@ describe('call sites and models', () => {
     expect(body.data.find((site: { site: string }) => site.site === 'story-editor').assignment).toBeNull()
   })
 
+  it('replaces an assignment with a different model rather than keeping the first', async () => {
+    const app = buildApp()
+    const assign = (model: string) =>
+      app.request('/call-sites/shape/assignment', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+
+    await assign('llama-3')
+    const second = await assign('qwen3-30b')
+    expect(second.status).toBe(200)
+    expect(await second.json()).toEqual({ success: true, data: { site: 'shape', assignment: 'qwen3-30b' } })
+
+    const body = await (await app.request('/call-sites')).json()
+    expect(body.data.find((site: { site: string }) => site.site === 'shape').assignment).toBe('qwen3-30b')
+  })
+
   it('refuses an assignment for a call site that does not exist', async () => {
     const app = buildApp()
 
