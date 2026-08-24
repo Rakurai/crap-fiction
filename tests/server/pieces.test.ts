@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  ConversationNotFoundError,
   createPiece,
   DraftWriter,
+  getConversation,
   getPiece,
   listPieces,
   PieceNotFoundError,
@@ -14,7 +16,8 @@ import {
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftStore } from '../../src/server/store/index.js'
+import { DraftStore, writeAppliedChange, writeConversation } from '../../src/server/store/index.js'
+import type { AppliedChange } from '../../src/shared/appliedChange.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',
@@ -269,5 +272,56 @@ describe('DraftWriter', () => {
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than writing outside it', async () => {
     await expect(draftWriter().save(workspaceDir, '../../etc', 'text')).rejects.toThrowError(PieceNotFoundError)
+  })
+})
+
+describe('getConversation', () => {
+  let workspaceDir: string
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
+    await createPiece(workspaceDir, 'Cups', flash)
+    expect(() => getConversation(workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
+  })
+
+  it('joins each applied change onto the response that caused it, by round and participant, and leaves the rest with none', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    await writeConversation(workspaceDir, piece.id, 'c1', {
+      id: 'c1',
+      rounds: [
+        {
+          id: 'r1',
+          addressed: [],
+          brought: [],
+          outcome: 'settled',
+          participants: [
+            { participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
+            { participantId: 'compression', result: { kind: 'response', outcome: 'commentary', claim: 'it holds' } },
+          ],
+        },
+      ],
+    })
+    const change: AppliedChange = {
+      id: 'change1',
+      roundId: 'r1',
+      participantId: 'shape',
+      content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] },
+    }
+    await writeAppliedChange(workspaceDir, piece.id, change)
+
+    const conversation = getConversation(workspaceDir, piece.id, 'c1')
+
+    const [round] = conversation.rounds
+    const shape = round?.participants.find((participant) => participant.participantId === 'shape')
+    const compression = round?.participants.find((participant) => participant.participantId === 'compression')
+    expect(shape?.appliedChanges).toEqual([change])
+    expect(compression?.appliedChanges).toEqual([])
   })
 })

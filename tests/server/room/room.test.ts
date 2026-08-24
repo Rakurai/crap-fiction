@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModelAccess } from '../../../src/server/model/types.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
-import { readConversation, readPiece, writeConversation, writePieceCast } from '../../../src/server/store/index.js'
+import { readAppliedChanges, readConversation, readPiece, writeConversation, writePieceCast } from '../../../src/server/store/index.js'
+import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
 import { RecommendationNotFoundError, Room, RoomBusyError, type RoomEvent } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
@@ -382,7 +383,8 @@ describe('Room.apply', () => {
 
     const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'The cups sat where she left them, twice.')
 
-    expect(result).toEqual({ outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } })
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.manuscript).toBe('The cups sat where she left them.')
     expect(adapter.promptFor('shape')).toBeUndefined()
     expect(adapter.promptFor('compression')).toBeUndefined()
     expect(adapter.promptFor('story-editor')).toBeUndefined()
@@ -466,7 +468,8 @@ describe('Room.apply', () => {
     expect(room.snapshot(piece.id)).toBeUndefined()
     adapter.release('apply')
     const second = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'draft text')
-    expect(second).toEqual({ outcome: 'value', value: { manuscript: 'revised' } })
+    if (second.outcome !== 'value') throw new Error('expected the second application to settle')
+    expect(second.value.manuscript).toBe('revised')
   })
 
   it('changes nothing on a failed call, and leaves the recommendation applicable', async () => {
@@ -480,6 +483,36 @@ describe('Room.apply', () => {
     expect(failed).toEqual({ outcome: 'failed', reason: 'unconfigured' })
     expect(room.snapshot(piece.id)).toBeUndefined()
     expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
+  })
+
+  it('persists the change a settled call actually made, naming the response it came from', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'The cups sat where she left them, twice.')
+
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.change).toMatchObject({ roundId: 'r1', participantId: 'shape' })
+
+    const [onDisk] = readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)
+    expect(onDisk).toEqual(result.value.change)
+  })
+
+  it('carries no change where the application returned the manuscript unchanged', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithRecommendation())
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'unchanged text' } } },
+    })
+
+    const result = await room.apply(workspaceDir, piece.id, 'c1', 'r1', 'shape', undefined, 'unchanged text')
+
+    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    expect(result.value.change).toBeUndefined()
+    expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([])
   })
 })
 

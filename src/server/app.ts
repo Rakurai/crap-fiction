@@ -161,7 +161,7 @@ export function createApp(
     const result = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), roundId, participantId, constraint, draft)
     const outcome: ApplyOutcome =
       result.outcome === 'value'
-        ? { outcome: 'applied', manuscript: result.value.manuscript }
+        ? { outcome: 'applied', manuscript: result.value.manuscript, change: result.value.change }
         : result.outcome === 'abandoned'
           ? { outcome: 'abandoned' }
           : { outcome: 'failed', reason: result.reason, returned: result.returned }

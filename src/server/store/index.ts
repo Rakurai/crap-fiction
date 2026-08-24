@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { Mutex } from 'async-mutex'
 import { z } from 'zod'
+import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import { resolveWithinRoot } from './containment.js'
@@ -330,6 +331,44 @@ export function mostRecentConversationId(workspaceDir: string, pieceId: string):
     .sort((a, b) => b.modifiedMs - a.modifiedMs)
 
   return mostRecent?.id
+}
+
+// ---------------------------------------------------------------------------
+// Applied changes
+// ---------------------------------------------------------------------------
+
+const CHANGE_SUFFIX = '.json'
+
+function changesDirectory(pieceDir: string): string {
+  return path.join(pieceDir, 'changes')
+}
+
+function changeFile(pieceDir: string, changeId: string): string {
+  return path.join(changesDirectory(pieceDir), `${changeId}${CHANGE_SUFFIX}`)
+}
+
+/** SPEC "Files": one JSON file per applied change, the room's only writer of it. */
+export async function writeAppliedChange(workspaceDir: string, pieceId: string, change: AppliedChange): Promise<void> {
+  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
+  await writeJsonArtifact(changeFile(pieceDir, change.id), change)
+}
+
+/**
+ * Every applied change a piece holds, read together because presenting a
+ * conversation is the only reason anything reads them back — CONTEXT
+ * "Applied change" attaches each one to the response that caused it, and that
+ * join happens above this boundary. An id that names no piece reads as none
+ * at all, on the same terms as every other read here.
+ */
+export function readAppliedChanges<T>(workspaceDir: string, pieceId: string, schema: z.ZodType<T>): readonly T[] {
+  const pieceDir = pieceDirectory(workspaceDir, pieceId)
+  if (pieceDir === undefined) return []
+
+  const dir = changesDirectory(pieceDir)
+  return fileNames(dir, CHANGE_SUFFIX).flatMap((name) => {
+    const change = readJsonArtifact(path.join(dir, name), schema)
+    return change === undefined ? [] : [change]
+  })
 }
 
 // ---------------------------------------------------------------------------

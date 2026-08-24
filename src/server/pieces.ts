@@ -1,6 +1,7 @@
 import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
-import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
+import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
+import { conversationSchema, type ConversationView } from '../shared/conversationViews.js'
 import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
@@ -11,6 +12,7 @@ import {
   mostRecentConversationId,
   pieceExists,
   pieceIds,
+  readAppliedChanges,
   readConversation,
   readPiece,
   readStoryContext,
@@ -220,11 +222,31 @@ export function startConversation(workspaceDir: string, pieceId: string): { read
  * SPEC "Files"/"Transport": a conversation exists once its first round
  * opens, so an id naming none yet is a stated `ConversationNotFoundError`
  * rather than an empty conversation standing in for one.
+ *
+ * CONTEXT "Applied change": each change names the round and the participant
+ * whose response caused it, so the join onto that response happens here —
+ * reading every change the piece holds and attaching each to its response,
+ * rather than the conversation file carrying a reference the room would have
+ * to keep in step with a second writer.
  */
-export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): Conversation {
+export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): ConversationView {
   const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
-  return conversation
+
+  const changes = readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema)
+  const changesFor = (roundId: string, participantId: string): readonly AppliedChange[] =>
+    changes.filter((change) => change.roundId === roundId && change.participantId === participantId)
+
+  return {
+    id: conversation.id,
+    rounds: conversation.rounds.map((round) => ({
+      ...round,
+      participants: round.participants.map((participant) => ({
+        ...participant,
+        appliedChanges: changesFor(round.id, participant.participantId),
+      })),
+    })),
+  }
 }
 
 /**

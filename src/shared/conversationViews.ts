@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { appliedChangeSchema } from './appliedChange.js'
 import { failureReasonSchema } from './modelResult.js'
 
 /**
@@ -70,3 +71,30 @@ export const conversationSchema = z.object({
 })
 
 export type Conversation = z.infer<typeof conversationSchema>
+
+/**
+ * What one round's participant looks like over the wire rather than on disk:
+ * CONTEXT "Applied change" presents each applied change on the response that
+ * caused it, and the join between a change and the round and participant it
+ * names lives above the store rather than in the file `roundParticipantRecordSchema`
+ * describes — so this is the record plus that join, never written back.
+ */
+export const roundParticipantViewSchema = roundParticipantRecordSchema.extend({
+  appliedChanges: z.array(appliedChangeSchema).readonly(),
+})
+
+export type RoundParticipantView = z.infer<typeof roundParticipantViewSchema>
+
+export const roundViewSchema = roundRecordSchema.extend({
+  participants: z.array(roundParticipantViewSchema).readonly(),
+})
+
+export type RoundView = z.infer<typeof roundViewSchema>
+
+/** SPEC "Transport": what `GET .../conversations/:cid` reports — a conversation with each applied change resolved onto the response that caused it. */
+export const conversationViewSchema = z.object({
+  id: z.string().min(1),
+  rounds: z.array(roundViewSchema).readonly(),
+})
+
+export type ConversationView = z.infer<typeof conversationViewSchema>

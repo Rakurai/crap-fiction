@@ -198,6 +198,92 @@
   flex: 1;
 }
 
+/*
+ * UX_DESIGN "Applying, and seeing what it did": the applied change, in the
+ * room's own registers rather than a code diff — the facts line names what
+ * happened and, for a bounded change, opens onto the passage; a
+ * whole-manuscript rewrite has no passage to open onto.
+ */
+.change {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 3px 0 0;
+}
+
+.changeFacts,
+.changeToggle {
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+}
+
+.changeToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.changeToggle:hover {
+  color: var(--ink2);
+}
+
+.changeDiff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.changePassage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The passage as it stood, read as withdrawn. */
+.changeBefore {
+  font: 400 13.5px/1.55 var(--font-prose);
+  color: var(--ink3);
+  text-decoration: line-through;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* The passage as it now stands, read as current — highlighted over the same neutral tint the room's own line uses, never the accent. */
+.changeAfter {
+  font: 400 13.5px/1.55 var(--font-prose);
+  color: var(--ink);
+  background: var(--tint);
+  border-radius: 4px;
+  padding: 7px 9px;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.changeAsk {
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.changeAsk:hover {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.changeAsk:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
+}
+
 .nothing {
   font: 400 12.5px/1.55 var(--font-ui);
   color: var(--ink2);

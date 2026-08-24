@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { Conversation, RoundRecord } from '../../../src/shared/conversationViews.js'
+import type { ConversationView, RoundView } from '../../../src/shared/conversationViews.js'
 import type { RoundSnapshot } from '../../../src/shared/roundEvents.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomEvent } from '../../../src/client/roomClient.js'
@@ -8,13 +8,13 @@ import { useConversation, type RoomAdapters } from '../../../src/client/useConve
 
 const OPENED_AT = 1_700_000_000_000
 
-function settledRound(id: string): RoundRecord {
+function settledRound(id: string): RoundView {
   return {
     id,
     message: `what about ${id}`,
     addressed: ['shape'],
     brought: [],
-    participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' } }],
+    participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' }, appliedChanges: [] }],
     outcome: 'settled',
   }
 }
@@ -29,7 +29,7 @@ function snapshot(roundId: string): RoundSnapshot {
  * already arriving, so the test has to be able to put an event between the request
  * and its answer. Nothing here is scripted that a test does not use.
  */
-function roomWithHeldConversation(conversation: Conversation) {
+function roomWithHeldConversation(conversation: ConversationView) {
   let deliver: (event: RoomEvent) => void = () => {
     throw new Error('the room was never subscribed to')
   }
@@ -37,7 +37,7 @@ function roomWithHeldConversation(conversation: Conversation) {
     throw new Error('the conversation was never asked for')
   }
 
-  const held = new Promise<RequestResult<Conversation>>((resolve) => {
+  const held = new Promise<RequestResult<ConversationView>>((resolve) => {
     answer = () => resolve({ outcome: 'value', value: conversation })
   })
 

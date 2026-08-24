@@ -1,4 +1,5 @@
-import type { ParticipantResult, RoundRecord } from '../shared/conversationViews.js'
+import type { AppliedChange } from '../shared/appliedChange.js'
+import type { ParticipantResult, RoundView } from '../shared/conversationViews.js'
 import type {
   ParticipantSettledEvent,
   ParticipantStateEvent,
@@ -13,6 +14,8 @@ export type ProjectedParticipant = Readonly<{
   participantId: string
   state: ProjectedParticipantState
   result: ParticipantResult | undefined
+  /** CONTEXT "Applied change": every change an application caused on this response, in the order they were applied. */
+  appliedChanges: readonly AppliedChange[]
 }>
 
 export type ProjectedRound = Readonly<{
@@ -48,19 +51,24 @@ export type RoundEvent =
 
 export const EMPTY_PROJECTION: ConversationProjection = { rounds: [] }
 
-function fromRecord(round: RoundRecord): ProjectedRound {
+function fromRecord(round: RoundView): ProjectedRound {
   return {
     roundId: round.id,
     message: round.message,
     openedAt: undefined,
     outcome: round.outcome,
-    participants: round.participants.map((record) => ({ participantId: record.participantId, state: 'settled', result: record.result })),
+    participants: round.participants.map((record) => ({
+      participantId: record.participantId,
+      state: 'settled',
+      result: record.result,
+      appliedChanges: record.appliedChanges,
+    })),
     brought: round.brought,
   }
 }
 
 /** SPEC "Seams": a new round preserves earlier rounds — this is what a reload's settled history becomes before any live event lands. */
-export function initialProjection(rounds: readonly RoundRecord[]): ConversationProjection {
+export function initialProjection(rounds: readonly RoundView[]): ConversationProjection {
   return { rounds: rounds.map(fromRecord) }
 }
 
@@ -84,6 +92,7 @@ export function withRoundInFlight(projection: ConversationProjection, snapshot: 
       participantId,
       state: settled.has(participantId) ? 'settled' : snapshot.states[participantId] ?? 'waiting',
       result: settled.get(participantId),
+      appliedChanges: [],
     })),
     brought: snapshot.brought,
   }
@@ -132,6 +141,17 @@ function updateParticipant(round: ProjectedRound, participantId: string, update:
 }
 
 /**
+ * CONTEXT "Applied change": attaches a change onto the response that caused
+ * it, the moment applying it settles — not an event the room streamed, since
+ * apply has none, but the same shape a projection update always has here.
+ */
+export function withAppliedChange(projection: ConversationProjection, roundId: string, participantId: string, change: AppliedChange): ConversationProjection {
+  return updateRound(projection, roundId, (round) =>
+    updateParticipant(round, participantId, (participant) => ({ ...participant, appliedChanges: [...participant.appliedChanges, change] })),
+  )
+}
+
+/**
  * SPEC "Seams": the projection is a pure reducer rather than a boundary, so every
  * load-bearing rule lives here rather than in the surface that renders it —
  * participants seeded in a stable order when a round opens, earlier rounds
@@ -150,7 +170,7 @@ export function projectRoundEvent(projection: ConversationProjection, event: Rou
         message: event.data.message,
         openedAt: event.data.openedAt,
         outcome: 'inFlight',
-        participants: event.data.participants.map((participantId) => ({ participantId, state: 'waiting', result: undefined })),
+        participants: event.data.participants.map((participantId) => ({ participantId, state: 'waiting', result: undefined, appliedChanges: [] })),
         brought: event.data.brought,
       }
       return { rounds: [...projection.rounds, round] }

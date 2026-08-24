@@ -1,7 +1,9 @@
 import * as Ariakit from '@ariakit/react'
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { AppliedChange } from '../shared/appliedChange.js'
 import type { Clock } from '../shared/clock.js'
-import { elapsed, facts, machineWords } from './facts.js'
+import { countWords } from '../shared/storyLength.js'
+import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { everyCallFailed, tallyRound, type ProjectedParticipant, type ProjectedRound } from './roundProjection.js'
@@ -11,6 +13,9 @@ import { useApply, type ApplyingResponse } from './useApply.js'
 import type { HandleEntry } from './useRoster.js'
 import { useNow } from './useNow.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
+
+/** SPEC "Review change": a convenience for something the author could type, never a distinct mode of reasoning. */
+const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
 
 /** How many suggestions the composer's own combobox offers at once, so a broad prefix does not fill the screen. */
 const MAX_MENTION_MATCHES = 8
@@ -167,6 +172,57 @@ function ApplyingFlight({ onAbandon }: { readonly onAbandon: () => void }) {
   )
 }
 
+/**
+ * UX_DESIGN "Applying, and seeing what it did": the before-and-after as
+ * prose, struck through and replaced, in the room's own register rather than
+ * as a code diff — the author is reading sentences and judging whether they
+ * are better. Disclosed on the author's own action: closed, it is a computed
+ * count in the facts register, never a composed sentence, so a long change
+ * is one closed line until the author wants it.
+ *
+ * A whole-manuscript rewrite has nothing to disclose — CONTEXT "Applied
+ * change" keeps no prose for it — so it is the bare statement, with no
+ * toggle to open onto content that was never kept.
+ */
+function AppliedChangeView({
+  change,
+  askDisabled,
+  onAskAboutChange,
+}: {
+  readonly change: AppliedChange
+  readonly askDisabled: boolean
+  readonly onAskAboutChange: () => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className={styles.change}>
+      {change.content.kind === 'rewrittenWhole' ? (
+        <span className={styles.changeFacts}>{facts(machineWords('applied'), machineWords('rewritten whole'))}</span>
+      ) : (
+        <>
+          <button type="button" className={styles.changeToggle} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+            {facts(machineWords('applied'), wordCount(change.content.passages.reduce((sum, passage) => sum + countWords(passage.after), 0)))}
+          </button>
+          {open && (
+            <div className={styles.changeDiff}>
+              {change.content.passages.map((passage, index) => (
+                <div key={index} className={styles.changePassage}>
+                  <p className={styles.changeBefore}>{passage.before}</p>
+                  <p className={styles.changeAfter}>{passage.after}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <button type="button" className={styles.changeAsk} disabled={askDisabled} onClick={onAskAboutChange}>
+        ask the room about this
+      </button>
+    </div>
+  )
+}
+
 function ParticipantBlock({
   participant,
   roundId,
@@ -176,6 +232,7 @@ function ParticipantBlock({
   applyDisabled,
   onApply,
   onAbandonApply,
+  onAskAboutChange,
 }: {
   readonly participant: ProjectedParticipant
   readonly roundId: string
@@ -187,6 +244,8 @@ function ParticipantBlock({
   readonly applyDisabled: boolean
   readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
   readonly onAbandonApply: () => void
+  /** CONTEXT "Applied change": asking the room about a change is an ordinary message the author does not have to compose. */
+  readonly onAskAboutChange: () => void
 }) {
   const says = participantSays(participant)
   if (says === null) return null
@@ -201,6 +260,9 @@ function ParticipantBlock({
         <span className={styles.name}>{name}</span>
       </div>
       {says}
+      {participant.appliedChanges.map((change) => (
+        <AppliedChangeView key={change.id} change={change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+      ))}
       {recommends &&
         (applying ? (
           <ApplyingFlight onAbandon={onAbandonApply} />
@@ -271,6 +333,7 @@ function RoundView({
   applyDisabled,
   onApply,
   onAbandonApply,
+  onAskAboutChange,
 }: {
   readonly round: ProjectedRound
   readonly nowMs: number
@@ -281,6 +344,7 @@ function RoundView({
   readonly applyDisabled: boolean
   readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
   readonly onAbandonApply: () => void
+  readonly onAskAboutChange: () => void
 }) {
   return (
     <div className={styles.round}>
@@ -303,6 +367,7 @@ function RoundView({
           applyDisabled={applyDisabled}
           onApply={onApply}
           onAbandonApply={onAbandonApply}
+          onAskAboutChange={onAskAboutChange}
         />
       ))}
       {round.outcome === 'abandoned' && <p className={styles.abandoned}>ABANDONED</p>}
@@ -364,13 +429,18 @@ export function Conversation({
   }, [caretOffset])
 
   const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, room)
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, conversation.attachAppliedChange, room)
   const counting = conversation.projection.rounds.some((round) => round.outcome === 'inFlight')
   const nowMs = useNow(counting, clock)
   // SPEC "Operation state": one operation at a time, whichever kind — the
   // client disables the controls that would start a second one rather than
   // relying on the room's own refusal, which exists for the case this misses.
   const roomBusy = conversation.busy || apply.applying !== undefined
+
+  function askAboutChange(): void {
+    if (roomBusy) return
+    conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
+  }
 
   function submit() {
     const text = message.trim()
@@ -405,6 +475,7 @@ export function Conversation({
             applyDisabled={roomBusy}
             onApply={apply.apply}
             onAbandonApply={apply.abandon}
+            onAskAboutChange={askAboutChange}
           />
         ))}
       </div>

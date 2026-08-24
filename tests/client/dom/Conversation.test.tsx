@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Conversation as ConversationRecord, RoundRecord } from '../../../src/shared/conversationViews.js'
+import type { Conversation as ConversationRecord, ConversationView, RoundRecord } from '../../../src/shared/conversationViews.js'
 import { Conversation } from '../../../src/client/Conversation.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
@@ -15,6 +15,22 @@ const HANDLES = [
 ]
 
 /**
+ * What a fixture built as `RoundRecord`s reads back as once `getConversation`
+ * has resolved it — CONTEXT "Applied change": a conversation fresh off disk
+ * names no applied change until the store attaches one, which is exactly
+ * what a bare fixture is.
+ */
+function toView(conversation: ConversationRecord): ConversationView {
+  return {
+    id: conversation.id,
+    rounds: conversation.rounds.map((round) => ({
+      ...round,
+      participants: round.participants.map((participant) => ({ ...participant, appliedChanges: [] })),
+    })),
+  }
+}
+
+/**
  * The room, stood still: this surface is being read, not driven, so the stream
  * yields nothing and the conversation is whatever the fixture recorded. Sending a
  * message is exercised where it is decided — `useConversation` and `Room`.
@@ -23,7 +39,7 @@ function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAda
   return {
     subscribeToRoom: () => () => {},
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: conversation.id } }),
-    fetchConversation: () => Promise.resolve({ outcome: 'value', value: conversation }),
+    fetchConversation: () => Promise.resolve({ outcome: 'value', value: toView(conversation) }),
     startRound: () => Promise.resolve({ outcome: 'value', value: { conversationId: conversation.id, roundId: 'r1' } }),
     abandonOperation,
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'applied', manuscript: 'the revised manuscript' } }),
@@ -324,6 +340,107 @@ describe('a specialist the addressing brought into the room', () => {
     await screen.findByText('It holds.')
 
     expect(screen.queryByText('ROOM CHANGED')).toBeNull()
+  })
+})
+
+/** A settled round with one applicable suggestion, ready to apply. */
+const ROUND_WITH_RECOMMENDATION: RoundRecord = {
+  id: 'r1',
+  addressed: [],
+  brought: [],
+  participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } }],
+  outcome: 'settled',
+}
+
+describe('the applied change, shown on the response', () => {
+  afterEach(cleanup)
+
+  it('presents a bounded change collapsed to a computed count, disclosed on the author\'s action', async () => {
+    const conversation: ConversationRecord = { id: 'c1', rounds: [ROUND_WITH_RECOMMENDATION] }
+    const room: RoomAdapters = {
+      ...roomHolding(conversation),
+      applyRecommendation: () =>
+        Promise.resolve({
+          outcome: 'value',
+          value: {
+            outcome: 'applied',
+            manuscript: 'the revised manuscript',
+            change: {
+              id: 'change1',
+              roundId: 'r1',
+              participantId: 'shape',
+              content: { kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] },
+            },
+          },
+        }),
+    }
+
+    renderConversation(ROUND_WITH_RECOMMENDATION, { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+
+    const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
+    expect(screen.queryByText('the old line')).toBeNull()
+
+    fireEvent.click(toggle)
+
+    expect(await screen.findByText('the old line')).toBeTruthy()
+    expect(screen.getByText('the new line')).toBeTruthy()
+  })
+
+  it('presents a whole-manuscript rewrite as the bare statement, with nothing to disclose', async () => {
+    const conversation: ConversationRecord = { id: 'c1', rounds: [ROUND_WITH_RECOMMENDATION] }
+    const room: RoomAdapters = {
+      ...roomHolding(conversation),
+      applyRecommendation: () =>
+        Promise.resolve({
+          outcome: 'value',
+          value: {
+            outcome: 'applied',
+            manuscript: 'an entirely different piece',
+            change: { id: 'change1', roundId: 'r1', participantId: 'shape', content: { kind: 'rewrittenWhole' } },
+          },
+        }),
+    }
+
+    renderConversation(ROUND_WITH_RECOMMENDATION, { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+
+    await screen.findByText('APPLIED · REWRITTEN WHOLE')
+    expect(screen.queryByRole('button', { name: /APPLIED/ })).toBeNull()
+  })
+
+  it('asks the room about the change as an ordinary message the author does not have to compose', async () => {
+    const conversation: ConversationRecord = { id: 'c1', rounds: [ROUND_WITH_RECOMMENDATION] }
+    const startRound = vi.fn(() => Promise.resolve<RequestResult<{ conversationId: string; roundId: string }>>({ outcome: 'value', value: { conversationId: 'c1', roundId: 'r2' } }))
+    const room: RoomAdapters = {
+      ...roomHolding(conversation),
+      startRound,
+      applyRecommendation: () =>
+        Promise.resolve({
+          outcome: 'value',
+          value: {
+            outcome: 'applied',
+            manuscript: 'the revised manuscript',
+            change: {
+              id: 'change1',
+              roundId: 'r1',
+              participantId: 'shape',
+              content: { kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] },
+            },
+          },
+        }),
+    }
+
+    renderConversation(ROUND_WITH_RECOMMENDATION, { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'ask the room about this' }))
+
+    await waitFor(() =>
+      expect(startRound).toHaveBeenCalledWith('the-lighthouse', 'c1', 'Take a look at the change I just made and tell me what you think.', 'First light.'),
+    )
   })
 })
 

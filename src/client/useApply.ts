@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { AppliedChange } from '../shared/appliedChange.js'
 import type { abandonOperation as abandonOperationFn, applyRecommendation as applyRecommendationFn } from './roomClient.js'
 import { failureMessage } from './request.js'
 
@@ -19,12 +20,14 @@ export type ApplyViewModel = Readonly<{
 
 /**
  * CONTEXT "Apply"/SPEC "Applying a recommendation": one call, reached by the
- * request that asked for it rather than by an event. Silent on success — the
- * manuscript changing is the whole of what the author is told — and silent on
- * abandonment too, which UX_DESIGN "Degraded and absent states" leaves
- * identical to the author's eye. Only a failure says anything, and even then
- * the recommendation stays applicable: nothing here disables it, remembers
- * that this attempt happened, or reasons about whether trying again is wise.
+ * request that asked for it rather than by an event. Nothing new is said on
+ * success beyond the manuscript changing and, where it did, the applied
+ * change presented on the response that caused it (`onChangeApplied`) —
+ * and it is silent on abandonment too, which UX_DESIGN "Degraded and absent
+ * states" leaves identical to the author's eye. Only a failure says
+ * anything, and even then the recommendation stays applicable: nothing here
+ * disables it, remembers that this attempt happened, or reasons about
+ * whether trying again is wise.
  */
 export function useApply(
   pieceId: string,
@@ -32,6 +35,7 @@ export function useApply(
   getDraft: () => string,
   onApplied: (markdown: string) => void,
   onApplyingChange: (applying: boolean) => void,
+  onChangeApplied: (roundId: string, participantId: string, change: AppliedChange) => void,
   adapters: ApplyAdapters,
 ): ApplyViewModel {
   const { applyRecommendation, abandonOperation } = adapters
@@ -62,6 +66,7 @@ export function useApply(
       if (outcome.outcome === 'applied') {
         stop(undefined)
         onApplied(outcome.manuscript)
+        if (outcome.change !== undefined) onChangeApplied(roundId, participantId, outcome.change)
         return
       }
       if (outcome.outcome === 'failed') {

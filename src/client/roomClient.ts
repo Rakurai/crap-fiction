@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
-import { conversationSchema, type Conversation } from '../shared/conversationViews.js'
+import { conversationViewSchema, type ConversationView } from '../shared/conversationViews.js'
 import {
   participantSettledEventSchema,
   participantStateEventSchema,
@@ -34,8 +34,8 @@ export function fetchConversation(
   pieceId: string,
   conversationId: string,
   signal?: AbortSignal,
-): Promise<RequestResult<Conversation>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, conversationSchema, {
+): Promise<RequestResult<ConversationView>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, conversationViewSchema, {
     signal: signal ?? null,
   })
 }

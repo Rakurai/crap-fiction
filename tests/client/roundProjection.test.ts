@@ -5,12 +5,14 @@ import {
   initialProjection,
   projectRoundEvent,
   tallyRound,
+  withAppliedChange,
   withRoundInFlight,
   type ConversationProjection,
   type ProjectedRound,
   type RoundEvent,
 } from '../../src/client/roundProjection.js'
-import type { RoundRecord } from '../../src/shared/conversationViews.js'
+import type { AppliedChange } from '../../src/shared/appliedChange.js'
+import type { RoundRecord, RoundView } from '../../src/shared/conversationViews.js'
 import type { RoundClosedEvent, RoundSnapshot } from '../../src/shared/roundEvents.js'
 
 /**
@@ -124,16 +126,25 @@ describe('projectRoundEvent', () => {
   })
 })
 
+const noChange: AppliedChange = {
+  id: 'change1',
+  roundId: 'r1',
+  participantId: 'shape',
+  content: { kind: 'rewrittenWhole' },
+}
+
 describe('initialProjection', () => {
   it('projects a conversation file\'s settled rounds as already-settled, so a reload shows them with no new event', () => {
-    const rounds: readonly RoundRecord[] = [
+    const rounds: readonly RoundView[] = [
       {
         id: 'r1',
         message: '@shape does the opening earn its length',
         addressed: ['shape'],
         brought: [],
         outcome: 'settled',
-        participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
+        participants: [
+          { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' }, appliedChanges: [] },
+        ],
       },
     ]
 
@@ -147,10 +158,59 @@ describe('initialProjection', () => {
         // none: there is no count still running to measure from it.
         openedAt: undefined,
         outcome: 'settled',
-        participants: [{ participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } }],
+        participants: [
+          { participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' }, appliedChanges: [] },
+        ],
         brought: [],
       },
     ])
+  })
+
+  it('carries each response\'s applied changes read back off the file, so a reload shows what an earlier application did', () => {
+    const rounds: readonly RoundView[] = [
+      {
+        id: 'r1',
+        addressed: [],
+        brought: [],
+        outcome: 'settled',
+        participants: [
+          {
+            participantId: 'shape',
+            result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' },
+            appliedChanges: [noChange],
+          },
+        ],
+      },
+    ]
+
+    const projection = initialProjection(rounds)
+
+    expect(projection.rounds[0]?.participants[0]?.appliedChanges).toEqual([noChange])
+  })
+})
+
+describe('withAppliedChange', () => {
+  it('attaches a change onto the response that caused it, and leaves every other response untouched', () => {
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape', 'compression']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' }))
+    projection = projectRoundEvent(projection, settled('r1', 'compression', { kind: 'response', outcome: 'commentary', claim: 'it holds' }))
+
+    projection = withAppliedChange(projection, 'r1', 'shape', noChange)
+
+    const [shape, compression] = projection.rounds[0]?.participants ?? []
+    expect(shape?.appliedChanges).toEqual([noChange])
+    expect(compression?.appliedChanges).toEqual([])
+  })
+
+  it('appends rather than replaces, where a recommendation was applied more than once', () => {
+    const second: AppliedChange = { ...noChange, id: 'change2' }
+    let projection = projectRoundEvent(EMPTY_PROJECTION, opened('r1', ['shape']))
+    projection = projectRoundEvent(projection, settled('r1', 'shape', { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' }))
+
+    projection = withAppliedChange(projection, 'r1', 'shape', noChange)
+    projection = withAppliedChange(projection, 'r1', 'shape', second)
+
+    expect(projection.rounds[0]?.participants[0]?.appliedChanges).toEqual([noChange, second])
   })
 })
 
@@ -222,8 +282,8 @@ describe('withRoundInFlight', () => {
         openedAt: OPENED_AT,
         outcome: 'inFlight',
         participants: [
-          { participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'noComment' } },
-          { participantId: 'compression', state: 'working', result: undefined },
+          { participantId: 'shape', state: 'settled', result: { kind: 'response', outcome: 'noComment' }, appliedChanges: [] },
+          { participantId: 'compression', state: 'working', result: undefined, appliedChanges: [] },
         ],
         brought: [],
       },

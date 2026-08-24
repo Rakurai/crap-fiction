@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
@@ -6,7 +7,7 @@ import type { CallResult, ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
 import { ConversationNotFoundError, PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
-import { readConversation, readPiece, TolerantReadError, writeConversation, writePieceCast } from '../store/index.js'
+import { readConversation, readPiece, TolerantReadError, writeAppliedChange, writeConversation, writePieceCast } from '../store/index.js'
 import {
   conversationSchema,
   substantiveResponse,
@@ -23,6 +24,7 @@ import type {
   RoundOpenedEvent,
   RoundSnapshot,
 } from '../../shared/roundEvents.js'
+import { computeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
 import {
   compileApplyContext,
@@ -336,6 +338,12 @@ export class Room {
    * a piece, a conversation or a recommendation this method cannot find is a
    * refusal that never touches `#operation`, on the same terms `startRound`
    * refuses before touching it.
+   *
+   * CONTEXT "Applied change": a settled call that actually changed the
+   * manuscript is also the one place that change is computed and persisted —
+   * from the manuscript states either side, never from anything a
+   * participant returned. A call whose manuscript came back identical to the
+   * draft it started from has nothing to keep a record of.
    */
   async apply(
     workspaceDir: string,
@@ -345,7 +353,7 @@ export class Room {
     participantId: string,
     constraint: string | undefined,
     draft: string,
-  ): Promise<CallResult<{ manuscript: string }>> {
+  ): Promise<CallResult<{ manuscript: string; change: AppliedChange | undefined }>> {
     const holder = this.#operation
     if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
 
@@ -375,7 +383,15 @@ export class Room {
         throughRoundId: roundId,
       })
       const prompt = renderApplyPrompt(context, this.#charter)
-      return await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
+      const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
+      if (result.outcome !== 'value') return result
+
+      const { manuscript } = result.value
+      if (manuscript === draft) return { outcome: 'value', value: { manuscript, change: undefined } }
+
+      const change: AppliedChange = { id: nanoid(), roundId, participantId, content: computeAppliedChangeContent(draft, manuscript) }
+      await writeAppliedChange(workspaceDir, pieceId, change)
+      return { outcome: 'value', value: { manuscript, change } }
     } finally {
       this.#operation = undefined
     }

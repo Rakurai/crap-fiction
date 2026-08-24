@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { AppliedChange } from '../shared/appliedChange.js'
 import type { RoundSnapshot } from '../shared/roundEvents.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -9,7 +10,14 @@ import type {
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
-import { EMPTY_PROJECTION, initialProjection, projectRoundEvent, withRoundInFlight, type ConversationProjection } from './roundProjection.js'
+import {
+  EMPTY_PROJECTION,
+  initialProjection,
+  projectRoundEvent,
+  withAppliedChange,
+  withRoundInFlight,
+  type ConversationProjection,
+} from './roundProjection.js'
 
 /**
  * Said when sending broke here rather than at the studio, which is the one
@@ -31,6 +39,8 @@ export type ConversationViewModel = Readonly<{
    * was never told.
    */
   conversationId: string | null
+  /** CONTEXT "Applied change": records a change onto the response that caused it, once applying it has settled. */
+  attachAppliedChange: (roundId: string, participantId: string, change: AppliedChange) => void
 }>
 
 /** The room's adapters, reached by whoever composes this hook rather than imported here. */
@@ -165,5 +175,9 @@ export function useConversation(
     })
   }
 
-  return { projection, busy, error, sendMessage, abandon, conversationId: conversationIdRef.current }
+  function attachAppliedChange(roundId: string, participantId: string, change: AppliedChange): void {
+    setProjection((prev) => withAppliedChange(prev, roundId, participantId, change))
+  }
+
+  return { projection, busy, error, sendMessage, abandon, conversationId: conversationIdRef.current, attachAppliedChange }
 }

@@ -187,6 +187,24 @@ describe('the room over HTTP', () => {
       expect(await res.json()).toMatchObject({ success: true, data: { outcome: 'applied' } })
     })
 
+    it('presents the applied change on the response that caused it, once the conversation is read back', async () => {
+      const { app, roundId } = await withRecommendation()
+
+      const applyRes = await app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ roundId, participantId: 'shape', draft: 'The cups sat where she left them.' }),
+      })
+      const { data: applied } = await applyRes.json()
+      expect(applied.change).toMatchObject({ roundId, participantId: 'shape' })
+
+      const conversationRes = await app.request('/pieces/cups/conversations/c1')
+      const { data: conversation } = await conversationRes.json()
+      const round = conversation.rounds.find((candidate: { id: string }) => candidate.id === roundId)
+      const participant = round.participants.find((candidate: { participantId: string }) => candidate.participantId === 'shape')
+      expect(participant.appliedChanges).toEqual([applied.change])
+    })
+
     it('refuses an unknown recommendation with RECOMMENDATION_NOT_FOUND', async () => {
       const { app, roundId } = await withRecommendation()
 

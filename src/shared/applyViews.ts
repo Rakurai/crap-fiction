@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { appliedChangeSchema } from './appliedChange.js'
 import { failureReasonSchema } from './modelResult.js'
 
 /**
@@ -9,9 +10,13 @@ import { failureReasonSchema } from './modelResult.js'
  * call carries the manuscript it produced, an abandoned one carries nothing
  * (CONTEXT "Apply": identical to the author's eye), and a failed one carries
  * what the model layer already knows to say about a call that did not land.
+ *
+ * `change` is absent rather than an empty change where the manuscript the
+ * call returned is identical to the draft it started from — there is nothing
+ * an application changed to keep a record of.
  */
 export const applyOutcomeSchema = z.union([
-  z.object({ outcome: z.literal('applied'), manuscript: z.string().min(1) }),
+  z.object({ outcome: z.literal('applied'), manuscript: z.string().min(1), change: appliedChangeSchema.optional() }),
   z.object({ outcome: z.literal('failed'), reason: failureReasonSchema, returned: z.string().optional() }),
   z.object({ outcome: z.literal('abandoned') }),
 ])
