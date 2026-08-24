@@ -20,6 +20,7 @@ describe('the prompt a specialist is called with', () => {
       criteria: undefined,
       owesAnswer: true,
       message: undefined,
+      ask: undefined,
       authorContext: undefined,
       storyContext: undefined,
       draft: 'text',

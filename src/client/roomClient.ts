@@ -55,6 +55,16 @@ export function deleteConversation(pieceId: string, conversationId: string, sign
 const startRoundResultSchema = z.object({ conversationId: z.string(), roundId: z.string() })
 
 /**
+ * SPEC "Transport": the author's message, or a round opened from a particular
+ * response — a target and the reply sent to it, or the response being asked
+ * for a concrete change and any clarification.
+ */
+export type RoundOpening =
+  | Readonly<{ message: string }>
+  | Readonly<{ target: string; message: string }>
+  | Readonly<{ respondingTo: Readonly<{ roundId: string; participantId: string }>; clarification: string | undefined }>
+
+/**
  * SPEC "Write semantics": the current text travels in this request either
  * way — the caller is expected to have flushed the pending draft write
  * without waiting on it before calling this, and to pass the same text here.
@@ -62,14 +72,14 @@ const startRoundResultSchema = z.object({ conversationId: z.string(), roundId: z
 export function startRound(
   pieceId: string,
   conversationId: string,
-  message: string,
+  opening: RoundOpening,
   draft: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<{ conversationId: string; roundId: string }>> {
   return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/rounds`, startRoundResultSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message, draft }),
+    body: JSON.stringify({ ...opening, draft }),
     signal: signal ?? null,
   })
 }

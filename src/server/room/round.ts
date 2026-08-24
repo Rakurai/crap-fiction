@@ -14,6 +14,21 @@ import type { ParticipantEvidence } from './context.js'
  * that carries them.
  */
 
+/**
+ * SPEC "The room"/"The round": what a round asking for a concrete change carries
+ * that no other round does — the response it is asking about, resolved to the
+ * claim and note that made it worth asking, and the author's own clarification
+ * where they gave one. `respondingTo` is kept here rather than derived again at
+ * render time because it is what the conversation record and the live event both
+ * name the response by.
+ */
+export type AskContext = Readonly<{
+  claim: string
+  note: string | undefined
+  clarification: string | undefined
+  respondingTo: Readonly<{ roundId: string; participantId: string }>
+}>
+
 export type RoundPlan = Readonly<{
   roundId: string
   message: string | undefined
@@ -25,6 +40,8 @@ export type RoundPlan = Readonly<{
   specialists: readonly RoleDefinition[]
   /** Present, and last, exactly where the round will reach the Story Editor (CONTEXT "Round"). */
   storyEditor: RoleDefinition | undefined
+  /** Present exactly where this round asks the one participant it addresses for a concrete change. */
+  ask: AskContext | undefined
 }>
 
 export type RoundResult = Readonly<{

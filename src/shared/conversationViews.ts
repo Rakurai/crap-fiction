@@ -53,12 +53,21 @@ export type RoundParticipantRecord = z.infer<typeof roundParticipantRecordSchema
  * message verbatim, which participants were addressed, and each
  * participant's settled outcome in the order it was called.
  */
+/** Which response a round opened to ask about — CONTEXT "Round"/"Addressing": present only on a round asking for a concrete change. */
+export const respondingToSchema = z.object({ roundId: z.string().min(1), participantId: z.string().min(1) })
+
+export type RespondingTo = z.infer<typeof respondingToSchema>
+
 export const roundRecordSchema = z.object({
   id: z.string().min(1),
   message: z.string().min(1).optional(),
   addressed: z.array(z.string().min(1)).readonly(),
   /** Ids addressing durably enabled by this round, so history keeps saying the room changed. */
   brought: z.array(z.string().min(1)).readonly(),
+  /** SPEC "The round": the response this round asked a concrete change about, where it did — never present alongside `message`. */
+  respondingTo: respondingToSchema.optional(),
+  /** SPEC "The round": the author's own clarification on what they asked, where they gave one. */
+  clarification: z.string().min(1).optional(),
   participants: z.array(roundParticipantRecordSchema).readonly(),
   outcome: z.enum(['settled', 'abandoned']),
 })

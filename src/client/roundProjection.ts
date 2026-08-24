@@ -39,6 +39,9 @@ export type ProjectedRound = Readonly<{
   participants: readonly ProjectedParticipant[]
   /** UX_DESIGN "Where the author speaks": ids this round's addressing durably enabled — ordinarily empty. */
   brought: readonly string[]
+  /** UX_DESIGN "Actions on a response": present where this round is answering a request for a concrete change — never alongside `message`. */
+  respondingTo: Readonly<{ roundId: string; participantId: string }> | undefined
+  clarification: string | undefined
 }>
 
 export type ConversationProjection = Readonly<{ rounds: readonly ProjectedRound[] }>
@@ -64,6 +67,8 @@ function fromRecord(round: RoundView): ProjectedRound {
       appliedChanges: record.appliedChanges,
     })),
     brought: round.brought,
+    respondingTo: round.respondingTo,
+    clarification: round.clarification,
   }
 }
 
@@ -95,6 +100,8 @@ export function withRoundInFlight(projection: ConversationProjection, snapshot: 
       appliedChanges: [],
     })),
     brought: snapshot.brought,
+    respondingTo: snapshot.respondingTo,
+    clarification: snapshot.clarification,
   }
   return { rounds: [...projection.rounds, round] }
 }
@@ -172,6 +179,8 @@ export function projectRoundEvent(projection: ConversationProjection, event: Rou
         outcome: 'inFlight',
         participants: event.data.participants.map((participantId) => ({ participantId, state: 'waiting', result: undefined, appliedChanges: [] })),
         brought: event.data.brought,
+        respondingTo: event.data.respondingTo,
+        clarification: event.data.clarification,
       }
       return { rounds: [...projection.rounds, round] }
     }

@@ -28,7 +28,7 @@ import {
   UnknownCastMemberError,
   updatePieceDetails,
 } from './pieces.js'
-import { RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
+import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
@@ -39,7 +39,23 @@ const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
-const postRoundSchema = z.object({ message: z.string().min(1), draft: z.string() })
+/**
+ * SPEC "Transport": the author's message, or a round the author opened from a
+ * particular response — a target and the reply sent to it, or the response
+ * being asked for a concrete change and any clarification. The three are
+ * mutually exclusive rather than one shape with every field optional
+ * (CODING_STANDARDS "Types"): which round this opens is a fact about the
+ * request, not a state a caller could half-supply.
+ */
+const postRoundSchema = z.union([
+  z.strictObject({ message: z.string().min(1), draft: z.string() }),
+  z.strictObject({ target: z.string().min(1), message: z.string().min(1), draft: z.string() }),
+  z.strictObject({
+    respondingTo: z.object({ roundId: z.string().min(1), participantId: z.string().min(1) }),
+    clarification: z.string().min(1).optional(),
+    draft: z.string(),
+  }),
+])
 const postApplySchema = z.object({
   roundId: z.string().min(1),
   participantId: z.string().min(1),
@@ -152,8 +168,22 @@ export function createApp(
   })
 
   app.post('/pieces/:id/conversations/:cid/rounds', body(postRoundSchema), async (c) => {
-    const { message, draft } = c.req.valid('json')
-    const result = await room.startRound(workspace.require(), c.req.param('id'), c.req.param('cid'), message, draft)
+    const parsed = c.req.valid('json')
+    const workspaceDir = workspace.require()
+    const pieceId = c.req.param('id')
+    const conversationId = c.req.param('cid')
+
+    const result =
+      'respondingTo' in parsed
+        ? await room.startRound(workspaceDir, pieceId, conversationId, undefined, parsed.draft, {
+            kind: 'ask',
+            respondingTo: parsed.respondingTo,
+            clarification: parsed.clarification,
+          })
+        : 'target' in parsed
+          ? await room.startRound(workspaceDir, pieceId, conversationId, parsed.message, parsed.draft, { kind: 'targeted', target: parsed.target })
+          : await room.startRound(workspaceDir, pieceId, conversationId, parsed.message, parsed.draft)
+
     return c.json(ok(result))
   })
 
@@ -252,6 +282,8 @@ export function createApp(
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
     if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
+    if (err instanceof CommentaryNotFoundError) return refused('COMMENTARY_NOT_FOUND', 404)
+    if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)
 
     // Nothing here names it, so nothing here can tell the author what it was. It

@@ -145,6 +145,7 @@ function Surfaces({
           room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
           mark={roster.mark}
+          handle={roster.handle}
           handles={roster.handles}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
           clock={Date.now}

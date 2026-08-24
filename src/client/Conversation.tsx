@@ -31,6 +31,8 @@ type ConversationProps = {
   readonly displayName: (participantId: string) => string
   /** The participant's own colour, stable for as long as the room is. */
   readonly mark: (participantId: string) => string
+  /** UX_DESIGN "Actions on a response": the shipped handle for a participant, so an empty reply can address it in the main input. */
+  readonly handle: (participantId: string) => string | undefined
   /** SPEC "The room": the shipped handles the composer's own combobox offers, read from the roster. */
   readonly handles: readonly HandleEntry[]
   /**
@@ -158,6 +160,101 @@ function ApplyAction({
 }
 
 /**
+ * UX_DESIGN "Actions on a response": offered on any response, on the same
+ * terms — empty, it addresses that participant in the main input and leaves
+ * the author composing; with text, it sends that text immediately. Both
+ * outcomes are read off the one field on the button's own click, since
+ * replying and sending a reply are not different kinds of interaction.
+ *
+ * The field itself is never disabled: nothing about another operation being
+ * in flight is a reason to stop composing a reply. Only sending is refused
+ * while busy — and refused quietly, on the same terms `sendMessage` and
+ * `apply` already refuse a second operation.
+ */
+function ReplyAction({
+  participantId,
+  busy,
+  onReplyEmpty,
+  onReply,
+}: {
+  readonly participantId: string
+  readonly busy: boolean
+  readonly onReplyEmpty: (participantId: string) => void
+  readonly onReply: (participantId: string, message: string) => void
+}) {
+  const [text, setText] = useState('')
+  const blocked = text.trim().length > 0 && busy
+
+  function submit(): void {
+    const trimmed = text.trim()
+    if (trimmed.length === 0) {
+      onReplyEmpty(participantId)
+      return
+    }
+    if (busy) return
+    onReply(participantId, trimmed)
+    setText('')
+  }
+
+  return (
+    <div className={styles.actions}>
+      <input
+        aria-label="Reply, in your own words"
+        className={styles.actionField}
+        value={text}
+        placeholder="in your words — optional"
+        onChange={(event) => setText(event.target.value)}
+      />
+      <button type="button" className={styles.actionButton} disabled={blocked} onClick={submit}>
+        reply
+      </button>
+    </div>
+  )
+}
+
+/**
+ * UX_DESIGN "Actions on a response": offered on a response that offered a
+ * reading without an action. Empty, it asks that participant to show what it
+ * would change; with text, it asks the same with the author's clarification —
+ * carried to the room, never shown, on the same terms `ApplyAction`'s
+ * constraint is.
+ */
+function AskAction({
+  roundId,
+  participantId,
+  disabled,
+  onAsk,
+}: {
+  readonly roundId: string
+  readonly participantId: string
+  readonly disabled: boolean
+  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
+}) {
+  const [clarification, setClarification] = useState('')
+
+  return (
+    <div className={styles.actions}>
+      <input
+        aria-label="Clarify what you're asking for"
+        className={styles.actionField}
+        value={clarification}
+        disabled={disabled}
+        placeholder="a clarification, if there is one"
+        onChange={(event) => setClarification(event.target.value)}
+      />
+      <button
+        type="button"
+        className={styles.actionButton}
+        disabled={disabled}
+        onClick={() => onAsk(roundId, participantId, clarification.trim().length > 0 ? clarification.trim() : undefined)}
+      >
+        ask for a concrete change
+      </button>
+    </div>
+  )
+}
+
+/**
  * UX_DESIGN "An operation in flight": the same register a round in flight
  * uses, drawn on the response being applied rather than merged with the
  * round's own facts line — an application is not the round that produced the
@@ -235,6 +332,9 @@ function ParticipantBlock({
   onApply,
   onAbandonApply,
   onAskAboutChange,
+  onReplyEmpty,
+  onReply,
+  onAsk,
 }: {
   readonly participant: ProjectedParticipant
   readonly roundId: string
@@ -248,12 +348,20 @@ function ParticipantBlock({
   readonly onAbandonApply: () => void
   /** CONTEXT "Applied change": asking the room about a change is an ordinary message the author does not have to compose. */
   readonly onAskAboutChange: () => void
+  /** UX_DESIGN "Actions on a response": Reply, empty — addresses the participant in the main input rather than sending anything. */
+  readonly onReplyEmpty: (participantId: string) => void
+  /** UX_DESIGN "Actions on a response": Reply, with text — sent to the participant immediately. */
+  readonly onReply: (participantId: string, message: string) => void
+  /** UX_DESIGN "Actions on a response": Ask for a concrete change. */
+  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
 }) {
   const says = participantSays(participant)
   if (says === null) return null
 
   const recommends =
     participant.state === 'settled' && participant.result?.kind === 'response' && participant.result.outcome === 'applicableSuggestion'
+  const offeredAReading =
+    participant.state === 'settled' && participant.result?.kind === 'response' && participant.result.outcome === 'commentary'
 
   return (
     <div className={styles.participant}>
@@ -271,6 +379,8 @@ function ParticipantBlock({
         ) : (
           <ApplyAction roundId={roundId} participantId={participant.participantId} disabled={applyDisabled} onApply={onApply} />
         ))}
+      {offeredAReading && <AskAction roundId={roundId} participantId={participant.participantId} disabled={applyDisabled} onAsk={onAsk} />}
+      <ReplyAction participantId={participant.participantId} busy={applyDisabled} onReplyEmpty={onReplyEmpty} onReply={onReply} />
     </div>
   )
 }
@@ -310,6 +420,16 @@ function roomChangedText(names: readonly string[]): string {
 }
 
 /**
+ * UX_DESIGN "Actions on a response": a round asking for a concrete change
+ * carries no author message (CONTEXT "Round"), so the foot of the
+ * conversation names what it is answering in its place — never the
+ * deterministic instruction itself, which SPEC "The round" keeps unshown.
+ */
+function askedText(name: string): string {
+  return `${name} was asked for a concrete change.`
+}
+
+/**
  * UX_DESIGN "An operation in flight": the mockup's own placement, beside the
  * round's own facts line rather than at the composer — it is this round being
  * stopped, not the surface as a whole.
@@ -336,6 +456,9 @@ function RoundView({
   onApply,
   onAbandonApply,
   onAskAboutChange,
+  onReplyEmpty,
+  onReply,
+  onAsk,
 }: {
   readonly round: ProjectedRound
   readonly nowMs: number
@@ -347,10 +470,20 @@ function RoundView({
   readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
   readonly onAbandonApply: () => void
   readonly onAskAboutChange: () => void
+  readonly onReplyEmpty: (participantId: string) => void
+  readonly onReply: (participantId: string, message: string) => void
+  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
 }) {
   return (
     <div className={styles.round}>
       {round.message !== undefined && <p className={styles.message}>{round.message}</p>}
+      {round.message === undefined && round.respondingTo !== undefined && (
+        <div className={styles.asked}>
+          <span className={styles.askedFacts}>{machineWords('asked')}</span>
+          <span className={styles.askedWords}>{askedText(displayName(round.respondingTo.participantId))}</span>
+        </div>
+      )}
+      {round.clarification !== undefined && <p className={styles.message}>{round.clarification}</p>}
       {round.brought.length > 0 && (
         <div className={styles.roomChanged}>
           <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
@@ -370,6 +503,9 @@ function RoundView({
           onApply={onApply}
           onAbandonApply={onAbandonApply}
           onAskAboutChange={onAskAboutChange}
+          onReplyEmpty={onReplyEmpty}
+          onReply={onReply}
+          onAsk={onAsk}
         />
       ))}
       {round.outcome === 'abandoned' && <p className={styles.abandoned}>ABANDONED</p>}
@@ -399,6 +535,7 @@ export function Conversation({
   room,
   displayName,
   mark,
+  handle,
   handles,
   runtime,
   clock,
@@ -450,6 +587,27 @@ export function Conversation({
     conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
   }
 
+  /** UX_DESIGN "Actions on a response": Reply, empty — addresses that participant in the main input and focuses it, leaving the author composing. */
+  function replyEmpty(participantId: string): void {
+    const participantHandle = handle(participantId)
+    if (participantHandle === undefined) return
+    const prefix = `@${participantHandle} `
+    const next = message.startsWith(prefix) ? message : `${prefix}${message}`
+    setMessage(next)
+    setCaretOffset(next.length)
+    textareaRef.current?.focus()
+  }
+
+  function reply(participantId: string, text: string): void {
+    if (roomBusy) return
+    conversation.reply(participantId, text)
+  }
+
+  function askForConcreteChange(roundId: string, participantId: string, clarification: string | undefined): void {
+    if (roomBusy) return
+    conversation.askForConcreteChange(roundId, participantId, clarification)
+  }
+
   function submit() {
     const text = message.trim()
     if (text.length === 0 || roomBusy) return
@@ -484,6 +642,9 @@ export function Conversation({
             onApply={apply.apply}
             onAbandonApply={apply.abandon}
             onAskAboutChange={askAboutChange}
+            onReplyEmpty={replyEmpty}
+            onReply={reply}
+            onAsk={askForConcreteChange}
           />
         ))}
       </div>

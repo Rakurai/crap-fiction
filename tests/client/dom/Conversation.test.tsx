@@ -46,6 +46,8 @@ function roomHolding(conversation: ConversationRecord, abandonOperation: RoomAda
   }
 }
 
+const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
+
 /**
  * A moment, stated. The elapsed count is read from `clock`, so a test that wants
  * `0:14` on screen says which fourteen seconds rather than sleeping through them.
@@ -64,6 +66,7 @@ function renderConversation(round: RoundRecord, extra: Partial<ComponentProps<ty
       room={roomHolding(conversation)}
       displayName={(id) => NAMES[id] ?? id}
       mark={() => 'var(--mark-teal)'}
+      handle={(id) => HANDLE_BY_ID[id]}
       handles={HANDLES}
       runtime={{ reachable: true, models: ['a-model'] }}
       clock={() => OPENED_AT}
@@ -439,8 +442,103 @@ describe('the applied change, shown on the response', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'ask the room about this' }))
 
     await waitFor(() =>
-      expect(startRound).toHaveBeenCalledWith('the-lighthouse', 'c1', 'Take a look at the change I just made and tell me what you think.', 'First light.'),
+      expect(startRound).toHaveBeenCalledWith(
+        'the-lighthouse',
+        'c1',
+        { message: 'Take a look at the change I just made and tell me what you think.' },
+        'First light.',
+      ),
     )
+  })
+})
+
+describe('replying to a response', () => {
+  afterEach(cleanup)
+
+  it('empty, addresses that participant in the main input and focuses it', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'reply' }))
+
+    const composer = await screen.findByLabelText('Message the room')
+    await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
+    expect(document.activeElement).toBe(composer)
+  })
+
+  it('with text, sends it to that participant immediately rather than focusing the composer', async () => {
+    const startRound = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; roundId: string }>>({ outcome: 'value', value: { conversationId: 'c1', roundId: 'r2' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding({ id: 'c1', rounds: [SETTLED_ROUND] }), startRound }
+
+    renderConversation(SETTLED_ROUND, { room })
+
+    const field = await screen.findByLabelText('Reply, in your own words')
+    fireEvent.change(field, { target: { value: 'say more about that' } })
+    fireEvent.click(screen.getByRole('button', { name: 'reply' }))
+
+    await waitFor(() =>
+      expect(startRound).toHaveBeenCalledWith('the-lighthouse', 'c1', { target: 'shape', message: 'say more about that' }, 'First light.'),
+    )
+    expect((field as HTMLInputElement).value).toBe('')
+
+    // The reply went straight to the room rather than into the main input.
+    expect((screen.getByLabelText('Message the room') as HTMLTextAreaElement).value).toBe('')
+  })
+})
+
+describe('asking for a concrete change', () => {
+  afterEach(cleanup)
+
+  it('is offered on a response that offered a reading without an action', async () => {
+    renderConversation(SETTLED_ROUND)
+
+    await screen.findByText('It holds.')
+
+    expect(screen.getByRole('button', { name: 'ask for a concrete change' })).toBeTruthy()
+  })
+
+  it('is not offered on an applicable suggestion, which offers Apply instead', async () => {
+    renderConversation(ROUND_WITH_RECOMMENDATION)
+
+    await screen.findByRole('button', { name: 'apply' })
+
+    expect(screen.queryByRole('button', { name: 'ask for a concrete change' })).toBeNull()
+  })
+
+  it('opens an ordinary round carrying no author message, naming the response it came from', async () => {
+    const startRound = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; roundId: string }>>({ outcome: 'value', value: { conversationId: 'c1', roundId: 'r2' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding({ id: 'c1', rounds: [SETTLED_ROUND] }), startRound }
+
+    renderConversation(SETTLED_ROUND, { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ask for a concrete change' }))
+
+    await waitFor(() =>
+      expect(startRound).toHaveBeenCalledWith(
+        'the-lighthouse',
+        'c1',
+        { respondingTo: { roundId: 'r0', participantId: 'shape' }, clarification: undefined },
+        'First light.',
+      ),
+    )
+  })
+
+  it('shows the naming at the foot of the conversation, in place of the author message a round like this never had', async () => {
+    renderConversation({
+      id: 'r1',
+      addressed: ['shape'],
+      brought: [],
+      respondingTo: { roundId: 'r0', participantId: 'shape' },
+      participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the aside' } }],
+      outcome: 'settled',
+    })
+
+    await screen.findByText('cut the aside')
+
+    expect(screen.getByText('Shape was asked for a concrete change.')).toBeTruthy()
   })
 })
 

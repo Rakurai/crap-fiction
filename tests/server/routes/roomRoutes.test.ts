@@ -141,6 +141,84 @@ describe('the room over HTTP', () => {
     await settlementOf(room, 'cups')
   })
 
+  describe('replying and asking for a concrete change', () => {
+    /** The first round settled over HTTP, so the piece holds a commentary at a real round and participant id. */
+    async function withCommentary(): Promise<{ app: Hono; room: Room; conversationId: string; roundId: string }> {
+      const { app, room } = await withPiece()
+
+      const roundRes = await app.request('/pieces/cups/conversations/c1/rounds', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'a message', draft: 'text' }),
+      })
+      const { conversationId, roundId } = (await roundRes.json()).data
+      await settlementOf(room, 'cups')
+      return { app, room, conversationId, roundId }
+    }
+
+    it('sends a reply to the named participant, addressed by the act rather than by the words', async () => {
+      const { app, room, conversationId } = await withCommentary()
+
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: 'shape', message: 'say more, @story-editor', draft: 'text' }),
+      })
+      expect(res.status).toBe(200)
+      await settlementOf(room, 'cups')
+
+      const conversationRes = await app.request(`/pieces/cups/conversations/${conversationId}`)
+      const { data: conversation } = await conversationRes.json()
+      const round = conversation.rounds[1]
+      expect(round.message).toBe('say more, @story-editor')
+      // The sigil in the reply's own text addresses nobody: a supplied target is the whole of the addressing.
+      expect(round.addressed).toEqual(['shape'])
+    })
+
+    it('asks the named response for a concrete change, opening a round with no author message', async () => {
+      const { app, room, conversationId, roundId } = await withCommentary()
+
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ respondingTo: { roundId, participantId: 'shape' }, clarification: 'be specific', draft: 'text' }),
+      })
+      expect(res.status).toBe(200)
+      await settlementOf(room, 'cups')
+
+      const conversationRes = await app.request(`/pieces/cups/conversations/${conversationId}`)
+      const { data: conversation } = await conversationRes.json()
+      const round = conversation.rounds[1]
+      expect(round.message).toBeUndefined()
+      expect(round.respondingTo).toEqual({ roundId, participantId: 'shape' })
+      expect(round.clarification).toBe('be specific')
+    })
+
+    it('refuses asking about a response that never gave commentary, with COMMENTARY_NOT_FOUND', async () => {
+      const { app, conversationId, roundId } = await withCommentary()
+
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ respondingTo: { roundId, participantId: 'no-such-participant' }, draft: 'text' }),
+      })
+      expect(res.status).toBe(404)
+      expect(await res.json()).toMatchObject({ success: false, error: { code: 'COMMENTARY_NOT_FOUND' } })
+    })
+
+    it('refuses replying to an unknown participant, with PARTICIPANT_NOT_FOUND', async () => {
+      const { app, conversationId } = await withCommentary()
+
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: 'no-such-participant', message: 'a reply', draft: 'text' }),
+      })
+      expect(res.status).toBe(404)
+      expect(await res.json()).toMatchObject({ success: false, error: { code: 'PARTICIPANT_NOT_FOUND' } })
+    })
+  })
+
   describe('applying a recommendation', () => {
     /**
      * A round settled over HTTP first, so the piece holds an applicable

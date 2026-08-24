@@ -12,6 +12,7 @@ import {
   conversationSchema,
   substantiveResponse,
   type Conversation,
+  type RespondingTo,
   type RoundParticipantRecord,
   type RoundRecord,
 } from '../../shared/conversationViews.js'
@@ -37,7 +38,7 @@ import {
   type SpecialistCriteria,
 } from './context.js'
 import type { CompiledDurableContext, ReadDurableContext } from './durableContext.js'
-import { callParticipant, evidenceFrom, type RoundPlan, type RoundResult } from './round.js'
+import { callParticipant, evidenceFrom, type AskContext, type RoundPlan, type RoundResult } from './round.js'
 import type { RoomRoster } from './roster.js'
 
 export type RoomEvent =
@@ -62,6 +63,22 @@ export class RecommendationNotFoundError extends Error {
   }
 }
 
+/** No commentary stands at the named place — a stale identity, or an outcome that was never one to ask a concrete change about. */
+export class CommentaryNotFoundError extends Error {
+  constructor(pieceId: string, roundId: string, participantId: string) {
+    super(`no commentary from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
+    this.name = 'CommentaryNotFoundError'
+  }
+}
+
+/** A round the author opened by an act — replying to a response — named a participant the room does not have. */
+export class ParticipantNotFoundError extends Error {
+  constructor(pieceId: string, participantId: string) {
+    super(`no participant "${participantId}" in the room for piece "${pieceId}"`)
+    this.name = 'ParticipantNotFoundError'
+  }
+}
+
 type Listener = (event: RoomEvent) => void
 
 /**
@@ -83,6 +100,31 @@ function findRecommendation(conversation: Conversation, roundId: string, partici
   return response?.outcome === 'applicableSuggestion' ? response : undefined
 }
 
+/**
+ * The commentary the author is asking a concrete change about, or `undefined`
+ * — a stale identity, or a response that was never a reading without an action
+ * (UX_DESIGN "Actions on a response": asking is offered only there — an
+ * applicable suggestion already names one).
+ */
+function findCommentary(conversation: Conversation, roundId: string, participantId: string) {
+  const round = conversation.rounds.find((candidate) => candidate.id === roundId)
+  const record = round?.participants.find((candidate) => candidate.participantId === participantId)
+  if (record === undefined) return undefined
+  const response = substantiveResponse(record.result)
+  return response?.outcome === 'commentary' ? response : undefined
+}
+
+/**
+ * What `startRound` takes beyond the author's own message, for the two rounds
+ * SPEC "The round" has addressed by the act rather than by the words: replying
+ * to a response names a participant directly, and asking one for a concrete
+ * change names the response it is asking about instead of carrying a message
+ * at all. Absent, the message (if any) is read for addressing the ordinary way.
+ */
+export type RoundOpening =
+  | Readonly<{ kind: 'targeted'; target: string }>
+  | Readonly<{ kind: 'ask'; respondingTo: RespondingTo; clarification: string | undefined }>
+
 /** A round under way, as the room tracks it while it runs. */
 type ActiveRound = {
   readonly kind: 'round'
@@ -97,6 +139,8 @@ type ActiveRound = {
   readonly controller: AbortController
   /** Stamped once, where the round opens, so the event and the snapshot agree. */
   readonly openedAt: number
+  /** Present exactly where this round is asking its one participant for a concrete change. */
+  readonly ask: AskContext | undefined
 }
 
 type RunningRound = ActiveRound & {
@@ -215,14 +259,24 @@ export class Room {
       states: Object.fromEntries(operation.states),
       settled: [...operation.settled],
       openedAt: operation.openedAt,
+      respondingTo: operation.ask?.respondingTo,
+      clarification: operation.ask?.clarification,
     }
   }
 
   /**
-   * SPEC "The round": addressing is parsed out of the author's message and
-   * is the only thing it is parsed for. Addressing a specialist that is not
-   * enabled enables it — the same durable write to `piece.yaml` as enabling
-   * it directly — before the round opens.
+   * SPEC "The room is the only parser, and a round that names its target is not
+   * parsed at all": `opening` absent reads the ordinary way — addressing is
+   * parsed out of `message`, and is the only thing it is parsed for. `opening`
+   * present is a round the author opened from a particular response — replying
+   * to it, addressed to that participant by the act rather than by the words
+   * (`message` still carries the author's own text verbatim, sent rather than
+   * parsed), or asking it for a concrete change, which carries no message at
+   * all and resolves the response being asked about here, once, so nothing
+   * downstream reads the conversation a second time to find it. Addressing a
+   * specialist that is not enabled enables it — the same durable write to
+   * `piece.yaml` as enabling it directly — before the round opens, on the same
+   * terms whichever way the round was addressed.
    *
    * `message` is optional because a round can be opened by an act rather than
    * by something the author typed, and CONTEXT "Round" keeps the record honest
@@ -235,6 +289,7 @@ export class Room {
     conversationId: string,
     message: string | undefined,
     draft: string,
+    opening?: RoundOpening,
   ): Promise<{ conversationId: string; roundId: string }> {
     const holder = this.#operation
     if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
@@ -242,8 +297,27 @@ export class Room {
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const addressed = message === undefined ? [] : parseAddressing(message, [...this.#specialists, this.#storyEditor])
-    const addressedIds = addressed.map((role) => role.id)
+    const roster = [...this.#specialists, this.#storyEditor]
+
+    let addressedIds: readonly string[]
+    let ask: AskContext | undefined
+
+    if (opening === undefined) {
+      addressedIds = message === undefined ? [] : parseAddressing(message, roster).map((role) => role.id)
+      ask = undefined
+    } else if (opening.kind === 'targeted') {
+      if (!roster.some((role) => role.id === opening.target)) throw new ParticipantNotFoundError(pieceId, opening.target)
+      addressedIds = [opening.target]
+      ask = undefined
+    } else {
+      const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+      if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
+      const { roundId: respondingToRoundId, participantId: respondingToParticipantId } = opening.respondingTo
+      const commentary = findCommentary(conversation, respondingToRoundId, respondingToParticipantId)
+      if (commentary === undefined) throw new CommentaryNotFoundError(pieceId, respondingToRoundId, respondingToParticipantId)
+      addressedIds = [respondingToParticipantId]
+      ask = { claim: commentary.claim, note: commentary.note, clarification: opening.clarification, respondingTo: opening.respondingTo }
+    }
 
     const eligibleSpecialists =
       addressedIds.length === 0
@@ -265,6 +339,7 @@ export class Room {
       brought,
       specialists: eligibleSpecialists,
       storyEditor: storyEditorIncluded ? this.#storyEditor : undefined,
+      ask,
     }
     const participants = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
 
@@ -281,8 +356,12 @@ export class Room {
       settled: [],
       controller: new AbortController(),
       openedAt,
+      ask,
     }
-    this.#emit(pieceId, { type: 'round.opened', data: { conversationId, roundId, message, participants, brought, openedAt } })
+    this.#emit(pieceId, {
+      type: 'round.opened',
+      data: { conversationId, roundId, message, participants, brought, openedAt, respondingTo: ask?.respondingTo, clarification: ask?.clarification },
+    })
     this.#logger.info({ pieceId, conversationId, roundId, participants, brought }, 'round opened')
 
     // The round is under way before there is a promise to represent it, so the
@@ -466,6 +545,8 @@ export class Room {
       message: plan.message,
       addressed: plan.addressedIds,
       brought: plan.brought,
+      respondingTo: plan.ask?.respondingTo,
+      clarification: plan.ask?.clarification,
       participants: result.participants,
       outcome: result.outcome,
     }
@@ -518,6 +599,7 @@ export class Room {
     const signal = operation.controller.signal
     const shared = {
       message: plan.message,
+      ask: plan.ask,
       authorContext: durableContext.authorContext,
       storyContext: durableContext.storyContext,
       draft,

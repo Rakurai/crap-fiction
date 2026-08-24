@@ -6,6 +6,7 @@ import type {
   applyRecommendation as applyRecommendationFn,
   createConversation as createConversationFn,
   fetchConversation as fetchConversationFn,
+  RoundOpening,
   startRound as startRoundFn,
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
@@ -30,6 +31,10 @@ export type ConversationViewModel = Readonly<{
   busy: boolean
   error: string | undefined
   sendMessage: (message: string) => void
+  /** UX_DESIGN "Actions on a response": reply with text, addressed to that participant by the act rather than by the words. */
+  reply: (participantId: string, message: string) => void
+  /** UX_DESIGN "Actions on a response": ask the response's own participant for a concrete change, carrying no author message. */
+  askForConcreteChange: (roundId: string, participantId: string, clarification: string | undefined) => void
   abandon: () => void
   /**
    * The conversation an author action addresses right now, once one exists —
@@ -125,7 +130,14 @@ export function useConversation(
     }
   }, [pieceId, initialConversationId])
 
-  function sendMessage(message: string): void {
+  /**
+   * Every round the author opens — an ordinary message, a reply sent to a
+   * particular participant, or asking one for a concrete change — mints a
+   * conversation on the first round and refuses a second while one is already
+   * busy on the same terms, so the three share this rather than each
+   * repeating it: they are ordinary rounds, not different kinds of interaction.
+   */
+  function openRound(opening: RoundOpening): void {
     if (busy) return
     flushDraft()
     setError(undefined)
@@ -149,7 +161,7 @@ export function useConversation(
         conversationIdRef.current = created.value.id
       }
 
-      const result = await startRound(pieceId, conversationId, message, getDraft())
+      const result = await startRound(pieceId, conversationId, opening, getDraft())
       if (result.outcome !== 'value') stop(failureMessage(result))
     }
 
@@ -159,6 +171,18 @@ export function useConversation(
     void run().catch((err: unknown) => {
       stop(err instanceof Error ? err.message : UNSENT)
     })
+  }
+
+  function sendMessage(message: string): void {
+    openRound({ message })
+  }
+
+  function reply(participantId: string, message: string): void {
+    openRound({ target: participantId, message })
+  }
+
+  function askForConcreteChange(roundId: string, participantId: string, clarification: string | undefined): void {
+    openRound({ respondingTo: { roundId, participantId }, clarification })
   }
 
   /**
@@ -179,5 +203,15 @@ export function useConversation(
     setProjection((prev) => withAppliedChange(prev, roundId, participantId, change))
   }
 
-  return { projection, busy, error, sendMessage, abandon, conversationId: conversationIdRef.current, attachAppliedChange }
+  return {
+    projection,
+    busy,
+    error,
+    sendMessage,
+    reply,
+    askForConcreteChange,
+    abandon,
+    conversationId: conversationIdRef.current,
+    attachAppliedChange,
+  }
 }

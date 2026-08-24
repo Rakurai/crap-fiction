@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { participantResultSchema, roundParticipantRecordSchema } from './conversationViews.js'
+import { participantResultSchema, respondingToSchema, roundParticipantRecordSchema } from './conversationViews.js'
 
 /**
  * SPEC "Model access": a call may report that it is preparing before it is
@@ -42,6 +42,9 @@ export const roundOpenedEventSchema = z.object({
    * mid-round would restart the count.
    */
   openedAt: z.number().int().positive(),
+  /** UX_DESIGN "Actions on a response": present while the round is answering a request for a concrete change, so its place at the foot of the conversation can name what it is answering before it settles. */
+  respondingTo: respondingToSchema.optional(),
+  clarification: z.string().min(1).optional(),
 })
 
 export type RoundOpenedEvent = z.infer<typeof roundOpenedEventSchema>
@@ -116,6 +119,9 @@ export const roundSnapshotSchema = z.object({
   settled: z.array(roundParticipantRecordSchema).readonly(),
   /** The same stamp `round.opened` carried, so a reload's count continues rather than restarting. */
   openedAt: z.number().int().positive(),
+  /** Carried over from `round.opened`, so a reload mid-round still knows what the round is answering. */
+  respondingTo: respondingToSchema.optional(),
+  clarification: z.string().min(1).optional(),
 })
 
 export type RoundSnapshot = z.infer<typeof roundSnapshotSchema>

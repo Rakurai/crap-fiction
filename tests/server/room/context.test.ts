@@ -29,6 +29,7 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
     criteria: undefined,
     owesAnswer: false,
     message: undefined,
+    ask: undefined,
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
@@ -355,5 +356,34 @@ describe('renderPrompt', () => {
 
     expect(renderPrompt(owed, charter)).toContain(charter.directQuestionOwedAnswer)
     expect(renderPrompt(eligible, charter)).not.toContain(charter.directQuestionOwedAnswer)
+  })
+
+  /**
+   * #16 "Reply, and ask for a concrete change"/SPEC "The round": the
+   * deterministic instruction stands where "Author's message" would, because
+   * CONTEXT "Round" has this round carrying no message at all — the two never
+   * appear together.
+   */
+  it('carries the reading being asked about and the author\'s clarification, never as the author\'s own message', () => {
+    const context = compileSpecialistContext(
+      contextInput({ role: shape, ask: { claim: 'the entry is late', note: 'by a paragraph', clarification: 'what would you cut' } }),
+    )
+
+    const prompt = renderPrompt(context, charter)
+    expect(prompt).toContain('the entry is late')
+    expect(prompt).toContain('by a paragraph')
+    expect(prompt).toContain('what would you cut')
+    expect(prompt).not.toContain("Author's message")
+  })
+
+  it('omits the "Asked for a concrete change" section for an ordinary call', () => {
+    const prompt = renderPrompt(baseContext, charter)
+    expect(prompt).not.toContain('Asked for a concrete change')
+  })
+
+  it('carries no clarification section when the author gave none', () => {
+    const context = compileSpecialistContext(contextInput({ role: shape, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }))
+
+    expect(renderPrompt(context, charter)).not.toContain('The author added')
   })
 })

@@ -8,7 +8,14 @@ import { createPiece } from '../../../src/server/pieces.js'
 import { readAppliedChanges, readConversation, readPiece, writeConversation, writePieceCast } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import { conversationSchema, type Conversation } from '../../../src/shared/conversationViews.js'
-import { RecommendationNotFoundError, Room, RoomBusyError, type RoomEvent } from '../../../src/server/room/room.js'
+import {
+  CommentaryNotFoundError,
+  ParticipantNotFoundError,
+  RecommendationNotFoundError,
+  Room,
+  RoomBusyError,
+  type RoomEvent,
+} from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
 
@@ -513,6 +520,127 @@ describe('Room.apply', () => {
     if (result.outcome !== 'value') throw new Error('expected the application to settle')
     expect(result.value.change).toBeUndefined()
     expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([])
+  })
+})
+
+/** A conversation whose first round left one reading behind, worth asking a concrete change about. */
+function conversationWithCommentary(): Conversation {
+  return {
+    id: 'c1',
+    rounds: [
+      {
+        id: 'r1',
+        message: 'does the opening earn its length',
+        addressed: [],
+        brought: [],
+        outcome: 'settled',
+        participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'The entry is late.', note: 'By a paragraph.' } }],
+      },
+    ],
+  }
+}
+
+/**
+ * #16 "Reply, and ask for a concrete change": both open ordinary rounds
+ * addressed by the act rather than by the words (SPEC "The room is the only
+ * parser, and a round that names its target is not parsed at all").
+ */
+describe('Room.startRound — a round the author opened from a particular response', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('replying addresses the named participant by the act, reading the message for nothing', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    // The message names "@compression" — were it parsed the ordinary way, that
+    // sigil alone would address compression instead. A supplied target is the
+    // whole of the addressing, so it is not parsed at all.
+    await room.startRound(workspaceDir, piece.id, 'c1', 'say more about that, @compression', 'draft text', { kind: 'targeted', target: 'shape' })
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('shape')).toContain('say more about that, @compression')
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[0]?.addressed).toEqual(['shape'])
+    expect(conversation?.rounds[0]?.message).toBe('say more about that, @compression')
+  })
+
+  it('replying to an unknown participant is refused, not opened against nobody', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room } = buildRoom(dataRoot, {})
+
+    await expect(
+      room.startRound(workspaceDir, piece.id, 'c1', 'a reply', 'draft text', { kind: 'targeted', target: 'no-such-participant' }),
+    ).rejects.toThrowError(ParticipantNotFoundError)
+    expect(room.snapshot(piece.id)).toBeUndefined()
+  })
+
+  it('asking for a concrete change opens a round with no message, calling only the response\'s own participant', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithCommentary())
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the aside' } } },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    await room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text', {
+      kind: 'ask',
+      respondingTo: { roundId: 'r1', participantId: 'shape' },
+      clarification: 'what would you cut',
+    })
+    await settlementOf(room, piece.id)
+
+    const opened = events.find((event) => event.type === 'round.opened')
+    expect(opened?.type === 'round.opened' && opened.data.participants).toEqual(['shape'])
+    expect(opened?.type === 'round.opened' && opened.data.message).toBeUndefined()
+
+    // The reading and the author's clarification reach the call, but the
+    // deterministic instruction that makes it concrete is never carried as
+    // the author's own message — CONTEXT "Round" keeps that record honest.
+    expect(adapter.promptFor('shape')).toContain('The entry is late.')
+    expect(adapter.promptFor('shape')).toContain('what would you cut')
+    expect(adapter.promptFor('shape')).not.toContain("Author's message")
+    expect(adapter.promptFor('compression')).toBeUndefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+
+    const conversation = readConversation(workspaceDir, piece.id, 'c1', conversationSchema)
+    expect(conversation?.rounds[1]?.message).toBeUndefined()
+    expect(conversation?.rounds[1]?.respondingTo).toEqual({ roundId: 'r1', participantId: 'shape' })
+    expect(conversation?.rounds[1]?.clarification).toBe('what would you cut')
+  })
+
+  it('refuses where no commentary stands at the named response', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writeConversation(workspaceDir, piece.id, 'c1', conversationWithCommentary())
+    const { room } = buildRoom(dataRoot, {})
+
+    // "compression" said nothing in round "r1" at all — no participant record to find.
+    await expect(
+      room.startRound(workspaceDir, piece.id, 'c1', undefined, 'draft text', {
+        kind: 'ask',
+        respondingTo: { roundId: 'r1', participantId: 'compression' },
+        clarification: undefined,
+      }),
+    ).rejects.toThrowError(CommentaryNotFoundError)
+    expect(room.snapshot(piece.id)).toBeUndefined()
   })
 })
 

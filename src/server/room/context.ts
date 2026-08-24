@@ -21,6 +21,14 @@ export type HistoryEntry =
 export type ParticipantEvidence = Readonly<{ participantId: string; claim: string; note: string | undefined }>
 
 /**
+ * What a specialist's call carries when the round is asking it for a concrete
+ * change, rather than the response it is asking about's full identity — the
+ * room resolves `respondingTo` to this before the call is compiled, so nothing
+ * downstream of the room reads the conversation a second time to find it.
+ */
+export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
+
+/**
  * What the mode says this specialist applies at this scale (CONTEXT "Mode"). It
  * is the mode's rather than the role's because the same specialist attends to
  * different things at different lengths, which is the one axis this software is
@@ -36,6 +44,8 @@ export type ContextInput = Readonly<{
   criteria: SpecialistCriteria | undefined
   owesAnswer: boolean
   message: string | undefined
+  /** Present exactly where the round is asking this call's own participant for a concrete change. */
+  ask: AskContextInput | undefined
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
@@ -48,6 +58,7 @@ export type Context = Readonly<{
   criteria: SpecialistCriteria | undefined
   owesAnswer: boolean
   message: string | undefined
+  ask: AskContextInput | undefined
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
@@ -108,6 +119,7 @@ function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence
     criteria: input.criteria,
     owesAnswer: input.owesAnswer,
     message: input.message,
+    ask: input.ask,
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
@@ -211,6 +223,23 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
 const APPLY_INSTRUCTION =
   "Revise the manuscript so that it embodies the recommendation below, honoring the author's constraint where one is given. Change only what embodying the recommendation and the constraint requires — nothing else about the prose. Return the manuscript whole."
 
+/**
+ * The one instruction a round asking for a concrete change carries that no
+ * other participant's call does — deterministic and never displayed, the same
+ * way `APPLY_INSTRUCTION` above is not (SPEC "The round"). It stands in the
+ * slot an author's message would otherwise fill; the two never appear
+ * together, because CONTEXT "Round" has this round carrying no message.
+ */
+const ASK_INSTRUCTION =
+  'The author found the reading below worth acting on but it named no action. Say plainly what you would change in the manuscript to act on it — an applicable suggestion where you have one — rather than elaborating on the reading itself.'
+
+function askText(ask: AskContextInput | undefined): string {
+  if (ask === undefined) return ''
+  const reading = ask.note !== undefined ? `${ask.claim} ${ask.note}` : ask.claim
+  const clarification = ask.clarification !== undefined ? `\n\nThe author added: ${ask.clarification}` : ''
+  return `${ASK_INSTRUCTION}\n\n${reading}${clarification}`
+}
+
 export function renderApplyPrompt(context: ApplyContext, charter: Charter): string {
   const recommendation =
     context.recommendationNote !== undefined ? `${context.recommendationClaim} ${context.recommendationNote}` : context.recommendationClaim
@@ -288,6 +317,7 @@ export function renderPrompt(context: Context, charter: Charter): string {
     historyText(context.history),
     evidenceText(context.evidence),
     section("Author's message", context.message),
+    section('Asked for a concrete change', askText(context.ask)),
   ]
   return parts.filter((part) => part.length > 0).join('')
 }

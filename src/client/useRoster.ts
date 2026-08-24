@@ -29,6 +29,8 @@ export type RosterViewModel = Readonly<{
   displayName: (participantId: string) => string
   /** The participant's own colour, as a value a style can carry. */
   mark: (participantId: string) => string
+  /** UX_DESIGN "Actions on a response": the shipped handle for a participant, so replying can address it in the main input the way typing `@` would — absent for an operation call site, which is never addressed. */
+  handle: (participantId: string) => string | undefined
   /**
    * SPEC "Model access"/"The room": every participant's handle, for the
    * composer's own combobox — the shipped handles, read from the roster rather
@@ -58,6 +60,7 @@ export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewMo
       const place = named.findIndex((site) => site.site === participantId)
       return place === -1 ? UNMARKED : (MARKS[place % MARKS.length] ?? UNMARKED)
     },
+    handle: (participantId) => named.find((site) => site.site === participantId)?.handle ?? undefined,
     handles: named.flatMap((site) => (site.handle === null ? [] : [{ handle: site.handle, displayName: site.displayName ?? site.site }])),
   }
 }

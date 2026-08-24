@@ -191,6 +191,76 @@
   cursor: default;
 }
 
+/* UX_DESIGN "Actions on a response": the same row shape Apply uses, for Reply and Ask for a concrete change. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0 0;
+}
+
+.actionField {
+  flex: 1;
+  min-width: 0;
+  font: 400 11.5px/1.4 var(--font-ui);
+  color: var(--ink);
+  background: var(--prose);
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+.actionButton {
+  flex: none;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.actionButton:hover {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.actionButton:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
+}
+
+/*
+ * UX_DESIGN "Actions on a response": a round asking for a concrete change has
+ * no author message to show in its place, so the foot of the conversation
+ * names what it is answering — the same tinted register `roomChanged` uses,
+ * because both are the room stating a fact about itself rather than the
+ * author's own words.
+ */
+.asked {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 4px;
+  padding: 9px 11px;
+  background: var(--tint);
+  border-radius: 4px;
+}
+
+.askedFacts {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+}
+
+.askedWords {
+  font: 400 11.5px/1.45 var(--font-ui);
+  color: var(--ink2);
+}
+
 .applyingFacts {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
