@@ -1,6 +1,6 @@
 # crap-fiction
 
-A local, single-user studio for writing fiction with a team of specialized agents. The design documents named below are the source of truth; the implementation under `src/` is partial and is built against them, so where code and documents disagree the documents are right and the code is behind.
+A local, single-user studio for writing fiction with a team of specialized agents. The design documents named below are the source of truth. The implementation under `src/` is built against them and now covers the specified surface; `docs/SPEC_GAPS.md` names the places it does not, and is the only place a divergence is allowed to live. So where code and documents disagree and the gap is not recorded there, the documents are right and the code is wrong — and the fix is the code, or a documented decision to change the document.
 
 ## Agent skills
 
@@ -14,7 +14,7 @@ The five canonical labels are used unchanged: `needs-triage`, `needs-info`, `rea
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. `CONTEXT.md` holds the domain model and is the authoritative glossary; the design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `SPEC.md`) governs behaviour in that order of precedence. See `docs/agents/domain.md`.
+Single-context: one `CONTEXT.md` at the repo root, holding the domain model and the authoritative glossary. The design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `SPEC.md`) governs behaviour in that order of precedence. There is no `docs/adr/` and none is wanted: a settled decision goes in `SPEC.md`, which is an ADR set in all but filename. See `docs/agents/domain.md`.
 
 ## Engineering discipline
 

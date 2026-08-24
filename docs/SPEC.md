@@ -45,8 +45,11 @@ projection of round state.
 **Not Electron** — a localhost URL is sufficient, and packaging is a cost with no return here.
 **No database** — everything a piece needs is in the piece's directory.
 
-Client state is a small event-fed store. This is a local event-stream application; modelling
-it as remote data fetching would be a category error.
+Client state is fed by the event stream rather than fetched. This is a local event-stream
+application; modelling it as remote data fetching would be a category error. The shape that
+satisfies it is a hook per concern over React's own state, with the round's accumulation held in
+a pure reducer the hook feeds events to — a store library would be a second state authority
+above the one the framework already supplies.
 
 **`pino` is the logger, and it writes to stderr and nowhere else.** No file transport, no log directory
 and no second destination, so nothing the logger emits outlives the process — which is what makes the
@@ -79,7 +82,7 @@ reasoning, and it is not repeated.
 | Capability | Package |
 |---|---|
 | Language, client framework, client build | `typescript`, `react`, `vite` |
-| HTTP server and routing | `hono`, served by `@hono/vite-dev-server`, or by `@hono/node-server` where Deployment's streaming contingency applies |
+| HTTP server and routing | `hono`, served by `@hono/vite-dev-server` |
 | Request body validation at a route | `@hono/zod-validator` |
 | SSE framing on the server | `hono`'s `streamSSE` |
 | SSE on the client | the platform's `EventSource` |
@@ -96,10 +99,8 @@ reasoning, and it is not repeated.
 | Before-and-after comparison of two manuscript states | `diff` |
 | Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
 | The prose and interface typefaces | latin-subset `woff2` under `src/client/fonts/`, in this repository |
-| Dialog focus management, and the combobox behind inline handle completion | `@ariakit/react` |
+| The combobox behind inline handle completion | `@ariakit/react` |
 | Relative time — when a conversation was last active, when a piece last changed | `date-fns` |
-| Holding the conversation at its latest response | `use-stick-to-bottom` |
-| Client store fed by the event stream | `zustand` |
 | Conversation and change identifiers | `nanoid` |
 | Piece directory slugs | `@sindresorhus/slugify` |
 | Story length | the platform's `Intl.Segmenter` |
@@ -153,17 +154,20 @@ browser chooses, and it is chosen deliberately.
 
 **`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
 is the condition of adopting it: a library carrying its own look would compete with the registers the
-interface is composed in. It is taken for the dialog's focus management and for the combobox that
-offers handles as the author types one — the completion surface only, since which participants a
-message addressed stays the room's reading of the text as stated above.
+interface is composed in. It is taken for the combobox that offers handles as the author types one —
+the completion surface only, since which participants a message addressed stays the room's reading of
+the text as stated above. It is taken for nothing else: the interface has no dialog, so the focus
+management that would otherwise be the second reason to carry it is unused.
 
-**Where a model must be named, the runtime's reported models are offered through the platform's own
-datalist.** `GET /models` already carries them, so an author who has to type an identifier by hand is
+**Where a model must be named, the model is chosen from the runtime's reported models rather than
+typed.** `GET /models` already carries them, so an author who has to type an identifier by hand is
 being asked for something the application knows: one character wrong is a call site that fails as
-unconfigured at the next round, discovered minutes later. It stays a text field against a list of
-suggestions rather than a closed choice, because a model the runtime does not hold yet is still one the
-author may be pointing a participant at. A datalist is what the platform has for exactly that shape, so
-`@ariakit/react`'s entry above does not widen to cover this surface.
+unconfigured at the next round, discovered minutes later. It is a closed choice over what the runtime
+holds, plus whatever the site is already assigned — an assignment the runtime no longer reports stays
+offered and stays selected, so a model that is merely not loaded right now is never silently dropped
+from a site the author configured. That is the whole of what a free-text field would have bought, and a
+closed choice cannot be got wrong by a keystroke. The platform's own `<select>` is what this shape is,
+so `@ariakit/react`'s entry above does not widen to cover this surface.
 
 The container image and the base it is built on are Deployment's rather than this table's: they are
 how the application is run and not something it depends on to work.
@@ -186,13 +190,12 @@ elsewhere opens.
 Perfect preservation of every syntactically equivalent Markdown spelling is not a requirement;
 preserving meaning is.
 
-**Markdown fidelity is validated before it is depended on.** TipTap's Markdown support is the
-one part of this choice that has to be proven rather than assumed, so it is exercised against
-the real schema early. If it proves inadequate, `prosemirror-markdown` replaces that extension
-over the same constrained schema, without disturbing anything else. That replacement is a
-node-and-mark spec table rather than a parser: the constrained schema is a subset of the document
-that package already serializes, so the work is configuration, and nothing here reads or emits
-Markdown by hand under any outcome.
+**Markdown is `prosemirror-markdown`'s over the constrained schema, not TipTap's.** This was the
+one part of the editor choice that had to be proven rather than assumed, and exercising it early is
+what settled it: the parser and serializer are configured directly against the schema, from a
+node-and-mark spec table with `markdown-it` as the tokenizer. The constrained schema is a subset of
+the document that package already serializes, so this is configuration rather than a parser, it
+disturbs nothing else in the editor integration, and nothing here reads or emits Markdown by hand.
 
 **The rendered view and the Markdown source view are two editing views over the same
 manuscript.** How representation switching is implemented is left to the editor integration;
@@ -425,7 +428,7 @@ CallResult<T> =
   | { outcome: 'abandoned' }
   | { outcome: 'failed';    reason: FailureReason; returned?: string }
 
-FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'nonconforming'
+FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
 ```
 
 **Three outcomes, and they are three types.** A value, an abandonment, and a failure carrying which
@@ -477,9 +480,16 @@ composition then owes.
 
 **The failure taxonomy is the product's.** No status code, runtime error class or SDK exception type
 crosses the boundary. A call fails because there is no assignment for that call site, because the
-runtime could not be reached or the model could not be served, because the configured wait elapsed, or
-because the answer could not be made to conform — and each of those means something different to the
-author or to the room.
+runtime could not be reached or the model could not be served, because the configured wait elapsed,
+because what came back was not the structure it was asked for at all, or because it was that structure
+and still did not conform — and each of those means something different to the author or to the room.
+
+**A malformed answer and a nonconforming one are two reasons, not one.** Text that is not the
+requested structure says the runtime is not honouring the constraint it was given — the wrong model,
+or one whose reasoning ran into the answer — while a value that parsed and then failed the schema says
+the model understood the shape and got the content wrong. The first is a setup the author can fix and
+the second is a model that is too weak for the role, so collapsing them would leave the author reading
+one message for two different problems.
 
 **Abandonment is its own outcome and is not in that taxonomy.** The room records an abandoned
 participant as abandoned rather than as failed: conflating them would tell the author their model broke
@@ -839,10 +849,27 @@ a frame around one.**
 | Event | Carries |
 |---|---|
 | `round.opened` | The conversation, the author's message verbatim, the participants called |
-| `participant.state` | Participant, and whether it is waiting for its call, having its model prepared, or working |
+| `participant.state` | Participant, and whether it is having its model prepared or working |
 | `participant.settled` | Participant, its response and outcome, or its failure |
-| `round.closed` | How it ended — settled or abandoned |
+| `round.closed` | How it ended — settled, abandoned, or failed |
 | `error` | A room failure belonging to no participant, in terms the author can act on |
+
+**An event names a participant by its identity and never by its display name.** A name is roster
+data, it is the same for every round, and putting it on every frame would make the stream a second
+place a participant's name is stated — one that would go stale the moment a role definition was
+edited and reloaded. The client resolves names through the roster, and the surface a round is drawn on
+does not render until the roster has landed, so there is no window in which a round could be drawn in
+identities.
+
+**A participant waiting for its call is the projection's, not the stream's.** The opened event already
+names every participant the round will call, so waiting is what a named participant that has neither
+reported a state nor settled *is* — deriving it costs a line and emitting it would be an event per
+participant carrying nothing the client did not already have.
+
+**A round closes as failed where the room itself failed**, distinctly from a round the author
+abandoned and from one that settled with failures inside it: a participant's failure is a response the
+author reads, while a room failure is the round not having happened. The close is accompanied by an
+`error` frame, which is where the reason is, so the outcome stays a single word.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the response envelope is the shape of a reply to a request, and a frame on a stream is not
@@ -1010,12 +1037,12 @@ not tested, and packaging a build to serve a page to a browser on the same machi
 That the studio's daily arrangement includes a development server is a consequence worth naming rather
 than hiding.
 
-**Streaming through that server is proven early, for the same reason Markdown fidelity is.** It is the
+**Streaming through that server is proven, for the same reason Markdown fidelity was.** It was the
 one part of this arrangement the product depends on and does not control: a round's events reach the
 client as server-sent events, and a dev server that buffered them would break the surface the author
-watches a round in. Where it cannot be made to stream, the Hono application is served by an ordinary
-Node adapter and the client build is served beside it — which costs the reload behaviour above and
-nothing else.
+watches a round in. It streams, held there by a test that puts frames through the real dev server
+rather than through a mock of it, so the contingency of serving the Hono application from an ordinary
+Node adapter beside a client build is not taken and its adapter is not on the roster.
 
 **The model runtime stays on the host.** Docker Desktop passes no GPU through on macOS, so a model
 served from inside the container would answer from the CPU and the room would be too slow to consult —
@@ -1097,6 +1124,13 @@ produces a capture starting during an application. It is also what keeps every r
 adapter, since a route that decided whether an operation may start would be a route with a decision
 in it.
 
+**`src/shared/` is deliberately not a seam.** It is a real contract — it is what makes the server's
+response shapes and the client's expectations one set of types rather than two that drift — but a
+contract with one possible implementation is not a boundary anything could be substituted at, and
+declaring it one would invite an adapter with nothing on the other side of it. What it owes is
+independence rather than substitutability: nothing in it may import from either side, which is a
+property of the import graph and is asserted there.
+
 Behind those, the round loop, the application call, the capture call, the lock, the state machine,
 per-call abort, the tolerant parser and the role registry are internal, with one implementation
 each.
@@ -1141,7 +1175,7 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | **context** | no specialist's compiled context contains another specialist's response from the round being formed, under either history policy; every specialist context is compiled before the round's first call is issued; the Story Editor's contains the round's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
 | **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
-| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
+| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
 | **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
 | **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
 
@@ -1162,7 +1196,10 @@ writing prose and finding it still there after a reload — because nothing belo
 that the parts were assembled at all.
 
 The three above need the studio answering from the fixture model implementation rather than from a
-runtime, which is a way of standing the studio up that does not exist yet.
+runtime, which is its own way of standing the studio up: a second Vite configuration that substitutes
+the fixture at the model seam and nothing else, so the arrangement under test is the real one down to
+that boundary. It is a development entry point and not a mode of the application — nothing shipped
+reads it, nothing branches on it, and a test in the import graph holds it that way.
 
 **No screenshot regression farm and no browser test per response state.** How the interface composes
 under lopsided and late responses is design work judged against the mockup, not a thing tests
