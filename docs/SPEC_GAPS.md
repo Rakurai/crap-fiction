@@ -34,17 +34,17 @@ as the shape the write takes if a surface ever asks for it.
 
 Issue #61 cuts ordinary conversation over to the durable entry substrate end to end — the room
 dispatches over entries, the transport is entry- and action-oriented, and the client renders a
-flat, chronological list of them with current activity overlaid. `UX_DESIGN.md` "A round in
-flight" and "A settled round" still describe the fuller round-shaped composition: every participant
-a dispatch will call visible from the moment it opens, in a stable seeded order, and a round's
-worth of outcomes read together as one unit. The client built here shows neither: an unanswered
-participant is a count in the activity line rather than a named, waiting row, and entries are not
-grouped by the action that caused them.
+flat, chronological list of them with current activity overlaid. Issue #64 then brought that
+activity in line with `UX_DESIGN.md` "A round in flight": the unconditional signal and Abandon,
+one line per participant the model layer actually reports on and none for the rest of the resolved
+audience, and no reserved place for the Story Editor. What remains basic, ahead of the full
+composition, is grouping: entries are not grouped by the action that caused them, and the roster has
+no cast-at-rest view.
 
-Not a defect in what #61 built — its own acceptance criteria call for exactly this, a basic
-transcript, and explicitly leave the full composition for later. Finishing the chronological chat
-composition to match `UX_DESIGN.md`, including cast-at-rest visibility and per-cause anchoring
-without a projected grouping container, is issue #65's.
+Not a defect in what #61 and #64 built — each names a basic transcript as its own acceptance
+criterion and leaves the rest for later. Finishing the chronological chat composition to match
+`UX_DESIGN.md`, including cast-at-rest visibility and per-cause anchoring without a projected
+grouping container, is issue #65's.
 
 ## Abandoning a context capture
 

@@ -133,7 +133,22 @@ describe('abandoning an operation', () => {
       result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
+  })
+
+  it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', () => {
+    const room = idleRoom(vi.fn(() => new Promise<RequestResult<null>>(() => {})))
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
+    )
+
+    act(() => {
+      result.current.abandon()
+    })
+
+    expect(result.current.busy).toBe(false)
+    expect(result.current.projection.activity).toBeUndefined()
   })
 
   it('asks nothing when no operation is in flight', () => {

@@ -87,16 +87,3 @@ export function projectEvent(projection: ConversationProjection, event: RoomEven
     }
   }
 }
-
-export type ActivityTally = Readonly<{ working: number; preparing: number; answered: number; waiting: number }>
-
-export function tallyActivity(activity: DispatchActivitySnapshot, entries: readonly ConversationEntryView[]): ActivityTally {
-  const landed = new Set(
-    entries.filter(isParticipantOutcome).filter((entry) => entry.causeId === activity.sourceEntryId).map((entry) => entry.participantId),
-  )
-  const working = activity.audience.filter((id) => activity.states[id] === 'working').length
-  const preparing = activity.audience.filter((id) => activity.states[id] === 'preparing').length
-  const answered = activity.audience.filter((id) => landed.has(id)).length
-  const waiting = activity.audience.length - working - preparing - answered
-  return { working, preparing, answered, waiting }
-}

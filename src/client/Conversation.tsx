@@ -3,11 +3,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
-import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { ConversationActivitySnapshot, DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
-import { tallyActivity } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplyingResponse } from './useApply.js'
 import type { HandleEntry } from './useRoster.js'
@@ -21,7 +20,7 @@ const MAX_MENTION_MATCHES = 8
 type ConversationProps = {
   readonly pieceId: string
   readonly currentConversationId: string | null
-  readonly conversationActionInFlight: DispatchActivitySnapshot | null
+  readonly conversationActionInFlight: ConversationActivitySnapshot | null
   readonly draft: string
   readonly flushDraft: () => void
   readonly room: RoomAdapters
@@ -34,6 +33,7 @@ type ConversationProps = {
   readonly onApplied?: (markdown: string) => void
   readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
+  readonly onActionIdChange?: (action: { readonly conversationId: string; readonly actionId: string } | undefined) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -331,35 +331,39 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
   }
 }
 
-function activityFacts(activity: DispatchActivitySnapshot, entries: readonly ConversationEntryView[], nowMs: number): string {
-  const tally = tallyActivity(activity, entries)
-  const counts = [
-    [tally.working, 'WORKING'],
-    [tally.preparing, 'PREPARING'],
-    [tally.answered, 'ANSWERED'],
-    [tally.waiting, 'WAITING'],
-  ] as const
-  const said = counts.filter(([count]) => count > 0).map(([count, noun]) => `${count} ${noun}`)
-  return facts(...said, elapsed(activity.startedAt, nowMs))
-}
-
+// UX_DESIGN "A round in flight": the facts line is unconditional — it states that the action is
+// active whether or not the model layer has anything to report yet — and the participant lines
+// below it are the opposite: each exists only because a real progress event named that
+// participant, never as a reserved place for one the dispatch merely intends to call.
 function DispatchFlight({
   activity,
-  entries,
+  displayName,
   nowMs,
   onAbandon,
 }: {
   readonly activity: DispatchActivitySnapshot
-  readonly entries: readonly ConversationEntryView[]
+  readonly displayName: (participantId: string) => string
   readonly nowMs: number
   readonly onAbandon: () => void
 }) {
+  const active = Object.keys(activity.states)
   return (
-    <div className={styles.flight}>
-      <span className={styles.roundFacts}>{activityFacts(activity, entries, nowMs)}</span>
-      <button type="button" className={styles.abandon} onClick={onAbandon}>
-        abandon
-      </button>
+    <div className={styles.flightWrapper}>
+      <div className={styles.flight}>
+        <span className={styles.roundFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
+        <button type="button" className={styles.abandon} onClick={onAbandon}>
+          abandon
+        </button>
+      </div>
+      {active.length > 0 && (
+        <ul className={styles.progress}>
+          {active.map((participantId) => (
+            <li key={participantId} className={styles.progressLine}>
+              {displayName(participantId)} is thinking.
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -380,6 +384,7 @@ export function Conversation({
   onApplied = () => {},
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
+  onActionIdChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -404,11 +409,40 @@ export function Conversation({
 
   const conversation = useConversation(pieceId, currentConversationId, conversationActionInFlight, flushDraft, () => draft, room)
 
-  function handleApplyingChange(next: ApplyingResponse | undefined): void {
-    onApplyingChange(next === undefined ? undefined : { participantName: participantNameFor(conversation.projection.entries, next.responseId, displayName) })
+  const initialApplying: ApplyingResponse | undefined = useMemo(
+    () => (conversationActionInFlight?.kind === 'apply' ? { responseId: conversationActionInFlight.sourceEntryId } : undefined),
+    // Captured once, at this component's mount, the same way `useConversation`'s own initial
+    // activity is: a reconnect snapshot seeds the first render and afterwards the live event
+    // stream is the only authority, so re-deriving this on every prop change would fight it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, conversation.attachEntry, room, initialApplying)
+
+  // Reactive rather than fired imperatively at the two or three call sites that change
+  // `apply.applying`: the participant name it reports depends on `conversation.projection.entries`
+  // having loaded, which is not yet true the moment a reconnect seeds `initialApplying`, and this
+  // re-resolves the name the instant the entries arrive rather than needing a special case for it.
+  useEffect(() => {
+    onApplyingChange(
+      apply.applying === undefined
+        ? undefined
+        : { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) },
+    )
+  }, [apply.applying, conversation.projection.entries, displayName, onApplyingChange])
+
+  function abandonCurrentAction(): void {
+    conversation.abandon()
+    apply.clear()
   }
 
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, handleApplyingChange, conversation.attachEntry, room)
+  useEffect(() => {
+    const conversationId = conversation.conversationId
+    onActionIdChange(
+      conversation.actionId === undefined || conversationId === null ? undefined : { conversationId, actionId: conversation.actionId },
+    )
+  }, [conversation.actionId, conversation.conversationId, onActionIdChange])
 
   const applicationsByResponse = useMemo(() => {
     const map = new Map<string, ApplicationEntryView[]>()
@@ -482,7 +516,7 @@ export function Conversation({
     applyDisabled: roomBusy,
     applicationsFor,
     onApply: apply.apply,
-    onAbandonApply: apply.abandon,
+    onAbandonApply: abandonCurrentAction,
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,
     onReply: reply,
@@ -496,7 +530,7 @@ export function Conversation({
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
         {conversation.projection.activity !== undefined && (
-          <DispatchFlight activity={conversation.projection.activity} entries={conversation.projection.entries} nowMs={nowMs} onAbandon={conversation.abandon} />
+          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} onAbandon={abandonCurrentAction} />
         )}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
@@ -565,8 +599,10 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
+        {/* UX_DESIGN "An operation in flight": disabled while busy, never relabelled — a swapped
+            label would change the button's width and read as the control itself shrinking away. */}
         <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-          {conversation.busy ? '…' : 'send'}
+          send
         </button>
       </form>
     </div>

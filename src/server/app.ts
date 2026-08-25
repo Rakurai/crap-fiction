@@ -185,9 +185,9 @@ export function createApp(
     return c.json(ok(outcome))
   })
 
-  app.post('/pieces/:id/abandon', (c) => {
+  app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
     workspace.require()
-    room.abandon(c.req.param('id'))
+    room.abandon(c.req.param('id'), c.req.param('actionId'))
     return c.json(ok(null))
   })
 

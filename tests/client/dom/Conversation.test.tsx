@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
 import { Conversation } from '../../../src/client/Conversation.js'
+import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 
@@ -49,6 +50,23 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       {...extra}
     />,
   )
+}
+
+function roomStreaming(
+  entries: readonly ConversationEntryView[],
+  abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
+): { room: RoomAdapters; stream: (event: RoomEvent) => void } {
+  let deliver: (event: RoomEvent) => void = () => {
+    throw new Error('the room was never subscribed to')
+  }
+  const room: RoomAdapters = {
+    ...roomHolding(entries, abandonOperation),
+    subscribeToRoom: (_pieceId, onEvent) => {
+      deliver = onEvent
+      return () => {}
+    },
+  }
+  return { room, stream: (event) => act(() => deliver(event)) }
 }
 
 function blockContaining(text: string): HTMLElement {
@@ -452,5 +470,131 @@ describe('handle completion at the composer', () => {
 
     await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
     expect(screen.queryByRole('option')).toBeNull()
+  })
+})
+
+describe('conversation activity, truthfully', () => {
+  afterEach(cleanup)
+
+  const STARTED: RoomEvent = {
+    type: 'action.started',
+    data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: ['shape', 'reader'] },
+  }
+
+  it('ACTIVE-ESCAPE: shows an unconditional activity signal and a distinct Abandon control the instant a dispatch opens, before any participant reports progress', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    stream(STARTED)
+
+    expect(await screen.findByRole('button', { name: 'abandon' })).toBeTruthy()
+    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
+    expect(screen.queryByText(/is thinking/)).toBeNull()
+  })
+
+  it('PROGRESS-REAL, NO-WAITING-PLACES: one "is thinking" line per participant actually reporting progress, none for the rest of a resolved audience it never got', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    stream(STARTED)
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
+
+    expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
+    expect(screen.queryByText(/Reader Experience is thinking/)).toBeNull()
+    expect(screen.queryByText(/waiting/i)).toBeNull()
+  })
+
+  it('PROGRESS-PARALLEL: several concurrently active participants each draw their own line', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    stream(STARTED)
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing' } })
+
+    expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
+    expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
+  })
+
+  it('a landed entry clears that participant\'s line without disturbing the unconditional signal', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    stream(STARTED)
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
+    await screen.findByText('Shape is thinking.')
+
+    stream({
+      type: 'entry.appended',
+      data: { actionId: 'a1', entry: { id: 'e1', kind: 'participantNoComment', participantId: 'shape', causeId: 'e0' } },
+    })
+
+    await waitFor(() => expect(screen.queryByText('Shape is thinking.')).toBeNull())
+    expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
+  })
+
+  it('ACTION-EXCLUSION: disables send while busy without relabelling it or collapsing its geometry', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    const send = (await screen.findByRole('button', { name: 'send' })) as HTMLButtonElement
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: 'a message' } })
+    expect(send.disabled).toBe(false)
+
+    stream(STARTED)
+
+    await waitFor(() => expect(send.disabled).toBe(true))
+    expect(send.textContent).toBe('send')
+  })
+
+  it('ABANDON-UNTRACK: targets the action by identity and releases controls immediately, without waiting for the request to resolve', async () => {
+    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
+    const { room, stream } = roomStreaming([], abandonOperation)
+    renderConversation([], { room })
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: 'a message' } })
+
+    stream(STARTED)
+    const abandon = await screen.findByRole('button', { name: 'abandon' })
+    fireEvent.click(abandon)
+
+    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
+    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
+    expect(screen.queryByText(/ACTIVE/)).toBeNull()
+    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('ABANDON-KEEP-LANDED: an entry accepted before abandonment stays, and a late progress callback for the same action cannot resurrect its activity', async () => {
+    const { room, stream } = roomStreaming([])
+    renderConversation([], { room })
+
+    stream(STARTED)
+    stream({
+      type: 'entry.appended',
+      data: { actionId: 'a1', entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' } },
+    })
+    await screen.findByText('It holds.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
+    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
+
+    // A model callback settling after this client already released controls — untracked
+    // server-side by ABANDON-UNTRACK, so this is what a race with it looks like here — must not
+    // reopen the activity this client already tore down.
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working' } })
+
+    expect(screen.getByText('It holds.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
+    expect(screen.queryByText(/is thinking/)).toBeNull()
+  })
+
+  it('reconnect: an apply already in flight for a response shows its flight from the piece snapshot alone, no new event required', async () => {
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], {
+      conversationActionInFlight: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: 1_700_000_000_000 },
+    })
+
+    expect(await screen.findByText('APPLYING')).toBeTruthy()
   })
 })

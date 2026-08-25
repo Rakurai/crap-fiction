@@ -111,11 +111,17 @@ export function approveCapture(
   })
 }
 
-export function abandonOperation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/abandon`, z.null(), {
-    method: 'POST',
-    signal: signal ?? null,
-  })
+export function abandonOperation(
+  pieceId: string,
+  conversationId: string,
+  actionId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<null>> {
+  return requestJson(
+    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
+    z.null(),
+    { method: 'POST', signal: signal ?? null },
+  )
 }
 
 export function subscribeToRoom(

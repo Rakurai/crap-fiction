@@ -69,28 +69,31 @@ later.
 
 ### A round in flight
 
-**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing
-about a round in flight is modal, blocking, or a reason to stop typing.
+**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing about a
+round in flight is modal, blocking, or a reason to stop typing. Chat send and every other
+response-triggering control are disabled for the round's whole duration, visibly so, but without
+losing their ordinary size or position — a control that shrank or relabelled itself would read as
+broken rather than as busy.
 
-**Every participant the round will call is visible from the moment it opens**, in a stable order
-fixed before the first of them is called, with the Story Editor last where the round will reach it
-and absent where it will not. An empty place reads as a participant waiting or thinking rather than
-a participant missing, and the Story Editor waiting in its place is how the author sees that the
-readings come before the judgment.
+**An unconditional signal states that the round is active, and Abandon stands beside it as its own
+distinct, always-available control**, present the instant the round opens and for as long as it
+runs. Neither depends on the model layer reporting anything: a runtime that never reports progress
+still leaves the author certain their message was sent and certain they can stop it.
 
-**In flight, the round states only what is true**, as states and counts rather than composed
-sentences: which participant is working, which is having its model prepared, which are waiting their
-turn, how long it has been. A participant whose model is loading is neither working nor merely
-waiting, and saying which it is costs less than an unexplained thirty seconds does.
-Because the room asks one participant at a time, the round fills in that order, and the interface
-says which participant is being asked rather than implying they are all at work. Nothing is
-attributed to a participant that has not answered, and no response is shown before it is complete.
+**A participant's own line appears only once the model layer reports real progress for it** — having
+its model prepared or working — and disappears the moment that participant's response lands. Several
+participants may show a line at once, because the room calls them independently rather than one at a
+time. There is no reserved place for a participant the round has not yet heard from, no waiting count,
+and no place held for the Story Editor while specialist readings are still arriving: the unconditional
+signal and the disabled composer are what tell the author the round is not yet settled, not a slot
+drawn in advance for a response that has not happened. Nothing is attributed to a participant that has
+not answered, and no response is shown before it is complete.
 
-**Filling in order must not read as a chain.** Each participant was asked the author's question,
-not the previous answer, and nothing in the composition may suggest otherwise — no connective
-framing, no visual thread between adjacent responses, no arrangement in which a later response
-appears to take up an earlier one. Sequential arrival makes this easier to get wrong than
-simultaneous arrival did, and it is the same guarantee.
+**Nothing in the composition suggests one participant answered another.** Each was asked the
+author's question independently, whichever order their lines and responses happen to arrive in, and
+no connective framing, visual thread, or arrangement may imply otherwise. Responses may now land in
+any order at all rather than a fixed one, which makes this guardrail more load-bearing than it was, not
+less.
 
 ### A settled round
 

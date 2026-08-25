@@ -183,16 +183,20 @@ failure is never presented as silence.
 **Know the room is working** — *per round*
 Every called participant's call is submitted independently, and one local model answers only one at
 a time regardless, so a round takes real time and the author watches it progress.
-*Done when:* each called participant's state is visible as it changes — having its model prepared,
-working, or answered — the author can keep writing throughout, no interim state is composed by a
-model, and no response is rendered before it is complete.
+*Done when:* the room states unconditionally that a round is active the moment one opens, a called
+participant's own progress is shown only once the model layer actually reports it — having its model
+prepared or working — several participants showing progress at once are each shown independently, no
+interim state is composed for a participant the model layer has not reported on, the author can keep
+writing throughout, and no response is rendered before it is complete.
 
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a round,
-an application, a context capture — cancelling the call in flight and making none of the calls the
-operation had not reached, responses that landed remain in the conversation, nothing holds the prose
-beyond the operation the author asked for, and a model that never answers resolves itself
-without the author having to act.
+an application, a context capture — targets the specific operation the author is looking at rather
+than whichever the room happens to be running, cancelling the call in flight and making none of the
+calls the operation had not reached, responses that landed remain in the conversation, control
+returns the moment abandonment is accepted rather than once the cancelled call finishes unwinding,
+nothing holds the prose beyond the operation the author asked for, and a model that never answers
+resolves itself without the author having to act.
 
 **Handle a bad response as housekeeping** — *per session*
 A response is incoherent, misreads the story, or the call failed outright. Local models do

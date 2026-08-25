@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import type { ApplicationEntryView } from '../shared/conversationEntryViews.js'
-import type { abandonOperation as abandonOperationFn, applyRecommendation as applyRecommendationFn } from './roomClient.js'
+import type { applyRecommendation as applyRecommendationFn } from './roomClient.js'
 import { failureMessage } from './request.js'
 
 export type ApplyAdapters = Readonly<{
   applyRecommendation: typeof applyRecommendationFn
-  abandonOperation: typeof abandonOperationFn
 }>
 
 export type ApplyingResponse = Readonly<{ responseId: string }>
@@ -14,7 +13,7 @@ export type ApplyViewModel = Readonly<{
   applying: ApplyingResponse | undefined
   error: string | undefined
   apply: (responseId: string, constraint: string | undefined) => void
-  abandon: () => void
+  clear: () => void
 }>
 
 export function useApply(
@@ -22,12 +21,12 @@ export function useApply(
   conversationId: string | null,
   getDraft: () => string,
   onApplied: (markdown: string) => void,
-  onApplyingChange: (applying: ApplyingResponse | undefined) => void,
   onApplicationEntry: (entry: ApplicationEntryView) => void,
   adapters: ApplyAdapters,
+  initialApplying?: ApplyingResponse,
 ): ApplyViewModel {
-  const { applyRecommendation, abandonOperation } = adapters
-  const [applying, setApplying] = useState<ApplyingResponse | undefined>(undefined)
+  const { applyRecommendation } = adapters
+  const [applying, setApplying] = useState<ApplyingResponse | undefined>(initialApplying)
   const [error, setError] = useState<string | undefined>(undefined)
 
   function apply(responseId: string, constraint: string | undefined): void {
@@ -35,11 +34,9 @@ export function useApply(
     const cid = conversationId
     setError(undefined)
     setApplying({ responseId })
-    onApplyingChange({ responseId })
 
     function stop(message: string | undefined): void {
       setApplying(undefined)
-      onApplyingChange(undefined)
       if (message !== undefined) setError(message)
     }
 
@@ -71,10 +68,12 @@ export function useApply(
     })
   }
 
-  function abandon(): void {
-    if (applying === undefined) return
-    void abandonOperation(pieceId)
+  // Local only: the request that actually cancels the model work is `conversation.abandon()`'s —
+  // apply and dispatch share one action identity and one abandon route, so this only clears the
+  // response-local "applying" state a caller who already fired that request also holds.
+  function clear(): void {
+    setApplying(undefined)
   }
 
-  return { applying, error, apply, abandon }
+  return { applying, error, apply, clear }
 }

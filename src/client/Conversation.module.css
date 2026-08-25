@@ -107,11 +107,14 @@
   white-space: pre-wrap;
 }
 
+.flightWrapper {
+  margin: 0 0 4px;
+}
+
 .flight {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 4px;
 }
 
 .roundFacts {
@@ -119,6 +122,17 @@
   color: var(--ink4);
   letter-spacing: 0.07em;
   flex: 1;
+}
+
+.progress {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.progressLine {
+  font: 400 11.5px/1.5 var(--font-ui);
+  color: var(--ink3);
 }
 
 .abandon {

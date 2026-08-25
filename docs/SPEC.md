@@ -704,7 +704,11 @@ in flight for the same piece; a dispatch or an Apply in flight is never a reason
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the
 one that replaced it. With at most one conversation action and one capture per piece at a time, the
 identifier costs nothing, and it is the whole of what keeps an abandoned call from arriving as a
-live one.
+live one. Abandoning targets this identifier directly rather than "whichever operation this piece is
+running": a request naming an action that has already finished, ordinary or abandoned, is a silent
+no-op rather than a reason to touch whatever runs in its place. Untracking is synchronous with the
+abandon request itself, not with the cancelled call's own eventual settlement, which is what lets the
+room accept the next operation immediately rather than once the abandoned one finishes unwinding.
 
 **Serialization is a simplification, not a principle.** Local capacity is bounded by the loaded
 model, so overlapping conversation actions would buy little wall-clock while multiplying the states
@@ -921,10 +925,13 @@ was edited and reloaded. The client resolves names through the roster, and the s
 conversation is drawn on does not render until the roster has landed, so there is no window in
 which a conversation could be drawn in identities.
 
-**A participant waiting for its call is the projection's, not the stream's.** The started event
-already names every participant a dispatch will call, so waiting is what a named participant that
-has neither reported activity nor an appended entry *is* — deriving it costs a line and emitting it
-would be an event per participant carrying nothing the client did not already have.
+**Nothing in this event set is a waiting state, a waiting count, or a reserved place**, for a
+specialist or for the Story Editor. The started event's resolved audience is a durable fact about
+what the dispatch will call, not a queue the client renders: a client that drew one named participant
+per audience member, empty until it reports something, would be inventing a state the model layer
+never asserted. What the author sees for a participant that has not yet reported anything is nothing
+at all — the dispatch's unconditional activity and the disabled composer are what say the round is not
+yet settled.
 
 **An action finishes as failed where the room itself failed**, distinctly from an action the author
 abandoned and from a dispatch that settled with failures inside it: a participant's failure is a
@@ -1002,9 +1009,11 @@ DELETE /pieces/:id/conversations/:cid
 POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
                                                    the response answered and any clarification
 POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
-POST   /pieces/:id/abandon                         whichever conversation action is in flight; never
-                                                   a capture, which has no abandon route of its own
-                                                   (issue #55)
+POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
+                                                   targets that action by identity, so a request
+                                                   naming one already finished touches nothing;
+                                                   never a capture, which has no abandon route of
+                                                   its own (issue #55)
 POST   /pieces/:id/capture                         returns proposals
 POST   /pieces/:id/capture/approve                 writes the approved proposals
 GET    /pieces/:id/events                          SSE
@@ -1208,10 +1217,11 @@ implementation each.
 
 **The client's projection of conversation events is a pure reducer** — not a boundary, since it
 has one implementation, but named and tested at its own interface because several load-bearing
-rules live in it: an entry appended twice appears once; a dispatch's activity tracks the
-participants it is still waiting on and clears one the moment its entry lands; an action finishing
-late for an action no longer current is discarded; and reading the piece mid-dispatch and watching
-one open from the start project identically.
+rules live in it: an entry appended twice appears once; a dispatch's activity holds only the
+participants the model layer has actually reported progress for, clearing one the moment its entry
+lands, never a place for one it has not; an action finishing late for an action no longer current is
+discarded; and reading the piece mid-dispatch and watching one open from the start project
+identically.
 
 ## Test fixtures
 
@@ -1244,11 +1254,11 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | Boundary | What must hold |
 |---|---|
 | **context** | no specialist's compiled context contains another specialist's response from the dispatch being formed, under either history policy; every specialist context is compiled before the dispatch's first call is issued; the Story Editor's contains the dispatch's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
-| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; every eligible specialist's call is submitted independently before any of them has settled, entries land in completion order rather than cast order, and the Story Editor is called once this dispatch's own specialist set is empty, never inferred from unrelated model work going idle; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment cancels every call this dispatch has in flight through its shared signal, appends no entry for one that lands as abandoned, and skips the Story Editor; a result settling for a call this dispatch no longer tracks is discarded rather than appended; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a round coordinate |
+| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; every eligible specialist's call is submitted independently before any of them has settled, entries land in completion order rather than cast order, and the Story Editor is called once this dispatch's own specialist set is empty, never inferred from unrelated model work going idle; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment cancels every call this dispatch has in flight through its shared signal, appends no entry for one that lands as abandoned, and skips the Story Editor; a result settling for a call this dispatch no longer tracks is discarded rather than appended; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; abandon targets the action identity currently in flight, so a request naming one already finished touches nothing, and untracking releases the room immediately rather than waiting on the abandoned call's own settlement; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a round coordinate |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written; two entries accepted together both survive, in the order accepted |
 | **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text; a call submitted without awaiting an earlier one never reaches the runtime until that earlier one has settled, and one settling carries no bearing on the other's outcome |
 | **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
-| **projection** | an entry appended twice appears once; a dispatch's activity tracks the participants still owed a call and clears one the moment its entry lands; a finished event for an action that is not the current one is discarded; entries loaded from the file and entries arriving live merge in chronological order regardless of which settles the read race |
+| **projection** | an entry appended twice appears once; a dispatch's activity holds a line only for a participant the model layer has actually reported progress for, never one merely named in the resolved audience, and clears it the moment its entry lands; a finished event for an action that is not the current one is discarded, and a participant-activity event for one is ignored; entries loaded from the file and entries arriving live merge in chronological order regardless of which settles the read race |
 
 **A small number of browser tests over the fixture implementation**, and the count is a ceiling on
 purpose. A browser earns a test only where the thing that can break is a browser: real layout, real

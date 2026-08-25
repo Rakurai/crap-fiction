@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  EMPTY_PROJECTION,
-  initialProjection,
-  projectEvent,
-  tallyActivity,
-  withDispatchInFlight,
-  type RoomEvent,
-} from '../../src/client/entryProjection.js'
+import { EMPTY_PROJECTION, initialProjection, projectEvent, withDispatchInFlight, type RoomEvent } from '../../src/client/entryProjection.js'
 import type { ConversationEntryView } from '../../src/shared/conversationEntryViews.js'
 import type { DispatchActivitySnapshot } from '../../src/shared/conversationEvents.js'
 
@@ -134,37 +127,5 @@ describe('withDispatchInFlight', () => {
     }
 
     expect(withDispatchInFlight(EMPTY_PROJECTION, snapshot)).toEqual({ entries: [], activity: snapshot })
-  })
-})
-
-describe('tallyActivity', () => {
-  it('counts each participant once, as working, preparing, answered or still waiting', () => {
-    const snapshot: DispatchActivitySnapshot = {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'dispatch',
-      sourceEntryId: 'e0',
-      audience: ['shape', 'compression', 'interiority', 'story-editor'],
-      states: { interiority: 'working' },
-      startedAt: STARTED_AT,
-    }
-    const entries = [response('e1', 'shape', 'e0'), response('e2', 'compression', 'e0')]
-
-    expect(tallyActivity(snapshot, entries)).toEqual({ working: 1, preparing: 0, answered: 2, waiting: 1 })
-  })
-
-  it('counts a response only when it was caused by this action\'s own source entry', () => {
-    const snapshot: DispatchActivitySnapshot = {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'dispatch',
-      sourceEntryId: 'e5',
-      audience: ['shape'],
-      states: {},
-      startedAt: STARTED_AT,
-    }
-    const entries = [response('e1', 'shape', 'e0')]
-
-    expect(tallyActivity(snapshot, entries).answered).toBe(0)
   })
 })

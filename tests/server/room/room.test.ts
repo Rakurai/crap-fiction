@@ -390,13 +390,89 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId, actionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
-    room.abandon(piece.id)
+    room.abandon(piece.id, actionId)
+    // Released the instant abandon() returns, not once the abandoned calls' own promises settle —
+    // ABANDON-UNTRACK's "immediately restore controls" is this synchronously, never a later tick.
+    expect(room.activitySnapshot(piece.id)).toBeUndefined()
     await settled
 
     const landed = entries(workspaceDir, piece.id, conversationId)
     expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
+  })
+
+  it('ABANDON-UNTRACK: lets a new dispatch start immediately, without waiting for the abandoned one to finish unwinding', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
+    room.abandon(piece.id, firstActionId)
+
+    // The first dispatch's own calls are still gated — held, never released — proving this second
+    // dispatch was refused by nothing rather than by a first that happened to finish fast.
+    const { conversationId, actionId: secondActionId } = await room.dispatch(
+      workspaceDir,
+      piece.id,
+      'c1',
+      { kind: 'message', text: 'second' },
+      'draft text',
+    )
+    expect(secondActionId).not.toBe(firstActionId)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settlementOf(room, piece.id)
+
+    const landed = entries(workspaceDir, piece.id, conversationId).filter(
+      (entry) => entry.kind === 'participantResponse' || entry.kind === 'participantNoComment',
+    )
+    expect(landed).toHaveLength(3)
+  })
+
+  it('a stale actionId — naming an action already abandoned — is a silent no-op, never touching whatever runs next', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
+    room.abandon(piece.id, firstActionId)
+
+    // The first dispatch's own calls stay gated — held, never released — so the second dispatch's
+    // calls below are the only ones this test ever releases, and nothing races on fixture timing.
+    const { conversationId, actionId: secondActionId } = await room.dispatch(
+      workspaceDir,
+      piece.id,
+      'c1',
+      { kind: 'message', text: 'second' },
+      'draft text',
+    )
+    expect(secondActionId).not.toBe(firstActionId)
+    const settled = settlementOf(room, piece.id)
+
+    // A late-arriving request naming the action that already finished — abandoned or otherwise —
+    // must not touch the one running now, the same way a client's own delayed retry of an earlier
+    // click must not.
+    room.abandon(piece.id, firstActionId)
+    expect(room.activitySnapshot(piece.id)).toMatchObject({ actionId: secondActionId })
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settled
+
+    const landed = entries(workspaceDir, piece.id, conversationId).filter(
+      (entry) => entry.kind === 'participantResponse' || entry.kind === 'participantNoComment',
+    )
+    expect(landed).toHaveLength(3)
   })
 })
 
@@ -530,8 +606,17 @@ describe('Room.apply', () => {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
     })
 
+    const events: RoomEvent[] = []
+    room.subscribe(pieceId, (event) => events.push(event))
+
+    // `room.apply()`'s own actionId is not known to the caller until the whole call settles — the
+    // author's client learns it from the `action.started` event instead, and this mirrors that:
+    // everything up to the model call's own `await` runs synchronously, so it is already in
+    // `events` before this line returns.
     const applying = room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
-    room.abandon(pieceId)
+    const started = events.find((event) => event.type === 'action.started')
+    if (started === undefined) throw new Error('expected action.started to have fired synchronously')
+    room.abandon(pieceId, started.data.actionId)
     await expect(applying).resolves.toMatchObject({ result: { outcome: 'abandoned' } })
 
     expect(room.activitySnapshot(pieceId)).toBeUndefined()
@@ -685,7 +770,7 @@ describe('Room.capture', () => {
     })
 
     const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
-    room.abandon(piece.id)
+    room.abandon(piece.id, 'no-such-action')
 
     expect(room.captureSnapshot(piece.id)).toBeDefined()
 

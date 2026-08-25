@@ -256,9 +256,16 @@ export class Room {
   }
 
   // Targets the dispatch-or-apply operation only — a capture in flight has its own identity and is
-  // never reachable from here.
-  abandon(pieceId: string): void {
-    this.#operationFor(pieceId)?.controller.abort()
+  // never reachable from here. A stale or unmatched `actionId` (naming an action that already
+  // finished, or a piece with nothing in flight) is a silent no-op rather than a failure: it is
+  // never the caller's fault that the action it named is no longer the one running. The operation
+  // is untracked immediately, synchronously, so a caller sees controls released the instant this
+  // returns rather than once the abandoned call's own promise chain happens to unwind.
+  abandon(pieceId: string, actionId: string): void {
+    const operation = this.#operationFor(pieceId)
+    if (operation === undefined || operation.actionId !== actionId) return
+    operation.controller.abort()
+    this.#operation = undefined
   }
 
   async dispatch(
@@ -363,7 +370,9 @@ export class Room {
         this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
       })
       .finally(() => {
-        this.#operation = undefined
+        // An immediate abandon() already cleared `#operation` and may have let a newer action
+        // claim the slot; only release it here if it is still this one.
+        if (this.#operation?.actionId === actionId) this.#operation = undefined
       })
     this.#operation = { ...dispatchState, settlement }
 
@@ -560,7 +569,9 @@ export class Room {
       this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
       return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
     } finally {
-      this.#operation = undefined
+      // Mirrors dispatch(): an immediate abandon() may already have cleared `#operation` for a
+      // newer action, and this must not release that one out from under it.
+      if (this.#operation?.actionId === actionId) this.#operation = undefined
     }
   }
 

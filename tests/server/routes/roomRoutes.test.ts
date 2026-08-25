@@ -100,13 +100,41 @@ describe('the room over HTTP', () => {
   it('refuses to abandon before a workspace is set, and abandons nothing afterwards without complaint', async () => {
     const bare = buildTestApp(dataRoot).app
 
-    const refused = await bare.request('/pieces/cups/abandon', { method: 'POST' })
+    const refused = await bare.request('/pieces/cups/conversations/c1/actions/a1/abandon', { method: 'POST' })
     expect(refused.status).toBe(400)
     expect(await refused.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
 
     const { app } = await withPiece()
-    const accepted = await app.request('/pieces/cups/abandon', { method: 'POST' })
+    const accepted = await app.request('/pieces/cups/conversations/c1/actions/no-such-action/abandon', { method: 'POST' })
     expect(accepted.status).toBe(200)
+  })
+
+  it('targets the named action, so an abandon request naming one already finished never touches the one running now', async () => {
+    const { app, room } = await withPiece(50)
+
+    const first = await app.request('/pieces/cups/conversations/c1/dispatch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'first', draft: 'text' }),
+    })
+    const { actionId: firstActionId } = (await first.json()).data
+    await settlementOf(room, 'cups')
+
+    const second = await app.request('/pieces/cups/conversations/c1/dispatch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'second', draft: 'text' }),
+    })
+    const { actionId: secondActionId } = (await second.json()).data
+
+    const stale = await app.request(`/pieces/cups/conversations/c1/actions/${firstActionId}/abandon`, { method: 'POST' })
+    expect(stale.status).toBe(200)
+
+    const pieceRes = await app.request('/pieces/cups')
+    const pieceBody = await pieceRes.json()
+    expect(pieceBody.data.conversationActionInFlight).toMatchObject({ actionId: secondActionId })
+
+    await settlementOf(room, 'cups')
   })
 
   it('reports the dispatch in flight on the piece before it settles, so a reload mid-dispatch knows what it is watching', async () => {
@@ -275,6 +303,49 @@ describe('the room over HTTP', () => {
 
       expect(res.status).toBe(404)
       expect(await res.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })
+    })
+
+    it('reports the apply in flight on the piece before it settles, so a reload mid-apply also knows what it is watching', async () => {
+      const behavior: FixtureBehavior = {
+        result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
+        delayMs: 50,
+      }
+      const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
+      const room = buildTestRoom(dataRoot, { modelAccess })
+      const { app, workspace } = buildTestApp(dataRoot, { room })
+      await workspace.set('my-writing')
+      await app.request('/pieces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Cups' }),
+      })
+      await app.request('/pieces/cups/conversations/c1/dispatch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: 'shape', message: 'a direct question', draft: 'text' }),
+      })
+      await settlementOf(room, 'cups')
+
+      const conversationRes = await app.request('/pieces/cups/conversations/c1')
+      const { data: conversation } = await conversationRes.json()
+      const response = conversation.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
+
+      const applying = app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ responseId: response.id, draft: 'text' }),
+      })
+      // Lets the request reach the point where the room registers the apply operation, without
+      // waiting for the delayed model call the assertion below needs still in flight.
+      await new Promise((resolve) => setImmediate(resolve))
+
+      const pieceRes = await app.request('/pieces/cups')
+      const pieceBody = await pieceRes.json()
+      expect(pieceBody.data.conversationActionInFlight).not.toBeNull()
+      expect(pieceBody.data.conversationActionInFlight.kind).toBe('apply')
+      expect(pieceBody.data.conversationActionInFlight.sourceEntryId).toBe(response.id)
+
+      await applying
     })
 
     it('refuses to dispatch while an application is in flight, with ROOM_BUSY', async () => {

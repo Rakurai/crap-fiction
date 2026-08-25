@@ -81,6 +81,10 @@ function Surfaces({
   // that round down mid-flight.
   const [session, setSession] = useState(0)
   const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
+  // SPEC "one piece is open at a time": leaving abandons whatever conversation action is in
+  // flight, by the identity `Conversation` reports live — `piece.conversationActionInFlight` is
+  // only as fresh as the last load and cannot be trusted once a dispatch or Apply has opened since.
+  const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
 
   function switchTo(conversationId: string | null): void {
     setActiveConversationId(conversationId)
@@ -94,12 +98,17 @@ function Surfaces({
     }
   }
 
+  function closeAndAbandon(): void {
+    if (liveAction !== undefined) void abandonOperation(piece.id, liveAction.conversationId, liveAction.actionId)
+    onClose()
+  }
+
   return (
     <div className={styles.row}>
       <Manuscript
         title={piece.title}
         mode={piece.mode}
-        onClose={onClose}
+        onClose={closeAndAbandon}
         manuscript={manuscript}
         autosave={autosave}
         onOpenRoom={() => setPanel('room')}
@@ -120,7 +129,7 @@ function Surfaces({
           pieceId={piece.id}
           currentConversationId={activeConversationId}
           conversationActionInFlight={
-            piece.conversationActionInFlight?.kind === 'dispatch' && piece.conversationActionInFlight.conversationId === activeConversationId
+            piece.conversationActionInFlight !== null && piece.conversationActionInFlight.conversationId === activeConversationId
               ? piece.conversationActionInFlight
               : null
           }
@@ -136,6 +145,7 @@ function Surfaces({
           onApplied={manuscript.applyRecommendation}
           onApplyingChange={setApplying}
           onConversationIdChange={setActiveConversationId}
+          onActionIdChange={setLiveAction}
         />
       )}
       {panel === 'room' && (
@@ -185,11 +195,6 @@ function Surfaces({
 export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
-  function leave(): void {
-    void abandonOperation(id)
-    onClose()
-  }
-
   if (piece.status === 'ready') {
     return (
       <Surfaces
@@ -211,14 +216,14 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
           error: piece.conversationsError,
           onDelete: piece.deleteConversation,
         }}
-        onClose={leave}
+        onClose={onClose}
       />
     )
   }
 
   return (
     <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={leave}>
+      <button type="button" className={styles.back} onClick={onClose}>
         ‹ pieces
       </button>
       {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}
