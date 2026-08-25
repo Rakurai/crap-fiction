@@ -25,6 +25,7 @@ import {
   PieceNotFoundError,
   startConversation,
   UnknownCastMemberError,
+  UnknownModeError,
   updatePiece,
 } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
@@ -36,7 +37,7 @@ import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
-const postPieceSchema = z.object({ title: z.string().min(1) })
+const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
@@ -56,7 +57,7 @@ const patchPieceSchema = z.object({
 export function createApp(
   env: StudioEnv,
   workspace: WorkspaceRegistry,
-  mode: ModeDescriptor,
+  modes: readonly ModeDescriptor[],
   draftWriter: DraftWriter,
   sites: readonly CallSiteDescriptor[],
   modelAccess: ModelAccess,
@@ -83,9 +84,13 @@ export function createApp(
     return c.json(ok(listPieces(workspace.require())))
   })
 
+  app.get('/modes', (c) => {
+    return c.json(ok(modes.map((mode) => ({ id: mode.id, displayName: mode.displayName }))))
+  })
+
   app.post('/pieces', body(postPieceSchema), async (c) => {
-    const { title } = c.req.valid('json')
-    const piece = await createPiece(workspace.require(), title, mode.id, room.specialists())
+    const { title, mode } = c.req.valid('json')
+    const piece = await createPiece(workspace.require(), title, mode, modes, room.specialists())
     return c.json(ok(piece))
   })
 
@@ -199,6 +204,7 @@ export function createApp(
     if (err instanceof UnknownCallSiteError) return refused('CALL_SITE_NOT_FOUND', 404)
     if (err instanceof PieceNotFoundError) return refused('PIECE_NOT_FOUND', 404)
     if (err instanceof UnknownCastMemberError) return refused('CAST_MEMBER_UNKNOWN', 400)
+    if (err instanceof UnknownModeError) return refused('MODE_UNKNOWN', 400)
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
     if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)

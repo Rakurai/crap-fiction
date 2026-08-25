@@ -26,6 +26,16 @@
   padding: 7px 9px;
 }
 
+.select {
+  flex: none;
+  font: 400 12px/1 var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 7px 9px;
+}
+
 /* Starting a piece is the author's own act of commitment on this screen, and the only one. */
 .submit {
   composes: author from './controls.module.css';

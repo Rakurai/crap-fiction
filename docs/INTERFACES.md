@@ -38,8 +38,10 @@ Every route returns the full result for its scope. There is no pagination.
 ## HTTP routes
 
 ```
+GET    /modes                                      every loaded mode's id and display name
 GET    /pieces                                     title, mode, status, length, modified
-POST   /pieces                                     title; enables the mode's default cast
+POST   /pieces                                     title and the chosen mode; enables that mode's
+                                                   default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
                                                    the room (the cast and the Story Editor), the
                                                    conversation action in flight if there is one,
@@ -176,10 +178,13 @@ A **participant** carries its display name and its single-token handle, which ar
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
 **description**, read by the author assigning it a model, and a **persona**, briefing the model with the
 participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
-or `addressed-only`.
+or `addressed-only`. A `cast` participant additionally declares **availability**: the mode-and-surface
+pairs it is available for, and for each whether it starts enabled.
 
 A **mode** carries its `id` and its `displayName`, and names no participant. Its sibling document
-carries the shared **description** of its form and scale that every participant call receives.
+carries the shared **description** of its form and scale that every participant call receives. Any
+number of modes may load; the roster and initial cast for a given mode and surface are derived from
+every cast participant's declared availability, never listed by the mode.
 
 ## Process environment
 

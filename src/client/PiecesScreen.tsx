@@ -69,8 +69,9 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
             <NewPieceForm
               submitting={pieces.status === 'ready' && pieces.creating}
               error={pieces.status === 'ready' ? pieces.createError : undefined}
-              onSubmit={(title) => {
-                if (pieces.status === 'ready') pieces.create(title)
+              modes={pieces.status === 'ready' ? pieces.modes : []}
+              onSubmit={(title, mode) => {
+                if (pieces.status === 'ready') pieces.create(title, mode)
               }}
             />
           </div>

@@ -57,7 +57,8 @@ import {
 } from './context.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
-import type { RoomRoster } from './roster.js'
+import { specialistsFor, type RoomRoster } from './roster.js'
+import type { ModeDescriptor } from '../modes.js'
 
 export type RoomEvent =
   | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
@@ -91,6 +92,13 @@ export class ParticipantNotFoundError extends Error {
   constructor(pieceId: string, participantId: string) {
     super(`no participant "${participantId}" in the room for piece "${pieceId}"`)
     this.name = 'ParticipantNotFoundError'
+  }
+}
+
+export class ModeNotFoundError extends Error {
+  constructor(modeId: string) {
+    super(`no loaded mode "${modeId}"`)
+    this.name = 'ModeNotFoundError'
   }
 }
 
@@ -150,6 +158,7 @@ type DispatchPlan = Readonly<{
   storyEditorIncluded: boolean
   existingEntries: readonly ConversationEntry[]
   draft: string
+  modeDescription: string
 }>
 
 function findResponse(
@@ -172,7 +181,7 @@ export class Room {
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
-  readonly #modeDescription: string
+  readonly #modeDescriptions: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
@@ -183,7 +192,7 @@ export class Room {
     authorContextStore: AuthorContextStore,
     entries: ConversationEntryStore,
     roster: RoomRoster,
-    modeDescription: string,
+    modes: readonly ModeDescriptor[],
     charter: Charter,
     policy: HistoryPolicy,
     logger: Logger,
@@ -200,7 +209,7 @@ export class Room {
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
-    this.#modeDescription = modeDescription
+    this.#modeDescriptions = new Map(modes.map((mode) => [mode.id, mode.description]))
   }
 
   specialists(): readonly RoleDefinition[] {
@@ -209,6 +218,12 @@ export class Room {
 
   storyEditor(): RoleDefinition {
     return this.#storyEditor
+  }
+
+  #modeDescriptionFor(modeId: string): string {
+    const description = this.#modeDescriptions.get(modeId)
+    if (description === undefined) throw new ModeNotFoundError(modeId)
+    return description
   }
 
   subscribe(pieceId: string, listener: Listener): () => void {
@@ -280,7 +295,9 @@ export class Room {
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
     const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
-    const roster = [...this.#specialists, this.#storyEditor, ...this.#addressedOnly]
+    const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, 'draft')
+    const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
     let causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
@@ -315,8 +332,8 @@ export class Room {
 
     const eligibleSpecialists =
       addressedIds.length === 0
-        ? this.#specialists.filter((role) => piece.metadata.cast.includes(role.id))
-        : this.#specialists.filter((role) => addressedIds.includes(role.id))
+        ? modeSpecialists.filter((role) => piece.metadata.cast.includes(role.id))
+        : modeSpecialists.filter((role) => addressedIds.includes(role.id))
     const eligibleAddressedOnly = this.#addressedOnly.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
@@ -354,6 +371,7 @@ export class Room {
       storyEditorIncluded,
       existingEntries,
       draft,
+      modeDescription,
     }
     const cause = causeEntry
 
@@ -398,7 +416,8 @@ export class Room {
     plan: DispatchPlan,
     operation: ActiveDispatch,
   ): Promise<void> {
-    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft } = plan
+    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft, modeDescription } =
+      plan
     const { actionId, controller } = operation
     const signal = controller.signal
 
@@ -421,7 +440,7 @@ export class Room {
       draft,
       entries: existingEntries,
       policy: this.#policy,
-      modeDescription: this.#modeDescription,
+      modeDescription,
     }
     const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
       ...shared,

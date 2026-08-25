@@ -16,7 +16,7 @@ import { FixtureModelAdapter } from './modelAdapter.js'
 import { buildTestRoom } from './room.js'
 
 export type AppSpec = Readonly<{
-  mode: ModeDescriptor
+  modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   /** Scripted, never defaulted: a test that never asks for it passes `undefined`. */
   runtimeStatus: RuntimeStatus | undefined
@@ -43,9 +43,9 @@ const UNREACHED_CHARTER: Charter = {
   noReasoningAboutTheAuthorsQuestion: 'unreached: no prompt is rendered in this scenario',
 }
 
-function idleRoom(dataRoot: string, mode: ModeDescriptor, roles: readonly RoleDefinition[]): Room {
+function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {
-    mode,
+    modes,
     roles,
     charter: UNREACHED_CHARTER,
     policy: SHIPPED_HISTORY_POLICY,
@@ -65,13 +65,13 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
   })
 
   const workspace = WorkspaceRegistry.openAt(dataRoot)
-  const room = spec.room ?? idleRoom(dataRoot, spec.mode, spec.roles)
+  const room = spec.room ?? idleRoom(dataRoot, spec.modes, spec.roles)
   const modelAccess = FixtureModelAdapter.bySite({}, spec.runtimeStatus)
 
   const app = createApp(
     env,
     workspace,
-    spec.mode,
+    spec.modes,
     new DraftWriter(new DraftStore()),
     callSites(spec.roles),
     modelAccess,

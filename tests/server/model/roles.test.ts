@@ -7,11 +7,20 @@ import {
   loadRoles,
   requireDistinctRoles,
   requireSingleGeneralist,
+  requireValidAvailability,
   type RoleDefinition,
 } from '../../../src/server/model/roles.js'
 import { ShippedDataError } from '../../../src/server/store/index.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' }
+const shape: RoleDefinition = {
+  id: 'shape',
+  handle: 'shape',
+  displayName: 'Shape',
+  description: 'x',
+  persona: 'reasons about x',
+  eligibility: 'cast',
+  availability: [],
+}
 const storyEditor: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
@@ -19,6 +28,7 @@ const storyEditor: RoleDefinition = {
   description: 'y',
   persona: 'reasons about y',
   eligibility: 'generalist',
+  availability: [],
 }
 
 describe('requireDistinctRoles', () => {
@@ -34,6 +44,7 @@ describe('requireDistinctRoles', () => {
       description: 'y',
       persona: 'reasons about y',
       eligibility: 'cast',
+      availability: [],
     }
     expect(requireDistinctRoles([shape, compression])).toEqual([shape, compression])
 
@@ -62,6 +73,29 @@ describe('requireSingleGeneralist', () => {
   })
 })
 
+describe('requireValidAvailability', () => {
+  it('passes a cast participant whose availability names a loaded mode once per surface, and fails naming the file otherwise', () => {
+    const available: RoleDefinition = { ...shape, availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }] }
+    expect(requireValidAvailability([available], new Set(['flash']))).toEqual([available])
+
+    const unloadedMode: RoleDefinition = { ...shape, availability: [{ mode: 'novella', surface: 'draft', enabledByDefault: true }] }
+    expect(() => requireValidAvailability([unloadedMode], new Set(['flash']))).toThrowError(ShippedDataError)
+    expect(() => requireValidAvailability([unloadedMode], new Set(['flash']))).toThrowError(/did not load/)
+
+    const duplicated: RoleDefinition = {
+      ...shape,
+      availability: [
+        { mode: 'flash', surface: 'draft', enabledByDefault: true },
+        { mode: 'flash', surface: 'draft', enabledByDefault: false },
+      ],
+    }
+    expect(() => requireValidAvailability([duplicated], new Set(['flash']))).toThrowError(/duplicate availability/)
+
+    const notCast: RoleDefinition = { ...storyEditor, availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }] }
+    expect(() => requireValidAvailability([notCast], new Set(['flash']))).toThrowError(/only a cast participant/)
+  })
+})
+
 describe('loadRoles', () => {
   let contentRoot: string
 
@@ -84,7 +118,7 @@ describe('loadRoles', () => {
       '---\nhandle: shape\ndisplayName: Shape\ndescription: Reasons about shape.\neligibility: generalist\n---\nReasons about the entry, the turn and the close.\n',
     )
 
-    expect(loadRoles(contentRoot)).toEqual([
+    expect(loadRoles(contentRoot, new Set())).toEqual([
       {
         id: 'shape',
         handle: 'shape',
@@ -92,6 +126,7 @@ describe('loadRoles', () => {
         description: 'Reasons about shape.',
         persona: 'Reasons about the entry, the turn and the close.',
         eligibility: 'generalist',
+        availability: [],
       },
     ])
   })
@@ -99,14 +134,28 @@ describe('loadRoles', () => {
   it('fails startup naming the file when a participant document has no frontmatter block', () => {
     writeParticipant('broken', 'not a frontmatter document at all')
 
-    expect(() => loadRoles(contentRoot)).toThrowError(ShippedDataError)
-    expect(() => loadRoles(contentRoot)).toThrowError(/broken\.md/)
+    expect(() => loadRoles(contentRoot, new Set())).toThrowError(ShippedDataError)
+    expect(() => loadRoles(contentRoot, new Set())).toThrowError(/broken\.md/)
   })
 
   it('fails startup naming the count when the shipped participants do not declare exactly one generalist', () => {
     writeParticipant('shape', '---\nhandle: shape\ndisplayName: Shape\ndescription: x\neligibility: cast\n---\nReasons about shape.\n')
 
-    expect(() => loadRoles(contentRoot)).toThrowError(GeneralistCardinalityError)
-    expect(() => loadRoles(contentRoot)).toThrowError(/found 0/)
+    expect(() => loadRoles(contentRoot, new Set())).toThrowError(GeneralistCardinalityError)
+    expect(() => loadRoles(contentRoot, new Set())).toThrowError(/found 0/)
+  })
+
+  it('fails startup naming the file when a cast participant declares availability for a mode that did not load', () => {
+    writeParticipant(
+      'shape',
+      '---\nhandle: shape\ndisplayName: Shape\ndescription: x\neligibility: cast\navailability:\n  - mode: novella\n    surface: draft\n    enabledByDefault: true\n---\nReasons about shape.\n',
+    )
+    writeParticipant(
+      'story-editor',
+      '---\nhandle: editor\ndisplayName: Story Editor\ndescription: y\neligibility: generalist\n---\nReasons about the whole.\n',
+    )
+
+    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
+    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/shape/)
   })
 })

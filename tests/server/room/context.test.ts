@@ -23,6 +23,7 @@ const shape: RoleDefinition = {
   description: 'the shape of it',
   persona: 'reasons about the turn',
   eligibility: 'cast',
+  availability: [],
 }
 const compression: RoleDefinition = {
   id: 'compression',
@@ -31,6 +32,7 @@ const compression: RoleDefinition = {
   description: 'what earns its space',
   persona: 'reasons about omission',
   eligibility: 'cast',
+  availability: [],
 }
 
 const charter = CHARTER_FIXTURE

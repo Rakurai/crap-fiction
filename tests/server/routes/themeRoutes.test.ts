@@ -14,8 +14,16 @@ import { buildTestApp } from '../../support/harness.js'
 
 const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'x',
+    persona: 'reasons about x',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', availability: [] },
 ]
 
 describe('the theme routes', () => {
@@ -30,7 +38,7 @@ describe('the theme routes', () => {
   })
 
   function studio() {
-    return buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus: undefined }).app
+    return buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus: undefined }).app
   }
 
   it('reports a theme never chosen as null, and the chosen one on every read after', async () => {

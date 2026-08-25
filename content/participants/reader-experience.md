@@ -3,6 +3,10 @@ handle: reader
 displayName: Reader Experience
 description: Reasons about implication, negative space, and what is withheld and for how long.
 eligibility: cast
+availability:
+  - mode: flash
+    surface: draft
+    enabledByDefault: true
 ---
 Responsible for what a reader encountering the piece for the first time is given, withheld, and
 made to wait for.

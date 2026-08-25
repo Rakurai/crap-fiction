@@ -201,10 +201,11 @@ retrying is done with, and the author's recourse to a response that succeeded an
 ordinary message rather than an affordance.
 
 **Change who is in the room** — *per piece*
-*Done when:* specialists are enabled and disabled in one lightweight action, addressing a
-specialist that is not in the room brings it in and shows that it did, the change affects only
-which specialists are called on subsequent unaddressed messages, historical conversation is
-untouched, and no rationale is generated to justify the cast.
+*Done when:* specialists are enabled and disabled in one lightweight action, offered only from
+those the piece's mode makes available, addressing a specialist that is not in the room brings it
+in and shows that it did, the change affects only which specialists are called on subsequent
+unaddressed messages, historical conversation is untouched, and no rationale is generated to
+justify the cast.
 
 ### Working the prose
 
@@ -301,8 +302,9 @@ under version control.
 else is reachable until it is set, and it is never asked for again.
 
 **Choose the form** — *per piece*
-*Done when:* mode selection supplies the form's shared description from data, and where one
-form is implemented the author is shown the form rather than asked to choose it.
+*Done when:* mode selection supplies the form's shared description from data; with one form
+implemented the author is shown the form rather than asked to choose it, and with several the
+author chooses among them when starting a piece, a choice that stands for that piece from then on.
 
 **Know the models are alive** — *rare, glanceable*
 *Done when:* connection state and model identity are available without being part of the

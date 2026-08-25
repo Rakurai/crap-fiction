@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { parseAddressing } from '../../../src/server/room/addressing.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' }
+const shape: RoleDefinition = {
+  id: 'shape',
+  handle: 'shape',
+  displayName: 'Shape',
+  description: 'x',
+  persona: 'reasons about x',
+  eligibility: 'cast',
+  availability: [],
+}
 const compression: RoleDefinition = {
   id: 'compression',
   handle: 'compression',
@@ -10,6 +18,7 @@ const compression: RoleDefinition = {
   description: 'y',
   persona: 'reasons about y',
   eligibility: 'cast',
+  availability: [],
 }
 const editor: RoleDefinition = {
   id: 'story-editor',
@@ -18,6 +27,7 @@ const editor: RoleDefinition = {
   description: 'z',
   persona: 'reasons about z',
   eligibility: 'generalist',
+  availability: [],
 }
 const participants = [shape, compression, editor]
 

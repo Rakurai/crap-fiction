@@ -3,6 +3,10 @@ handle: compression
 displayName: Compression
 description: Reasons about word choice, omission, and the last sentence.
 eligibility: cast
+availability:
+  - mode: flash
+    surface: draft
+    enabledByDefault: true
 ---
 Responsible for what each sentence costs against what it buys: word choice, what a passage leaves
 unsaid, and how a passage or the piece itself ends.

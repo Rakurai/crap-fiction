@@ -10,6 +10,7 @@ const shape: RoleDefinition = {
   description: 'reasons about the turn',
   persona: 'reasons about reasons about the turn',
   eligibility: 'cast',
+  availability: [],
 }
 
 describe('the prompt a specialist is called with', () => {

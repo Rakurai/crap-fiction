@@ -226,14 +226,22 @@ is the store boundary's, like the rest of the layout — the modules that read t
 contain and never where it is. It is kept apart from author configuration because conflating them means
 an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
 validated at startup, and invalid shipped data is a startup failure, since a document that parses
-partially would enable the wrong cast. The mode set shipped is one descriptor, and any other count is a
-startup failure too: everything above reads the mode as singular, so a second one arriving as data would
-be silently ignored rather than offered.
+partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
+and sibling description, and none names a participant.
 
 **A participant declares its own eligibility, and the count that must hold is validated where the
 participants are loaded.** Exactly one may declare itself the generalist; none or several is a startup
 failure naming the participant files involved, because nothing downstream has a second way to choose
 which one judges the piece as a whole.
+
+**A cast participant declares the mode-and-surface pairs it is available for, and whether it starts
+enabled at each.** Validating that declaration needs the loaded modes, so it happens after modes load
+and before the participants they name are trusted: an availability entry naming a mode that did not
+load, naming a participant that is not cast-eligible, or repeating a mode-and-surface pair is a startup
+failure naming the participant file. The available roster for a given mode and surface, and the
+initial cast it yields, are both derived from these declarations rather than stored anywhere — a mode
+descriptor names no specialist, so making one available in a mode is an edit to that specialist's own
+document.
 
 **The piece directory is the piece's identity.** Its name derives from the title, slugified, with
 collisions disambiguated at creation, and it is what the application addresses a piece by. A renamed
@@ -834,8 +842,9 @@ cast and is not togglable, so it is reported as its own thing rather than as a c
 and it is reported rather than left to the client to infer as *the participant that is not in the cast*,
 which is a rule about the room's composition and belongs to the server that resolves the roster.
 
-**Creating a piece makes no model call.** It writes the piece directory and enables every cast-eligible
-participant by default, so a piece is creatable and writable with the runtime not even running.
+**Creating a piece makes no model call.** It writes the piece directory and enables the roster
+specialists that declare themselves on by default for the chosen mode, so a piece is creatable and
+writable with the runtime not even running.
 
 **Every model operation receives the manuscript as it currently stands**, carried in the request that
 starts it. The draft file remains the sole durable representation of the manuscript, and the room never

@@ -3,8 +3,8 @@ import { callSites, DuplicateCallSiteError, withAssignments } from '../../../src
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
 const roles: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast', availability: [] },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', availability: [] },
 ]
 
 describe('callSites', () => {
@@ -28,7 +28,7 @@ describe('callSites', () => {
 
   it('fails when a participant id collides with an operation call site', () => {
     const colliding: readonly RoleDefinition[] = [
-      { id: 'apply', handle: 'apply', displayName: 'Apply', description: 'z', persona: 'reasons about z', eligibility: 'cast' },
+      { id: 'apply', handle: 'apply', displayName: 'Apply', description: 'z', persona: 'reasons about z', eligibility: 'cast', availability: [] },
     ]
     expect(() => callSites(colliding)).toThrowError(DuplicateCallSiteError)
   })

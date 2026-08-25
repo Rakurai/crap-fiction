@@ -19,11 +19,11 @@ export function saveDraft(id: string, draft: string, signal?: AbortSignal): Prom
   })
 }
 
-export function createPiece(title: string, signal?: AbortSignal): Promise<RequestResult<PieceSummary>> {
+export function createPiece(title: string, mode: string, signal?: AbortSignal): Promise<RequestResult<PieceSummary>> {
   return requestJson('/pieces', pieceSummarySchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, mode }),
     signal: signal ?? null,
   })
 }

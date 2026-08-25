@@ -9,8 +9,24 @@ export const MODE_FIXTURE: ModeDescriptor = {
 }
 
 export const ROLES_FIXTURE: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'x',
+    persona: 'reasons about x',
+    eligibility: 'cast',
+    availability: [{ mode: MODE_FIXTURE.id, surface: 'draft', enabledByDefault: true }],
+  },
+  {
+    id: 'story-editor',
+    handle: 'editor',
+    displayName: 'Story Editor',
+    description: 'y',
+    persona: 'reasons about y',
+    eligibility: 'generalist',
+    availability: [],
+  },
 ]
 
 export const CHARTER_FIXTURE: Charter = {

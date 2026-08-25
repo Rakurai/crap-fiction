@@ -27,8 +27,8 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   const logger = createLogger(env.logLevel)
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
-  const mode = loadModes()
-  const roles = loadRoles(CONTENT_ROOT)
+  const modes = loadModes()
+  const roles = loadRoles(CONTENT_ROOT, new Set(modes.map((mode) => mode.id)))
   const charter = loadCharter()
   const sites = callSites(roles)
   const draftWriter = new DraftWriter(new DraftStore())
@@ -40,11 +40,11 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     authorContextStore(env.dataRoot),
     new ConversationEntryStore(),
     roster,
-    mode.description,
+    modes,
     charter,
     SHIPPED_HISTORY_POLICY,
     logger,
     Date.now,
   )
-  return { app: createApp(env, workspace, mode, draftWriter, sites, modelAccess, room, logger) }
+  return { app: createApp(env, workspace, modes, draftWriter, sites, modelAccess, room, logger) }
 }

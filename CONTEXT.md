@@ -50,6 +50,9 @@ The form and scale of a piece, expressed as data rather than code. A mode suppli
 description of that form and scale, which every participant interprets through its own
 persona.
 
+Several modes may exist side by side. A piece is created against exactly one and keeps it for
+its whole life.
+
 ## Draft
 
 The manuscript: the current prose of the piece, in Markdown, and the only durable
@@ -73,13 +76,23 @@ author context.
 
 ## Room
 
-The participants engaged on a piece: its specialists and the Story Editor.
+The participants engaged on a piece: its roster and the Story Editor.
 
-**Cast** means the specialists. The Story Editor is always present and is not one of them.
+### Roster
 
-A specialist is **enabled** or it is not. There is no joining or leaving lifecycle and no
-temporary presence: a specialist disabled for a time and re-enabled later simply becomes
-answerable again.
+The specialists available to a piece, given its mode. A mode names no specialist; each
+specialist declares for itself the modes it is available in. The roster is everything that
+declaration yields for the piece's mode, whether currently enabled or not.
+
+**Cast** means the roster's enabled subset. The Story Editor is always present and belongs to
+neither the roster nor the cast.
+
+**Initial cast** — the cast a newly created piece begins with, drawn from the default each
+roster specialist declares for the piece's mode.
+
+A specialist is **enabled** or it is not, within the roster. There is no joining or leaving
+lifecycle and no temporary presence: a specialist disabled for a time and re-enabled later
+simply becomes answerable again.
 
 ## Participant
 
@@ -98,7 +111,8 @@ of three closed kinds — cast, generalist, or addressed-only.
 ### Specialist
 
 A cast participant holding one craft responsibility, reasoning narrowly and deliberately within
-it.
+it. It declares, for each mode and editing surface it is available on, whether it starts enabled
+there.
 
 ### Story Editor
 

@@ -9,6 +9,8 @@ import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { RoleDefinition } from './model/roles.js'
+import type { ModeDescriptor } from './modes.js'
+import { defaultCastFor, specialistsFor } from './room/roster.js'
 import {
   conversationActivity,
   deleteAppliedChange,
@@ -45,6 +47,13 @@ export class UnknownCastMemberError extends Error {
   constructor(pieceId: string, memberId: string) {
     super(`piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
     this.name = 'UnknownCastMemberError'
+  }
+}
+
+export class UnknownModeError extends Error {
+  constructor(modeId: string) {
+    super(`no loaded mode "${modeId}"`)
+    this.name = 'UnknownModeError'
   }
 }
 
@@ -98,15 +107,18 @@ export async function createPiece(
   workspaceDir: string,
   title: string,
   modeId: string,
+  modes: readonly ModeDescriptor[],
   specialists: readonly RoleDefinition[],
 ): Promise<PieceSummary> {
+  if (!modes.some((mode) => mode.id === modeId)) throw new UnknownModeError(modeId)
+
   const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
   await writePieceMetadata(workspaceDir, id, {
     title,
     mode: modeId,
     status: 'drafting',
-    cast: specialists.map((role) => role.id),
+    cast: [...defaultCastFor(specialists, modeId, 'draft')],
   })
 
   return summarize(id, requirePiece(workspaceDir, id))
@@ -126,6 +138,7 @@ export function getPiece(
   storyEditor: RoleDefinition,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
+  const available = specialistsFor(specialists, piece.metadata.mode, 'draft')
   return {
     ...summarize(id, piece),
     draft: piece.draft?.text ?? '',
@@ -134,7 +147,7 @@ export function getPiece(
     conversations: listConversations(workspaceDir, id),
     conversationActionInFlight,
     captureInFlight,
-    cast: castView(specialists, piece.metadata.cast),
+    cast: castView(available, piece.metadata.cast),
     storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
   }
 }
@@ -145,13 +158,14 @@ export async function setPieceCast(
   specialists: readonly RoleDefinition[],
   cast: readonly string[],
 ): Promise<readonly CastMemberView[]> {
-  requirePiece(workspaceDir, id)
-  const ceiling = new Set(specialists.map((role) => role.id))
+  const piece = requirePiece(workspaceDir, id)
+  const available = specialistsFor(specialists, piece.metadata.mode, 'draft')
+  const ceiling = new Set(available.map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
   await writePieceCast(workspaceDir, id, cast)
-  return castView(specialists, cast)
+  return castView(available, cast)
 }
 
 export async function updatePieceDetails(

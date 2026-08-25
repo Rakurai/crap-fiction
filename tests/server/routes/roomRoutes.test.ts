@@ -25,8 +25,16 @@ import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
 const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'x',
+    persona: 'reasons about x',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', availability: [] },
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
@@ -51,17 +59,17 @@ describe('the room over HTTP', () => {
   ): Promise<{ app: Hono; modelAccess: FixtureModelAdapter }> {
     const modelAccess = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, {
-      mode: MODE,
+      modes: [MODE],
       roles: ROLES,
       charter: CHARTER_FIXTURE,
       policy: SHIPPED_HISTORY_POLICY,
       modelAccess,
       now: () => 1_700_000_000_000,
     })
-    const { app, workspace } = buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus: undefined, room })
+    const { app, workspace } = buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus: undefined, room })
 
     await workspace.set('my-writing')
-    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups' }) })
+    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', mode: 'flash' }) })
     return { app, modelAccess }
   }
 

@@ -12,7 +12,7 @@ import { ConversationEntryStore } from '../../src/server/store/index.js'
 
 /** Every value a Room's behaviour turns on, stated by the test rather than assumed here. */
 export type RoomSpec = Readonly<{
-  mode: ModeDescriptor
+  modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   charter: Charter
   policy: HistoryPolicy
@@ -27,7 +27,7 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     authorContextStore(dataRoot),
     new ConversationEntryStore(),
     resolveRoster(spec.roles),
-    spec.mode.description,
+    spec.modes,
     spec.charter,
     spec.policy,
     createLogger('silent'),
