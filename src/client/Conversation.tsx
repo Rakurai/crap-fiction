@@ -331,8 +331,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
   }
 }
 
-// UX_DESIGN "A round in flight": the facts line is unconditional — it states that the action is
-// active whether or not the model layer has anything to report yet — and the participant lines
+// UX_DESIGN "While the room answers": the facts line is unconditional — it states that the action
+// is active whether or not the model layer has anything to report yet — and the participant lines
 // below it are the opposite: each exists only because a real progress event named that
 // participant, never as a reserved place for one the dispatch merely intends to call.
 function DispatchFlight({
@@ -350,7 +350,7 @@ function DispatchFlight({
   return (
     <div className={styles.flightWrapper}>
       <div className={styles.flight}>
-        <span className={styles.roundFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
+        <span className={styles.activityFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
         <button type="button" className={styles.abandon} onClick={onAbandon}>
           abandon
         </button>
@@ -525,7 +525,7 @@ export function Conversation({
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.rounds}>
+      <div className={styles.transcript}>
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}

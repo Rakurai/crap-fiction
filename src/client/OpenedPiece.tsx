@@ -77,8 +77,8 @@ function Surfaces({
   const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
   // Keyed on this rather than on `activeConversationId`: `Conversation` reports back the id
-  // it mints on a fresh conversation's first round, and remounting on that report would tear
-  // that round down mid-flight.
+  // it mints on a fresh conversation's first dispatch, and remounting on that report would tear
+  // that dispatch down mid-flight.
   const [session, setSession] = useState(0)
   const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
   // SPEC "one piece is open at a time": leaving abandons whatever conversation action is in

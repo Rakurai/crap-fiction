@@ -9,7 +9,7 @@
   border-left: 1px solid var(--rule);
 }
 
-.rounds {
+.transcript {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -17,11 +17,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-.round {
-  display: flex;
-  flex-direction: column;
 }
 
 .message {
@@ -94,8 +89,9 @@
 }
 
 .failed {
-  font: 400 12.5px/1.55 var(--font-ui);
-  color: var(--ink3);
+  font: 500 12px/1.55 var(--font-facts);
+  color: var(--ink2);
+  letter-spacing: 0.02em;
   margin: 0;
 }
 
@@ -117,7 +113,7 @@
   gap: 12px;
 }
 
-.roundFacts {
+.activityFacts {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.07em;

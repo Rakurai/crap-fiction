@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
 import { Conversation } from '../../../src/client/Conversation.js'
+import styles from '../../../src/client/Conversation.module.css'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
@@ -141,6 +142,20 @@ describe('a landed response in the conversation', () => {
     ])
 
     await waitFor(() => expect(screen.getByText('{"claim": "the ending')).toBeTruthy())
+  })
+
+  it('draws a failure in its own machine-status class, never the note register it could be mistaken for', async () => {
+    renderConversation([
+      { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'timeout' },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e0', outcome: 'commentary', claim: 'It holds.', note: 'A quiet note.' },
+    ])
+
+    const failed = await screen.findByText('did not answer — TIMEOUT')
+    const note = await screen.findByText('A quiet note.')
+
+    expect(failed.className).toBe(styles.failed)
+    expect(failed.className).not.toBe(styles.note)
+    expect(note.className).toBe(styles.note)
   })
 })
 
