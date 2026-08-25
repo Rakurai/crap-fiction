@@ -21,18 +21,7 @@
 }
 
 .modelsButton {
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
-  cursor: pointer;
-}
-
-.modelsButton:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
+  composes: surface from './controls.module.css';
 }
 
 .center {
@@ -47,13 +36,27 @@
   width: 420px;
 }
 
+.name {
+  font: 400 26px/1.1 var(--font-prose);
+  color: var(--ink);
+  margin: 0;
+}
+
+.what {
+  font: 400 12px/1.5 var(--font-ui);
+  color: var(--ink2);
+  margin: 7px 0 22px;
+}
+
+/* Where the pieces are kept is a fact about the machine, and reads as one. */
 .workspace {
   font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  margin: 0 0 16px;
-  word-break: break-all;
+  color: var(--facts-ink);
+  letter-spacing: .06em;
+  margin: 18px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .creating {

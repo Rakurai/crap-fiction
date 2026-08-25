@@ -16,20 +16,9 @@
 }
 
 .back {
+  composes: surface from './controls.module.css';
   align-self: flex-start;
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
   margin: 16px 0 20px;
-  cursor: pointer;
-}
-
-.back:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
 }
 
 .error {

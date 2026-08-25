@@ -91,7 +91,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -100,7 +100,7 @@ export function createApp(
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {

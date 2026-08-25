@@ -1,8 +1,15 @@
+/*
+ * The two surfaces sit together in the middle of the window rather than at its two edges: the
+ * slack a wide display leaves goes outside the pair, where it reads as margin, and not between
+ * them, where it read as two applications open at once.
+ */
 .row {
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
+  justify-content: center;
+  background: var(--bg);
 }
 
 .screen {
@@ -15,20 +22,9 @@
 }
 
 .back {
+  composes: surface from './controls.module.css';
   align-self: flex-start;
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
-  cursor: pointer;
   margin-bottom: 16px;
-}
-
-.back:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
 }
 
 .status {

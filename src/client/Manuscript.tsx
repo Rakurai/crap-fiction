@@ -1,5 +1,5 @@
 import { EditorContent } from '@tiptap/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PieceStatus } from '../shared/pieceViews.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
@@ -69,8 +69,28 @@ function EditableTitle({ title, saving, onRetitle }: { readonly title: string; r
   )
 }
 
+/** How long the way out of the reading view stands after the author last moved the pointer. */
+const WAY_BACK_HOLDS_MS = 2400
+
 export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, onOpenCapture, lifecycle, applying }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
+  const [wayBackRevealed, setWayBackRevealed] = useState(false)
+  const wayBackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // The reading view holds no chrome at rest. Moving the pointer is what asks for the way out,
+  // which is what a long piece entered near the top needs and a short one never has to see.
+  function revealTheWayBack(): void {
+    setWayBackRevealed(true)
+    if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
+    wayBackTimer.current = setTimeout(() => setWayBackRevealed(false), WAY_BACK_HOLDS_MS)
+  }
+
+  useEffect(() => {
+    setWayBackRevealed(false)
+    return () => {
+      if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
+    }
+  }, [manuscript.view])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -86,10 +106,10 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
   }, [manuscript.editor, reading, applying])
 
   return (
-    <div className={styles.wrapper}>
+    <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
       {!reading && (
         <div className={styles.topBar}>
-          <button type="button" className={styles.control} onClick={onClose} disabled={autosave.state.failed}>
+          <button type="button" className={styles.leave} onClick={onClose} disabled={autosave.state.failed}>
             ‹ pieces
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
@@ -107,12 +127,13 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
           </select>
           <span className={styles.spacer} />
           <div className={styles.controls}>
-            <button type="button" className={styles.control} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
+            <button type="button" className={styles.viewControl} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
               {manuscript.view === 'source' ? 'rendered' : 'source'}
             </button>
-            <button type="button" className={styles.control} onClick={manuscript.showReading}>
+            <button type="button" className={styles.viewControl} onClick={manuscript.showReading}>
               reading
             </button>
+            <span className={styles.controlsRule} />
             <button type="button" className={styles.control} onClick={onOpenConversations}>
               conversations
             </button>
@@ -139,9 +160,12 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
         </div>
       )}
 
-      <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>
-        <div className={reading ? styles.readingMeasure : styles.measure}>
-          {reading && <h1 className={styles.readingTitle}>{title}</h1>}
+      <div
+        ref={manuscript.containerRef}
+        className={reading ? `${styles.scroll} ${styles.readingScroll}` : styles.scroll}
+        onPointerMove={reading ? revealTheWayBack : undefined}
+      >
+        <div className={styles.measure}>
           {manuscript.view === 'source' ? (
             <textarea
               aria-label="Manuscript source"
@@ -151,13 +175,18 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
               onChange={(event) => manuscript.setSourceText(event.target.value)}
             />
           ) : (
-            <div className={reading ? styles.readingEditor : styles.editor}>
+            <div className={styles.editor}>
               <EditorContent editor={manuscript.editor} />
             </div>
           )}
-          {reading && <p className={styles.readingHint}>ESC TO RETURN</p>}
         </div>
       </div>
+
+      {reading && wayBackRevealed && (
+        <button type="button" className={styles.wayBack} onClick={manuscript.showRendered}>
+          {facts(machineWords('esc'), machineWords('return'))}
+        </button>
+      )}
 
       {!reading && autosave.state.failed && (
         <div className={styles.saveFailed}>

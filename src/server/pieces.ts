@@ -70,6 +70,7 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
 function castView(specialists: readonly RoleDefinition[], enabled: readonly string[]): readonly CastMemberView[] {
   return specialists.map((role) => ({
     id: role.id,
+    handle: role.handle,
     displayName: role.displayName,
     roleDescription: role.roleDescription,
     enabled: enabled.includes(role.id),
@@ -118,6 +119,7 @@ export function getPiece(
   conversationActionInFlight: ConversationActivitySnapshot | null,
   captureInFlight: CaptureSnapshot | null,
   specialists: readonly RoleDefinition[],
+  storyEditor: RoleDefinition,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
   return {
@@ -129,6 +131,7 @@ export function getPiece(
     conversationActionInFlight,
     captureInFlight,
     cast: castView(specialists, piece.metadata.cast),
+    storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, roleDescription: storyEditor.roleDescription },
   }
 }
 

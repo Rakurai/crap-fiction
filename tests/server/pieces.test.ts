@@ -36,6 +36,13 @@ const specialists: readonly RoleDefinition[] = [
   { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space' },
 ]
 
+const storyEditor: RoleDefinition = {
+  id: 'story-editor',
+  handle: 'editor',
+  displayName: 'Story Editor',
+  roleDescription: 'holds the whole of it',
+}
+
 describe('pieces', () => {
   let workspaceDir: string
 
@@ -97,7 +104,7 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
-    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists, storyEditor)
     expect(opened).toEqual({
       ...created,
       draft: '',
@@ -107,9 +114,10 @@ describe('pieces', () => {
       conversationActionInFlight: null,
       captureInFlight: null,
       cast: [
-        { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-        { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
+        { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
+        { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
       ],
+      storyEditor: { handle: 'editor', displayName: 'Story Editor', roleDescription: 'holds the whole of it' },
     })
   })
 
@@ -122,7 +130,7 @@ describe('pieces', () => {
       'utf8',
     )
 
-    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists, storyEditor)
     expect(opened.draft).toBe('Two small words.')
     expect(opened.storyContext).toEqual({
       Premise: ['two cups, one left behind'],
@@ -137,7 +145,7 @@ describe('pieces', () => {
    */
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
-      expect(() => getPiece(workspaceDir, id, null, null, specialists)).toThrowError(PieceNotFoundError)
+      expect(() => getPiece(workspaceDir, id, null, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
       await expect(setPieceCast(workspaceDir, id, specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
       await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
@@ -162,10 +170,10 @@ describe('setPieceCast', () => {
     const disabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
 
     expect(disabled).toEqual([
-      { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-      { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
+      { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, null, specialists).cast).toEqual(disabled)
+    expect(getPiece(workspaceDir, created.id, null, null, specialists, storyEditor).cast).toEqual(disabled)
 
     const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
@@ -197,7 +205,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(workspaceDir, 'cups', null, null, specialists).title).toBe('The Cups')
+    expect(getPiece(workspaceDir, 'cups', null, null, specialists, storyEditor).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {

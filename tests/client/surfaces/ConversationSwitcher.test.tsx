@@ -16,11 +16,15 @@ type Actions = {
   onDelete?: () => void
 }
 
-function renderSwitcher(deletingId: string | undefined, actions: Actions & { onClose?: () => void } = {}) {
+function renderSwitcher(
+  deletingId: string | undefined,
+  actions: Actions & { onClose?: () => void } = {},
+  activeId: string | null = null,
+) {
   render(
     <ConversationSwitcher
       conversations={CONVERSATIONS}
-      activeId={null}
+      activeId={activeId}
       deletingId={deletingId}
       error={undefined}
       clock={() => NOW}
@@ -30,6 +34,10 @@ function renderSwitcher(deletingId: string | undefined, actions: Actions & { onC
       onClose={actions.onClose ?? vi.fn()}
     />,
   )
+}
+
+function armFor(opening: string): HTMLElement {
+  return screen.getByRole('button', { name: `Delete the conversation ${opening}` })
 }
 
 describe('the conversation listing', () => {
@@ -47,6 +55,14 @@ describe('the conversation listing', () => {
     expect(screen.getByText('ASKED FOR A CONCRETE CHANGE')).toBeTruthy()
   })
 
+  /** The listing is opened from a transcript, so it says which conversation that transcript is. */
+  it('holds the conversation presently open as the current one', () => {
+    renderSwitcher(undefined, {}, 'c2')
+
+    const rows = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-current'))
+    expect(rows.map((row) => row.getAttribute('aria-current'))).toEqual(['false', 'true'])
+  })
+
   it('reaches each of its actions in one action apiece, selecting a conversation by its own row', () => {
     const onSelect = vi.fn()
     const onStartNew = vi.fn()
@@ -62,15 +78,29 @@ describe('the conversation listing', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('deletes one conversation, disabling only the row a deletion is in flight for', () => {
+  /**
+   * Losing a conversation is the one irreversible act on this surface, so it is asked for on
+   * the row it would delete and confirmed on that row — never a single click in the scan path.
+   */
+  it('deletes no conversation until the row it names is asked and then confirmed, and can be kept instead', () => {
     const onDelete = vi.fn()
-    renderSwitcher('c1', { onDelete })
+    renderSwitcher(undefined, { onDelete })
 
-    const [firstDelete, secondDelete] = screen.getAllByRole('button', { name: 'delete' })
-    expect(firstDelete?.hasAttribute('disabled')).toBe(true)
-    expect(secondDelete?.hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByRole('button', { name: 'delete' })).toBeNull()
 
-    if (secondDelete !== undefined) fireEvent.click(secondDelete)
-    expect(onDelete).toHaveBeenCalledWith('c2')
+    fireEvent.click(armFor('does the opening earn its length'))
+    fireEvent.click(screen.getByRole('button', { name: 'keep' }))
+    expect(onDelete).not.toHaveBeenCalled()
+
+    fireEvent.click(armFor('does the opening earn its length'))
+    fireEvent.click(screen.getByRole('button', { name: 'delete' }))
+    expect(onDelete).toHaveBeenCalledWith('c1')
+  })
+
+  it('goes quiet on the row a deletion is in flight for', () => {
+    renderSwitcher('c1')
+
+    fireEvent.click(armFor('does the opening earn its length'))
+    expect(screen.getByRole('button', { name: 'delete' }).hasAttribute('disabled')).toBe(true)
   })
 })

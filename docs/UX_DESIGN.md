@@ -12,9 +12,12 @@ requirement.
 > **Two surfaces are always present: the prose, and the conversation about it.**
 
 The manuscript is where the story lives and the conversation is where the work gets decided,
-so both are permanent and adjacent. Everything else — choosing a conversation, editing the
-room, reviewing context proposals, configuration — arrives when the author reaches for it
-and leaves without disturbing either.
+so both are permanent and adjacent. They sit together: on a window wider than the two of them the
+surplus is margin around the pair rather than a void between them, the conversation stays wide enough
+to read the room's sentences in, and neither surface is pushed to an edge. Everything else — choosing a
+conversation, editing the room, reviewing context proposals, configuration — arrives when the author
+reaches for it, over the window and on a ground of its own that accounts for what it covers, and leaves
+without disturbing either.
 
 **One piece is open at a time.** Both permanent surfaces belong to one story, and opening another
 piece replaces both with nothing to save and nothing to confirm, because everything the author has
@@ -122,12 +125,19 @@ that offers no action looks diminished for it; frequently it is the most useful 
 conversation.
 
 Every visible response carries the participant's identity, what it said, and its actions.
-Identity is identity only: it never encodes agreement, severity or confidence.
+Identity is identity only: it never encodes agreement, severity or confidence. It is carried on the
+handle the participant is addressed by, so every response teaches the addressing in the ordinary
+course of being read.
 
 **What a response says arrives in two parts.** Its **claim** is one sentence and is always visible.
 Its **note** elaborates and is optional. The two are typographically distinct, so the author can read
 the conversation's claims down the column and stop at the ones worth the elaboration — which is what
 keeps five calls scannable when one participant wrote three lines and another fifteen.
+
+**A claim is visible to a ceiling.** A participant that writes a paragraph where a sentence was asked
+for does not take the column: the claim is bounded and the remainder is behind a disclosure on that
+response. The bound is on what is shown and nothing else — no text moves between the claim and the
+note, and what is disclosed is the participant's own remaining words.
 
 Neither part is a generated summary of the other. The participant writes both, and a response that is
 a claim alone is complete rather than truncated: nothing marks it as missing something, and nothing
@@ -222,10 +232,11 @@ because the conversation has moved on since the author reached for Apply.
 
 ## The room
 
-**Enabling and disabling specialists is a short list of the piece's specialists with their
-static role descriptions**, reached in one action and left in one action. No rationale is
-generated, no lifecycle is presented, and disabling explains nothing to the author beyond
-what the role description already says.
+**Enabling and disabling specialists is a short list of the whole room with static role
+descriptions** — the piece's specialists, and the Story Editor, which is always present and is not
+something the author can turn off — reached in one action and left in one action. Members are named by
+the handle they are addressed by. No rationale is generated, no lifecycle is presented, and disabling
+explains nothing to the author beyond what the role description already says.
 
 The change takes effect on the next unaddressed message. Nothing in the conversation is
 altered by it, and a specialist re-enabled after several messages simply appears again.
@@ -237,10 +248,16 @@ discussion where the author left them.
 
 **A lightweight listing offers the piece's conversations**, each recognizable by the author's own
 opening words, truncated, and when it was last active — ordered by last activity, which is also
-the order that decides which one opening the piece lands in. Nothing else appears in the listing:
-no response counts, no participant rosters, no sizes. Starting a new conversation and deleting one
-are available from the same place. It is not a project-management surface: no titles to maintain,
+the order that decides which one opening the piece lands in. It holds the one the transcript behind it
+is showing, since it is opened from a conversation in order to leave it. Nothing else appears in the
+listing: no response counts, no participant rosters, no sizes. Starting a new conversation and deleting
+one are available from the same place. It is not a project-management surface: no titles to maintain,
 no organization, no metadata to curate.
+
+**Deleting a conversation is asked for on the row it would delete, and confirmed there.** It is the
+one act the author can reach that discards their own words irrecoverably, so it is the one place the
+interface asks before doing as it is told, and the control that asks does not stand exposed in the scan
+path beside every row.
 
 **Where the author wrote no opening words, the listing finds the first they did write.** A
 conversation that began by asking a participant for a concrete change has no author message at its
@@ -269,14 +286,16 @@ destination is the consequential part of a proposal.
 
 ## Registers
 
-Three kinds of text are on screen and the author must feel which is which without thinking
-about it: **the prose**, which is the work; **what the room says about the work**; and **facts
+Four kinds of text are on screen and the author must feel which is which without thinking
+about it: **the prose**, which is the work; **what the room says about the work**; **the author's
+own words to the room**, which are neither the work nor the room's reading of it; and **facts
 about the machine** — participant state, elapsed time, counts, the story's
-length, model identity. Keeping the third in its own register is what stops an operational
+length, model identity. Keeping the last in its own register is what stops an operational
 number from reading as content, and is why a length the author glances at constantly does not
-read as a score.
+read as a score. Keeping the author's own words in one is what lets them scan a transcript for what
+they asked, and their words are never louder than either the work or the room's reading of it.
 
-The visual language carrying that distinction is a matter of typography and colour rather
+The visual language carrying these distinctions is a matter of typography and colour rather
 than of composition, and is settled in the design itself.
 
 ## Prominence
@@ -300,7 +319,22 @@ machine rather than to any story: which model serves which participant, and whic
 is in. Both are properties of where the author writes rather than of what they are writing, both are
 decided rarely, and neither belongs in a surface the author is looking at while writing. It is also
 where launching the studio lands, so the one screen that precedes any open piece is the one that
-configures the machine.
+configures the machine and the one that says what this is: it carries the studio's name and one line of
+what it does, and where the pieces are kept is stated as a fact about the machine rather than as the
+most prominent thing on the screen.
+
+**Model assignment is grouped by what a model is being chosen for** — the room, whose entries are the
+participants the author addresses, and the operations, which are the places the studio itself calls a
+model from — because one undifferentiated sequence asks the author to hold in mind which of the names
+are collaborators and which are machinery. Every entry says what the model there is for, the operations
+most of all, since the author has no other place to learn what they are.
+
+**A control's weight says what kind of act it is**, so the interface carries one weight per kind of act
+rather than one treatment for every control. Two of those weights are load-bearing. The accent is the
+author's own act of commitment and appears once on a screen; handing prose to a model is not that act
+and never carries it, because the author is the final authority and an interface whose loudest element
+invites a model to rewrite the prose says otherwise. And destroying something never wears the weight of
+dismissing it, because the two stand next to each other and only one of them can be undone.
 
 Three consequences: nothing needs two paths to it, unless one of them is the author's own
 sentence — addressing an absent specialist enables it, because typing to a collaborator is a

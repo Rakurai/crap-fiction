@@ -25,7 +25,6 @@ type ConversationProps = {
   readonly flushDraft: () => void
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
-  readonly mark: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
   readonly handles: readonly HandleEntry[]
   readonly runtime: { readonly reachable: boolean } | undefined
@@ -196,7 +195,7 @@ const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
 
 type EntryActions = Readonly<{
   displayName: (id: string) => string
-  mark: (id: string) => string
+  handle: (id: string) => string | undefined
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
@@ -208,17 +207,48 @@ type EntryActions = Readonly<{
   onAsk: (responseId: string, clarification: string | undefined) => void
 }>
 
-function ParticipantIdentity({ name, mark }: { readonly name: string; readonly mark: string }) {
+function ParticipantIdentity({ name, handle }: { readonly name: string; readonly handle: string | undefined }) {
   return (
     <div className={styles.identity}>
-      <span className={styles.mark} style={{ background: mark }} aria-hidden="true" />
+      {handle !== undefined && <span className={styles.handle}>@{handle}</span>}
       <span className={styles.name}>{name}</span>
     </div>
   )
 }
 
+/**
+ * A conforming claim is not a short one, so the column's scannability cannot depend on the
+ * participant's restraint: the claim has a ceiling and the rest is one action away. Nothing is
+ * rewritten, nothing moves to the note, and the ceiling only shows itself where it is reached.
+ */
+function Claim({ text }: { readonly text: string }) {
+  const [open, setOpen] = useState(false)
+  const [beyondTheCeiling, setBeyondTheCeiling] = useState(false)
+  const ref = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (open || element === null) return
+    setBeyondTheCeiling(element.scrollHeight > element.clientHeight + 1)
+  }, [text, open])
+
+  return (
+    <>
+      <p ref={ref} className={open ? styles.claim : `${styles.claim} ${styles.claimClamped}`}>
+        {text}
+      </p>
+      {beyondTheCeiling && (
+        <button type="button" className={styles.claimMore} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+          {machineWords(open ? 'less' : 'more')}
+        </button>
+      )}
+    </>
+  )
+}
+
 function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
-  const { displayName, mark, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } = actions
+  const { displayName, handle, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } =
+    actions
 
   switch (entry.kind) {
     case 'authorMessage':
@@ -243,7 +273,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'participantFailure':
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
+          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
           <ResponseActions
@@ -263,8 +293,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       const applications = applicationsFor(entry.id)
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
-          <p className={styles.claim}>{entry.claim}</p>
+          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <Claim text={entry.claim} />
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
           {applications.map((application) => (
             <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
@@ -336,7 +366,6 @@ export function Conversation({
   flushDraft,
   room,
   displayName,
-  mark,
   handle,
   handles,
   runtime,
@@ -464,7 +493,7 @@ export function Conversation({
 
   const actions: EntryActions = {
     displayName,
-    mark,
+    handle,
     applying: apply.applying,
     applyDisabled: roomBusy,
     applicationsFor,

@@ -36,9 +36,19 @@ export function CallSitesScreen({ onClose }: CallSitesScreenProps) {
               </p>
             )}
             <CallSiteList
-              sites={view.sites}
+              heading="The room"
+              sites={view.room}
               known={view.runtime?.reachable === true ? view.runtime.models : []}
               assigning={view.assigning}
+              saved={view.saved}
+              onAssign={view.assign}
+            />
+            <CallSiteList
+              heading="Operations"
+              sites={view.operations}
+              known={view.runtime?.reachable === true ? view.runtime.models : []}
+              assigning={view.assigning}
+              saved={view.saved}
               onAssign={view.assign}
             />
           </>

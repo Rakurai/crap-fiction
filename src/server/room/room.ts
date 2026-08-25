@@ -204,6 +204,10 @@ export class Room {
     return this.#specialists
   }
 
+  storyEditor(): RoleDefinition {
+    return this.#storyEditor
+  }
+
   subscribe(pieceId: string, listener: Listener): () => void {
     const set = this.#listeners.get(pieceId) ?? new Set()
     set.add(listener)

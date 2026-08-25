@@ -1,11 +1,14 @@
 import type { ChangeEvent } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import styles from './CallSiteList.module.css'
+import { machineWords } from './facts.js'
 
 type CallSiteListProps = {
+  readonly heading: string
   readonly sites: readonly CallSiteAssignmentView[]
   readonly known: readonly string[]
   readonly assigning: string | undefined
+  readonly saved: string | undefined
   readonly onAssign: (site: string, model: string) => void
 }
 
@@ -14,22 +17,26 @@ function choices(known: readonly string[], assignment: string | null): readonly 
   return [assignment, ...known]
 }
 
-export function CallSiteList({ sites, known, assigning, onAssign }: CallSiteListProps) {
+export function CallSiteList({ heading, sites, known, assigning, saved, onAssign }: CallSiteListProps) {
   return (
-    <ul className={styles.list}>
-      {sites.map((site) => {
-        const models = choices(known, site.assignment)
-        return (
-          <li key={site.site} className={styles.item}>
-            <div className={styles.name}>{site.displayName ?? site.site}</div>
-            {site.roleDescription !== null && <p className={styles.role}>{site.roleDescription}</p>}
-            <div className={styles.form}>
-              <label className={styles.label} htmlFor={`model-${site.site}`}>
-                model
-              </label>
+    <section className={styles.group}>
+      <div className={styles.groupHeader}>
+        <h2 className={styles.heading}>{heading}</h2>
+        <span className={styles.column}>{machineWords('model')}</span>
+      </div>
+      <ul className={styles.list}>
+        {sites.map((site) => {
+          const models = choices(known, site.assignment)
+          return (
+            <li key={site.site} className={styles.item}>
+              <div className={styles.identity}>
+                {site.handle !== null && <span className={styles.handle}>@{site.handle}</span>}
+                <span className={styles.name}>{site.displayName}</span>
+                {saved === site.site && <span className={styles.saved}>{machineWords('saved')}</span>}
+              </div>
+              <p className={styles.role}>{site.description}</p>
               <select
-                id={`model-${site.site}`}
-                name="model"
+                aria-label={`Model for ${site.displayName}`}
                 className={styles.input}
                 value={site.assignment ?? ''}
                 disabled={assigning === site.site || models.length === 0}
@@ -46,11 +53,11 @@ export function CallSiteList({ sites, known, assigning, onAssign }: CallSiteList
                   </option>
                 ))}
               </select>
-            </div>
-            {models.length === 0 && <p className={styles.note}>No models to choose from until the runtime is reachable.</p>}
-          </li>
-        )
-      })}
-    </ul>
+              {models.length === 0 && <p className={styles.note}>No models to choose from until the runtime is reachable.</p>}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
