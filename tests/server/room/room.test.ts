@@ -26,6 +26,7 @@ const fixtureMode: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
   description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 const fixtureRoles: readonly RoleDefinition[] = [

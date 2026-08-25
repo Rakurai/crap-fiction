@@ -249,7 +249,10 @@ export async function deleteAppliedChange(workspaceDir: string, pieceId: string,
   await deleteFile(changeFile(pieceDir, changeId))
 }
 
-export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
+export function readShippedModes<T>(
+  contentRoot: string,
+  schema: z.ZodType<T>,
+): readonly Readonly<T & { description: string; storyContextReference: string }>[] {
   const dir = path.join(contentRoot, 'modes')
   const modeIds = directoryNames(dir)
   if (modeIds.length === 0) {
@@ -260,12 +263,17 @@ export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): 
     const modeDir = path.join(dir, id)
     const descriptor = readYamlFile(path.join(modeDir, 'mode.yaml'), schema)
     const description = readShippedTextFile(path.join(modeDir, 'description.md'))
-    return { ...descriptor, description }
+    const storyContextReference = readShippedTextFile(path.join(modeDir, 'story-context-reference.md'))
+    return { ...descriptor, description, storyContextReference }
   })
 }
 
 export function readShippedCharter(contentRoot: string): string {
   return readShippedTextFile(path.join(contentRoot, 'charter.md'))
+}
+
+export function readShippedAuthorContextReference(contentRoot: string): string {
+  return readShippedTextFile(path.join(contentRoot, 'author-context-reference.md'))
 }
 
 export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {

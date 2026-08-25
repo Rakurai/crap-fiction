@@ -71,6 +71,7 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: Ap
     storyContext: undefined,
     draft: 'text',
     surface: 'draft',
+    referenceSchema: undefined,
     participants: PARTICIPANTS,
     ...overrides,
   }
@@ -277,6 +278,15 @@ describe('rendering a prompt', () => {
 
     const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
     expect(wholeOf(renderApplyPrompt(unconstrained, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+  })
+
+  it('carries the reference schema for the document a context Apply targets, only where the surface has one', () => {
+    const withReference = compileApplyContext(applyContextInput({ referenceSchema: 'Sections, each holding entries.', entries: [] }))
+    expect(wholeOf(renderApplyPrompt(withReference, fragments))).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(wholeOf(renderApplyPrompt(withReference, fragments))).toContain('Sections, each holding entries.')
+
+    const withoutReference = compileApplyContext(applyContextInput({ entries: [] }))
+    expect(wholeOf(renderApplyPrompt(withoutReference, fragments))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
   it("gives the story editor the dispatch's readings as their own section, a no-comment among them as an attributed craft finding rather than a tally, naming the participant by display name", () => {

@@ -10,6 +10,7 @@ export type ModeDescriptor = Readonly<{
   id: string
   displayName: string
   description: string
+  storyContextReference: string
 }>
 
 export function loadModes(contentRoot: string): readonly ModeDescriptor[] {

@@ -229,6 +229,13 @@ validated at startup, and invalid shipped data is a startup failure, since a doc
 partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
 and sibling description, and none names a participant.
 
+**A reference schema is guidance, never a contract.** Each mode ships one story-context reference
+beside its descriptor and description, and the studio ships one author-context reference at the
+content root; both are startup-required text, missing exactly as fatally as a mode's description
+would be missing. A reference travels to a context Apply and to the client that shows it, and
+nothing parses it, validates a context document against it, or compares it with an Apply result —
+a document that satisfies no schema is not invalid, since none is enforced.
+
 **The same startup validation gates a release, not only a running instance.** Content that could not
 start the application does not ship, so the check that decides this runs the real loaders against the
 real content before a release rather than trusting that whatever passed review also parses. It asserts

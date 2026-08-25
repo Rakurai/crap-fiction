@@ -528,6 +528,7 @@ export class Room {
         storyContext: durableContext.storyContext,
         draft,
         surface: WORKED_SURFACE,
+        referenceSchema: undefined,
         entries,
         participants: this.#displayNames,
       })

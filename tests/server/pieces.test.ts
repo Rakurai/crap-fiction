@@ -27,12 +27,14 @@ const flash: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
   description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 const epic: ModeDescriptor = {
   id: 'epic',
   displayName: 'Epic',
   description: 'A piece read over several sittings.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 const specialists: readonly RoleDefinition[] = [

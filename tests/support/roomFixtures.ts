@@ -7,6 +7,7 @@ export const MODE_FIXTURE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
   description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 export const ROLES_FIXTURE: readonly RoleDefinition[] = [
@@ -55,6 +56,7 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     clarification: variableFragment('sections/clarification', ['clarification'], 'FIXTURE_CLARIFICATION_HEADING\n\n{{clarification}}'),
     recommendation: variableFragment('sections/recommendation', ['recommendation'], 'FIXTURE_RECOMMENDATION_HEADING\n\n{{recommendation}}'),
     constraint: variableFragment('sections/constraint', ['constraint'], 'FIXTURE_CONSTRAINT_HEADING\n\n{{constraint}}'),
+    referenceSchema: variableFragment('sections/referenceSchema', ['referenceSchema'], 'FIXTURE_REFERENCE_SCHEMA_HEADING\n\n{{referenceSchema}}'),
   },
   lines: {
     historyMessage: variableFragment('lines/historyMessage', ['text'], 'Author: {{text}}'),

@@ -132,7 +132,7 @@ One compilation per kind of call, each returning the whole of what its prompt is
 |---|---|
 | a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
-| an application | the recommendation and the author's constraint |
+| an application | the recommendation, the author's constraint, and the reference schema for the surface it targets, where that surface has one |
 
 Every kind receives both context documents, the current draft whole, the surface it is compiling for, and
 the conversation's entries. Author context and story context arrive as opaque text — exactly the bytes on
@@ -168,10 +168,11 @@ change file are machinery, and nothing invites an edit to them. `piece.yaml` is 
 `author-context.yaml` and `story-context.yaml` keep the name by convention but are opaque text — nothing
 parses them, and a save replaces one with exactly the bytes it was given.
 
-Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
-travels with the application and not under the data root, under a content root resolved once at startup.
-The charter and every participant are one Markdown document each; a participant's filename is its id.
-Each mode is a descriptor paired with a sibling document describing its form and scale.
+Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
+reference schema — travels with the application and not under the data root, under a content root
+resolved once at startup. The charter, the author-context reference and every participant are one
+Markdown document each; a participant's filename is its id. Each mode is a descriptor paired with a
+sibling document describing its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
 generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
@@ -188,6 +189,11 @@ A **mode** carries its `id` and its `displayName`, and names no participant. Its
 carries the shared **description** of its form and scale that every participant call receives. Any
 number of modes may load; the roster and initial cast for a given mode and surface are derived from
 every cast participant's declared availability, never listed by the mode.
+
+A **reference schema** is one Markdown document under the content root, shown to the author and
+given whole to a context Apply for the surface it belongs to: one per mode, for that mode's story
+context, and one for the studio's author context. It is guidance, not a contract — nothing parses
+it, and it is never compared with a context document or an Apply result.
 
 A **prompt fragment** is one Markdown document under the content root, holding a heading or an
 instruction addressed to a model together with frontmatter declaring the names it interpolates as

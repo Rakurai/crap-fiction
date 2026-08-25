@@ -14,7 +14,7 @@ import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { durableContextReader } from './room/durableContext.js'
 import { Room } from './room/room.js'
 import { resolveRoster, type RoomRoster } from './room/roster.js'
-import { ConversationEntryStore, DraftStore } from './store/index.js'
+import { ConversationEntryStore, DraftStore, readShippedAuthorContextReference } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -30,6 +30,7 @@ export type ShippedContent = Readonly<{
   fragments: PromptFragments
   sites: readonly CallSiteDescriptor[]
   roster: RoomRoster
+  authorContextReference: string
 }>
 
 export function loadShippedContent(contentRoot: string): ShippedContent {
@@ -39,7 +40,8 @@ export function loadShippedContent(contentRoot: string): ShippedContent {
   const fragments = loadPromptFragments(contentRoot)
   const sites = callSites(roles)
   const roster = resolveRoster(roles)
-  return { modes, roles, charter, fragments, sites, roster }
+  const authorContextReference = readShippedAuthorContextReference(contentRoot)
+  return { modes, roles, charter, fragments, sites, roster, authorContextReference }
 }
 
 export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => ModelAccess): Studio {

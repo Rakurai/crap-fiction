@@ -13,7 +13,12 @@ import { buildTestApp } from '../../support/harness.js'
  * two answers a runtime the author cannot reach arrives as.
  */
 
-const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
+const MODE: ModeDescriptor = {
+  id: 'flash',
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
+}
 
 const ROLES: readonly RoleDefinition[] = [
   {

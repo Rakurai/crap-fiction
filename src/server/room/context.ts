@@ -119,6 +119,7 @@ export type ApplyContextInput = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   entries: readonly ConversationEntry[]
   participants: ReadonlyMap<string, string>
 }>
@@ -132,6 +133,7 @@ export type ApplyContext = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   history: readonly HistoryEntry[]
 }>
 
@@ -155,6 +157,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     storyContext: input.storyContext,
     draft: input.draft,
     surface: input.surface,
+    referenceSchema: input.referenceSchema,
     history: fullHistory(input.entries, input.participants),
   }
 }
@@ -206,6 +209,7 @@ export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragme
   const perCall = compose([
     fixedSection(fragments.tasks.apply),
     fixedSection(fragments.surfaces[context.surface]),
+    section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),
     section(fragments, 'manuscript', 'manuscript', context.draft),

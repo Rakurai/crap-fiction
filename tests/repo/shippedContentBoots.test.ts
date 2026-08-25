@@ -23,6 +23,7 @@ describe('content a release must refuse', () => {
     mkdirSync(path.join(brokenRoot, 'modes', 'flash'), { recursive: true })
     writeFileSync(path.join(brokenRoot, 'modes', 'flash', 'mode.yaml'), 'id: flash\ndisplayName: Flash\n', 'utf8')
     writeFileSync(path.join(brokenRoot, 'modes', 'flash', 'description.md'), 'A short piece.', 'utf8')
+    writeFileSync(path.join(brokenRoot, 'modes', 'flash', 'story-context-reference.md'), 'A reference.', 'utf8')
     mkdirSync(path.join(brokenRoot, 'participants'), { recursive: true })
     writeFileSync(path.join(brokenRoot, 'participants', 'broken.md'), 'not a frontmatter document at all', 'utf8')
 

@@ -53,6 +53,7 @@ export type SectionName =
   | 'clarification'
   | 'recommendation'
   | 'constraint'
+  | 'referenceSchema'
 
 export type LineName = 'historyMessage' | 'historyResponse' | 'readingSubstantive' | 'readingNoComment'
 export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
@@ -72,6 +73,7 @@ const SECTION_NAMES: readonly SectionName[] = [
   'clarification',
   'recommendation',
   'constraint',
+  'referenceSchema',
 ]
 const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'readingSubstantive', 'readingNoComment']
 const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply']

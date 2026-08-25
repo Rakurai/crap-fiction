@@ -22,7 +22,12 @@ import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFix
  * the piece through the same route the author's studio watches it through.
  */
 
-const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
+const MODE: ModeDescriptor = {
+  id: 'flash',
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
+}
 
 const ROLES: readonly RoleDefinition[] = [
   {
