@@ -9,36 +9,36 @@ export class CastMemberWithoutRoleError extends Error {
   }
 }
 
-export class StoryEditorNotResolvedError extends Error {
-  constructor(found: number) {
-    super(`expected exactly one participant outside the mode's cast (the Story Editor), found ${found}`)
-    this.name = 'StoryEditorNotResolvedError'
+export class GeneralistNotInRosterError extends Error {
+  constructor() {
+    super('no participant among the loaded roles declares itself the generalist')
+    this.name = 'GeneralistNotInRosterError'
   }
 }
 
 export type RoomRoster = Readonly<{
   specialists: readonly RoleDefinition[]
   storyEditor: RoleDefinition
+  addressedOnly: readonly RoleDefinition[]
   criteria: ReadonlyMap<string, SpecialistCriteria>
 }>
 
 export function resolveRoster(mode: ModeDescriptor, roles: readonly RoleDefinition[]): RoomRoster {
-  const castIds = new Set(mode.cast.map((specialist) => specialist.id))
   const specialists = mode.cast.map((specialist) => {
     const role = roles.find((candidate) => candidate.id === specialist.id)
     if (role === undefined) throw new CastMemberWithoutRoleError(mode.id, specialist.id)
     return role
   })
 
-  const outsideCast = roles.filter((role) => !castIds.has(role.id))
-  const [storyEditor, ...beyondOne] = outsideCast
-  if (storyEditor === undefined || beyondOne.length > 0) {
-    throw new StoryEditorNotResolvedError(outsideCast.length)
-  }
+  const storyEditor = roles.find((role) => role.eligibility === 'generalist')
+  if (storyEditor === undefined) throw new GeneralistNotInRosterError()
+
+  const addressedOnly = roles.filter((role) => role.eligibility === 'addressed-only')
 
   return {
     specialists,
     storyEditor,
+    addressedOnly,
     criteria: new Map(mode.cast.map((specialist) => [specialist.id, { attendsTo: specialist.attendsTo, defect: specialist.defect }])),
   }
 }

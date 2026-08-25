@@ -230,6 +230,11 @@ partially would enable the wrong cast. The mode set shipped is one descriptor, a
 startup failure too: everything above reads the mode as singular, so a second one arriving as data would
 be silently ignored rather than offered.
 
+**A participant declares its own eligibility, and the count that must hold is validated where the
+participants are loaded.** Exactly one may declare itself the generalist; none or several is a startup
+failure naming the participant files involved, because nothing downstream has a second way to choose
+which one judges the piece as a whole.
+
 **The piece directory is the piece's identity.** Its name derives from the title, slugified, with
 collisions disambiguated at creation, and it is what the application addresses a piece by. A renamed
 or copied directory is simply a piece at a new path, which is what plain files are for. The display
@@ -644,6 +649,12 @@ would put words in the conversation they never wrote.
 same durable write as enabling it directly, and the same author-message entry that carries the resolved
 audience also names which of them were newly brought in. The alternative is participation with an
 expiry, which is new domain machinery for something the author reverses in one action.
+
+**Naming an addressed-only participant calls it and writes nothing.** It belongs to no cast, so there is
+no membership for the dispatch to bring it into — it joins this dispatch's eligible set exactly as a
+named specialist does, and the piece's enabled cast is untouched. Because something was addressed, the
+generalist is excluded from that same dispatch unless it too was named, the same rule that already keeps
+it out of a dispatch addressed to one specialist alone.
 
 **The Story Editor is not a member of the eligible set.** Keeping it out is what stops the ambiguity
 from becoming a double call. An addressed dispatch does not call it unless it was addressed; a dispatch

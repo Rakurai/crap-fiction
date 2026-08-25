@@ -32,13 +32,21 @@ const flash: ModeDescriptor = {
 }
 
 const specialists: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the shape of it' },
-  { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', persona: 'reasons about what earns its space' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the shape of it', eligibility: 'cast' },
+  {
+    id: 'compression',
+    handle: 'comp',
+    displayName: 'Compression',
+    description: 'what earns its space',
+    persona: 'reasons about what earns its space',
+    eligibility: 'cast',
+  },
 ]
 
 const storyEditor: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
+  eligibility: 'generalist',
   displayName: 'Story Editor',
   description: 'holds the whole of it',
   persona: 'reasons about the whole of it',

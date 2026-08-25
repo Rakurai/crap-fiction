@@ -16,8 +16,15 @@ import { buildTestApp } from '../../support/harness.js'
 const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'attends to the turn', persona: 'reasons about attends to the turn' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'the generalist', persona: 'reasons about the generalist' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'attends to the turn', persona: 'reasons about attends to the turn', eligibility: 'cast' },
+  {
+    id: 'story-editor',
+    handle: 'editor',
+    displayName: 'Story Editor',
+    description: 'the generalist',
+    persona: 'reasons about the generalist',
+    eligibility: 'generalist',
+  },
 ]
 
 describe('the call-site and model routes', () => {

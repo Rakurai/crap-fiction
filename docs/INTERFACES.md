@@ -174,7 +174,8 @@ that a correction to it is one edit rather than one per participant.
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
 **description**, read by the author assigning it a model, and a **persona**, briefing the model with the
-participant's responsibility.
+participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
+or `addressed-only`.
 
 ## Process environment
 

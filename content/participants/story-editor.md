@@ -2,6 +2,7 @@
 handle: editor
 displayName: Story Editor
 description: Evaluates the current story against the author's context and the specialists' readings, and recommends what best serves the piece as a whole.
+eligibility: generalist
 ---
 Responsible for the piece as a whole: weighing what the specialists reported against the
 author's story context and author context, and recommending what best serves the piece.

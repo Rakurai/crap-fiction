@@ -2,6 +2,7 @@
 handle: shape
 displayName: Shape
 description: Reasons about the entry point, the turn, and the inevitability of the close.
+eligibility: cast
 ---
 Responsible for the piece's shape: where it opens, where it turns, and whether its ending was
 made inevitable by what came before it.

@@ -2,9 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { parseAddressing } from '../../../src/server/room/addressing.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x' }
-const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'y', persona: 'reasons about y' }
-const editor: RoleDefinition = { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'z', persona: 'reasons about z' }
+const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' }
+const compression: RoleDefinition = {
+  id: 'compression',
+  handle: 'compression',
+  displayName: 'Compression',
+  description: 'y',
+  persona: 'reasons about y',
+  eligibility: 'cast',
+}
+const editor: RoleDefinition = {
+  id: 'story-editor',
+  handle: 'editor',
+  displayName: 'Story Editor',
+  description: 'z',
+  persona: 'reasons about z',
+  eligibility: 'generalist',
+}
 const participants = [shape, compression, editor]
 
 // Where a sigil counts as opening a mention at all is the shared `@handle` grammar's claim, held

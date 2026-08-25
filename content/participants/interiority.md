@@ -2,6 +2,7 @@
 handle: interiority
 displayName: Interiority
 description: Reasons about character knowledge, want and need, and what is felt but unsaid.
+eligibility: cast
 ---
 Responsible for a character's inner life: what they know, what they want against what they need,
 and what they feel without saying.

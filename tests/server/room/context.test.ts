@@ -16,8 +16,22 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the turn' }
-const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'what earns its space', persona: 'reasons about omission' }
+const shape: RoleDefinition = {
+  id: 'shape',
+  handle: 'shape',
+  displayName: 'Shape',
+  description: 'the shape of it',
+  persona: 'reasons about the turn',
+  eligibility: 'cast',
+}
+const compression: RoleDefinition = {
+  id: 'compression',
+  handle: 'compression',
+  displayName: 'Compression',
+  description: 'what earns its space',
+  persona: 'reasons about omission',
+  eligibility: 'cast',
+}
 
 const charter = CHARTER_FIXTURE
 const MANUSCRIPT = 'The cups sat where she left them.'

@@ -78,27 +78,37 @@ The participants engaged on a piece: its specialists and the Story Editor.
 
 A specialist is **enabled** or it is not. There is no joining or leaving lifecycle and no
 temporary presence: a specialist disabled for a time and re-enabled later simply becomes
-eligible again.
+answerable again.
 
 ## Participant
 
-A collaborator that can be addressed and can respond: a specialist, or the Story Editor.
+A collaborator that can be addressed and can respond: a specialist, the Story Editor, or an
+addressed-only collaborator.
 
 Each participant is one authored document holding two distinct texts: a short **description**,
 read by the author when assigning it a model, and a **persona**, briefing the model with the
 participant's responsibility. Neither stands in for the other.
 
+### Eligibility
+
+Whether a participant answers an unaddressed message: a property of the participant itself, one
+of three closed kinds — cast, generalist, or addressed-only.
+
 ### Specialist
 
-A participant holding one craft responsibility, reasoning narrowly and deliberately within
+A cast participant holding one craft responsibility, reasoning narrowly and deliberately within
 it.
 
 ### Story Editor
 
-The generalist participant, always present. Its objective is its own and holistic:
+The generalist. Exactly one participant declares it. Its objective is its own and holistic:
 evaluate the current story against the author's story context and author context, using the
-specialists' readings as evidence, and recommend what best serves the piece as a whole. It
-is not a summarizer, not a consensus mechanism, and not an authority over the author.
+specialists' readings as evidence, and recommend what best serves the piece as a whole. It is not
+a summarizer, not a consensus mechanism, and not an authority over the author.
+
+### Addressed-only
+
+Available in every mode, belonging to no cast, and answering only when the author names it.
 
 ## Conversation
 

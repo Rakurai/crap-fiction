@@ -147,6 +147,7 @@ type DispatchPlan = Readonly<{
   ask: { claim: string; note: string | undefined; clarification: string | undefined } | undefined
   addressedIds: readonly string[]
   eligibleSpecialists: readonly RoleDefinition[]
+  eligibleAddressedOnly: readonly RoleDefinition[]
   storyEditorIncluded: boolean
   existingEntries: readonly ConversationEntry[]
   draft: string
@@ -171,6 +172,7 @@ export class Room {
   readonly #policy: HistoryPolicy
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
+  readonly #addressedOnly: readonly RoleDefinition[]
   readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #captures = new Map<string, ActiveCapture>()
@@ -197,6 +199,7 @@ export class Room {
     this.#policy = policy
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
+    this.#addressedOnly = roster.addressedOnly
     this.#criteria = roster.criteria
   }
 
@@ -277,7 +280,7 @@ export class Room {
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
     const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
-    const roster = [...this.#specialists, this.#storyEditor]
+    const roster = [...this.#specialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
     let causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
@@ -314,12 +317,17 @@ export class Room {
       addressedIds.length === 0
         ? this.#specialists.filter((role) => piece.metadata.cast.includes(role.id))
         : this.#specialists.filter((role) => addressedIds.includes(role.id))
+    const eligibleAddressedOnly = this.#addressedOnly.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
     if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
-    const audience = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
+    const audience = [
+      ...eligibleSpecialists.map((role) => role.id),
+      ...eligibleAddressedOnly.map((role) => role.id),
+      ...(storyEditorIncluded ? [this.#storyEditor.id] : []),
+    ]
 
     const actionId = nanoid()
     const startedAt = this.#now()
@@ -342,6 +350,7 @@ export class Room {
       ask,
       addressedIds,
       eligibleSpecialists,
+      eligibleAddressedOnly,
       storyEditorIncluded,
       existingEntries,
       draft,
@@ -389,7 +398,7 @@ export class Room {
     plan: DispatchPlan,
     operation: ActiveDispatch,
   ): Promise<void> {
-    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, storyEditorIncluded, existingEntries, draft } = plan
+    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft } = plan
     const { actionId, controller } = operation
     const signal = controller.signal
 
@@ -425,7 +434,7 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
     }
 
-    const calls = eligibleSpecialists.map((role) => {
+    const calls = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
       return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
     })

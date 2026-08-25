@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelAccess } from '../../../src/server/model/types.js'
+import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece, PieceNotFoundError } from '../../../src/server/pieces.js'
 import {
@@ -40,10 +41,11 @@ const fixtureMode: ModeDescriptor = {
   ],
 }
 
-const fixtureRoles = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x' },
-  { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'y', persona: 'reasons about y' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'z', persona: 'reasons about z' },
+const fixtureRoles: readonly RoleDefinition[] = [
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
+  { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'y', persona: 'reasons about y', eligibility: 'cast' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'z', persona: 'reasons about z', eligibility: 'generalist' },
+  { id: 'toolsmith', handle: 'toolsmith', displayName: 'Toolsmith', description: 'w', persona: 'reasons about w', eligibility: 'addressed-only' },
 ]
 
 /** Everything a room turns on except the seam under test, which each caller supplies. */
@@ -292,6 +294,24 @@ describe('Room.dispatch', () => {
 
     expect(entries(workspaceDir, alreadyIn.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: [] })
     expect(adapter.promptFor('shape')).toBeDefined()
+  })
+
+  it('calls a named addressed-only participant alone, enrolling it in nothing and trailing it with no generalist call', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a tool reading' } } },
+    })
+
+    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: '@toolsmith sharpen this' }, 'draft text')
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('toolsmith')).toBeDefined()
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+    expect(readPiece(workspaceDir, piece.id)?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+
+    const landed = entries(workspaceDir, piece.id, conversationId)
+    expect(landed[0]).toMatchObject({ kind: 'authorMessage', audience: ['toolsmith'], brought: [] })
+    expect(landed.filter((entry) => entry.kind === 'participantResponse').map((entry) => entry.participantId)).toEqual(['toolsmith'])
   })
 
   it('settles with nothing in it at all when every call failed, without ever emitting an error event', async () => {

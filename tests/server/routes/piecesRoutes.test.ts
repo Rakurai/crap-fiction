@@ -21,8 +21,22 @@ const MODE: ModeDescriptor = {
 }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'reads for the shape of the whole', persona: 'reasons about the shape of the whole' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'weighs what the room said', persona: 'reasons about what the room said' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'reads for the shape of the whole',
+    persona: 'reasons about the shape of the whole',
+    eligibility: 'cast',
+  },
+  {
+    id: 'story-editor',
+    handle: 'editor',
+    displayName: 'Story Editor',
+    description: 'weighs what the room said',
+    persona: 'reasons about what the room said',
+    eligibility: 'generalist',
+  },
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
