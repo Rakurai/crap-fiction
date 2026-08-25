@@ -23,12 +23,22 @@ export type PieceSummary = z.infer<typeof pieceSummarySchema>
 export const castMemberViewSchema = z
   .object({
     id: z.string(),
+    handle: z.string(),
     displayName: z.string(),
     roleDescription: z.string(),
     enabled: z.boolean(),
   })
   .readonly()
 export type CastMemberView = z.infer<typeof castMemberViewSchema>
+
+export const storyEditorViewSchema = z
+  .object({
+    handle: z.string(),
+    displayName: z.string(),
+    roleDescription: z.string(),
+  })
+  .readonly()
+export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 
 export const pieceDetailSchema = pieceSummaryShape
   .extend({
@@ -39,6 +49,7 @@ export const pieceDetailSchema = pieceSummaryShape
     conversationActionInFlight: conversationActivitySnapshotSchema.nullable(),
     captureInFlight: captureSnapshotSchema.nullable(),
     cast: z.array(castMemberViewSchema).readonly(),
+    storyEditor: storyEditorViewSchema,
   })
   .readonly()
 export type PieceDetail = z.infer<typeof pieceDetailSchema>

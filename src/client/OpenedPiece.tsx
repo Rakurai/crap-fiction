@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
-import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
 import { ContextReview } from './ContextReview.js'
@@ -33,6 +33,7 @@ type OpenedPieceProps = {
 
 type RoomProps = {
   readonly cast: readonly CastMemberView[]
+  readonly storyEditor: StoryEditorView
   readonly toggling: string | undefined
   readonly error: string | undefined
   readonly onToggle: (id: string) => void
@@ -133,7 +134,6 @@ function Surfaces({
           flushDraft={autosave.flush}
           room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
-          mark={roster.mark}
           handle={roster.handle}
           handles={roster.handles}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
@@ -145,7 +145,13 @@ function Surfaces({
         />
       )}
       {panel === 'room' && (
-        <RoomEditor members={room.cast} toggling={room.toggling} onToggle={room.onToggle} onClose={() => setPanel('none')} />
+        <RoomEditor
+          members={room.cast}
+          storyEditor={room.storyEditor}
+          toggling={room.toggling}
+          onToggle={room.onToggle}
+          onClose={() => setPanel('none')}
+        />
       )}
       {panel === 'conversations' && (
         <ConversationSwitcher
@@ -195,7 +201,13 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
     return (
       <Surfaces
         piece={piece.piece}
-        room={{ cast: piece.piece.cast, toggling: piece.castToggling, error: piece.castError, onToggle: piece.toggleCast }}
+        room={{
+          cast: piece.piece.cast,
+          storyEditor: piece.piece.storyEditor,
+          toggling: piece.castToggling,
+          error: piece.castError,
+          onToggle: piece.toggleCast,
+        }}
         lifecycle={{
           status: piece.piece.status,
           retitling: piece.retitling,

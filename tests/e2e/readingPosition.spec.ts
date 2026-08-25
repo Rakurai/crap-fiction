@@ -40,10 +40,10 @@ test('the reading view keeps the place the author was reading, and gives it back
   }
 
   await control(page, 'reading').click()
-  await expect(page.getByText('ESC TO RETURN')).toBeVisible()
+  await expect(control(page, 'reading')).toBeHidden()
   await expect.poll(drift).toBeLessThan(TOLERANCE)
 
   await page.keyboard.press('Escape')
-  await expect(page.getByText('ESC TO RETURN')).toBeHidden()
+  await expect(control(page, 'reading')).toBeVisible()
   await expect.poll(drift).toBeLessThan(TOLERANCE)
 })

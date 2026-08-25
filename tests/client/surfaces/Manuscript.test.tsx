@@ -156,15 +156,23 @@ describe('the surfaces the manuscript opens onto', () => {
 describe('the reading view', () => {
   afterEach(cleanup)
 
-  it('holds no control at all, says so in the register rather than in a footer, and is left by the keystroke the hint names', () => {
+  /**
+   * At rest the view is the prose and nothing else. The way out is not inside the column as
+   * though it were the story's last line: it arrives on the pointer, where the author's hand is,
+   * and it says the keystroke rather than replacing it.
+   */
+  it('holds no control at rest, offers one way back the moment the pointer moves, and is left by the keystroke that offer names', () => {
     renderManuscript({ draft: 'First light.' })
 
     fireEvent.click(screen.getByRole('button', { name: 'reading' }))
     expect(screen.queryAllByRole('button')).toEqual([])
-    expect(screen.getByText('ESC TO RETURN')).toBeTruthy()
+
+    fireEvent.pointerMove(screen.getByLabelText('Manuscript'))
+    const wayBack = screen.getAllByRole('button')
+    expect(wayBack).toHaveLength(1)
+    expect(wayBack[0]?.textContent).toContain('ESC')
 
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.queryByText('ESC TO RETURN')).toBeNull()
     expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
   })
 })

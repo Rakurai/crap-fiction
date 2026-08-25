@@ -1,6 +1,6 @@
 .empty {
   font: 400 11.5px/1.5 var(--font-ui);
-  color: var(--ink3);
+  color: var(--ink2);
 }
 
 .list {
@@ -24,7 +24,7 @@
   color: var(--ink);
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px 0;
   cursor: pointer;
 }
 
@@ -34,7 +34,7 @@
 
 .facts {
   font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: .06em;
   white-space: nowrap;
 }

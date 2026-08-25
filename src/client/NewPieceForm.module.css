@@ -1,16 +1,5 @@
 .reveal {
-  font: 500 11px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 4px;
-  padding: 7px 11px;
-  cursor: pointer;
-}
-
-.reveal:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
+  composes: surface from './controls.module.css';
 }
 
 .form {
@@ -21,7 +10,7 @@
 
 .label {
   font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: .08em;
   text-transform: uppercase;
   flex: none;
@@ -37,25 +26,10 @@
   padding: 7px 9px;
 }
 
+/* Starting a piece is the author's own act of commitment on this screen, and the only one. */
 .submit {
-  font: 500 11px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 4px;
-  padding: 7px 11px;
-  cursor: pointer;
+  composes: author from './controls.module.css';
   white-space: nowrap;
-}
-
-.submit:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
-}
-
-.submit:disabled {
-  cursor: not-allowed;
-  opacity: .45;
 }
 
 .error {

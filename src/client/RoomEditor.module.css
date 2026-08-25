@@ -1,44 +1,35 @@
 .panel {
   position: absolute;
-  top: 60px;
-  right: 22px;
-  width: 280px;
-  max-height: calc(100% - 80px);
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 520px;
+  max-height: calc(100% - 96px);
   overflow: auto;
-  background: var(--paper);
+  background: var(--panel);
   border: 1px solid var(--rule2);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
-  padding: 14px 16px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
+  padding: 18px 22px 20px;
   z-index: 10;
+  animation: dr-in .14s ease-out;
 }
 
 .header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .title {
-  font: 500 11.5px/1 var(--font-ui);
+  font: 500 12.5px/1 var(--font-ui);
   color: var(--ink);
   flex: 1;
 }
 
 .done {
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 5px 8px;
-  cursor: pointer;
-}
-
-.done:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
+  composes: surface from './controls.module.css';
 }
 
 .list {
@@ -47,44 +38,49 @@
   padding: 0;
 }
 
+/* Wide enough that the craft vocabulary reads as sentences rather than as three words a line. */
 .item {
-  padding: 12px 0;
+  padding: 13px 0;
   border-top: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 16px;
+}
+
+.identity {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.handle {
+  font: 600 12.5px/1 var(--font-room);
+  color: var(--room-ink);
 }
 
 .name {
-  font: 600 11.5px/1.3 var(--font-ui);
+  font: 400 11.5px/1.3 var(--font-ui);
   color: var(--ink);
 }
 
 .role {
-  font: 400 10.5px/1.45 var(--font-ui);
+  grid-column: 1 / -1;
+  font: 400 11.5px/1.5 var(--font-ui);
   color: var(--ink2);
-  margin: 4px 0 0;
+  margin: 5px 0 0;
 }
 
 .toggle {
+  composes: surface from './controls.module.css';
   flex: none;
-  font: 500 10px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 5px 8px;
-  cursor: pointer;
   white-space: nowrap;
 }
 
-.toggle:hover:enabled {
-  color: var(--ink);
-  border-color: var(--ink3);
-}
-
-.toggle:disabled {
-  cursor: default;
-  opacity: .6;
+.absent,
+.always {
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--facts-ink);
+  letter-spacing: .07em;
+  white-space: nowrap;
 }

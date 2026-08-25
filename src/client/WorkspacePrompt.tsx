@@ -18,6 +18,9 @@ export function WorkspacePrompt({ error, submitting, onSubmit }: WorkspacePrompt
   return (
     <div className={styles.screen}>
       <form className={styles.panel} onSubmit={handleSubmit}>
+        {/* The first screen of all is the first chance to say what this is. */}
+        <h1 className={styles.name}>crap fiction</h1>
+        <p className={styles.what}>A studio for writing fiction with a room of specialized collaborators.</p>
         <label className={styles.heading} htmlFor="workspace-path">
           Where do your pieces live?
         </label>

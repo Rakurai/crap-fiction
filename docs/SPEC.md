@@ -134,9 +134,15 @@ repository's own.** They are a few lines each against rules stated in this docum
 general enough to cover them would arrive with a policy the product has not chosen.
 
 **The token layer is the mockup's own.** `tokens.css` as the mockup settled it is the whole styling
-substrate — the two themes, the three type registers, the rules and the marks — applied through CSS
-Modules. Nothing supplies appearance from a package, and the values are read from the mockup rather
-than reinvented beside it.
+substrate — the two themes, the type registers and the rules — applied through CSS Modules. Nothing
+supplies appearance from a package, and the values are read from the mockup rather than reinvented
+beside it. What the registers and the control weights resolve to is declared once — each register's ink
+as a token in every theme, each weight as a class other modules compose from — so a module states which
+register or weight a thing is in rather than restating what that looks like.
+
+**The register the room speaks in is composed from the typefaces already carried**, in a token of its
+own over Public Sans. A face of its own would be the more direct answer and is not taken: a third
+typeface is a change to the dependency roster above, and the register is separable without one.
 
 **The typefaces are files in this repository.** Spectral for the prose and Public Sans for the
 interface travel with the application as latin-subset `woff2` under `src/client/fonts/`, declared in
@@ -997,7 +1003,8 @@ one is reported. SSE frames are not wrapped; the event set above is the contract
 GET    /pieces                                     title, mode, status, modified
 POST   /pieces                                     title + mode; enables the mode's default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the conversation action in flight if there is one,
+                                                   the room (the cast and the Story Editor), the
+                                                   conversation action in flight if there is one,
                                                    and whether a capture is
 PATCH  /pieces/:id                                 title, status, enabled cast
 PUT    /pieces/:id/draft
@@ -1022,17 +1029,29 @@ GET    /workspace                                  the configured directory, or 
 PUT    /workspace                                  the directory the author chose
 GET    /theme                                      the author's chosen appearance, or that they have not chosen
 PUT    /theme                                      the appearance the author chose
-GET    /call-sites                                 every site, its role description where it has one,
-                                                   and its current assignment
+GET    /call-sites                                 every site, what the model there is for, the handle
+                                                   where it has one, and its current assignment
 PUT    /call-sites/:site/assignment                the model assigned to one site
 GET    /models                                     what the runtime holds, and whether it is reachable
 ```
+
+**The piece detail reports the whole room, cast and Story Editor alike.** The Story Editor is not in
+the cast and is not togglable, so it is reported as its own thing rather than as a cast member with a
+flag — and it is reported rather than left to the client to infer as *the participant that is not in
+the cast*, which is a rule about the room's composition and belongs to the server that resolves the
+roster.
 
 **A model is assigned one call site per request.** The call site is already the unit the model interface
 knows, and the two sites that are not participants are assigned the same way without a second
 mechanism. A single config resource patched as a whole would make pointing one participant at a
 different model a read-modify-write over every other assignment, which is how an author loses one they
 did not touch.
+
+**Every call site says what its model is for.** A participant carries the handle it is addressed by
+and an operation carries none, which is what tells the two kinds apart and what the assignment surface
+groups on. Both carry a display name and a description — the participants' from the role, the
+operations' written here, since there is no role file to hold them — so the surface decides nothing
+about what either kind is.
 
 `GET /call-sites` is what the room-editing surface and the assignment surface both read, and
 `GET /models` is what *know the models are alive* is drawn from: it reports whether the runtime can be

@@ -10,6 +10,18 @@
   width: 420px;
 }
 
+.name {
+  font: 400 26px/1.1 var(--font-prose);
+  color: var(--ink);
+  margin: 0;
+}
+
+.what {
+  font: 400 12px/1.5 var(--font-ui);
+  color: var(--ink2);
+  margin: 7px 0 26px;
+}
+
 .heading {
   display: block;
   font: 400 17px/1.6 var(--font-prose);
@@ -19,7 +31,7 @@
 
 .hint {
   font: 400 12px/1.6 var(--font-ui);
-  color: var(--ink3);
+  color: var(--ink2);
   margin-bottom: 22px;
 }
 
@@ -43,18 +55,7 @@
 }
 
 .submit {
-  font: 600 11.5px/1 var(--font-ui);
-  color: var(--accentfg);
-  background: var(--accent);
-  border: none;
-  border-radius: 4px;
-  padding: 10px 15px;
-  cursor: pointer;
-}
-
-.submit:disabled {
-  cursor: not-allowed;
-  opacity: .45;
+  composes: author from './controls.module.css';
 }
 
 .error {

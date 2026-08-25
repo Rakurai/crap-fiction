@@ -56,7 +56,9 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
               {theme.chooseError}
             </p>
           )}
-          <p className={styles.workspace}>{workspace}</p>
+          {/* The one screen that precedes any open piece is the one that says what this is. */}
+          <h1 className={styles.name}>crap fiction</h1>
+          <p className={styles.what}>A studio for writing fiction with a room of specialized collaborators.</p>
           {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} onOpen={setOpenedId} />}
           {pieces.status === 'error' && (
             <p className={styles.error} role="alert">
@@ -72,6 +74,9 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
               }}
             />
           </div>
+          <p className={styles.workspace} title={workspace}>
+            {workspace}
+          </p>
         </div>
       </div>
     </div>

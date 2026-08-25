@@ -1,7 +1,7 @@
 .wrapper {
-  flex: none;
-  width: 340px;
-  min-width: 280px;
+  flex: 0 1 520px;
+  width: 520px;
+  min-width: 420px;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -13,17 +13,19 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 22px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
+/* The author's own words: the manuscript's face, in its own voice, and not the room's. */
 .message {
-  font: 400 13px/1.5 var(--font-ui);
-  color: var(--ink);
-  padding-left: 10px;
-  border-left: 2px solid var(--ink3);
+  font: 400 13.5px/1.6 var(--font-prose);
+  font-style: italic;
+  color: var(--ink2);
+  padding-left: 11px;
+  border-left: 2px solid var(--rule2);
   margin: 0 0 4px;
 }
 
@@ -40,7 +42,7 @@
 .roomChangedFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
 }
 
@@ -52,39 +54,63 @@
 .participant {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   padding: 13px 0 4px;
   border-top: 1px solid var(--rule);
 }
 
+/* Identity is the handle the author addresses, which is also how the addressing gets learned. */
 .identity {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.mark {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
+.handle {
+  font: 600 12.5px/1 var(--font-room);
+  color: var(--room-ink);
 }
 
 .name {
-  font: 600 11.5px/1 var(--font-ui);
-  color: var(--ink);
+  font: 400 11px/1 var(--font-ui);
+  color: var(--ink2);
 }
 
 .claim {
-  font: 400 15px/1.55 var(--font-prose);
-  color: var(--ink);
+  font: 400 15px/1.55 var(--font-room);
+  color: var(--room-ink);
   margin: 0;
   text-wrap: pretty;
 }
 
-.note {
-  font: 400 12.5px/1.65 var(--font-ui);
+/* A conforming claim can still be fifteen lines. Four is the ceiling; the rest discloses. */
+.claimClamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.claimMore {
+  align-self: flex-start;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--facts-ink);
+  letter-spacing: 0.07em;
+  background: none;
+  border: none;
+  padding: 7px 8px;
+  margin: -3px -8px 0;
+  cursor: pointer;
+}
+
+.claimMore:hover {
   color: var(--ink2);
+}
+
+.note {
+  font: 400 13px/1.6 var(--font-room);
+  color: var(--room-ink2);
   margin: 0;
 }
 
@@ -97,7 +123,7 @@
 
 .returned {
   font: 400 10.5px/1.5 var(--font-facts);
-  color: var(--ink3);
+  color: var(--facts-ink);
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -115,7 +141,7 @@
 
 .activityFacts {
   font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
   flex: 1;
 }
@@ -128,23 +154,12 @@
 
 .progressLine {
   font: 400 11.5px/1.5 var(--font-ui);
-  color: var(--ink3);
+  color: var(--ink2);
 }
 
 .abandon {
+  composes: surface from './controls.module.css';
   flex: none;
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
-  cursor: pointer;
-}
-
-.abandon:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
 }
 
 .apply {
@@ -155,20 +170,8 @@
 }
 
 .applyButton {
+  composes: commit from './controls.module.css';
   flex: none;
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--accentfg);
-  background: var(--accent);
-  border: none;
-  border-radius: 3px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.applyButton:disabled {
-  background: var(--rule2);
-  color: var(--ink4);
-  cursor: default;
 }
 
 .actions {
@@ -186,29 +189,12 @@
   background: var(--prose);
   border: 1px solid var(--rule2);
   border-radius: 4px;
-  padding: 5px 8px;
+  padding: 6px 8px;
 }
 
 .actionButton {
+  composes: surface from './controls.module.css';
   flex: none;
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
-  cursor: pointer;
-}
-
-.actionButton:hover {
-  color: var(--ink);
-  border-color: var(--ink3);
-}
-
-.actionButton:disabled {
-  color: var(--ink4);
-  border-color: var(--rule);
-  cursor: default;
 }
 
 .asked {
@@ -224,7 +210,7 @@
 .askedFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
 }
 
@@ -235,7 +221,7 @@
 
 .applyingFacts {
   font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
   flex: 1;
 }
@@ -251,14 +237,17 @@
 .changeFacts,
 .changeToggle {
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
 }
 
+/* A disclosure states a fact about what is hidden, so it is in the facts register rather than
+ * in the control language — but it is still something a hand has to hit. */
 .changeToggle {
   background: none;
   border: none;
-  padding: 0;
+  padding: 7px 8px;
+  margin: -7px -8px;
   cursor: pointer;
 }
 
@@ -279,17 +268,11 @@
   gap: 4px;
 }
 
+/* Withdrawn is the quoted, struck ground; what stands now stands as prose. */
 .changeBefore {
   font: 400 13.5px/1.55 var(--font-prose);
   color: var(--ink3);
   text-decoration: line-through;
-  margin: 0;
-  text-wrap: pretty;
-}
-
-.changeAfter {
-  font: 400 13.5px/1.55 var(--font-prose);
-  color: var(--ink);
   background: var(--tint);
   border-radius: 4px;
   padding: 7px 9px;
@@ -297,31 +280,22 @@
   text-wrap: pretty;
 }
 
-.changeAsk {
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 6px 9px;
-  cursor: pointer;
-}
-
-.changeAsk:hover {
+.changeAfter {
+  font: 400 13.5px/1.55 var(--font-prose);
   color: var(--ink);
-  border-color: var(--ink3);
+  padding: 0 9px;
+  margin: 0;
+  text-wrap: pretty;
 }
 
-.changeAsk:disabled {
-  color: var(--ink4);
-  border-color: var(--rule);
-  cursor: default;
+.changeAsk {
+  composes: surface from './controls.module.css';
 }
 
 .error {
   font: 400 11.5px/1.45 var(--font-ui);
   color: var(--ink2);
-  padding: 0 22px 10px;
+  padding: 0 24px 10px;
   margin: 0;
 }
 
@@ -330,13 +304,13 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 13px 16px 0;
+  padding: 13px 24px 0;
 }
 
 .unavailableFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--ink4);
+  color: var(--facts-ink);
   letter-spacing: 0.07em;
 }
 
@@ -349,8 +323,8 @@
   flex: none;
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 16px 24px;
   border-top: 1px solid var(--rule);
 }
 
@@ -372,17 +346,20 @@
 }
 
 .mentions {
+  min-width: 260px;
   background: var(--panel);
   border: 1px solid var(--rule2);
   border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
   overflow: hidden;
 }
 
 .mention {
-  display: flex;
+  display: grid;
+  grid-template-columns: 92px 1fr;
   align-items: baseline;
   gap: 10px;
-  padding: 8px 11px;
+  padding: 8px 12px;
   border-top: 1px solid var(--rule);
   cursor: pointer;
 }
@@ -393,35 +370,23 @@
 
 .mention[data-active-item] {
   background: var(--tint);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .mentionHandle {
-  font: 500 11.5px/1 var(--font-facts);
-  color: var(--ink);
-  letter-spacing: 0.02em;
+  font: 600 12px/1 var(--font-room);
+  color: var(--room-ink);
 }
 
 .mentionName {
   font: 400 11px/1.3 var(--font-ui);
-  color: var(--ink3);
+  color: var(--ink2);
 }
 
 .send {
+  composes: author from './controls.module.css';
   flex: none;
   height: 34px;
-  font: 500 11px/1 var(--font-ui);
-  color: var(--accentfg);
-  background: var(--accent);
-  border: none;
-  border-radius: 4px;
-  padding: 0 14px;
-  cursor: pointer;
-}
-
-.send:disabled {
-  background: var(--rule2);
-  color: var(--ink4);
-  cursor: default;
 }
 
 .visuallyHidden {

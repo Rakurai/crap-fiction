@@ -42,7 +42,6 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       flushDraft={() => {}}
       room={roomHolding(entries)}
       displayName={(id) => NAMES[id] ?? id}
-      mark={() => 'var(--mark-teal)'}
       handle={(id) => HANDLE_BY_ID[id]}
       handles={HANDLES}
       runtime={{ reachable: true }}
@@ -100,8 +99,10 @@ describe('a landed response in the conversation', () => {
     expect(claim.contains(note)).toBe(false)
     expect(note.contains(claim)).toBe(false)
 
-    expect(blockContaining('The ending arrives before the fear does.').textContent).toContain('Reader Experience')
-    expect(screen.queryByText('reader')).toBeNull()
+    // Identity is carried on the handle the author would address, with the display name secondary.
+    const block = blockContaining('The ending arrives before the fear does.').textContent
+    expect(block).toContain('@reader')
+    expect(block).toContain('Reader Experience')
   })
 
   it('draws nothing at all for a no-comment outcome — not a row, not a name, not a placeholder', async () => {
@@ -381,8 +382,8 @@ describe('handle completion at the composer', () => {
     const composer = await screen.findByLabelText('Message the room')
     fireEvent.change(composer, { target: { value: '@sh' } })
 
-    expect(await screen.findByText('@shape')).toBeTruthy()
-    expect(screen.queryByText('@reader')).toBeNull()
+    expect(await screen.findByRole('option', { name: /@shape/ })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
   })
 
   // Where a sigil counts as beginning a mention at all is the shared `@handle` grammar's

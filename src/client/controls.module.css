@@ -1,0 +1,104 @@
+/*
+ * The three things a control does, and what each one looks like. A control that changes how
+ * the author sees what is already on screen is quiet; a control that opens a surface or acts
+ * on a response is a pill; a control the author commits something with carries weight. The
+ * accent is the author's own act of commitment and belongs to one control per screen.
+ */
+
+.view {
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.view:hover:enabled {
+  color: var(--ink);
+  background: var(--tint);
+}
+
+.view:disabled {
+  color: var(--ink4);
+  cursor: default;
+}
+
+.surface {
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.surface:hover:enabled {
+  color: var(--ink);
+  border-color: var(--ink3);
+}
+
+.surface:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
+}
+
+.commit {
+  font: 600 10.5px/1 var(--font-ui);
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--ink3);
+  border-radius: 3px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+.commit:hover:enabled {
+  border-color: var(--ink);
+}
+
+.commit:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
+}
+
+.author {
+  font: 600 11px/1 var(--font-ui);
+  color: var(--accentfg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+.author:disabled {
+  color: var(--ink4);
+  background: none;
+  border-color: var(--rule2);
+  cursor: default;
+}
+
+.destructive {
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--danger);
+  background: none;
+  border: 1px solid var(--danger-rule);
+  border-radius: 3px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.destructive:hover:enabled {
+  border-color: var(--danger);
+}
+
+.destructive:disabled {
+  color: var(--ink4);
+  border-color: var(--rule);
+  cursor: default;
+}

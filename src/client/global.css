@@ -13,6 +13,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The caret is the prose surface's own focus indicator; a ring around the page of it is not. */
 [contenteditable] {
   outline: none;
 }
@@ -22,6 +23,12 @@ textarea,
 select,
 button {
   font-family: inherit;
+}
+
+/* One focus treatment, in the accent, for everything the keyboard can reach. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 ::placeholder {

@@ -65,12 +65,16 @@
   --accent:   #d08a5e;
   --accentfg: #241610;
 
-  --mark-teal:   #6fa3a4;
-  --mark-indigo: #8b95c9;
-  --mark-clay:   #c58a72;
-  --mark-olive:  #9a9d6f;
+  --room-ink:  #c7d1dc;
+  --room-ink2: #98a3af;
+
+  --facts-ink: #948d84;
+
+  --danger:      #e07b76;
+  --danger-rule: rgba(224, 123, 118, .40);
 
   --font-prose: Spectral, Georgia, serif;
+  --font-room: 'Public Sans', system-ui, sans-serif;
   --font-ui: 'Public Sans', system-ui, sans-serif;
   --font-facts: ui-monospace, Menlo, monospace;
 }
@@ -94,10 +98,13 @@
     --accent:   #a6603c;
     --accentfg: #fdf8f4;
 
-    --mark-teal:   #3f7273;
-    --mark-indigo: #5a6499;
-    --mark-clay:   #a15c41;
-    --mark-olive:  #6b6e3f;
+    --room-ink:  #37424f;
+    --room-ink2: #5a6675;
+
+    --facts-ink: #6b6659;
+
+    --danger:      #9c3226;
+    --danger-rule: rgba(156, 50, 38, .40);
   }
 }
 
@@ -119,10 +126,13 @@
   --accent:   #a6603c;
   --accentfg: #fdf8f4;
 
-  --mark-teal:   #3f7273;
-  --mark-indigo: #5a6499;
-  --mark-clay:   #a15c41;
-  --mark-olive:  #6b6e3f;
+  --room-ink:  #37424f;
+  --room-ink2: #5a6675;
+
+  --facts-ink: #6b6659;
+
+  --danger:      #9c3226;
+  --danger-rule: rgba(156, 50, 38, .40);
 }
 
 @keyframes dr-breathe { 0%, 100% { opacity: .32 } 50% { opacity: 1 } }
