@@ -10,8 +10,8 @@ import { normalizeResponse, responseValueSchema } from '../../shared/participant
 import type { ParticipantEvidence } from './context.js'
 
 // A settled participant call, before it is written durably. Abandonment produces neither an entry
-// nor evidence (SPEC "The round" — the equivalent rule for a dispatch — and ABANDON-NO-ENTRY): it is
-// the one outcome the dispatcher discards rather than appends.
+// nor evidence (SPEC "Dispatch" and ABANDON-NO-ENTRY): it is the one outcome the dispatcher
+// discards rather than appends.
 export type ParticipantOutcome =
   | Readonly<{ kind: 'entry'; entry: ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry }>
   | Readonly<{ kind: 'abandoned' }>

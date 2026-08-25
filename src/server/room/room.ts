@@ -476,7 +476,7 @@ export class Room {
       if (gathered !== undefined) evidence.push(gathered)
     }
 
-    // Responses are never rearranged into cast order (SPEC "The round"): each settles and appends
+    // Responses are never rearranged into cast order (SPEC "Dispatch"): each settles and appends
     // independently, so durable order is completion order.
     await Promise.all(calls.map(settleSpecialist))
 

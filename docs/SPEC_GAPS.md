@@ -30,27 +30,11 @@ Not resolved by deleting them from the table, because the store can already writ
 the routes would each be a one-line adapter over a capability that exists. They stay in the document
 as the shape the write takes if a surface ever asks for it.
 
-## The chronological transcript is basic, ahead of the full composition
-
-Issue #61 cuts ordinary conversation over to the durable entry substrate end to end — the room
-dispatches over entries, the transport is entry- and action-oriented, and the client renders a
-flat, chronological list of them with current activity overlaid. Issue #64 then brought that
-activity in line with `UX_DESIGN.md` "A round in flight": the unconditional signal and Abandon,
-one line per participant the model layer actually reports on and none for the rest of the resolved
-audience, and no reserved place for the Story Editor. What remains basic, ahead of the full
-composition, is grouping: entries are not grouped by the action that caused them, and the roster has
-no cast-at-rest view.
-
-Not a defect in what #61 and #64 built — each names a basic transcript as its own acceptance
-criterion and leaves the rest for later. Finishing the chronological chat composition to match
-`UX_DESIGN.md`, including cast-at-rest visibility and per-cause anchoring without a projected
-grouping container, is issue #65's.
-
 ## Abandoning a context capture
 
 `PRD.md` "Stop waiting" requires abandoning for as long as any model operation is in flight and names
-three: a round, an application, and a context capture. `SPEC.md` "Operation state" and "Seams" now
-give capture its own activity and abandonment identity, independent of the round-or-application
+three: a dispatch, an application, and a context capture. `SPEC.md` "Operation state" and "Seams" now
+give capture its own activity and abandonment identity, independent of the dispatch-or-application
 state — issue #59 detached it so that capture no longer shares that state, that lock or that
 abandonment path. Nothing in the room, the transport or the client reaches a capture in flight to
 stop it: there is no route, no hook, and the review surface has no state for an analysis still out,

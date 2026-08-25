@@ -130,7 +130,7 @@ describe('Room.dispatch', () => {
     adapter.release('story-editor')
   })
 
-  it('CONTEXT "Round": an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
+  it('CONTEXT "Room": an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
@@ -265,7 +265,7 @@ describe('Room.dispatch', () => {
     }
   })
 
-  it('SPEC "The round": submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
+  it('SPEC "Dispatch": submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },

@@ -10,14 +10,13 @@ The domain model and the authoritative vocabulary. Where a term is defined here,
 what it means everywhere — in requirements, in interface design, in the implementation, and
 in conversation between the author and an agent working on this software.
 
-Four pairs are near-synonyms in ordinary English and different things here.
+Three pairs are near-synonyms in ordinary English and different things here.
 
 - **Author context** generalizes across every piece. **Story context** belongs to one piece.
 - **Commentary** is a reading. An **applicable suggestion** is something the manuscript can
   be made to embody.
 - The **Story Editor** is a collaborator in the room. The **prose editor** is the text
   editing surface.
-- A **round** is one exchange. A **conversation** is a durable sequence of them.
 
 ---
 
@@ -84,12 +83,16 @@ The participants engaged on a piece: its specialists and the Story Editor.
 
 **Cast** means the specialists. The Story Editor is always present and is not one of them.
 
-The cast is a filter over which specialists are called on a round that names no one. A new
+The cast is a filter over which specialists are called on a message that addresses no one. A new
 piece begins with its mode's default cast; the author enables and disables specialists at any
 time, either directly or by addressing a specialist that is not enabled, which enables it.
-There is no joining or leaving lifecycle and no temporary presence: a specialist disabled for
-several rounds and re-enabled later simply becomes eligible again, and historical conversation
-is untouched.
+There is no joining or leaving lifecycle and no temporary presence: a specialist disabled for a
+time and re-enabled later simply becomes eligible again, and historical conversation is
+untouched.
+
+An author message that names no participant calls the enabled cast, then calls the Story Editor
+over what the specialists returned. A message that names participants calls only those, and does
+not call the Story Editor unless it was named.
 
 ## Participant
 
@@ -102,8 +105,8 @@ Each participant has a static role description explaining what it contributes.
 A participant holding one craft responsibility, reasoning narrowly and deliberately within
 it.
 
-A specialist forms its response without seeing any other specialist's response from the
-same round.
+A specialist forms its response without seeing any other specialist's response caused by the
+same author action.
 
 ### Story Editor
 
@@ -111,14 +114,14 @@ The generalist participant, always present. Its objective is its own and holisti
 evaluate the current story against the author's story context and author context, using the
 specialists' readings as evidence, and recommend what best serves the piece as a whole.
 
-It receives the round's substantive specialist responses only after those responses have been
-independently formed. Silences and failures are not readings and do not reach it, so its
-reasoning is about the story rather than about the room.
+It receives the substantive specialist responses caused by the same author action only after
+those responses have been independently formed. Silences and failures are not readings and do
+not reach it, so its reasoning is about the story rather than about the room.
 
 It may endorse a specialist strongly, reject a specialist's concern, name a genuine tradeoff,
 or supply a better framing than any specialist offered. It may also have nothing to add, where
 specialists have already given the author something substantive; where they have not, the
-answer the round owes the author is the Story Editor's. It is not a summarizer, not a consensus
+answer owed to the author is the Story Editor's. It is not a summarizer, not a consensus
 mechanism, and not an authority over the author.
 
 ## Conversation
@@ -128,27 +131,16 @@ A durable, resumable, multi-turn discussion about a piece. A piece may have seve
 Opening a piece resumes its most recent conversation. The author may start a new
 conversation, resume a prior one, or delete one.
 
-A conversation exists once its first round opens. Until then, starting one is an intention
-rather than a thing: nothing empty is kept, and nothing accumulates to be pruned.
+A conversation exists once its first author action opens. Until then, starting one is an
+intention rather than a thing: nothing empty is kept, and nothing accumulates to be pruned.
+
+A conversation has at most one author action in flight at a time.
 
 **Conversation history and manuscript state are independent.** A conversation does not
 version, own, or restore the draft. Where a discussion occurred against earlier prose and
 the draft has since changed, the historical discussion stands as it was said, and any new
 call receives the current draft. The earlier prose is not restored or reconstructed, and
 nothing attempts to reconcile the conversation with it.
-
-## Round
-
-One exchange within a conversation, opened by an author action and settled when every
-participant it called has settled. Ordinarily that action is a message. Asking one participant
-for a concrete change opens a round with no message, because the author supplied none, and
-nothing attributes words to them that they did not write.
-
-A round that names no participant calls the enabled cast, then calls the Story Editor over
-what the specialists returned. A round that names participants calls only those, and does
-not call the Story Editor unless it was named.
-
-Rounds do not overlap. A conversation has at most one round in flight.
 
 ## Addressing
 
@@ -158,14 +150,18 @@ message goes to the enabled cast.
 Addressing is expressed in the author's message itself, so directing a question at one
 collaborator is an ordinary message rather than a different kind of interaction.
 
-A round the author opened from a particular response — replying to it, or asking it for a concrete
-change — is addressed to that participant by the act rather than by the words. Where a round is
-addressed that way, the message is not read for addressing at all: the author aimed it by pointing,
+An author action settles when every participant it called has settled. Ordinarily that action
+is a message. Asking one participant for a concrete change carries no message, because the
+author supplied none, and nothing attributes words to them that they did not write.
+
+An author action opened from a particular response — replying to it, or asking it for a concrete
+change — is addressed to that participant by the act rather than by the words. Where addressing
+happens that way, the message is not read for addressing at all: the author aimed it by pointing,
 and a second authority on who was called could disagree with the words the participants receive.
 
 ## Response
 
-What one participant returned for one round. Every response settles as exactly one of three
+What one participant returned for one author action. Every response settles as exactly one of three
 outcomes, declared by the participant itself. The declaration is what the outcome is; nothing
 weighs it against the content of the response.
 
@@ -235,9 +231,8 @@ additional instruction. *Keep the opening image intact.*
 
 ## Review change
 
-An ordinary round whose message asks the room to evaluate the current prose in light of a
-change just made. A convenience for something the author could type; not a distinct mode of
-reasoning.
+An ordinary message that asks the room to evaluate the current prose in light of a change just
+made. A convenience for something the author could type; not a distinct mode of reasoning.
 
 ## Capture context
 
