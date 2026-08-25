@@ -1,21 +1,22 @@
 import { z } from 'zod'
 import { conversationEntryViewSchema } from './conversationEntryViews.js'
 
-// SPEC "Transport": entry- and action-oriented frames. An action is a conversation dispatch or an
-// Apply; neither is a durable concept, so nothing here is read back from disk — only entries are.
-
 export const actionKindSchema = z.enum(['dispatch', 'apply'])
 
 export type ActionKind = z.infer<typeof actionKindSchema>
 
-export const actionStartedEventSchema = z.object({
+const startedFields = {
   actionId: z.string().min(1),
   conversationId: z.string().min(1),
-  kind: actionKindSchema,
   sourceEntryId: z.string().min(1),
   startedAt: z.number().int().positive(),
-  audience: z.array(z.string().min(1)).readonly().optional(),
-})
+}
+
+export const dispatchStartedEventSchema = z.object({ ...startedFields, kind: z.literal('dispatch'), audience: z.array(z.string().min(1)).readonly() })
+
+export const applyStartedEventSchema = z.object({ ...startedFields, kind: z.literal('apply') })
+
+export const actionStartedEventSchema = z.discriminatedUnion('kind', [dispatchStartedEventSchema, applyStartedEventSchema])
 
 export type ActionStartedEvent = z.infer<typeof actionStartedEventSchema>
 
@@ -49,9 +50,6 @@ export const conversationErrorEventSchema = z.object({ code: conversationFailure
 
 export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
 
-// What `GET /pieces/:id` reports about a conversation action already in flight, so a client that
-// (re)loads mid-action knows what it is watching without waiting for a new event. Landed entries are
-// not part of this: they are already durable, and the client reads them from the conversation itself.
 export const dispatchActivitySnapshotSchema = z.object({
   actionId: z.string().min(1),
   conversationId: z.string().min(1),

@@ -108,6 +108,65 @@ describe('merging the conversation on disk with the one being streamed', () => {
   })
 })
 
+describe('releasing the controls an action holds', () => {
+  function streamingRoom() {
+    let deliver: (event: RoomEvent) => void = () => {
+      throw new Error('the room was never subscribed to')
+    }
+
+    const room: RoomAdapters = {
+      createConversation: vi.fn(),
+      fetchConversation: vi.fn(),
+      dispatch: vi.fn(),
+      abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
+      applyRecommendation: vi.fn(),
+      subscribeToRoom: vi.fn((_pieceId, onEvent) => {
+        deliver = onEvent
+        return () => {}
+      }),
+    }
+
+    return { room, stream: (...events: readonly RoomEvent[]) => act(() => events.forEach((event) => deliver(event))) }
+  }
+
+  it('holds them for the newer action when the one it replaced settles behind it', () => {
+    const { room, stream } = streamingRoom()
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
+    )
+
+    act(() => {
+      result.current.abandon()
+    })
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a2', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e1', startedAt: STARTED_AT, audience: ['shape'] },
+    })
+    stream({ type: 'action.finished', data: { actionId: 'a1', outcome: 'abandoned' } })
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.actionId).toBe('a2')
+  })
+
+  it('releases them for an action started and finished in the same batch of frames', () => {
+    const { room, stream } = streamingRoom()
+
+    const { result } = renderHook(() => useConversation('the-lighthouse', null, null, () => {}, () => 'the draft', room))
+
+    stream(
+      {
+        type: 'action.started',
+        data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e1', startedAt: STARTED_AT, audience: ['shape'] },
+      },
+      { type: 'action.finished', data: { actionId: 'a1', outcome: 'settled' } },
+    )
+
+    expect(result.current.busy).toBe(false)
+    expect(result.current.actionId).toBeUndefined()
+  })
+})
+
 describe('abandoning an operation', () => {
   function idleRoom(
     abandonOperation: RoomAdapters['abandonOperation'] = vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),

@@ -10,9 +10,6 @@ export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'response'; participantId: string; claim: string; note: string | undefined }>
 
-// SPEC "Context compilation": a specialist's no-comment is not evidence and is excluded even from the
-// Story Editor's own history; it is carried to the Story Editor only as the current dispatch's own
-// evidence, below, never as something a later message's history recalls.
 export type ParticipantEvidence =
   | Readonly<{ kind: 'substantive'; participantId: string; claim: string; note: string | undefined }>
   | Readonly<{ kind: 'noComment'; participantId: string }>
@@ -47,11 +44,6 @@ export type Context = Readonly<{
   evidence: readonly ParticipantEvidence[]
 }>
 
-// Only an author message and a participant's substantive response carry into history: a no-comment
-// outcome, a failure and an application never re-enter a model's context (SPEC "Context compilation",
-// "Deliberately out"). A concrete-change request's own clarification is likewise never carried into
-// later history — it is display-only (UX_DESIGN "Applying, and seeing what it did") — but the
-// response it caused is, like any other.
 function deriveHistory(entries: readonly ConversationEntry[] | undefined, policy: HistoryPolicy, roleId: string): readonly HistoryEntry[] {
   const result: HistoryEntry[] = []
   for (const entry of entries ?? []) {
@@ -119,10 +111,6 @@ function fullHistory(entries: readonly ConversationEntry[]): readonly HistoryEnt
   return result
 }
 
-// SPEC "Applying a recommendation": Apply reads the full current conversation at the moment it is
-// invoked, not the prefix through the recommendation — intervening discussion may qualify or
-// contradict an old recommendation, and the write process must weigh that rather than replay against
-// stale history.
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
     recommendationClaim: input.recommendationClaim,
@@ -191,9 +179,6 @@ function historyText(history: readonly HistoryEntry[]): string {
   return section('Conversation so far', lines.join('\n'))
 }
 
-// SPEC "Context compilation": a no-comment reaches the Story Editor as an attributed craft finding —
-// a specialist explicitly finding nothing material — never as a roster, an attendance fact, a tally
-// or a consensus signal.
 function evidenceText(evidence: readonly ParticipantEvidence[]): string {
   if (evidence.length === 0) return ''
   const lines = evidence.map((entry) =>

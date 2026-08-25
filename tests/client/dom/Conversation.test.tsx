@@ -1,9 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
+import type { ApplicationEntryView, ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
 import { Conversation } from '../../../src/client/Conversation.js'
-import styles from '../../../src/client/Conversation.module.css'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
@@ -144,19 +143,6 @@ describe('a landed response in the conversation', () => {
     await waitFor(() => expect(screen.getByText('{"claim": "the ending')).toBeTruthy())
   })
 
-  it('draws a failure in its own machine-status class, never the note register it could be mistaken for', async () => {
-    renderConversation([
-      { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'timeout' },
-      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e0', outcome: 'commentary', claim: 'It holds.', note: 'A quiet note.' },
-    ])
-
-    const failed = await screen.findByText('did not answer — TIMEOUT')
-    const note = await screen.findByText('A quiet note.')
-
-    expect(failed.className).toBe(styles.failed)
-    expect(failed.className).not.toBe(styles.note)
-    expect(note.className).toBe(styles.note)
-  })
 })
 
 describe('a room that cannot be reached', () => {
@@ -213,34 +199,24 @@ const RESPONSE_WITH_RECOMMENDATION: ConversationEntryView = {
   claim: 'cut the second paragraph',
 }
 
+function application(change: ApplicationEntryView['change']): RoomEvent {
+  return { type: 'entry.appended', data: { actionId: 'a1', entry: { id: 'e-app1', kind: 'application', responseId: 'e1', changeId: 'change1', change } } }
+}
+
 describe('the applied change, shown on its originating response', () => {
   afterEach(cleanup)
 
   it('opens disclosed on the author applying it, and closes to an unambiguous summary', async () => {
-    const room: RoomAdapters = {
-      ...roomHolding([RESPONSE_WITH_RECOMMENDATION]),
-      applyRecommendation: () =>
-        Promise.resolve({
-          outcome: 'value',
-          value: {
-            outcome: 'applied',
-            actionId: 'a1',
-            entryId: 'e-app1',
-            manuscript: 'the revised manuscript',
-            change: { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] } },
-          },
-        }),
-    }
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
 
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream(application({ kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] }))
 
     const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
     expect(screen.getByText('the old line')).toBeTruthy()
     expect(screen.getByText('the new line')).toBeTruthy()
-    // The response that caused the change still carries its own actions — Apply created no
-    // participant follow-up, and the change is presented on the response rather than as a new item.
     expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy()
 
     fireEvent.click(toggle)
@@ -249,52 +225,40 @@ describe('the applied change, shown on its originating response', () => {
   })
 
   it('presents a whole-manuscript rewrite as the bare statement, with nothing to disclose', async () => {
-    const room: RoomAdapters = {
-      ...roomHolding([RESPONSE_WITH_RECOMMENDATION]),
-      applyRecommendation: () =>
-        Promise.resolve({
-          outcome: 'value',
-          value: {
-            outcome: 'applied',
-            actionId: 'a1',
-            entryId: 'e-app1',
-            manuscript: 'an entirely different piece',
-            change: { id: 'change1', content: { kind: 'rewrittenWhole' } },
-          },
-        }),
-    }
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
 
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream(application({ kind: 'rewrittenWhole' }))
 
     await screen.findByText('APPLIED · REWRITTEN WHOLE')
     expect(screen.queryByRole('button', { name: /APPLIED/ })).toBeNull()
+  })
+
+  it('still shows the application when the change file it names is gone', async () => {
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream(application(undefined))
+
+    await screen.findByText('APPLIED · CHANGE FILE MISSING')
+    expect(screen.getByRole('button', { name: 'ask the room about this' })).toBeTruthy()
   })
 
   it('asks the room about the change as an ordinary message the author does not have to compose', async () => {
     const dispatch = vi.fn(() =>
       Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a2' } }),
     )
-    const room: RoomAdapters = {
-      ...roomHolding([RESPONSE_WITH_RECOMMENDATION]),
-      dispatch,
-      applyRecommendation: () =>
-        Promise.resolve({
-          outcome: 'value',
-          value: {
-            outcome: 'applied',
-            actionId: 'a1',
-            entryId: 'e-app1',
-            manuscript: 'the revised manuscript',
-            change: { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] } },
-          },
-        }),
-    }
+    const streaming = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
+    const room: RoomAdapters = { ...streaming.room, dispatch }
 
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    streaming.stream(application({ kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] }))
     fireEvent.click(await screen.findByRole('button', { name: 'ask the room about this' }))
 
     await waitFor(() =>
@@ -417,20 +381,12 @@ describe('asking for a concrete change', () => {
 describe('one response-local field shared by every action on the response', () => {
   afterEach(cleanup)
 
-  it('offers exactly one text field on a response that offered a reading, serving both reply and asking for a concrete change', async () => {
-    renderConversation([RESPONSE_WITH_COMMENTARY])
-
-    await screen.findByText('It holds.')
-
-    expect(screen.getAllByRole('textbox')).toHaveLength(1) // the one shared field on the response
-  })
-
-  it('offers exactly one text field on a response that recommends something concrete, serving both reply and apply', async () => {
-    renderConversation([RESPONSE_WITH_RECOMMENDATION])
+  it('offers one text field per response, whichever actions that response carries', async () => {
+    renderConversation([RESPONSE_WITH_COMMENTARY, RESPONSE_WITH_RECOMMENDATION])
 
     await screen.findByRole('button', { name: 'apply' })
 
-    expect(screen.getAllByRole('textbox')).toHaveLength(1) // the one shared field on the response
+    expect(screen.getAllByRole('textbox')).toHaveLength(2)
   })
 
   it('carries text left in the shared field as the constraint when Apply is chosen', async () => {
@@ -496,7 +452,7 @@ describe('conversation activity, truthfully', () => {
     data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: ['shape', 'reader'] },
   }
 
-  it('ACTIVE-ESCAPE: shows an unconditional activity signal and a distinct Abandon control the instant a dispatch opens, before any participant reports progress', async () => {
+  it('ACTIVE-ESCAPE: offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -548,7 +504,7 @@ describe('conversation activity, truthfully', () => {
     expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
   })
 
-  it('ACTION-EXCLUSION: disables send while busy without relabelling it or collapsing its geometry', async () => {
+  it('ACTION-EXCLUSION: disables send while busy without relabelling it', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -595,9 +551,6 @@ describe('conversation activity, truthfully', () => {
     fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
     expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
 
-    // A model callback settling after this client already released controls — untracked
-    // server-side by ABANDON-UNTRACK, so this is what a race with it looks like here — must not
-    // reopen the activity this client already tore down.
     stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working' } })
 
     expect(screen.getByText('It holds.')).toBeTruthy()

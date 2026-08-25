@@ -9,8 +9,6 @@ import type { CallResult, CallState, ModelAccess } from './types.js'
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
 
-// A runtime that stalls inside an unclosed JSON structure generates until something stops it, so
-// every call carries a bound. Applying a recommendation returns a whole manuscript; nothing else does.
 const RESPONSE_MAX_TOKENS = 2_000
 const MANUSCRIPT_MAX_TOKENS = 32_000
 
@@ -68,9 +66,6 @@ export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
   readonly #logger: Logger
-  // Submissions may arrive independently and concurrently — the model seam promises callers
-  // nothing about their order. This runtime is configured for one call at a time, so every
-  // submission is chained onto the one before it rather than reaching the SDK together.
   #queue: Promise<unknown> = Promise.resolve()
 
   constructor(baseUrl: string, getAssignment: GetAssignment, logger: Logger) {
@@ -100,9 +95,6 @@ export class LMStudioAdapter implements ModelAccess {
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
     const run = this.#queue.then(() => this.#call(site, prompt, schema, signal, onState))
-    // A rejection here is already carried as a `CallResult`, never a thrown error, but the queue
-    // itself must never stall on a settled entry — the next submission runs whether this one
-    // resolved, or, in principle, threw.
     this.#queue = run.catch(() => undefined)
     return run
   }
@@ -124,7 +116,6 @@ export class LMStudioAdapter implements ModelAccess {
     const jsonSchema = z.toJSONSchema(schema)
     const maxTokens = site === APPLY_CALL_SITE ? MANUSCRIPT_MAX_TOKENS : RESPONSE_MAX_TOKENS
 
-    // A retried attempt loads nothing the first one did not, so `preparing` is stated once.
     let preparing = false
     const announce = (state: CallState): void => {
       if (state === 'preparing') {
@@ -165,11 +156,8 @@ export class LMStudioAdapter implements ModelAccess {
     announce('preparing')
     const model = await this.#client.llm.model(assignment, { signal })
     announce('working')
-    // `respond` rather than `complete`: the completion endpoint applies no prompt template, and an
-    // instruct-tuned model handed a bare prompt completes the schema instead of answering it.
     const result = await model.respond(prompt, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
 
-    // A reasoning model puts its reasoning in `content` ahead of the JSON. Only this field is the answer.
     const returned = result.nonReasoningContent
 
     let raw: unknown

@@ -197,9 +197,6 @@ export function readConversationEntries(workspaceDir: string, pieceId: string, c
   return readJsonArtifact(conversationFile(pieceDir, conversationId), entryConversationSchema)
 }
 
-// The one serialized append operation the conversation-entry substrate exposes: read-modify-write
-// and the atomic replacement it produces happen under the same lock, so two entries accepted
-// while both are in flight still both land, in the order they were accepted.
 export class ConversationEntryStore {
   readonly #lock = new Mutex()
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_PROJECTION, initialProjection, projectEvent, withDispatchInFlight, type RoomEvent } from '../../src/client/entryProjection.js'
+import { EMPTY_PROJECTION, projectEvent, type RoomEvent } from '../../src/client/entryProjection.js'
 import type { ConversationEntryView } from '../../src/shared/conversationEntryViews.js'
-import type { DispatchActivitySnapshot } from '../../src/shared/conversationEvents.js'
 
 const STARTED_AT = 1_700_000_000_000
 
@@ -103,29 +102,5 @@ describe('projectEvent', () => {
     projection = projectEvent(projection, activity('shape', 'working', 'a-different-action'))
 
     expect(projection.activity?.states.shape).toBeUndefined()
-  })
-})
-
-describe('initialProjection', () => {
-  it("projects a conversation file's entries as-is, with no activity, so a reload shows them with no new event", () => {
-    const entries = [authorMessage('e1'), response('e2', 'shape', 'e1')]
-
-    expect(initialProjection(entries)).toEqual({ entries, activity: undefined })
-  })
-})
-
-describe('withDispatchInFlight', () => {
-  it('seeds the activity when the piece reports a dispatch already in flight on reload', () => {
-    const snapshot: DispatchActivitySnapshot = {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'dispatch',
-      sourceEntryId: 'e0',
-      audience: ['shape'],
-      states: { shape: 'working' },
-      startedAt: STARTED_AT,
-    }
-
-    expect(withDispatchInFlight(EMPTY_PROJECTION, snapshot)).toEqual({ entries: [], activity: snapshot })
   })
 })

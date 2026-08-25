@@ -76,14 +76,10 @@ function Surfaces({
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
   const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
-  // Keyed on this rather than on `activeConversationId`: `Conversation` reports back the id
-  // it mints on a fresh conversation's first dispatch, and remounting on that report would tear
-  // that dispatch down mid-flight.
+  // Keyed on this rather than on `activeConversationId`, which `Conversation` reports back when it
+  // mints one on a first dispatch: remounting on that report would tear the dispatch down mid-flight.
   const [session, setSession] = useState(0)
   const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
-  // SPEC "one piece is open at a time": leaving abandons whatever conversation action is in
-  // flight, by the identity `Conversation` reports live — `piece.conversationActionInFlight` is
-  // only as fresh as the last load and cannot be trusted once a dispatch or Apply has opened since.
   const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
 
   function switchTo(conversationId: string | null): void {

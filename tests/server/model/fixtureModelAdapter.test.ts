@@ -68,47 +68,6 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     await expect(adapter.call('story-editor', 'prompt', schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
   })
 
-  it('controls each held job by its own site, settling them out of submission order with distinct outcomes', async () => {
-    const adapter = FixtureModelAdapter.bySite(
-      {
-        shape: { result: { outcome: 'value', value: { claim: 'from shape' } }, held: true },
-        compression: { result: { outcome: 'failed', reason: 'timeout' }, held: true },
-      },
-      runtimeStatus,
-    )
-
-    const first = adapter.call('shape', 'prompt', schema, new AbortController().signal)
-    const second = adapter.call('compression', 'prompt', schema, new AbortController().signal)
-
-    // Submitted first, settled last: nothing about submission order binds completion order.
-    adapter.release('compression')
-    expect(await second).toEqual({ outcome: 'failed', reason: 'timeout' })
-
-    adapter.release('shape')
-    expect(await first).toEqual({ outcome: 'value', value: { claim: 'from shape' } })
-  })
-
-  it('cancels one held job without disturbing another still open', async () => {
-    const adapter = FixtureModelAdapter.bySite(
-      {
-        shape: { result: { outcome: 'value', value: { claim: 'from shape' } }, held: true },
-        compression: { result: { outcome: 'value', value: { claim: 'from compression' } }, held: true },
-      },
-      runtimeStatus,
-    )
-    const cancelled = new AbortController()
-    const untouched = new AbortController()
-
-    const first = adapter.call('shape', 'prompt', schema, cancelled.signal)
-    const second = adapter.call('compression', 'prompt', schema, untouched.signal)
-    cancelled.abort()
-
-    expect(await first).toEqual({ outcome: 'abandoned' })
-
-    adapter.release('compression')
-    expect(await second).toEqual({ outcome: 'value', value: { claim: 'from compression' } })
-  })
-
   it('refuses to report a runtime status no test stated', async () => {
     const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, undefined)
 

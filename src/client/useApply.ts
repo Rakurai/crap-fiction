@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { ApplicationEntryView } from '../shared/conversationEntryViews.js'
 import type { applyRecommendation as applyRecommendationFn } from './roomClient.js'
 import { failureMessage } from './request.js'
 
@@ -21,7 +20,6 @@ export function useApply(
   conversationId: string | null,
   getDraft: () => string,
   onApplied: (markdown: string) => void,
-  onApplicationEntry: (entry: ApplicationEntryView) => void,
   adapters: ApplyAdapters,
   initialApplying?: ApplyingResponse,
 ): ApplyViewModel {
@@ -51,9 +49,6 @@ export function useApply(
       if (outcome.outcome === 'applied') {
         stop(undefined)
         onApplied(outcome.manuscript)
-        if (outcome.change !== undefined && outcome.entryId !== undefined) {
-          onApplicationEntry({ id: outcome.entryId, kind: 'application', responseId, changeId: outcome.change.id, change: outcome.change.content })
-        }
         return
       }
       if (outcome.outcome === 'failed') {
@@ -68,9 +63,6 @@ export function useApply(
     })
   }
 
-  // Local only: the request that actually cancels the model work is `conversation.abandon()`'s —
-  // apply and dispatch share one action identity and one abandon route, so this only clears the
-  // response-local "applying" state a caller who already fired that request also holds.
   function clear(): void {
     setApplying(undefined)
   }

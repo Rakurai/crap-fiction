@@ -6,8 +6,8 @@ const OPENING = 'The cups sat where she had left them.'
 
 const CONTINUED = ' The harbour was still dark.'
 
-test('keystrokes reach the manuscript while a round is delivering responses', async ({ page }) => {
-  await openPiece(page, 'Typing During A Round')
+test('keystrokes reach the manuscript while the room is delivering responses', async ({ page }) => {
+  await openPiece(page, 'Typing While The Room Answers')
 
   const editor = manuscript(page)
   await editor.click()

@@ -9,8 +9,6 @@ import {
   participantResponseEntrySchema,
 } from './conversationEntries.js'
 
-// SPEC "Files": an application names only the identifier of the change it produced, and the change's
-// own content sits in its own file. The view joins them so the client never opens that file itself.
 export const applicationEntryViewSchema = applicationEntrySchema.extend({
   change: appliedChangeContentSchema.optional(),
 })

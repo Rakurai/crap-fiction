@@ -22,14 +22,6 @@ export type ConversationProjection = Readonly<{
 
 export const EMPTY_PROJECTION: ConversationProjection = { entries: [], activity: undefined }
 
-export function initialProjection(entries: readonly ConversationEntryView[]): ConversationProjection {
-  return { entries, activity: undefined }
-}
-
-export function withDispatchInFlight(projection: ConversationProjection, snapshot: DispatchActivitySnapshot): ConversationProjection {
-  return { ...projection, activity: snapshot }
-}
-
 function isParticipantOutcome(
   entry: ConversationEntryView,
 ): entry is Extract<ConversationEntryView, { kind: 'participantResponse' | 'participantNoComment' | 'participantFailure' }> {
@@ -52,7 +44,7 @@ export function projectEvent(projection: ConversationProjection, event: RoomEven
           conversationId: event.data.conversationId,
           kind: 'dispatch',
           sourceEntryId: event.data.sourceEntryId,
-          audience: event.data.audience ?? [],
+          audience: event.data.audience,
           states: {},
           startedAt: event.data.startedAt,
         },

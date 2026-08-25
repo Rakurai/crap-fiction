@@ -1,10 +1,6 @@
 import { z } from 'zod'
 import { failureReasonSchema } from './modelResult.js'
 
-// A durable conversation is an ordered, append-only sequence of these entries: an author's message
-// or concrete-change request, each participant's outcome, and each application, all carrying the
-// identity of the entry that caused them rather than a round coordinate.
-
 export const authorMessageEntrySchema = z.object({
   id: z.string().min(1),
   kind: z.literal('authorMessage'),
@@ -85,13 +81,6 @@ export const entryConversationSchema = z.object({
 
 export type EntryConversation = z.infer<typeof entryConversationSchema>
 
-export function substantiveEntry(entry: ConversationEntry): ParticipantResponseEntry | undefined {
-  return entry.kind === 'participantResponse' ? entry : undefined
-}
-
-// CONTEXT "Conversation": listing reads the first verbatim author text in entry order, including a
-// concrete-change clarification, and falls back to a machine fact only where the conversation holds
-// no author-written text at all.
 export function openingWords(entries: readonly ConversationEntry[]): string | undefined {
   for (const entry of entries) {
     if (entry.kind === 'authorMessage') return entry.text

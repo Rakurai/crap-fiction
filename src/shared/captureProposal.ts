@@ -10,9 +10,6 @@ export type CaptureOperation = z.infer<typeof captureOperationSchema>
 
 const common = { destination: captureDestinationSchema, section: z.string().min(1) }
 
-// A discriminated union rather than optional fields refined afterwards: `z.toJSONSchema` carries the
-// per-operation `required` into the wire schema, so guided decoding obliges a runtime to write the
-// fields the operation needs. A refinement is dropped in that conversion and would only reject after.
 function proposalBranches<Extra extends z.ZodRawShape>(extra: Extra) {
   return [
     z.object({ ...common, ...extra, operation: z.literal('add'), text: z.string().min(1) }),

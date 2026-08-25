@@ -132,9 +132,6 @@ type ActiveApply = {
   readonly startedAt: number
 }
 
-// Capture is not part of this union: it shares the model seam with a dispatch and an application but
-// owns its own activity and abandonment identity, so it never occupies `#operation` and is never
-// reachable from `abandon()`.
 type ActiveCapture = {
   readonly pieceId: string
   readonly conversationId: string
@@ -255,12 +252,6 @@ export class Room {
     return operation?.kind === 'dispatch' ? operation.settlement : undefined
   }
 
-  // Targets the dispatch-or-apply operation only — a capture in flight has its own identity and is
-  // never reachable from here. A stale or unmatched `actionId` (naming an action that already
-  // finished, or a piece with nothing in flight) is a silent no-op rather than a failure: it is
-  // never the caller's fault that the action it named is no longer the one running. The operation
-  // is untracked immediately, synchronously, so a caller sees controls released the instant this
-  // returns rather than once the abandoned call's own promise chain happens to unwind.
   abandon(pieceId: string, actionId: string): void {
     const operation = this.#operationFor(pieceId)
     if (operation === undefined || operation.actionId !== actionId) return
@@ -321,9 +312,6 @@ export class Room {
         : this.#specialists.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
-    if (brought.length > 0) {
-      await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
-    }
     if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
@@ -331,10 +319,6 @@ export class Room {
 
     const actionId = nanoid()
     const startedAt = this.#now()
-
-    // Awaited here, before the action is registered or anything is emitted: the author-visible
-    // cause is durable, and the response to this call is trustworthy, before dispatch begins.
-    await this.#entries.append(workspaceDir, pieceId, conversationId, causeEntry)
 
     const dispatchState: ActiveDispatch = {
       kind: 'dispatch',
@@ -348,12 +332,6 @@ export class Room {
       startedAt,
     }
 
-    this.#emit(pieceId, {
-      type: 'action.started',
-      data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: causeEntry.id, startedAt, audience },
-    })
-    this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: causeEntry } })
-
     const plan: DispatchPlan = {
       causeEntry,
       message,
@@ -364,18 +342,33 @@ export class Room {
       existingEntries,
       draft,
     }
+    const cause = causeEntry
 
-    const settlement = this.#run(workspaceDir, pieceId, conversationId, plan, dispatchState)
-      .catch((err: unknown) => {
-        this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
-      })
+    const written = (async () => {
+      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
+      await this.#entries.append(workspaceDir, pieceId, conversationId, cause)
+    })()
+
+    const settlement = written
+      .then(
+        () => {
+          this.#emit(pieceId, {
+            type: 'action.started',
+            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience },
+          })
+          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause } })
+          return this.#run(workspaceDir, pieceId, conversationId, plan, dispatchState).catch((err: unknown) => {
+            this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
+          })
+        },
+        () => {},
+      )
       .finally(() => {
-        // An immediate abandon() already cleared `#operation` and may have let a newer action
-        // claim the slot; only release it here if it is still this one.
         if (this.#operation?.actionId === actionId) this.#operation = undefined
       })
     this.#operation = { ...dispatchState, settlement }
 
+    await written
     return { conversationId, actionId }
   }
 
@@ -428,9 +421,6 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
     }
 
-    // Compiled once, before any job is submitted (SPEC "Context compilation"): no specialist's
-    // context can contain a sibling's response caused by this same entry, whatever order they settle
-    // in — the exclusion holds by construction rather than by an ordering the calls happen not to race.
     const calls = eligibleSpecialists.map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
       return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
@@ -446,10 +436,6 @@ export class Room {
       this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
     }
 
-    // Submitted independently and awaited together: this dispatch tracks only the specialist jobs
-    // its own source entry caused, never a global model-queue state, and each settles and appends on
-    // its own schedule. `Promise.all` over exactly these jobs is that tracked set — it resolves the
-    // instant the last of them does, which is the zero-remaining moment the Story Editor waits for.
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
       const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
         onState(call.role.id, state),
@@ -460,8 +446,6 @@ export class Room {
         abandoned = true
         return
       }
-      // A result settling after this dispatch already closed as failed is stale and discarded, not
-      // appended behind the `action.finished` the author already saw.
       if (failed) return
 
       try {
@@ -476,8 +460,6 @@ export class Room {
       if (gathered !== undefined) evidence.push(gathered)
     }
 
-    // Responses are never rearranged into cast order (SPEC "Dispatch"): each settles and appends
-    // independently, so durable order is completion order.
     await Promise.all(calls.map(settleSpecialist))
 
     if (!abandoned && !failed && storyEditorIncluded) {
@@ -569,8 +551,6 @@ export class Room {
       this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
       return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
     } finally {
-      // Mirrors dispatch(): an immediate abandon() may already have cleared `#operation` for a
-      // newer action, and this must not release that one out from under it.
       if (this.#operation?.actionId === actionId) this.#operation = undefined
     }
   }

@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
-import {
-  appendEntry,
-  EMPTY_PROJECTION,
-  initialProjection,
-  projectEvent,
-  withDispatchInFlight,
-  type ConversationProjection,
-} from './entryProjection.js'
+import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -32,7 +25,6 @@ export type ConversationViewModel = Readonly<{
   abandon: () => void
   conversationId: string | null
   actionId: string | undefined
-  attachEntry: (entry: ConversationEntryView) => void
 }>
 
 export type RoomAdapters = Readonly<{
@@ -54,21 +46,16 @@ export function useConversation(
 ): ConversationViewModel {
   const { createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation } = room
   const [projection, setProjection] = useState<ConversationProjection>(() =>
-    initialActivity?.kind === 'dispatch' ? withDispatchInFlight(EMPTY_PROJECTION, initialActivity) : EMPTY_PROJECTION,
+    initialActivity?.kind === 'dispatch' ? { entries: [], activity: initialActivity } : EMPTY_PROJECTION,
   )
   const [busy, setBusy] = useState(initialActivity?.kind === 'dispatch')
-  // Tracks whichever conversation action — dispatch or apply — is currently open, regardless of
-  // kind: the two never overlap, and Abandon targets this identity either way rather than owning a
-  // separate notion of "the current apply" alongside "the current dispatch".
   const [actionId, setActionId] = useState<string | undefined>(initialActivity?.actionId)
+  const actionIdRef = useRef(actionId)
   const [error, setError] = useState<string | undefined>(undefined)
-  // Falls back to the activity snapshot's own conversation: an action in flight is proof a
-  // conversation already exists, so a reload that reports one always knows which without waiting
-  // for the separate conversation fetch this hook also kicks off.
   const conversationIdRef = useRef<string | null>(initialConversationId ?? initialActivity?.conversationId ?? null)
-  // Held rather than read from the prop below: this hook mints an id on a fresh conversation's
-  // first dispatch and reports it upward, and depending on the prop would rebuild the event stream
-  // in the moment that dispatch is opening. The author switching is a remount, not a changed prop.
+  // Held rather than read from the prop: this hook mints an id on a fresh conversation's first
+  // dispatch and reports it upward, and depending on the prop would rebuild the event stream in the
+  // moment that dispatch is opening. The author switching is a remount, not a changed prop.
   const [openedWithConversationId] = useState(initialConversationId)
 
   useEffect(() => {
@@ -78,8 +65,9 @@ export function useConversation(
       void fetchConversation(pieceId, openedWithConversationId).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
-          const loaded = initialProjection(result.value.entries)
-          setProjection((prev) => ({ ...prev, entries: [...loaded.entries, ...prev.entries] }))
+          setProjection((prev) =>
+            prev.entries.reduce((merged, entry) => appendEntry(merged, entry), { ...prev, entries: result.value.entries }),
+          )
           return
         }
         const message = failureMessage(result)
@@ -96,14 +84,16 @@ export function useConversation(
           return
         }
         if (event.type === 'action.started') {
+          actionIdRef.current = event.data.actionId
           setActionId(event.data.actionId)
           if (event.data.kind === 'dispatch') {
             conversationIdRef.current = event.data.conversationId
             setBusy(true)
           }
         }
-        if (event.type === 'action.finished') {
-          setActionId((current) => (current === event.data.actionId ? undefined : current))
+        if (event.type === 'action.finished' && actionIdRef.current === event.data.actionId) {
+          actionIdRef.current = undefined
+          setActionId(undefined)
           setBusy(false)
         }
         setProjection((prev) => projectEvent(prev, event))
@@ -163,14 +153,11 @@ export function useConversation(
     openDispatch({ respondingTo, clarification })
   }
 
-  // Targets whatever action is currently tracked by identity, dispatch or apply alike, and releases
-  // this hook's own controls the instant it is called rather than waiting on the request: ABANDON-
-  // UNTRACK is a property of the room the request asks it to honour, not something this client can
-  // observe over the network any sooner than "it accepted the request".
   function abandon(): void {
     const target = actionId
     const conversationId = conversationIdRef.current
     if (target === undefined || conversationId === null) return
+    actionIdRef.current = undefined
     setActionId(undefined)
     setBusy(false)
     setProjection((prev) => (prev.activity?.actionId === target ? { ...prev, activity: undefined } : prev))
@@ -178,10 +165,6 @@ export function useConversation(
       const message = failureMessage(result)
       if (message !== undefined) setError(message)
     })
-  }
-
-  function attachEntry(entry: ConversationEntryView): void {
-    setProjection((prev) => appendEntry(prev, entry))
   }
 
   return {
@@ -194,6 +177,5 @@ export function useConversation(
     abandon,
     conversationId: conversationIdRef.current,
     actionId,
-    attachEntry,
   }
 }

@@ -4,14 +4,10 @@ export const responseOutcomeSchema = z.enum(['noComment', 'commentary', 'applica
 
 export type ResponseOutcome = z.infer<typeof responseOutcomeSchema>
 
-// The claim is required and trimmed at the grammar itself — `z.toJSONSchema` carries `minLength`
-// into guided decoding, and `safeParse` enforces it on every runtime whether or not decoding is
-// guided there. A response missing it does not conform, and the model module retries and then
-// fails it rather than this module inventing a claim from the note.
 const substantiveValueSchema = z.object({
   outcome: z.enum(['commentary', 'applicableSuggestion']),
   claim: z.string().trim().min(1),
-  note: z.string().optional(),
+  note: z.string().trim().optional(),
 })
 
 const noCommentValueSchema = z.object({ outcome: z.literal('noComment') })
@@ -22,7 +18,9 @@ export const owedResponseValueSchema = substantiveValueSchema
 
 export type ResponseValue = z.infer<typeof eligibleResponseValueSchema>
 
-export function responseValueSchema(owesAnswer: boolean) {
+export type ResponseValueSchema = typeof owedResponseValueSchema | typeof eligibleResponseValueSchema
+
+export function responseValueSchema(owesAnswer: boolean): ResponseValueSchema {
   return owesAnswer ? owedResponseValueSchema : eligibleResponseValueSchema
 }
 

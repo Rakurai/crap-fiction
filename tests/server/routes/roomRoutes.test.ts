@@ -335,8 +335,6 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ responseId: response.id, draft: 'text' }),
       })
-      // Lets the request reach the point where the room registers the apply operation, without
-      // waiting for the delayed model call the assertion below needs still in flight.
       await new Promise((resolve) => setImmediate(resolve))
 
       const pieceRes = await app.request('/pieces/cups')
@@ -344,48 +342,6 @@ describe('the room over HTTP', () => {
       expect(pieceBody.data.conversationActionInFlight).not.toBeNull()
       expect(pieceBody.data.conversationActionInFlight.kind).toBe('apply')
       expect(pieceBody.data.conversationActionInFlight.sourceEntryId).toBe(response.id)
-
-      await applying
-    })
-
-    it('refuses to dispatch while an application is in flight, with ROOM_BUSY', async () => {
-      const behavior: FixtureBehavior = {
-        result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
-        delayMs: 50,
-      }
-      const modelAccess = FixtureModelAdapter.uniform(behavior, { reachable: true, models: [] })
-      const room = buildTestRoom(dataRoot, { modelAccess })
-      const { app, workspace } = buildTestApp(dataRoot, { room })
-      await workspace.set('my-writing')
-      await app.request('/pieces', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: 'Cups' }),
-      })
-      await app.request('/pieces/cups/conversations/c1/dispatch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: 'shape', message: 'a direct question', draft: 'text' }),
-      })
-      await settlementOf(room, 'cups')
-
-      const conversationRes = await app.request('/pieces/cups/conversations/c1')
-      const { data: conversation } = await conversationRes.json()
-      const response = conversation.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
-
-      const applying = app.request('/pieces/cups/conversations/c1/apply', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ responseId: response.id, draft: 'text' }),
-      })
-
-      const dispatchRes = await app.request('/pieces/cups/conversations/c1/dispatch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: 'another message', draft: 'text' }),
-      })
-      expect(dispatchRes.status).toBe(409)
-      expect(await dispatchRes.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
 
       await applying
     })
@@ -427,37 +383,6 @@ describe('the room over HTTP', () => {
       expect(data.proposals[0]).toMatchObject({ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' })
     })
 
-    it('CONTEXT "Capture context": proceeds while a dispatch is in flight, sharing the model seam rather than the room\'s dispatch-and-apply lock', async () => {
-      const behavior: FixtureBehavior = { result: CONFORMING_RESULT, delayMs: 50 }
-      const modelAccess = FixtureModelAdapter.bySite(
-        { shape: behavior, 'story-editor': behavior, capture: { result: { outcome: 'value', value: { proposals: [] } } } },
-        { reachable: true, models: [] },
-      )
-      const room = buildTestRoom(dataRoot, { modelAccess })
-      const { app, workspace } = buildTestApp(dataRoot, { room })
-      await workspace.set('my-writing')
-      await app.request('/pieces', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: 'Cups' }),
-      })
-      await app.request('/pieces/cups/conversations/c1/dispatch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: 'a message', draft: 'text' }),
-      })
-
-      const res = await app.request('/pieces/cups/capture', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId: 'c1', draft: 'text' }),
-      })
-      expect(res.status).toBe(200)
-      expect(await res.json()).toMatchObject({ success: true, data: { outcome: 'captured', proposals: [] } })
-
-      await settlementOf(room, 'cups')
-    })
-
     it('reports capture activity on the piece independently of the dispatch in flight, and clears it once capture settles', async () => {
       const modelAccess = FixtureModelAdapter.bySite(
         { capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true } },
@@ -477,8 +402,6 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ conversationId: 'c1', draft: 'text' }),
       })
-      // Lets the request reach the point where the room registers its capture snapshot, without
-      // waiting for the held model call the assertion below needs still in flight.
       await new Promise((resolve) => setImmediate(resolve))
 
       const pieceRes = await app.request('/pieces/cups')

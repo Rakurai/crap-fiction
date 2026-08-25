@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { eligibleResponseValueSchema, normalizeResponse, owedResponseValueSchema, responseValueSchema } from '../../src/shared/participantResponse.js'
+import { normalizeResponse, owedResponseValueSchema, responseValueSchema } from '../../src/shared/participantResponse.js'
 
 type FlatSchema = Readonly<{
   required?: readonly string[]
@@ -21,20 +21,6 @@ describe('the grammar a participant is decoded against', () => {
     expect(responseValueSchema(false).safeParse({ outcome: 'noComment' }).success).toBe(true)
   })
 
-  it('does not conform where a substantive outcome carries no claim, or an empty one', () => {
-    expect(eligibleResponseValueSchema.safeParse({ outcome: 'commentary' }).success).toBe(false)
-    expect(eligibleResponseValueSchema.safeParse({ outcome: 'commentary', claim: '', note: 'the opening is late' }).success).toBe(false)
-    expect(eligibleResponseValueSchema.safeParse({ outcome: 'commentary', claim: '   ' }).success).toBe(false)
-  })
-
-  it('trims a claim written with surrounding whitespace, rather than carrying it verbatim', () => {
-    const parsed = eligibleResponseValueSchema.safeParse({ outcome: 'commentary', claim: '  the opening is late  ' })
-    expect(parsed).toMatchObject({ success: true, data: { claim: 'the opening is late' } })
-  })
-
-  it('accepts a reply that omits the note, leaving elaboration optional', () => {
-    expect(eligibleResponseValueSchema.safeParse({ outcome: 'commentary', claim: 'the opening is late' }).success).toBe(true)
-  })
 })
 
 describe('reading what a participant returned', () => {

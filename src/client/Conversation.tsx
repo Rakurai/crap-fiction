@@ -38,50 +38,6 @@ type ConversationProps = {
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
 
-function ReplyAction({
-  participantId,
-  busy,
-  onReplyEmpty,
-  onReply,
-}: {
-  readonly participantId: string
-  readonly busy: boolean
-  readonly onReplyEmpty: (participantId: string) => void
-  readonly onReply: (participantId: string, message: string) => void
-}) {
-  const [text, setText] = useState('')
-  const blocked = text.trim().length > 0 && busy
-
-  function submit(): void {
-    const trimmed = text.trim()
-    if (trimmed.length === 0) {
-      onReplyEmpty(participantId)
-      return
-    }
-    if (busy) return
-    onReply(participantId, trimmed)
-    setText('')
-  }
-
-  return (
-    <div className={styles.actions}>
-      <input
-        aria-label="Reply, in your own words"
-        className={styles.actionField}
-        value={text}
-        placeholder="in your words — optional"
-        onChange={(event) => setText(event.target.value)}
-      />
-      <button type="button" className={styles.actionButton} disabled={blocked} onClick={submit}>
-        reply
-      </button>
-    </div>
-  )
-}
-
-// One field serves every response-local action (UX_DESIGN "Actions on a response"): its content
-// is carried verbatim as the constraint, the clarification, or the reply text, and it never
-// competes with a second field on the same response.
 function ResponseActions({
   responseId,
   participantId,
@@ -94,7 +50,7 @@ function ResponseActions({
 }: {
   readonly responseId: string
   readonly participantId: string
-  readonly outcome: 'commentary' | 'applicableSuggestion'
+  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void
@@ -102,7 +58,6 @@ function ResponseActions({
   readonly onReply: (participantId: string, message: string) => void
 }) {
   const [text, setText] = useState('')
-  const canApply = outcome === 'applicableSuggestion'
   const trimmed = text.trim()
   const withText = trimmed.length > 0
 
@@ -128,13 +83,21 @@ function ResponseActions({
     setText('')
   }
 
+  const fieldLabel =
+    outcome === 'applicableSuggestion'
+      ? 'Reply or apply, in your own words'
+      : outcome === 'commentary'
+        ? 'Reply or ask for a concrete change, in your own words'
+        : 'Reply, in your own words'
+
   return (
     <div className={styles.actions}>
-      {canApply ? (
+      {outcome === 'applicableSuggestion' && (
         <button type="button" className={styles.applyButton} disabled={disabled} onClick={apply}>
           apply
         </button>
-      ) : (
+      )}
+      {outcome === 'commentary' && (
         <button type="button" className={styles.actionButton} disabled={disabled} onClick={ask}>
           ask for a concrete change
         </button>
@@ -143,7 +106,7 @@ function ResponseActions({
         reply
       </button>
       <input
-        aria-label={canApply ? 'Reply or apply, in your own words' : 'Reply or ask for a concrete change, in your own words'}
+        aria-label={fieldLabel}
         className={styles.actionField}
         value={text}
         placeholder="in your words — optional"
@@ -169,18 +132,17 @@ function AppliedChangeView({
   askDisabled,
   onAskAboutChange,
 }: {
-  readonly content: AppliedChangeContent
+  readonly content: AppliedChangeContent | undefined
   readonly askDisabled: boolean
   readonly onAskAboutChange: () => void
 }) {
-  // UX_DESIGN "Applying, and seeing what it did": applying opens the disclosure, and it stays open
-  // through reload or navigation until the author closes it themselves — there is no author choice
-  // to remember across a load, so every render of a landed application starts open.
   const [open, setOpen] = useState(true)
 
   return (
     <div className={styles.change}>
-      {content.kind === 'rewrittenWhole' ? (
+      {content === undefined ? (
+        <span className={styles.changeFacts}>{facts(machineWords('applied'), machineWords('change file missing'))}</span>
+      ) : content.kind === 'rewrittenWhole' ? (
         <span className={styles.changeFacts}>{facts(machineWords('applied'), machineWords('rewritten whole'))}</span>
       ) : (
         <>
@@ -284,25 +246,29 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
           <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
-          <ReplyAction participantId={entry.participantId} busy={applyDisabled} onReplyEmpty={onReplyEmpty} onReply={onReply} />
+          <ResponseActions
+            responseId={entry.id}
+            participantId={entry.participantId}
+            outcome="failed"
+            disabled={applyDisabled}
+            onApply={onApply}
+            onAsk={onAsk}
+            onReplyEmpty={onReplyEmpty}
+            onReply={onReply}
+          />
         </div>
       )
     case 'participantResponse': {
       const applyingThis = applying?.responseId === entry.id
-      // SPEC "Applying a recommendation": the applied change renders on the response that caused
-      // it, never as its own item at the application entry's own append position.
       const applications = applicationsFor(entry.id)
       return (
         <div className={styles.participant}>
           <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
           <p className={styles.claim}>{entry.claim}</p>
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
-          {applications.map(
-            (application) =>
-              application.change !== undefined && (
-                <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
-              ),
-          )}
+          {applications.map((application) => (
+            <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+          ))}
           {applyingThis ? (
             <ApplyingFlight onAbandon={onAbandonApply} />
           ) : (
@@ -321,8 +287,6 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       )
     }
     case 'application':
-      // Its durable position is its true append order, but it presents only as state on the
-      // originating response above — no second visible marker at the foot of the chat.
       return null
     default: {
       const exhaustive: never = entry
@@ -331,10 +295,6 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
   }
 }
 
-// UX_DESIGN "While the room answers": the facts line is unconditional — it states that the action
-// is active whether or not the model layer has anything to report yet — and the participant lines
-// below it are the opposite: each exists only because a real progress event named that
-// participant, never as a reserved place for one the dispatch merely intends to call.
 function DispatchFlight({
   activity,
   displayName,
@@ -411,19 +371,12 @@ export function Conversation({
 
   const initialApplying: ApplyingResponse | undefined = useMemo(
     () => (conversationActionInFlight?.kind === 'apply' ? { responseId: conversationActionInFlight.sourceEntryId } : undefined),
-    // Captured once, at this component's mount, the same way `useConversation`'s own initial
-    // activity is: a reconnect snapshot seeds the first render and afterwards the live event
-    // stream is the only authority, so re-deriving this on every prop change would fight it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, conversation.attachEntry, room, initialApplying)
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, initialApplying)
 
-  // Reactive rather than fired imperatively at the two or three call sites that change
-  // `apply.applying`: the participant name it reports depends on `conversation.projection.entries`
-  // having loaded, which is not yet true the moment a reconnect seeds `initialApplying`, and this
-  // re-resolves the name the instant the entries arrive rather than needing a special case for it.
   useEffect(() => {
     onApplyingChange(
       apply.applying === undefined
@@ -599,8 +552,6 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
-        {/* UX_DESIGN "An operation in flight": disabled while busy, never relabelled — a swapped
-            label would change the button's width and read as the control itself shrinking away. */}
         <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
           send
         </button>

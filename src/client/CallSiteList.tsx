@@ -9,8 +9,6 @@ type CallSiteListProps = {
   readonly onAssign: (site: string, model: string) => void
 }
 
-// An assignment the runtime no longer reports is still this site's assignment, so it stays
-// offered rather than dropping off the list the moment the model is not loaded.
 function choices(known: readonly string[], assignment: string | null): readonly string[] {
   if (assignment === null || known.includes(assignment)) return known
   return [assignment, ...known]

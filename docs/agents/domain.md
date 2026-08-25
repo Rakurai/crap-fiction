@@ -39,7 +39,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
 
-This project is unusually strict about it, for a reason that is worth knowing: several of its terms are near-synonyms in ordinary English but denote different things here, and conflating them produces working code that models the wrong system. *Cast* excludes the Story Editor. *Author context* and *story context* are different scopes. *Commentary* and an *applicable suggestion* are different outcomes. The *Story Editor* is a collaborator; the *prose editor* is a text surface. A *round* is one exchange; a *conversation* is a durable sequence of them. If a term feels interchangeable with another, check the glossary before assuming it is.
+This project is unusually strict about it, for a reason that is worth knowing: several of its terms are near-synonyms in ordinary English but denote different things here, and conflating them produces working code that models the wrong system. *Cast* excludes the Story Editor. *Author context* and *story context* are different scopes. *Commentary* and an *applicable suggestion* are different outcomes. The *Story Editor* is a collaborator; the *prose editor* is a text surface. If a term feels interchangeable with another, check the glossary before assuming it is.
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 

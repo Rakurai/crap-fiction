@@ -149,9 +149,6 @@ describe('LMStudioAdapter.call', () => {
 
     const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, silent)
     const pending = adapter.call('shape', 'prompt', schema, new AbortController().signal)
-    // A submission is queued rather than started synchronously, so this waits for the call to
-    // actually reach the runtime — and so for `AbortSignal.timeout` to actually be asked for a
-    // signal — before aborting the bound it asked for.
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(120_000))
     timeout.abort()
 
@@ -235,9 +232,6 @@ describe('LMStudioAdapter.call', () => {
     const first = adapter.call('shape', 'prompt one', schema, new AbortController().signal)
     const second = adapter.call('compression', 'prompt two', schema, new AbortController().signal)
 
-    // Nothing about submission order is a promise the caller may lean on, but this runtime is
-    // configured for one call at a time regardless: the second submission must not reach it
-    // while the first is still held open.
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(respondFn).toHaveBeenCalledTimes(1)
 

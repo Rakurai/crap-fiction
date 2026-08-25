@@ -61,8 +61,6 @@ function settlementOf(room: Room, pieceId: string): Promise<void> {
   return settlement
 }
 
-// Resolves the instant `participantId`'s entry lands, rather than on a fixed delay: subscribing is
-// synchronous, so setting this up before releasing the fixture's gate cannot race the event it waits for.
 function nextEntryAppended(room: Room, pieceId: string, participantId: string): Promise<void> {
   return new Promise((resolve) => {
     const unsubscribe = room.subscribe(pieceId, (event) => {
@@ -90,7 +88,7 @@ describe('Room.dispatch', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('refuses a second dispatch while one is in flight for the same piece', async () => {
+  it('refuses a second dispatch while one is in flight for the same piece, including one issued in the same tick', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -98,11 +96,16 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const [first, second] = await Promise.allSettled([
+      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text'),
+      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'second' }, 'draft text'),
+    ])
 
-    await expect(room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'another message' }, 'draft text')).rejects.toThrowError(
-      RoomBusyError,
-    )
+    expect(first?.status).toBe('fulfilled')
+    expect(second?.status).toBe('rejected')
+    expect(second?.status === 'rejected' && second.reason).toBeInstanceOf(RoomBusyError)
+
+    expect(entries(workspaceDir, piece.id, 'c1')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
 
     adapter.release('shape')
     adapter.release('compression')
@@ -181,7 +184,6 @@ describe('Room.dispatch', () => {
     expect(finished?.data).toMatchObject({ outcome: 'failed' })
 
     expect(room.activitySnapshot(piece.id)).toBeUndefined()
-    // The author's own entry is durable regardless of what the dispatch that follows does with it.
     expect(readConversationEntries(workspaceDir, piece.id, 'c1')?.entries).toEqual([expect.objectContaining({ kind: 'authorMessage' })])
   })
 
@@ -243,7 +245,7 @@ describe('Room.dispatch', () => {
 
     const events: string[] = []
     room.subscribe(piece.id, (event) => {
-      if (event.type === 'action.started') events.push(`started:${event.data.audience?.join(',')}`)
+      if (event.type === 'action.started' && event.data.kind === 'dispatch') events.push(`started:${event.data.audience.join(',')}`)
       if (event.type === 'participant.activity') events.push(`state:${event.data.participantId}:${event.data.state}`)
       if (event.type === 'entry.appended' && event.data.entry.kind === 'participantResponse') events.push(`settled:${event.data.entry.participantId}`)
       if (event.type === 'entry.appended' && event.data.entry.kind === 'participantNoComment') events.push(`settled:${event.data.entry.participantId}`)
@@ -276,22 +278,17 @@ describe('Room.dispatch', () => {
     const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
 
-    // Both specialist calls are already in flight before either has settled — neither waited for
-    // the other to be submitted, and cast order lists shape before compression.
     expect(adapter.promptFor('shape')).toBeDefined()
     expect(adapter.promptFor('compression')).toBeDefined()
 
     const compressionLanded = nextEntryAppended(room, piece.id, 'compression')
     adapter.release('compression')
     await compressionLanded
-    // shape has not settled yet, so the tracked specialist set is not empty: no Story Editor call.
     expect(adapter.promptFor('story-editor')).toBeUndefined()
 
     const shapeLanded = nextEntryAppended(room, piece.id, 'shape')
     adapter.release('shape')
     await shapeLanded
-    // The story-editor call is issued once the last specialist promise resolves, a further
-    // microtask turn past the entry it just appended — polled rather than assumed on one tick.
     await vi.waitFor(() => expect(adapter.promptFor('story-editor')).toBeDefined())
 
     adapter.release('story-editor')
@@ -393,8 +390,6 @@ describe('Room.dispatch', () => {
     const { conversationId, actionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
     room.abandon(piece.id, actionId)
-    // Released the instant abandon() returns, not once the abandoned calls' own promises settle —
-    // ABANDON-UNTRACK's "immediately restore controls" is this synchronously, never a later tick.
     expect(room.activitySnapshot(piece.id)).toBeUndefined()
     await settled
 
@@ -413,8 +408,6 @@ describe('Room.dispatch', () => {
     const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
     room.abandon(piece.id, firstActionId)
 
-    // The first dispatch's own calls are still gated — held, never released — proving this second
-    // dispatch was refused by nothing rather than by a first that happened to finish fast.
     const { conversationId, actionId: secondActionId } = await room.dispatch(
       workspaceDir,
       piece.id,
@@ -446,8 +439,6 @@ describe('Room.dispatch', () => {
     const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
     room.abandon(piece.id, firstActionId)
 
-    // The first dispatch's own calls stay gated — held, never released — so the second dispatch's
-    // calls below are the only ones this test ever releases, and nothing races on fixture timing.
     const { conversationId, actionId: secondActionId } = await room.dispatch(
       workspaceDir,
       piece.id,
@@ -458,9 +449,6 @@ describe('Room.dispatch', () => {
     expect(secondActionId).not.toBe(firstActionId)
     const settled = settlementOf(room, piece.id)
 
-    // A late-arriving request naming the action that already finished — abandoned or otherwise —
-    // must not touch the one running now, the same way a client's own delayed retry of an earlier
-    // click must not.
     room.abandon(piece.id, firstActionId)
     expect(room.activitySnapshot(piece.id)).toMatchObject({ actionId: secondActionId })
 
@@ -609,10 +597,6 @@ describe('Room.apply', () => {
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
 
-    // `room.apply()`'s own actionId is not known to the caller until the whole call settles — the
-    // author's client learns it from the `action.started` event instead, and this mirrors that:
-    // everything up to the model call's own `await` runs synchronously, so it is already in
-    // `events` before this line returns.
     const applying = room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
     const started = events.find((event) => event.type === 'action.started')
     if (started === undefined) throw new Error('expected action.started to have fired synchronously')
@@ -969,7 +953,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
     await settlementOf(askRoom, piece.id)
 
     const started = events.find((event) => event.type === 'action.started')
-    expect(started?.type === 'action.started' && started.data.audience).toEqual(['shape'])
+    expect(started?.type === 'action.started' && started.data.kind === 'dispatch' && started.data.audience).toEqual(['shape'])
 
     expect(askAdapter.promptFor('shape')).toContain('The entry is late.')
     expect(askAdapter.promptFor('shape')).toContain('what would you cut')
