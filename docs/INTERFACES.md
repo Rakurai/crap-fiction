@@ -100,6 +100,8 @@ channel it arrived by.
 call(site, prompt, schema, signal, onState?) → CallResult<T>
 status()                                    → whether the runtime is reachable, and what it holds
 
+Prompt = { durable, perCall }               each half a string; see Context compilation
+
 CallResult<T> =
   | { outcome: 'value';     value: T }
   | { outcome: 'abandoned' }
@@ -107,6 +109,10 @@ CallResult<T> =
 
 FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
 ```
+
+`prompt` carries the durable half and the per-call half apart; no caller composes them into one string
+before the seam, and only an implementation constrained to a single-string vendor call joins them, as
+that vendor's own accommodation.
 
 | Reason | Means |
 |---|---|
@@ -133,10 +139,10 @@ One compilation per kind of call, each returning the whole of what its prompt is
 | an application | the recommendation and the author's constraint |
 | a context capture | nothing beyond the shared input |
 
-Every kind receives both durable contexts, the current draft whole, and the conversation's entries.
-A participant compilation also receives the history policy, which selects between shared history and
-stricter independence and is the whole of the difference between them; the other two kinds read the
-conversation whole and have no policy.
+Every kind receives both durable contexts, the current draft whole, the surface it is compiling for, and
+the conversation's entries. A participant compilation also receives the history policy, which selects
+between shared history and stricter independence and is the whole of the difference between them; the
+other two kinds read the conversation whole and have no policy.
 
 The two participant compilations return one type. The other two return their own, because a call that
 is not a participant has no role, no mode description and no owed answer, and a shape carrying those

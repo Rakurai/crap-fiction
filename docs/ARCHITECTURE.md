@@ -372,7 +372,7 @@ mean different things to the author and to the room, so none of them is the abse
 result modelling two of them as a missing value would leave every caller inferring the difference
 from state it happens to hold. A failure carries what came back verbatim where anything did.
 
-**The prompt crosses as text rather than as messages.** A message array would import a chat topology
+**Each half crosses as text rather than as messages.** A message array would import a chat topology
 from whichever runtime was consulted first, and this conversation has five speakers with no faithful
 mapping onto user-and-assistant alternation. Flattening is the correct representation here rather
 than a concession, and context compilation already produces it.

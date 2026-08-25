@@ -5,7 +5,7 @@ import type {
   ParticipantResponseEntry,
 } from '../../shared/conversationEntries.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { ModelAccess } from '../model/types.js'
+import type { CallPrompt, ModelAccess } from '../model/types.js'
 import { normalizeResponse, responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
@@ -24,7 +24,7 @@ export function evidenceFrom(outcome: ParticipantOutcome, participant: string): 
 
 export async function callParticipant(
   role: RoleDefinition,
-  prompt: string,
+  prompt: CallPrompt,
   causeId: string,
   owesAnswer: boolean,
   modelAccess: ModelAccess,

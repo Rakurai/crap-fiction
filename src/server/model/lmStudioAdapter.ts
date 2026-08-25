@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
-import type { CallResult, CallState, ModelAccess } from './types.js'
+import type { CallPrompt, CallResult, CallState, ModelAccess } from './types.js'
 
 const RETRIES = 2
 const TIMEOUT_MS = 120_000
@@ -89,7 +89,7 @@ export class LMStudioAdapter implements ModelAccess {
 
   call<T>(
     site: string,
-    prompt: string,
+    prompt: CallPrompt,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
@@ -101,7 +101,7 @@ export class LMStudioAdapter implements ModelAccess {
 
   async #call<T>(
     site: string,
-    prompt: string,
+    prompt: CallPrompt,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
@@ -146,7 +146,7 @@ export class LMStudioAdapter implements ModelAccess {
 
   async #attempt<T>(
     assignment: string,
-    prompt: string,
+    prompt: CallPrompt,
     schema: z.ZodType<T>,
     jsonSchema: object,
     maxTokens: number,
@@ -156,7 +156,8 @@ export class LMStudioAdapter implements ModelAccess {
     announce('preparing')
     const model = await this.#client.llm.model(assignment, { signal })
     announce('working')
-    const result = await model.respond(prompt, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
+    // The SDK takes one prompt string; joining the two halves is this vendor accommodation's own affair.
+    const result = await model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
 
     const returned = result.nonReasoningContent
 

@@ -45,6 +45,7 @@ import { computeAppliedChangeContent } from './appliedChange.js'
 import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
 import {
+  assertSpecialistIndependence,
   compileApplyContext,
   compileCaptureContext,
   compileSpecialistContext,
@@ -56,6 +57,7 @@ import {
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
+import type { SurfaceId } from '../../shared/surfaces.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
@@ -102,6 +104,9 @@ export class ModeNotFoundError extends Error {
     this.name = 'ModeNotFoundError'
   }
 }
+
+// No operation here is wired to any editing surface but the manuscript.
+const OPERATION_SURFACE: SurfaceId = 'draft'
 
 type Listener = (event: RoomEvent) => void
 
@@ -302,7 +307,7 @@ export class Room {
 
     const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
     const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
-    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, 'draft')
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, OPERATION_SURFACE)
     const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
@@ -444,6 +449,7 @@ export class Room {
       authorContext: durableContext.authorContext,
       storyContext: durableContext.storyContext,
       draft,
+      surface: OPERATION_SURFACE,
       entries: existingEntries,
       policy: this.#policy,
       modeDescription,
@@ -460,10 +466,12 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
     }
 
-    const calls = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
+    const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
-      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#fragments, this.#charter) }
+      return { role, owesAnswer, context: compileSpecialistContext(contextFor(role, owesAnswer)) }
     })
+    assertSpecialistIndependence(compiled.map(({ context }) => context))
+    const calls = compiled.map(({ role, owesAnswer, context }) => ({ role, owesAnswer, prompt: renderPrompt(context, this.#fragments, this.#charter) }))
 
     const evidence: ParticipantEvidence[] = []
     let abandoned = false
@@ -567,6 +575,7 @@ export class Room {
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
+        surface: OPERATION_SURFACE,
         entries,
         participants: this.#displayNames,
       })
@@ -619,6 +628,7 @@ export class Room {
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
+        surface: OPERATION_SURFACE,
         entries,
         participants: this.#displayNames,
       })

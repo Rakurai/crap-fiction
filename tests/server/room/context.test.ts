@@ -53,6 +53,7 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
+    surface: 'draft',
     entries: undefined,
     policy: 'shared',
     participants: PARTICIPANTS,
@@ -69,6 +70,7 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: Ap
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
+    surface: 'draft',
     participants: PARTICIPANTS,
     ...overrides,
   }
@@ -80,10 +82,15 @@ function captureContextInput(overrides: Partial<CaptureContextInput> = {}): Capt
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
+    surface: 'draft',
     entries: undefined,
     participants: PARTICIPANTS,
     ...overrides,
   }
+}
+
+function wholeOf(rendered: { durable: string; perCall: string }): string {
+  return rendered.durable + rendered.perCall
 }
 
 function sectionOf(prompt: string, marker: string): string {
@@ -235,14 +242,16 @@ describe('rendering a prompt', () => {
   const bareSpecialist = compileSpecialistContext(contextInput({ role: shape, draft: MANUSCRIPT }))
 
   it('always carries the manuscript, unexcerpted, whichever call it is', () => {
-    expect(renderPrompt(bareSpecialist, fragments, charter)).toContain(MANUSCRIPT)
-    expect(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments)).toContain(MANUSCRIPT)
-    expect(renderCapturePrompt(compileCaptureContext(captureContextInput({ draft: MANUSCRIPT })), fragments)).toContain(MANUSCRIPT)
+    expect(wholeOf(renderPrompt(bareSpecialist, fragments, charter))).toContain(MANUSCRIPT)
+    expect(
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments)),
+    ).toContain(MANUSCRIPT)
+    expect(wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput({ draft: MANUSCRIPT })), fragments))).toContain(MANUSCRIPT)
   })
 
   it('renders a line fragment once per supplied history entry, never collapsing or duplicating them', () => {
     const applyContext = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    const prompt = renderApplyPrompt(applyContext, fragments)
+    const prompt = wholeOf(renderApplyPrompt(applyContext, fragments))
     const lines = sectionOf(prompt, 'FIXTURE_HISTORY_HEADING')
       .split('\n')
       .filter((line) => line.length > 0)
@@ -253,8 +262,8 @@ describe('rendering a prompt', () => {
     const written = { authorContext: 'prefers short sentences', storyContext: 'a flash piece about a breakup' }
 
     for (const prompt of [
-      renderPrompt(compileSpecialistContext(contextInput({ role: shape, ...written })), fragments, charter),
-      renderCapturePrompt(compileCaptureContext(captureContextInput(written)), fragments),
+      wholeOf(renderPrompt(compileSpecialistContext(contextInput({ role: shape, ...written })), fragments, charter)),
+      wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput(written)), fragments)),
     ]) {
       expect(prompt).toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).toContain('prefers short sentences')
@@ -262,7 +271,10 @@ describe('rendering a prompt', () => {
       expect(prompt).toContain('a flash piece about a breakup')
     }
 
-    for (const prompt of [renderPrompt(bareSpecialist, fragments, charter), renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)]) {
+    for (const prompt of [
+      wholeOf(renderPrompt(bareSpecialist, fragments, charter)),
+      wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)),
+    ]) {
       expect(prompt).not.toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).not.toContain('FIXTURE_STORY_CONTEXT_HEADING')
     }
@@ -272,63 +284,63 @@ describe('rendering a prompt', () => {
     const constrained = compileApplyContext(
       applyContextInput({ recommendationClaim: 'cut the second paragraph', constraint: 'keep the last line', entries: entriesWithTwoMessages }),
     )
-    const prompt = renderApplyPrompt(constrained, fragments)
+    const prompt = wholeOf(renderApplyPrompt(constrained, fragments))
     expect(prompt).toContain('cut the second paragraph')
     expect(prompt).toContain('FIXTURE_CONSTRAINT_HEADING')
     expect(prompt).toContain('keep the last line')
 
     const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    expect(renderApplyPrompt(unconstrained, fragments)).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+    expect(wholeOf(renderApplyPrompt(unconstrained, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
-  it('composes the mode description and the operation role into the durable half of a capture prompt', () => {
-    const prompt = renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)
+  it('composes the mode description and the operation role into the durable half of a capture prompt, and its task into the per-call half', () => {
+    const { durable, perCall } = renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)
 
-    expect(prompt).toContain(MODE_DESCRIPTION)
-    expect(prompt).toContain('FIXTURE_CAPTURE_ROLE')
-    expect(prompt).toContain('FIXTURE_CAPTURE_TASK')
+    expect(durable).toContain(MODE_DESCRIPTION)
+    expect(durable).toContain('FIXTURE_CAPTURE_ROLE')
+    expect(perCall).toContain('FIXTURE_CAPTURE_TASK')
   })
 
   it("gives the story editor the dispatch's readings as their own section, a no-comment among them as an attributed craft finding rather than a tally, naming the participant by display name", () => {
     const withReading = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
       { kind: 'substantive', participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
     ])
-    const prompt = renderPrompt(withReading, fragments, charter)
+    const prompt = wholeOf(renderPrompt(withReading, fragments, charter))
     expect(prompt).toContain('FIXTURE_READINGS_HEADING')
     expect(prompt).toContain('the third line carries nothing')
 
     const withNoComment = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
       { kind: 'noComment', participant: 'Compression' },
     ])
-    expect(renderPrompt(withNoComment, fragments, charter)).toContain('Compression found nothing material in its discipline.')
+    expect(wholeOf(renderPrompt(withNoComment, fragments, charter))).toContain('Compression found nothing material in its discipline.')
   })
 
-  it("states the mode's shared description of form and scale alongside the role's own persona, and selects the generalist task for the generalist", () => {
+  it("states the mode's shared description of form and scale alongside the role's own persona in the durable half, and selects the generalist task for the generalist in the per-call half", () => {
     const compiled = compileSpecialistContext(contextInput({ role: shape }))
-    const prompt = renderPrompt(compiled, fragments, charter)
-    expect(prompt).toContain(MODE_DESCRIPTION)
-    expect(sectionOf(prompt, 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
-    expect(prompt).toContain('FIXTURE_SPECIALIST_TASK')
+    const { durable, perCall } = renderPrompt(compiled, fragments, charter)
+    expect(durable).toContain(MODE_DESCRIPTION)
+    expect(sectionOf(durable, 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
+    expect(perCall).toContain('FIXTURE_SPECIALIST_TASK')
 
     const generalistRole: RoleDefinition = { ...shape, eligibility: 'generalist' }
     const generalistPrompt = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
-    expect(generalistPrompt).toContain('FIXTURE_GENERALIST_TASK')
-    expect(generalistPrompt).not.toContain('FIXTURE_SPECIALIST_TASK')
+    expect(generalistPrompt.perCall).toContain('FIXTURE_GENERALIST_TASK')
+    expect(generalistPrompt.perCall).not.toContain('FIXTURE_SPECIALIST_TASK')
   })
 
   it('states that an answer is owed only when the call owes one', () => {
     const owed = compileSpecialistContext(contextInput({ role: shape, owesAnswer: true }))
     const eligible = compileSpecialistContext(contextInput({ role: shape, owesAnswer: false }))
 
-    expect(renderPrompt(owed, fragments, charter)).toContain('FIXTURE_ADDRESSED_HEADING')
-    expect(renderPrompt(eligible, fragments, charter)).not.toContain('FIXTURE_ADDRESSED_HEADING')
+    expect(wholeOf(renderPrompt(owed, fragments, charter))).toContain('FIXTURE_ADDRESSED_HEADING')
+    expect(wholeOf(renderPrompt(eligible, fragments, charter))).not.toContain('FIXTURE_ADDRESSED_HEADING')
   })
 
   it("carries the reading a concrete change was asked of, and the author's clarification where there was one, never as the author's own message", () => {
     const asked = compileSpecialistContext(
       contextInput({ role: shape, ask: { claim: 'the entry is late', note: 'by a paragraph', clarification: 'what would you cut' } }),
     )
-    const prompt = renderPrompt(asked, fragments, charter)
+    const prompt = wholeOf(renderPrompt(asked, fragments, charter))
     expect(prompt).toContain('FIXTURE_CONCRETE_CHANGE_TASK')
     expect(prompt).toContain('the entry is late')
     expect(prompt).toContain('by a paragraph')
@@ -338,10 +350,10 @@ describe('rendering a prompt', () => {
     const unclarified = compileSpecialistContext(
       contextInput({ role: shape, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
     )
-    expect(renderPrompt(unclarified, fragments, charter)).not.toContain('FIXTURE_CLARIFICATION_HEADING')
+    expect(wholeOf(renderPrompt(unclarified, fragments, charter))).not.toContain('FIXTURE_CLARIFICATION_HEADING')
 
     // An ordinary call carries neither section.
-    const ordinary = renderPrompt(bareSpecialist, fragments, charter)
+    const ordinary = wholeOf(renderPrompt(bareSpecialist, fragments, charter))
     expect(ordinary).not.toContain('FIXTURE_READING_HEADING')
     expect(ordinary).not.toContain('FIXTURE_MESSAGE_HEADING')
   })

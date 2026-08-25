@@ -5,6 +5,7 @@ import { FixtureModelAdapter } from '../../support/modelAdapter.js'
 
 const schema = z.object({ claim: z.string() })
 const runtimeStatus = { reachable: true, models: [] } as const
+const prompt = { durable: 'durable', perCall: 'per-call' }
 
 describe('the fixture model implementation, as a substitute for the seam', () => {
   /**
@@ -14,20 +15,20 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
    */
   it("relays every scripted outcome as the seam would — a value through the caller's own schema, one that does not conform as nonconforming carrying what it was, and a failure as its own reason", async () => {
     const conforming = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
-    expect(await conforming.call('shape', 'prompt', schema, new AbortController().signal)).toEqual({
+    expect(await conforming.call('shape', prompt, schema, new AbortController().signal)).toEqual({
       outcome: 'value',
       value: { claim: 'the room agrees' },
     })
 
     const muttering = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'muttered' } } }, runtimeStatus)
-    expect(await muttering.call('shape', 'prompt', eligibleResponseValueSchema, new AbortController().signal)).toEqual({
+    expect(await muttering.call('shape', prompt, eligibleResponseValueSchema, new AbortController().signal)).toEqual({
       outcome: 'failed',
       reason: 'nonconforming',
       returned: '{"outcome":"muttered"}',
     })
 
     const failing = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason: 'timeout' } }, runtimeStatus)
-    expect(await failing.call('shape', 'prompt', schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
+    expect(await failing.call('shape', prompt, schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
   })
 
   /**
@@ -42,13 +43,13 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     )
     const states: string[] = []
 
-    await adapter.call('shape', 'prompt', schema, new AbortController().signal, (state) => states.push(state))
+    await adapter.call('shape', prompt, schema, new AbortController().signal, (state) => states.push(state))
 
     expect(states).toEqual(['preparing', 'working'])
 
     const slow = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
     const controller = new AbortController()
-    const pending = slow.call('shape', 'prompt', schema, controller.signal)
+    const pending = slow.call('shape', prompt, schema, controller.signal)
     controller.abort()
 
     expect(await pending).toEqual({ outcome: 'abandoned' })
@@ -60,11 +61,11 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
       runtimeStatus,
     )
 
-    expect(await adapter.call('shape', 'prompt', schema, new AbortController().signal)).toEqual({
+    expect(await adapter.call('shape', prompt, schema, new AbortController().signal)).toEqual({
       outcome: 'value',
       value: { claim: 'from shape' },
     })
-    await expect(adapter.call('story-editor', 'prompt', schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
+    await expect(adapter.call('story-editor', prompt, schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
   })
 
   it('reports the runtime status a test stated, and refuses to invent one no test stated', async () => {

@@ -2,7 +2,9 @@ import type { Charter } from '../model/charter.js'
 import type { Fragment, PromptFragments, SectionName } from '../model/prompts.js'
 import { renderFragment } from '../model/prompts.js'
 import type { RoleDefinition } from '../model/roles.js'
+import type { CallPrompt } from '../model/types.js'
 import type { ConversationEntry } from '../../shared/conversationEntries.js'
+import type { SurfaceId } from '../../shared/surfaces.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
 
@@ -27,6 +29,7 @@ export type ContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   entries: readonly ConversationEntry[] | undefined
   policy: HistoryPolicy
   participants: ReadonlyMap<string, string>
@@ -41,6 +44,7 @@ export type Context = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   history: readonly HistoryEntry[]
   evidence: readonly ParticipantEvidence[]
 }>
@@ -79,6 +83,7 @@ function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
+    surface: input.surface,
     history: deriveHistory(input.entries, input.policy, input.role.id, input.participants),
     evidence,
   }
@@ -92,6 +97,24 @@ export function compileStoryEditorContext(input: ContextInput, evidence: readonl
   return contextFrom(input, evidence)
 }
 
+export class SpecialistIndependenceViolation extends Error {
+  constructor(participant: string) {
+    super(`the compiled context for "${participant}" carries a reading from the dispatch being formed`)
+    this.name = 'SpecialistIndependenceViolation'
+  }
+}
+
+/**
+ * A specialist's compiled context can never carry evidence — only `compileStoryEditorContext` accepts
+ * any — so this is a regression guard on that invariant, asserted on the compiled object and before
+ * any of these contexts is rendered.
+ */
+export function assertSpecialistIndependence(contexts: readonly Context[]): void {
+  for (const context of contexts) {
+    if (context.evidence.length > 0) throw new SpecialistIndependenceViolation(context.role.displayName)
+  }
+}
+
 export type ApplyContextInput = Readonly<{
   modeDescription: string
   recommendationClaim: string
@@ -100,6 +123,7 @@ export type ApplyContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   entries: readonly ConversationEntry[]
   participants: ReadonlyMap<string, string>
 }>
@@ -112,6 +136,7 @@ export type ApplyContext = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   history: readonly HistoryEntry[]
 }>
 
@@ -134,6 +159,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
+    surface: input.surface,
     history: fullHistory(input.entries, input.participants),
   }
 }
@@ -180,10 +206,11 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
     .join('\n')
 }
 
-export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): string {
+export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallPrompt {
   const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.apply)])
   const perCall = compose([
     fixedSection(fragments.tasks.apply),
+    fixedSection(fragments.surfaces[context.surface]),
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),
     section(fragments, 'manuscript', 'manuscript', context.draft),
@@ -191,10 +218,10 @@ export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragme
     section(fragments, 'recommendation', 'recommendation', readingValue(context.recommendationClaim, context.recommendationNote)),
     section(fragments, 'constraint', 'constraint', context.constraint),
   ])
-  return durable + perCall
+  return { durable, perCall }
 }
 
-export function renderPrompt(context: Context, fragments: PromptFragments, charter: Charter): string {
+export function renderPrompt(context: Context, fragments: PromptFragments, charter: Charter): CallPrompt {
   const task =
     context.ask !== undefined ? fragments.tasks.concreteChange : context.role.eligibility === 'generalist' ? fragments.tasks.generalist : fragments.tasks.specialist
 
@@ -206,6 +233,7 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
 
   const perCall = compose([
     fixedSection(task),
+    fixedSection(fragments.surfaces[context.surface]),
     context.owesAnswer ? fixedSection(fragments.sections.addressed) : '',
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),
@@ -217,7 +245,7 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
     context.ask?.clarification === undefined ? '' : section(fragments, 'clarification', 'clarification', context.ask.clarification),
   ])
 
-  return durable + perCall
+  return { durable, perCall }
 }
 
 export type CaptureContextInput = Readonly<{
@@ -225,6 +253,7 @@ export type CaptureContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   entries: readonly ConversationEntry[] | undefined
   participants: ReadonlyMap<string, string>
 }>
@@ -234,6 +263,7 @@ export type CaptureContext = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
+  surface: SurfaceId
   history: readonly HistoryEntry[]
 }>
 
@@ -243,18 +273,20 @@ export function compileCaptureContext(input: CaptureContextInput): CaptureContex
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
+    surface: input.surface,
     history: input.entries === undefined ? [] : fullHistory(input.entries, input.participants),
   }
 }
 
-export function renderCapturePrompt(context: CaptureContext, fragments: PromptFragments): string {
+export function renderCapturePrompt(context: CaptureContext, fragments: PromptFragments): CallPrompt {
   const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.capture)])
   const perCall = compose([
     fixedSection(fragments.tasks.capture),
+    fixedSection(fragments.surfaces[context.surface]),
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),
     section(fragments, 'manuscript', 'manuscript', context.draft),
     section(fragments, 'history', 'history', historyLines(fragments, context.history)),
   ])
-  return durable + perCall
+  return { durable, perCall }
 }
