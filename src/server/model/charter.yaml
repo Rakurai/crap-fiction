@@ -1,6 +1,4 @@
-# CONTEXT "Response"; PRD "What a recommendation means" / "A direct question is
-# owed an answer" / "Nothing reasons about the author's question". What every
-# participant is told, regardless of which one it is.
+# What every participant is told, regardless of which one it is.
 outcomes:
   noComment: >-
     The participant has nothing material to contribute. Recorded in the

@@ -20,9 +20,9 @@ describe('the @handle grammar the studio agrees on', () => {
   })
 
   /**
-   * SPEC "Addressing is parsed out of the author's message": a sigil counts where it begins the
-   * message or follows whitespace, so `mail@shape.com` and the second sigil of `@@shape` open
-   * nothing. Declared here once, for the server reading a message and the client completing one.
+   * A sigil counts where it begins the message or follows whitespace, so `mail@shape.com` and the
+   * second sigil of `@@shape` open nothing. Declared here once, for the server reading a message
+   * and the client completing one.
    */
   it('opens a mention at the start of the text or after whitespace, and after nothing else', () => {
     expect(opensMention(undefined)).toBe(true)

@@ -1,5 +1,5 @@
 # One container, run by Docker Desktop on the author's Mac, with two host binds
-# and one published port (SPEC "Deployment"). `docker compose up` is the whole
+# and one published port. `docker compose up` is the whole
 # of starting the studio; the values below come from .env, which is the author's
 # own file and is not committed.
 #

@@ -1,5 +1,5 @@
 # The base image is pinned by version and by digest, so the studio the author
-# writes in tomorrow is the one they wrote in today (SPEC "Deployment"). The
+# writes in tomorrow is the one they wrote in today. The
 # Debian image rather than a trimmed one because the roster's segmenter counts a
 # story's length with Intl, and a runtime built without full ICU counts it wrong
 # in whatever language it was not built for.

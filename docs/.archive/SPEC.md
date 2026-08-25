@@ -1,11 +1,11 @@
 # SPEC
 
 **Owns:** implementation substrate, persistence, model orchestration, transport, verification.
-**Does not own:** purpose and principles (VISION), vocabulary (CONTEXT), author requirements
-(PRD), composition and presentation (UX_DESIGN).
-**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. Everything here is subordinate to
-the documents above it; where this document appears to decide product behaviour, it is
-recording what the behaviour above it forces.
+**Does not own:** purpose and principles, vocabulary, author requirements, composition and
+presentation.
+
+Where this document appears to decide product behaviour, it is recording what the behaviour
+above it forces.
 
 ## What forces most of this
 
@@ -16,16 +16,16 @@ recording what the behaviour above it forces.
 | Models assignable per participant, behind a replaceable layer | Every model call goes through one internal interface, and the runtime it uses is that interface's business alone. |
 | The application owns the AI layer only | Conventional prose editing comes from a mature editor and is not reimplemented. |
 
-Three properties of the interaction do the rest of the constraining.
+Properties of the interaction do the rest of the constraining.
 
 **Independence is context compilation.** No specialist's context may contain another
 specialist's response from the dispatch being formed. This is a property of what goes into a
-call, not of what a prompt asks for, and it is the one seam where a plausible implementation
-defeats the product's central bet with no symptom.
+call, and it is the one seam where a plausible implementation defeats the product's central bet
+with no symptom.
 
-**Asking the room is several slow calls the author must not block on.** They are issued one at a
-time against one local model, so a dispatch costs the sum of its calls. This is an infrastructure
-fact before it is an interface one.
+**Asking the room is several slow calls the author must not block on.** Issued one at a time
+against one local model, a dispatch costs the sum of its calls. This is an infrastructure fact
+before it is an interface one.
 
 **Applying a recommendation is interpretation, not replay.** It reads the current manuscript
 and produces the next one; nothing stored describes the edit in advance.
@@ -52,19 +52,18 @@ accumulation held in a pure reducer the hook feeds events to — a store library
 state authority above the one the framework already supplies.
 
 **`pino` is the logger, and it writes to stderr and nowhere else.** No file transport, no log directory
-and no second destination, so nothing the logger emits outlives the process — which is what makes the
-refusal to keep a durable record of model traffic structural rather than a rule someone has to remember
-at each call site. What a line may carry follows from that refusal: the call site, the outcome, the
-elapsed time, the model identity, the piece and conversation identifiers, and a failure's reason, but
-never a prompt, a participant's response, manuscript text or the contents of either durable context.
-The author's story is not diagnostic data.
+and no second destination, so nothing the logger emits outlives the process — which makes the refusal
+to keep a durable record of model traffic structural rather than a rule remembered at each call site.
+A line may carry the call site, the outcome, the elapsed time, the model identity, the piece and
+conversation identifiers, and a failure's reason, but never a prompt, a participant's response,
+manuscript text or the contents of either durable context. The author's story is not diagnostic data.
 
 **One piece is open at a time, and the application state is singular** — one draft, one current
 conversation, one operation. Switching pieces replaces that state rather than accumulating
-alongside it, and abandons whatever operation is in flight, which keeps whatever landed. Nothing is
-ordinarily held unsaved, so ordinarily nothing is at risk in that replacement. A switch is refused
-only while a draft write remains unwritten after a failure, having first retried it: prose the
-author typed is the one thing a piece switch may never discard.
+alongside it, and abandons whatever operation is in flight, keeping whatever landed. Nothing is
+ordinarily held unsaved. A switch is refused only while a draft write remains unwritten after a
+failure, having first retried it: prose the author typed is the one thing a piece switch may never
+discard.
 
 ## Dependencies
 
@@ -75,9 +74,8 @@ alternative is not a smaller dependency list — it is the same capability writt
 arrived at one plausible decision at a time, which is how a studio for writing fiction acquires
 its own Markdown parser and its own diff.
 
-Four of these choices are argued where they are used rather than here — the editor, the model
-runtime, the logger and the test runner. This table records the choice; those sections carry the
-reasoning, and it is not repeated.
+Where a choice is argued at the point it is used, this table records the choice alone and the
+reasoning is not repeated.
 
 | Capability | Package |
 |---|---|
@@ -97,7 +95,7 @@ reasoning, and it is not repeated.
 | The document model `prosemirror-markdown` parses into and serializes from | `prosemirror-model` |
 | The tokenizer `prosemirror-markdown`'s parser is constructed with | `markdown-it` |
 | Before-and-after comparison of two manuscript states | `diff` |
-| Design tokens and component styling | the mockup's `tokens.css`, through Vite's CSS Modules |
+| Design tokens and component styling | `tokens.css`, through Vite's CSS Modules |
 | The prose and interface typefaces | latin-subset `woff2` under `src/client/fonts/`, in this repository |
 | The combobox behind inline handle completion | `@ariakit/react` |
 | Relative time — when a conversation was last active, when a piece last changed | `date-fns` |
@@ -133,47 +131,38 @@ library's output rather than a reason to compute the comparison here.
 repository's own.** They are a few lines each against rules stated in this document, and a package
 general enough to cover them would arrive with a policy the product has not chosen.
 
-**The token layer is the mockup's own.** `tokens.css` as the mockup settled it is the whole styling
-substrate — the two themes, the type registers and the rules — applied through CSS Modules. Nothing
-supplies appearance from a package, and the values are read from the mockup rather than reinvented
-beside it. What the registers and the control weights resolve to is declared once — each register's ink
-as a token in every theme, each weight as a class other modules compose from — so a module states which
+**The token layer is `tokens.css`**, and it is the whole styling substrate — the two themes, the type
+registers and the rules — applied through CSS Modules. Nothing supplies appearance from a package.
+What the registers and the control weights resolve to is declared once — each register's ink as a
+token in every theme, each weight as a class other modules compose from — so a module states which
 register or weight a thing is in rather than restating what that looks like.
 
 **The register the room speaks in is composed from the typefaces already carried**, in a token of its
-own over Public Sans. A face of its own would be the more direct answer and is not taken: a third
-typeface is a change to the dependency roster above, and the register is separable without one.
+own over Public Sans. A third typeface would be a change to this roster, and the register is separable
+without one.
 
 **The typefaces are files in this repository.** Spectral for the prose and Public Sans for the
 interface travel with the application as latin-subset `woff2` under `src/client/fonts/`, declared in
-`tokens.css` and served by the app. The mockup gets them from a Google Fonts `<link>`, which is mockup
-scaffolding: VISION "Local, and fully usable offline" rules out a runtime network fetch, and a font
-that fails to arrive leaves the author on a face nobody chose. Only the weights the mockup's own
-request names are carried — Spectral 300/400/500/600 and 400 italic, Public Sans 400/500/600 — since
-the geometry in the CSS modules was settled against those metrics. Both faces are OFL and the licences
-sit beside them.
+`tokens.css` and served by the app: a runtime network fetch is ruled out, and a font that fails to
+arrive leaves the author on a face nobody chose. Only the weights the CSS modules' geometry was settled
+against are carried — Spectral 300/400/500/600 and 400 italic, Public Sans 400/500/600. Both faces are
+OFL and the licences sit beside them.
 
 **The facts register composes on the platform's own monospace stack**, and names no face. It is the
-register the machine speaks in, where the local terminal face is the right voice and a shipped one
-would be a change to the composition rather than a fix to it. This is the one register whose face the
-browser chooses, and it is chosen deliberately.
+register the machine speaks in, where the local terminal face is the right voice. This is the one
+register whose face the browser chooses, and it is chosen deliberately.
 
 **`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
 is the condition of adopting it: a library carrying its own look would compete with the registers the
-interface is composed in. It is taken for the combobox that offers handles as the author types one —
-the completion surface only, since which participants a message addressed stays the room's reading of
-the text as stated above. It is taken for nothing else: the interface has no dialog, so the focus
-management that would otherwise be the second reason to carry it is unused.
+interface is composed in. It is taken for the combobox that offers handles as the author types one,
+and for nothing else — the interface has no dialog.
 
 **Where a model must be named, the model is chosen from the runtime's reported models rather than
-typed.** `GET /models` already carries them, so an author who has to type an identifier by hand is
-being asked for something the application knows: one character wrong is a call site that fails as
-unconfigured at the next call, discovered minutes later. It is a closed choice over what the runtime
-holds, plus whatever the site is already assigned — an assignment the runtime no longer reports stays
-offered and stays selected, so a model that is merely not loaded right now is never silently dropped
-from a site the author configured. That is the whole of what a free-text field would have bought, and a
-closed choice cannot be got wrong by a keystroke. The platform's own `<select>` is what this shape is,
-so `@ariakit/react`'s entry above does not widen to cover this surface.
+typed.** An author typing an identifier by hand is being asked for something the application knows,
+and one character wrong is a call site that fails as unconfigured minutes later. The choice is closed
+over what the runtime holds, plus whatever the site is already assigned — an assignment the runtime no
+longer reports stays offered and stays selected, so a model that is merely not loaded is never silently
+dropped from a site the author configured. The platform's own `<select>` is what this shape is.
 
 The container image and the base it is built on are Deployment's rather than this table's: they are
 how the application is run and not something it depends on to work.
@@ -189,19 +178,17 @@ level control is available where the application genuinely needs it.
 **The document schema is constrained to what round-trips through Markdown semantically.** The
 manuscript is prose: paragraphs, emphasis, strong emphasis, headings where a piece wants them,
 thematic breaks where a piece marks a scene division, and hard line breaks where a piece holds two
-lines apart inside one paragraph. Lists, tables, block quotes, links, images,
-inline code, raw HTML and front matter are not in the schema, and Markdown source offering one of
-them is read as the prose it contains rather than refused — a story the author brought from
-elsewhere opens.
-Perfect preservation of every syntactically equivalent Markdown spelling is not a requirement;
-preserving meaning is.
+lines apart inside one paragraph. Lists, tables, block quotes, links, images, inline code, raw HTML
+and front matter are not in the schema, and Markdown source offering one of them is read as the prose
+it contains rather than refused — a story the author brought from elsewhere opens. Perfect
+preservation of every syntactically equivalent Markdown spelling is not a requirement; preserving
+meaning is.
 
-**Markdown is `prosemirror-markdown`'s over the constrained schema, not TipTap's.** This was the
-one part of the editor choice that had to be proven rather than assumed, and exercising it early is
-what settled it: the parser and serializer are configured directly against the schema, from a
-node-and-mark spec table with `markdown-it` as the tokenizer. The constrained schema is a subset of
-the document that package already serializes, so this is configuration rather than a parser, it
-disturbs nothing else in the editor integration, and nothing here reads or emits Markdown by hand.
+**Markdown is `prosemirror-markdown`'s over the constrained schema, not TipTap's.** The parser and
+serializer are configured directly against the schema, from a node-and-mark spec table with
+`markdown-it` as the tokenizer. The constrained schema is a subset of the document that package
+already serializes, so this is configuration rather than a parser, and nothing here reads or emits
+Markdown by hand.
 
 **The rendered view and the Markdown source view are two editing views over the same
 manuscript.** How representation switching is implemented is left to the editor integration;
@@ -264,31 +251,27 @@ itself is never asked for, because whoever ran the application already said wher
 config living under it rather than in a per-user home directory is what makes the author's
 assignments and author context survive the process being replaced.
 
-Author context generalizes across pieces and is a
-property of the author rather than of any story, so it does not live in a piece. Model assignment is
-likewise a property of the author's machine and the models they hold rather than of any story: a
-participant is pointed at a different model once, and every piece it works on uses it.
+**What sits in `config/` is a property of the author's machine rather than of any story**: author
+context, which generalizes across pieces; model assignment, so a participant pointed at a different
+model once is on that model for every piece; and the interface theme. With no theme written the
+interface follows the operating system — an absent key means the author has not chosen, which is a
+different thing from a value the application supplied on their behalf.
 
-The interface theme sits there for the same reason, being a property of the machine the author writes
-on rather than of any story. With no theme written the interface follows the operating system: an
-absent key means the author has not chosen, which is a different thing from a value the application
-supplied on their behalf, and it is why nothing writes one until they pick.
+**Shipped data travels with the application**, beside its own source rather than under the data root:
+the participant charter, the role definitions, and the mode descriptors. Where exactly is the store
+boundary's, like the rest of the layout — the modules that read them state what each must contain and
+never where it is.
 
-Shipped data travels with the application in three kinds: the participant charter, the role
-definitions, and the mode descriptors. It sits beside the application's own source rather than under
-the data root, and where exactly is the store boundary's like the rest of the layout: the modules
-that read modes, roles and the charter state what each must contain and never where it is. The charter is what every participant is told whichever one it
-is — what the three outcomes mean and what makes a recommendation applicable rather than commentary,
-that a direct question is owed an answer, and that nothing reasons about the author's question
-instead of about the story. It is its own kind because repeating it inside every role definition
-would be as many places for it to drift, and because a correction to it is one edit rather than five.
-A role
-definition carries the participant's display name and its single-token handle, which are
-different things — a display name of more than one word cannot be recovered from a message.
-Conflating
-shipped data with author configuration means an upgrade either clobbers the author's assignments
-or fails to deliver a corrected role definition. Shipped data is validated at startup and
-invalid shipped data is a startup failure, because a descriptor that parses partially would
+The **charter** is what every participant is told whichever one it is: what the three outcomes mean
+and what makes a recommendation applicable rather than commentary, that a direct question is owed an
+answer, and that nothing reasons about the author's question instead of about the story. It is its own
+kind so that a correction to it is one edit rather than one per role. A **role definition** carries
+the participant's display name and its single-token handle, which are different things — a display
+name of more than one word cannot be recovered from a message.
+
+Shipped data is kept apart from author configuration because conflating them means an upgrade either
+clobbers the author's assignments or fails to deliver a corrected role definition. It is validated at
+startup and invalid shipped data is a startup failure, since a descriptor that parses partially would
 enable the wrong cast.
 
 **The piece directory is the piece's identity.** Its name derives from the title, slugified,
@@ -440,11 +423,10 @@ CallResult<T> =
 FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
 ```
 
-**Three outcomes, and they are three types.** A value, an abandonment, and a failure carrying which
-kind it was mean different things to the author and to the room, so none of them is the absence of
-another: a result that modelled two of them as a missing value would leave every caller inferring the
-difference from state it happens to hold, and the room is required to tell them apart. `returned`
-carries what came back verbatim where anything did.
+**Each outcome is its own type.** A value, an abandonment, and a failure carrying which kind it was
+mean different things to the author and to the room, so none of them is the absence of another: a
+result modelling two of them as a missing value would leave every caller inferring the difference from
+state it happens to hold. `returned` carries what came back verbatim where anything did.
 
 **The prompt crosses as text rather than as messages.** A message array would import a chat topology
 from whichever runtime was consulted first, and this conversation has five speakers with no faithful
@@ -465,27 +447,22 @@ application, or a capture — and it is how the assignment is found. The module 
 conversation, a dispatch, a participant's history or a manuscript exists, which is most of why
 replacing it is cheap.
 
-**Retry, timeout and model residency are policy inside the module, not parameters on a call.** Every
-call site wants the same policy, and a caller choosing a retry count is a caller reasoning about
-model reliability — which is the thing the module exists to absorb. Loading, holding and evicting
-models is likewise the module's business, and the case worth its attention is a full cast on distinct
-models: evicting after every call would have a dispatch spend more time loading than answering,
-which is a cost the author experiences as the room being slow and has no way to diagnose.
+**Retry, timeout and model residency are policy inside the module, not parameters on a call.** A
+caller choosing a retry count is reasoning about model reliability, which is what the module exists to
+absorb. Loading, holding and evicting models is likewise the module's business: evicting after every
+call would have a dispatch on a full cast of distinct models spend more time loading than answering.
 
 **How many times a failed call is retried, and how long a call may wait, are this module's values** —
-one place, maintainer-facing, not author configuration and not a knob anywhere on the interface. That a
-failure is retried without asking the author is behaviour the PRD requires; what the count is has no
-author-facing meaning, and putting it in the room, in a route or in a settings file would make it a
-number three callers could disagree about.
+one place, maintainer-facing, not author configuration and not a knob anywhere on the interface. The
+count has no author-facing meaning, and putting it in the room, in a route or in a settings file would
+make it a number several callers could disagree about.
 
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
-it can answer makes the author wait for a reason the interface can state, and a dispatch in flight is
-required to state only what is true. An implementation that cannot tell setup from work simply never
-reports preparing, which is the ceiling principle in its smallest form: the interface admits the
-richer state and a weaker implementation under-reports rather than the interface under-promising.
-Load progress is available as a fraction and is deliberately not carried, because the author's next
-move is the same at forty percent as at sixty and a number on the interface is a progress bar the
-composition then owes.
+it can answer makes the author wait for a reason the interface can state. An implementation that cannot
+tell setup from work simply never reports preparing — the interface admits the richer state and a weaker
+implementation under-reports. Load progress is available as a fraction and is deliberately not carried:
+the author's next move is the same at forty percent as at sixty, and a number on the interface is a
+progress bar the composition then owes.
 
 **The failure taxonomy is the product's.** No status code, runtime error class or SDK exception type
 crosses the boundary. A call fails because there is no assignment for that call site, because the
@@ -513,9 +490,9 @@ real question, and it is cheaper to answer it there than to carry unexercised ma
 **`@lmstudio/sdk` implements that interface, used natively and fully.** It is not wrapped in a
 provider abstraction, and the reason for choosing it is capability rather than portability: it
 enforces a JSON schema strictly, emits reasoning as a distinct output segment rather than as tags in
-the text, and manages which models are resident — three things the application would otherwise
-absorb as its own code, and two of which the current interface would have had to promise while
-knowing it could not deliver them.
+the text, and manages which models are resident — all of which the application would otherwise
+absorb as its own code, and some of which the interface would have had to promise while knowing it
+could not deliver them.
 
 **Where the runtime is reached is this module's own process configuration**, read once at startup and
 validated with everything else. It is the only place in the product where a host appears, and the
@@ -523,9 +500,8 @@ model module is the only module that receives it — which is what keeps *no con
 host or a locality* true of a deployment where the runtime is not even on the same machine as the
 process, rather than only of one where it happens to be.
 
-A second implementation stays possible, and the boundary that permits it is one of the two this
-document calls load-bearing. It is not designed for, sketched, or accommodated: an implementation over
-a weaker runtime writes whatever code the contract takes, and that cost is accepted in advance because
+A second implementation stays possible but is not designed for, sketched, or accommodated: one over a
+weaker runtime writes whatever code the contract takes, and that cost is accepted in advance because
 the alternative pays a smaller cost every day on the runtime actually in use. The condition that would
 call for one is wanting a model this runtime cannot reach, which is narrow — the seam stays because it
 is nearly free, not because it is expected to be exercised.
@@ -565,12 +541,11 @@ conformed is a normal outcome plainly reported; a response that could not be mad
 failure.
 
 **Schemas are as small as the call allows, because that is what makes constrained decoding hold.**
-A specialist's response is three flat fields — its declared outcome, its claim, and its note — and a
-local model holds that reliably where it falls apart on a nested structure. The note is optional, so
-a claim standing alone conforms and nothing has to be invented to fill a field. Where a call would need a large
-schema, several small calls are the better shape: context capture returning many proposals is the
-one case, and SPEC already declines to fix its call count. Shrinking the schema is always preferred
-to adding machinery that repairs what a larger one returned.
+A specialist's response is flat — its declared outcome, its claim, and its note — and a local model
+holds that reliably where it falls apart on a nested structure. The note is optional, so a claim
+standing alone conforms and nothing has to be invented to fill a field. Where a call would need a
+large schema, several small calls are the better shape, and context capture is the one such case.
+Shrinking the schema is always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
 one, and so does the Story Editor on a dispatch where nothing substantive landed. Declaring it is then a
@@ -603,7 +578,7 @@ change for either.
 **This is the seam the central bet lives in.** Everything else in the orchestration is
 plumbing.
 
-A call is assembled from four things the runtime holds, none of which is an intrinsic property
+A call is assembled from things the runtime holds, none of which is an intrinsic property
 of the participant:
 
 ```
@@ -611,12 +586,11 @@ role definition + the mode's criteria for that participant + model configuration
   + selected context compilation policy → participant call
 ```
 
-**The mode's criteria are named here because they are what make the specialists differ.** CONTEXT
-"Mode" has a mode supplying the criteria each specialist applies at that scale — what it attends to
-and the defect it is alert to — and a compilation that dropped them would separate four participants
-by one sentence of role description each, which is not the room the bet describes. The Story Editor
-has no such criteria, being no part of the cast, and is told what it is for by its role definition
-instead.
+**The mode's criteria are named here because they are what make the specialists differ.** A
+compilation that dropped what a specialist attends to and the defect it is alert to would separate
+four participants by one sentence of role description each, which is not the room the bet describes.
+The Story Editor has no such criteria, being no part of the cast, and is told what it is for by its
+role definition instead.
 
 ```
 compileContext(call, piece, conversation, policy) → Context
@@ -636,8 +610,8 @@ whole and unexcerpted, and the current author message. At flash length a whole d
 cheaper to include than any excerpting scheme is to specify, and excerpting would put a second
 inference in the context path.
 
-**Conversation history is supplied by policy.** Two policies exist and the seam is the whole of
-the difference between them.
+**Conversation history is supplied by policy**, and the seam is the whole of the difference between
+the policies.
 
 **Shared history is the default.** A specialist sees the conversation as it happened: author
 messages, prior dispatches' participant responses, and the applications that changed the
@@ -646,7 +620,7 @@ manuscript.
 **Stricter independence is the alternative** and filters other specialists' historical
 responses that the author did not act on, leaving author messages, applied recommendations and
 the participant's own prior responses. Which policy produces better collaboration is an
-empirical question, and switching between them must remain a configuration change rather than
+empirical question, so switching between them must remain a configuration change rather than
 a redesign.
 
 **Under every policy, the invariant holds: no specialist's context contains any other
@@ -708,20 +682,16 @@ in flight for the same piece; a dispatch or an Apply in flight is never a reason
 
 **Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the
-one that replaced it. With at most one conversation action and one capture per piece at a time, the
-identifier costs nothing, and it is the whole of what keeps an abandoned call from arriving as a
-live one. Abandoning targets this identifier directly rather than "whichever operation this piece is
-running": a request naming an action that has already finished, ordinary or abandoned, is a silent
-no-op rather than a reason to touch whatever runs in its place. Untracking is synchronous with the
-abandon request itself, not with the cancelled call's own eventual settlement, which is what lets the
-room accept the next operation immediately rather than once the abandoned one finishes unwinding.
+one that replaced it. Abandoning targets this identifier directly rather than whichever operation the
+piece is running: a request naming an action that has already finished, ordinary or abandoned, is a
+silent no-op. Untracking is synchronous with the abandon request itself rather than with the cancelled
+call's eventual settlement, which is what lets the room accept the next operation immediately.
 
-**Serialization is a simplification, not a principle.** Local capacity is bounded by the loaded
-model, so overlapping conversation actions would buy little wall-clock while multiplying the states
-the interface has to compose, and nothing is built to make that concurrency impossible — there is no
-requirement for it. Capture overlaps the other two anyway, on the same bounded capacity: gating a
-whole-story analysis the author invokes rarely on whatever the room happens to be doing would cost
-more in waiting than the shared capacity would ever save.
+**Serialization is a simplification, not a principle.** Overlapping conversation actions would buy
+little wall-clock against capacity bounded by the loaded model while multiplying the states the
+interface has to compose, and nothing is built to make that concurrency impossible. Capture overlaps
+the other two anyway: gating a whole-story analysis the author invokes rarely on whatever the room
+happens to be doing would cost more in waiting than the shared capacity would ever save.
 
 ## Dispatch
 
@@ -745,19 +715,16 @@ after them in some fixed position.
 
 **Where nothing was addressed, the Story Editor belongs to the dispatch's specialist set from the
 moment it opens** — its call cannot be submitted until every specialist call this dispatch caused has
-settled. The author has no use for the fact that a different condition gates it, so
-`participant.activity` needs no third value for it, and the guarantee that the readings precede the
-judgment is carried by that precondition rather than asserted in a label or a position in a list. An
-addressed dispatch that did not name it does not include it at all, and a directed message or a
-concrete-change request never reaches this gate regardless of how many specialists it happened to
-call.
+settled. The guarantee that the readings precede the judgment is carried by that precondition rather
+than asserted in a label or a position in a list, so `participant.activity` needs no third value for
+it. An addressed dispatch that did not name it does not include it at all, and a directed message or a
+concrete-change request never reaches this gate regardless of how many specialists it called.
 
 **Responses land in the order they settle, not the cast's order.** Every eligible specialist's call
-is submitted before any of them has settled, so a dispatch calling four specialists on four
-different models can have any one of them answer first, and whichever does is durable first.
-Independence never depended on a stable order: every context was already closed, from one snapshot,
-before any call was submitted, so which one settles when carries no bearing on what any of them was
-asked. The room does not serialize these calls itself and does not infer that all of them are done
+is submitted before any of them has settled, so a dispatch calling four specialists on four different
+models can have any one of them answer first, and whichever does is durable first. Independence never
+depended on a stable order: every context was already closed, from one snapshot, before any call was
+submitted. The room does not serialize these calls itself and does not infer that all of them are done
 from any shared model-queue state; it tracks only the specialist calls this dispatch's own source
 entry caused, and acts once exactly that set is empty.
 
@@ -767,10 +734,10 @@ message is parsed for.** A sigil counts where it begins the message or follows w
 lowercased and prefix-matched against the participants' lowercased handles, so `@comp` reaches
 Compression. A token matching exactly one handle addresses that participant; a token matching none,
 or more than one, is ignored and stays ordinary text. Typo tolerance and fuzzy matching are not
-required. Offering handles as the author types one is the composer's own affair and is the roster's
-combobox; it never becomes a second authority on who was called, because the room reads the text the
-author actually sent. The message itself reaches every call verbatim, sigils included, and is
-written into the author-message entry exactly as sent.
+required. Offering handles as the author types one is the composer's own affair and never becomes a
+second authority on who was called, because the room reads the text the author actually sent. The
+message itself reaches every call verbatim, sigils included, and is written into the author-message
+entry exactly as sent.
 
 **The room is the only parser, and a dispatch that names its target is not parsed at all.** Replying
 to a participant and asking one for a concrete change each aim at a single participant without the
@@ -854,7 +821,7 @@ renormalize punctuation, reflow paragraphs and revise prose nobody asked about.
 
 **The representation the model returns is an implementation choice** — revised Markdown,
 replacement ranges, or structured operations — and the author experience does not depend on it.
-Two requirements bound it: the result is applied to the editor as a single transaction, and the
+What bounds it: the result is applied to the editor as a single transaction, and the
 application computes the before-and-after presented to the author from the manuscript states
 rather than trusting the model to describe its own edit. That before-and-after is the changed
 passages with a little prose around them and no positions of any kind — enough to show what
@@ -862,11 +829,9 @@ happened, not enough to reapply it anywhere — and where the change is unbounde
 that the piece was rewritten whole.
 
 **That last case is a rule about what the file may hold, not about how much the surface may show.**
-The conversation discloses a change on the author's action and is indifferent to its length, so
-nothing about screen space is doing the work here. What the rule prevents is storing the prose either
-side of a whole-manuscript rewrite, which is a complete prior state of the story sitting on disk for
-as long as the conversation lives — a manuscript snapshot whatever the file is called, and the one
-thing this product refuses to keep.
+What it prevents is storing the prose either side of a whole-manuscript rewrite, which is a complete
+prior state of the story sitting on disk for as long as the conversation lives — a manuscript snapshot
+whatever the file is called.
 
 **An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, lock
 released, manuscript untouched, recommendation still applicable. With the timeout in the model
@@ -885,16 +850,13 @@ recommendation stays applicable.
 draft, the current conversation whole, and both existing contexts, snapshotted as they stand when
 the author invokes it. The author keeps writing while it runs: the analysis holds no lock, and
 editing afterwards neither cancels it nor is reconciled against its proposals, which are advisory
-and individually approved. It may run while a dispatch or an application is in flight for the same
-piece, and starting either of those never waits on a capture either — see "Operation state" and
-"Seams". Its output is a set of proposals, each carrying its destination context, the operation it
-performs — add, revise, replace, remove — the entry it concerns where it concerns an existing one,
-and the proposed text.
+and individually approved. Its output is a set of proposals, each carrying its destination context,
+the operation it performs — add, revise, replace, remove — the entry it concerns where it concerns an
+existing one, and the proposed text.
 
 **One call is the normal case and is not a contract.** Where a single call would need a schema large
-enough to defeat constrained decoding, the operation may issue several sequential calls instead —
-which is the reason the count is not fixed, the material's size having ceased to be one. Nothing in
-the interface encodes how many calls it took.
+enough to defeat constrained decoding, the operation may issue several sequential calls instead.
+Nothing in the interface encodes how many calls it took.
 
 **Only approved proposals are written**, as an ordinary atomic write to the destination context
 file. Nothing is written on the author's behalf, and no proposal is retained after the review
@@ -1020,7 +982,7 @@ POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
                                                    targets that action by identity, so a request
                                                    naming one already finished touches nothing;
                                                    never a capture, which has no abandon route of
-                                                   its own (issue #55)
+                                                   its own
 POST   /pieces/:id/capture                         returns proposals
 POST   /pieces/:id/capture/approve                 writes the approved proposals
 GET    /pieces/:id/events                          SSE
@@ -1132,12 +1094,11 @@ not tested, and packaging a build to serve a page to a browser on the same machi
 That the studio's daily arrangement includes a development server is a consequence worth naming rather
 than hiding.
 
-**Streaming through that server is proven, for the same reason Markdown fidelity was.** It was the
-one part of this arrangement the product depends on and does not control: a dispatch's events reach
-the client as server-sent events, and a dev server that buffered them would break the surface the
-author watches a dispatch in. It streams, held there by a test that puts frames through the real dev server
-rather than through a mock of it, so the contingency of serving the Hono application from an ordinary
-Node adapter beside a client build is not taken and its adapter is not on the roster.
+**Streaming through that server is held by a test that puts frames through the real dev server
+rather than through a mock of it.** A dispatch's events reach the client as server-sent events, and a
+dev server that buffered them would break the surface the author watches a dispatch in. Because it
+streams, the contingency of serving the Hono application from an ordinary Node adapter beside a client
+build is not taken and that adapter is not on the roster.
 
 **The model runtime stays on the host.** Docker Desktop passes no GPU through on macOS, so a model
 served from inside the container would answer from the CPU and the room would be too slow to consult —
@@ -1193,24 +1154,23 @@ this software refuses.
 
 ## Seams
 
-**A boundary earns its place by carrying a guarantee that cannot be asserted anywhere else.**
-Two are load-bearing and the rest of the orchestration is internal.
+**A boundary earns its place by carrying a guarantee that cannot be asserted anywhere else.** The
+load-bearing ones are below; the rest of the orchestration is internal.
 
 | Boundary | Interface | Why it is real |
 |---|---|---|
 | **context** | compile a participant's call input | current-dispatch independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
 | **model** | a call site, a prompt, a schema and an abort signal in; a conforming value, an abandonment, or a stated failure out | the LM Studio implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
-Two further interfaces are expected and useful without being doctrine. A **store** boundary
-concentrates atomic writes and artifact access, and owns the file layout "Files" draws: its entry
-points name artifacts — the settings file, a piece's metadata, a piece's draft, the three kinds of
-shipped data — so no module above it composes a path or holds a file handle, and containment against
-the workspace root is part of that ownership rather than a check a caller remembers to make. It is
-not a seam tests substitute: they cross the real implementation against a temporary directory, which
-is the real thing, and a second implementation with no variation behind it would be a premature seam
-asserting nothing. A **room** boundary owns the operations the author starts — start one, abandon the current one,
-subscribe to its events — which is already the client's contract, so tests and the client cross the
-same surface.
+Further interfaces are expected and useful without being doctrine. A **store** boundary concentrates
+atomic writes and artifact access, and owns the file layout above: its entry points name artifacts —
+the settings file, a piece's metadata, a piece's draft, each kind of shipped data — so no module above
+it composes a path or holds a file handle, and containment against the workspace root is part of that
+ownership rather than a check a caller remembers to make. It is not a seam tests substitute: they
+cross the real implementation against a temporary directory, and a second implementation with no
+variation behind it would be a premature seam asserting nothing. A **room** boundary owns the
+operations the author starts — start one, abandon the current one, subscribe to its events — which is
+already the client's contract, so tests and the client cross the same surface.
 
 **The room owns the dispatch, the application and the capture, but not as one shared operation.** A
 dispatch and an application share one state machine, one lock on the manuscript and one abandonment
@@ -1267,22 +1227,22 @@ rules are the larger part of the suite and have no use for one. It is for what t
 decides — a control refused, a field that arrives on an action, what a notice says — and not for what
 only the running application settles, which is the browser tests' few purposes below.
 
-**The boundaries are the test surface.** Each property is asserted at exactly one of them, and
-nowhere twice — a rule asserted at two levels is a rule that will be changed at one.
+**The boundaries are the test surface**, and the rules stated above are the properties. What each
+boundary owns:
 
-| Boundary | What must hold |
+| Boundary | Its assertion territory |
 |---|---|
-| **context** | no specialist's compiled context contains another specialist's response from the dispatch being formed, under either history policy; every specialist context is compiled before the dispatch's first call is issued; the Story Editor's contains the dispatch's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
-| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; every eligible specialist's call is submitted independently before any of them has settled, entries land in completion order rather than cast order, and the Story Editor is called once this dispatch's own specialist set is empty, never inferred from unrelated model work going idle; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment cancels every call this dispatch has in flight through its shared signal, appends no entry for one that lands as abandoned, and skips the Story Editor; a result settling for a call this dispatch no longer tracks is discarded rather than appended; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; abandon targets the action identity currently in flight, so a request naming one already finished touches nothing, and untracking releases the room immediately rather than waiting on the abandoned call's own settlement; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a dispatch coordinate |
-| **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written; two entries accepted together both survive, in the order accepted |
-| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text; a call submitted without awaiting an earlier one never reaches the runtime until that earlier one has settled, and one settling carries no bearing on the other's outcome |
-| **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
-| **projection** | an entry appended twice appears once; a dispatch's activity holds a line only for a participant the model layer has actually reported progress for, never one merely named in the resolved audience, and clears it the moment its entry lands; a finished event for an action that is not the current one is discarded, and a participant-activity event for one is ignored; entries loaded from the file and entries arriving live merge in chronological order regardless of which settles the read race |
+| **context** | the independence invariant under both history policies, the closing of every specialist context before the dispatch's first call, the Story Editor's asymmetric input, and what the stricter policy filters |
+| **room** | audience resolution and addressing; entry durability and completion ordering; the Story Editor's gate; refusal, abandonment and stale-result discard; resolution by entry identity; and that no operation writes the manuscript |
+| **store** | atomicity and one-writer ordering; a failed write reported with its text retained; the closed tolerance list and the failures off it; a hand-edited file's content, comments and key order surviving a round trip; re-reading at compilation; and a review whose second destination fails |
+| **model** | the failure taxonomy, each reason distinguished and carrying what came back; retry, timeout and unconfigured behaviour; cancellation resolving as abandoned rather than failed; no reasoning in a returned value; and the adapter's serialization of independently submitted calls |
+| **draft** | semantic Markdown round-tripping over the constrained schema; an application as one history action; and reading position and undo history across a view switch |
+| **projection** | idempotent entry append; activity held only for a participant the model layer reported on and cleared when its entry lands; events for an action that is not current discarded; and file-loaded and live entries merging chronologically whichever wins the read race |
 
-**A small number of browser tests over the fixture implementation**, and the count is a ceiling on
-purpose. A browser earns a test only where the thing that can break is a browser: real layout, real
-keystrokes, and the surface reacting to a state a real stream delivered. Where a hook or a component
-can state the property against a modelled DOM, it owns it and the browser does not repeat it.
+**A small number of browser tests over the fixture implementation**, and the smallness is deliberate.
+A browser earns a test only where the thing that can break is a browser: real layout, real keystrokes,
+and the surface reacting to a state a real stream delivered. Where a hook or a component can state the
+property against a modelled DOM, it owns it and the browser does not repeat it.
 
 - Typing stays possible while a dispatch lands, with the keystrokes reaching the editor while the
   stream is delivering.
@@ -1295,7 +1255,7 @@ Beside them, one journey through the deployed arrangement — naming a workspace
 writing prose and finding it still there after a reload — because nothing below the browser can say
 that the parts were assembled at all.
 
-The three above need the studio answering from the fixture model implementation rather than from a
+Those need the studio answering from the fixture model implementation rather than from a
 runtime, which is its own way of standing the studio up: a second Vite configuration that substitutes
 the fixture at the model seam and nothing else, so the arrangement under test is the real one down to
 that boundary. It is a development entry point and not a mode of the application — nothing shipped
@@ -1329,16 +1289,13 @@ Stated so they do not accrete.
   compatibility layer.
 - **No per-piece model configuration.** A participant's model is the author's, not the
   story's.
-- **No application undo stack, no second editor history, and no inverse-closure machinery.**
-- **No manuscript snapshots, no version history, and no manuscript state in a conversation
-  file.**
+- **No second editor history and no inverse-closure machinery.**
+- **No manuscript state in a conversation file.**
 - **No application state in the editor document**, and no application marks in the manuscript.
 - **Nothing stored that could replay an application's edit.** The passages it changed are kept for
   display, without positions of any kind, and nothing reapplies them or reconstructs a manuscript
   from them.
-- **No staleness detection** of any kind — no similarity scoring, no embeddings, no semantic
-  duplicate check, and nothing that decides a recommendation has expired.
-- **No durable record of what the author declined.**
+- **No similarity scoring, no embeddings, and no semantic duplicate check.**
 - **No queue of author-initiated operations**, and no dialog asking which of two to keep.
 - **No scheduler and no concurrency limits.** The room submits every eligible specialist's call
   independently and reasons about none of them relative to another. What the production adapter
@@ -1348,7 +1305,6 @@ Stated so they do not accrete.
 - **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its
   single-call surface is used.
 - **No per-participant re-ask**, and no attempt history inside a settled response.
-- **No temporary participation.** A participant is enabled or it is not.
 - **No dev mode, no demo mode, no seeded content, and no default model output.** Nothing fake exists
   outside a test, and no configuration falls back to another assignment: a default is accepted as
   evidence that something belongs there and then hides the absence it was meant to reveal.
@@ -1357,7 +1313,6 @@ Stated so they do not accrete.
 - **No validation of a declared outcome against a response's content**, which would take a second
   model call to do badly.
 - **No background inference.** Every model call is traceable to an author action.
-- **No model call on the piece-creation path.**
 - **No in-product role editor.** Role definitions are files, and rewriting prompts to fix weak
   differentiation belongs in the diagnostic path rather than in the studio the author writes in.
 - **No auth, sync, multi-user, or presence.**

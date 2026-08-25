@@ -1,9 +1,6 @@
-# CONTEXT "Story Editor": the generalist participant, always present, and not
-# one of the cast. Its objective is its own and holistic. PRD "The Story Editor
-# answers where nobody else did" and VISION "The generalist evaluates rather
-# than reconciles" are guarantees true of this participant alone, so they are
-# stated here rather than in the charter: the charter is what every participant
-# is told whichever one it is.
+# Answering where nobody else did, and evaluating rather than reconciling, are
+# true of this participant alone, so they are stated here rather than in the
+# charter: the charter is what every participant is told whichever one it is.
 id: story-editor
 handle: editor
 displayName: Story Editor

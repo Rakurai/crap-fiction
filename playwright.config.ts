@@ -4,19 +4,18 @@ import { defineConfig } from '@playwright/test'
 
 /**
  * The browser suite runs the studio the way the author runs it — Vite serving
- * the client with the Hono application inside it (SPEC "Deployment") — and
- * nothing here reads `.env`. The ports and the data roots are the suite's own and
- * are stated rather than inherited, for two reasons: a run must not write into
- * the author's work, and it must not fight the studio they already have open.
+ * the client with the Hono application inside it — and nothing here reads
+ * `.env`. The ports and the data roots are the suite's own and are stated
+ * rather than inherited, for two reasons: a run must not write into the
+ * author's work, and it must not fight the studio they already have open.
  *
- * Two studios, because the suite has two kinds of journey and SPEC "Verification"
- * separates them. The arrangement journey walks the deployment the author runs,
- * whose model runtime is a URL nothing is listening on — that journey contacts no
- * model. The other three need a round to settle and an application to return
- * prose, which SPEC gives to "the studio answering from the fixture model
- * implementation": a second entry, served identically, reached only by naming
- * `vite.fixture.config.ts`. Neither studio can become the other, which is the
- * point of there being two.
+ * Two studios, because the suite has two kinds of journey. The arrangement
+ * journey walks the deployment the author runs, whose model runtime is a URL
+ * nothing is listening on — that journey contacts no model. The other three
+ * need a round to settle and an application to return prose, so they answer
+ * from the fixture model implementation: a second entry, served identically,
+ * reached only by naming `vite.fixture.config.ts`. Neither studio can become
+ * the other, which is the point of there being two.
  */
 const PORT = 5273
 const FIXTURE_PORT = 5274

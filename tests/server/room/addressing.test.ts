@@ -19,9 +19,8 @@ describe('parseAddressing', () => {
   })
 
   /**
-   * SPEC "Addressing is parsed out of the author's message": a token matching no handle, or more
-   * than one, is ignored and stays ordinary text — as does a sigil that opened no mention, and a
-   * message holding none at all.
+   * A token matching no handle, or more than one, is ignored and stays ordinary text — as does a
+   * sigil that opened no mention, and a message holding none at all.
    */
   it('addresses nobody from a token matching no handle or more than one, from a sigil that opened nothing, or from a message with none', () => {
     const ambiguous = [shape, { ...compression, id: 'shade', handle: 'shade' }]

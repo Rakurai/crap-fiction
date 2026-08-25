@@ -8,7 +8,7 @@ TSX := ./.sandcastle/node_modules/.bin/tsx
 # The four STUDIO_* variables live here rather than in this file. They are the
 # author's own — a data root and a port on their machine — and .gitignore keeps
 # the file out of the repository. Nothing below supplies a value for any of
-# them: an absent one is a startup failure naming it (SPEC "Deployment").
+# them: an absent one is a startup failure naming it.
 STUDIO_ENV := .env
 
 .PHONY: sandcastle run test test-browser

@@ -2,12 +2,14 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This is a **single-context** repo: one `CONTEXT.md` and one `docs/adr/` at the root. One language end to end, and one definition of each artifact shape shared by orchestration and interface — so there is no second context to map.
+This is a **single-context** repo: one `CONTEXT.md` at the root. One language end to end, and one definition of each artifact shape shared by orchestration and interface — so there is no second context to map.
+
+There is no `docs/adr/` and none is wanted. A settled technical decision lives in `docs/ARCHITECTURE.md`, which is an ADR set in all but filename.
 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root — the domain model and the authoritative glossary. Every domain term this project uses is defined there, together with the invariants over those terms, and nothing else defines them again.
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in.
+- **`docs/ARCHITECTURE.md`** — read the decisions that touch the area you're about to work in.
 - **The design doc set**, when the work touches product behaviour rather than only code:
 
   | Doc              | Governs                                                     |
@@ -16,11 +18,12 @@ This is a **single-context** repo: one `CONTEXT.md` and one `docs/adr/` at the r
   | `CONTEXT.md`     | The domain model and the authoritative vocabulary            |
   | `PRD.md`         | Required behaviour, the flash mode descriptor, requirements |
   | `UX_DESIGN.md`   | Interaction and composition                                 |
-  | `SPEC.md`        | The settled implementation substrate, and the detail that depends on it |
+  | `ARCHITECTURE.md` | System shape, seams, invariants, and the technical decisions behind them |
+  | `INTERFACES.md`  | The declared surfaces — routes, events, seam interfaces, persisted artifacts, environment |
 
   Read in that order; where they appear to conflict, the earlier one governs. `VISION.md` carries the same statement.
 
-- **`docs/CODING_STANDARDS.md`**, whenever the work touches code. Engineering discipline only — depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP response envelope, client shape, logging, testing. It is subordinate to the design doc set and decides no product behaviour.
+- **`docs/CODING_STANDARDS.md`**, whenever the work touches code. Engineering discipline only — depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP layer, configuration, client shape, logging, testing. It is subordinate to the design doc set and decides no product behaviour.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
@@ -29,9 +32,9 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 ```
 /
 ├── CONTEXT.md
-├── docs/adr/
-│   ├── 0001-....md
-│   └── 0002-....md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── INTERFACES.md
 └── src/
 ```
 
@@ -45,8 +48,8 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 
 ## Flag conflicts
 
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+If your output contradicts a decision in `ARCHITECTURE.md`, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+> _Contradicts the decision that the room holds no lock on the manuscript — but worth reopening because…_
 
-**Apply the same rule to the design doc set.** A settled substrate decision in `SPEC.md` is an ADR in all but filename, and the constraints in `VISION.md` and the cross-cutting guarantees in `PRD.md` are load-bearing rather than aspirational. Contradicting one is sometimes right; doing it quietly never is.
+**The same rule holds across the design doc set.** The constraints in `VISION.md` and the requirements in `PRD.md` are load-bearing rather than aspirational. Contradicting one is sometimes right; doing it quietly never is.

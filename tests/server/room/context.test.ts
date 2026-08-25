@@ -155,7 +155,7 @@ describe('compiling a context', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).constraint).toBeUndefined()
   })
 
-  it('SPEC "Applying a recommendation": an apply and a capture read the conversation whole, past any one response, and report none where there is none yet', () => {
+  it('an apply and a capture read the conversation whole, past any one response, and report none where there is none yet', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
     expect(compileCaptureContext(captureContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
 
@@ -175,7 +175,7 @@ describe('compiling a context', () => {
     ])
   })
 
-  it('SPEC "Context compilation": carries no reading from the dispatch being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
+  it('carries no reading from the dispatch being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
     for (const policy of ['shared', 'stricter'] as const) {
       expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithMixedHistory, policy })).evidence).toEqual([])
     }
@@ -191,7 +191,7 @@ describe('compiling a context', () => {
     ])
   })
 
-  it("SPEC \"Context compilation\": the story editor alone weighs the dispatch's own readings, beside the history every call gets", () => {
+  it("the story editor alone weighs the dispatch's own readings, beside the history every call gets", () => {
     const reading = { kind: 'substantive' as const, participantId: 'compression', claim: 'a reading from this very dispatch', note: undefined }
 
     const context = compileStoryEditorContext(

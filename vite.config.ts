@@ -4,11 +4,11 @@ import { defineConfig, type UserConfig } from 'vite'
 import { loadEnv } from './src/server/env.js'
 
 /**
- * Vite serving the client with a Hono application inside it (SPEC
- * "Deployment"). The entry is a parameter because there is a second studio —
- * the one answering from the fixture model implementation, named by
- * `vite.fixture.config.ts` — and everything else about how a studio is served
- * is the same for both. Stated once here so the two cannot drift.
+ * Vite serving the client with a Hono application inside it. The entry is a
+ * parameter because there is a second studio — the one answering from the
+ * fixture model implementation, named by `vite.fixture.config.ts` — and
+ * everything else about how a studio is served is the same for both. Stated
+ * once here so the two cannot drift.
  */
 export function studioConfig(entry: string): UserConfig {
   const env = loadEnv()
@@ -26,9 +26,9 @@ export function studioConfig(entry: string): UserConfig {
       }),
     ],
     server: {
-      // SPEC "Local exposure": the namespace the deployment container supplies
-      // is the boundary; binding every interface here is what makes the
-      // published-loopback bind in the container's docker-compose reachable.
+      // The namespace the deployment container supplies is the boundary;
+      // binding every interface here is what makes the published-loopback
+      // bind in the container's docker-compose reachable.
       host: true,
       port: env.port,
       strictPort: true,

@@ -84,7 +84,7 @@ describe('useCapture', () => {
     expect(result.current.error).toBeUndefined()
   })
 
-  it('SPEC "Context capture": keeps every proposal for a destination that failed to write, approved or not, and states the failure', async () => {
+  it('keeps every proposal for a destination that failed to write, approved or not, and states the failure', async () => {
     const proposals = [
       proposal({ id: 'p1', destination: 'storyContext' }),
       proposal({ id: 'p2', destination: 'storyContext', section: 'Premise' }),

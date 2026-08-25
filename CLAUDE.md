@@ -1,6 +1,6 @@
 # crap-fiction
 
-A local, single-user studio for writing fiction with a team of specialized agents. The design documents named below are the source of truth. The implementation under `src/` is built against them and now covers the specified surface; `docs/SPEC_GAPS.md` names the places it does not, and is the only place a divergence is allowed to live. So where code and documents disagree and the gap is not recorded there, the documents are right and the code is wrong — and the fix is the code, or a documented decision to change the document.
+A local, single-user studio for writing fiction with a team of specialized agents. The design documents named below are the source of truth, and the implementation under `src/` is built against them. Where code and documents disagree, the documents are right and the code is wrong — and the fix is the code, or a documented decision to change the document.
 
 ## Agent skills
 
@@ -14,8 +14,20 @@ The five canonical labels are used unchanged: `needs-triage`, `needs-info`, `rea
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` at the repo root, holding the domain model and the authoritative glossary. The design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `SPEC.md`) governs behaviour in that order of precedence. There is no `docs/adr/` and none is wanted: a settled decision goes in `SPEC.md`, which is an ADR set in all but filename. See `docs/agents/domain.md`.
+Single-context: one `CONTEXT.md` at the repo root, holding the domain model and the authoritative glossary. The design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `ARCHITECTURE.md` → `INTERFACES.md`) is read in that order, each more specific than the last; where two appear to conflict, the earlier governs. There is no `docs/adr/` and none is wanted: a settled technical decision goes in `ARCHITECTURE.md`, which is an ADR set in all but filename. See `docs/agents/domain.md`.
+
+`ARCHITECTURE.md` holds only what would still be true after the code implementing it was rewritten; `INTERFACES.md` holds the declared surfaces — routes, events, seam interfaces, persisted artifacts, environment — as names, meanings and guarantees, never as transcribed shapes. Values that are tuning rather than decision, and appearance values of every kind, live where they are used and appear in no document.
+
+### Editing the design documents
+
+**One home per fact.** Every fact has exactly one owning document, and everywhere else it is absent — not summarized, not paraphrased, not restated for local readability. A document may describe machinery that operates on a fact another owns, so long as it makes no new claim about the fact itself. When a fact moves, find every copy and delete them all.
+
+**Current state only.** Documentation states what is true now. No migration commentary, no "this used to be" prose, no narration of positions the design has passed through. A reader should never have to subtract history to find the truth.
+
+**Know which hat a sentence wears.** A statement is domain truth, engineering mechanism, or the mapping between them. A mechanism narrated in domain language reads as a domain law and gets implemented as a constraint the architecture never imposed; a domain truth carrying mechanism words has absorbed a decision that belongs elsewhere. Where a document must span layers, mark the sections and make the mapping explicit.
+
+**No cross-references between documents**, no counted lists or numbered sections, and no issue numbers. Roles are clear enough that a pointer adds nothing and goes stale.
 
 ## Engineering discipline
 
-`docs/CODING_STANDARDS.md` is binding on all code: module depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP response envelope, client shape, logging, testing. It owns no architecture facts and no product behaviour — where it appears to decide either, the design doc set governs. Read it before writing code, not after review.
+`docs/CODING_STANDARDS.md` is binding on all code: module depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP layer, configuration, client shape, logging, testing. It owns no architecture facts, no declared surface and no product behaviour — where it appears to decide any of those, the design doc set governs — and it names no instance of its own rules. Read it before writing code, not after review.

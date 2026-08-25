@@ -14,8 +14,7 @@ export function parseAddressing(message: string, participants: readonly RoleDefi
     const token = message.slice(index + 1, end).toLowerCase()
     if (token.length === 0) continue
 
-    // SPEC "Addressing is parsed out of the author's message": a token matching no handle, or
-    // more than one, is ignored and stays ordinary text.
+    // A token matching no handle, or more than one, is ignored and stays ordinary text.
     const matches = participants.filter((participant) => participant.handle.startsWith(token))
     if (matches.length !== 1) continue
 

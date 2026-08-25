@@ -1,6 +1,6 @@
-# PRD "Flash mode": the default cast and the criteria each specialist applies
-# at this scale. The Story Editor is not listed here — CONTEXT "Room": it is
-# always present and is not one of the cast.
+# The default cast and the criteria each specialist applies at this scale. The
+# Story Editor is not listed here: it is always present and is not one of the
+# cast.
 id: flash
 name: Flash
 cast:

@@ -1,10 +1,8 @@
 # VISION
 
 **Owns:** purpose, the product bet, principles, standing constraints, refusals.
-**Does not own:** vocabulary (CONTEXT), author behaviour and requirements (PRD), composition
-and presentation (UX_DESIGN), implementation (SPEC).
-**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. Where a downstream document
-conflicts with this one, this one governs.
+**Does not own:** vocabulary, author behaviour and requirements, composition and presentation,
+implementation.
 
 ## What this is
 
@@ -35,8 +33,6 @@ useful, damaging to motivation, premature for the form, and thematically interes
 once. A generalist story editor weighs those readings against what the piece as a whole is
 trying to be.
 
-Two things follow from taking the bet seriously.
-
 **Specialization must be substantive.** Different personalities saying the same thing in
 different registers is failure. Each role applies genuinely different criteria and reaches
 genuinely different conclusions.
@@ -55,9 +51,6 @@ Manual writing is always available and sometimes the right move, but collaborati
 primary way work gets done. Discussion is not a detour from writing; it is where the
 writing gets decided.
 
-The room acts only when the author addresses it. There is no standing critique loop, no
-background analysis, and no unsolicited opinion.
-
 ## Principles
 
 These settle tradeoffs when a decision could go either way.
@@ -68,11 +61,11 @@ what the author is reaching for, or a record of how they got there.
 **The author is the final authority.** Collaborators recommend. The author decides, and
 nothing recommends its way past that.
 
-**The author keeps writing while the room thinks.** Consulting the room never costs the
-author the prose: a room too expensive to consult stops being consulted, and that is the
-likeliest way this product fails quietly. Accepting a recommendation is the one exception —
-prose the author has asked a collaborator to rewrite holds still while it is rewritten,
-because an edit landing underneath an incoming rewrite corrupts both.
+**The author keeps writing while the room thinks.** A room too expensive to consult stops
+being consulted, and that is the likeliest way this product fails quietly. Accepting a
+recommendation is the one exception — prose the author has asked a collaborator to rewrite
+holds still while it is rewritten, because an edit landing underneath an incoming rewrite
+corrupts both.
 
 **Recommendations are semantic, not mechanical.** A collaborator says what the story needs
 in the language of craft. Turning that into prose is a separate, explicit act.
@@ -93,13 +86,12 @@ another, name a tradeoff, or offer a framing no specialist supplied. It is not a
 consensus mechanism and not a summarizer.
 
 **Durable understanding of the story changes only when the author says so.** Conversation
-is exploratory — the author speculates, reverses, tests, and leaves things unresolved.
-Continuous interpretation of that would make every exchange prematurely consequential.
+is exploratory, and continuous interpretation of it would make every exchange prematurely
+consequential.
 
 **The software owns the AI-writing layer and nothing else.** Text editing is a solved
-problem with mature implementations. Reimplementing selection, history, keyboard
-conventions or Markdown handling is machinery this project cannot afford and would do
-worse.
+problem with mature implementations, and reimplementing it is machinery this project cannot
+afford and would do worse.
 
 **Plain Markdown is the manuscript.** Application concepts never enter it.
 
@@ -125,11 +117,11 @@ architecture.
 editable in any editor, and is diffable under version control. The files are the record;
 nothing is derived from a history in order to be true.
 
-**Models assignable per collaborator, behind a replaceable layer.** Any participant may be pointed
-at a different model, so prose quality is not capped by local hardware and weak differentiation
-between roles can be diagnosed as a design problem rather than confounded with model capacity. Which
-runtime serves those models is one layer's business, and staying agnostic above it is what keeps that
-commitment from depending on any particular one.
+**Models assignable per collaborator, behind a replaceable layer.** Any participant may be
+pointed at a different model, so prose quality is not capped by local hardware and weak
+differentiation between roles can be diagnosed as a design problem rather than confounded
+with model capacity. Which runtime serves those models is one layer's business, and staying
+agnostic above it is what keeps the commitment from depending on any particular one.
 
 **A capable prose editing surface.** Judging rhythm and sound requires prose set as prose,
 with the editing conventions the author already knows, in both a rendered view and a
@@ -139,6 +131,9 @@ Markdown view.
 
 **The room never silently modifies the manuscript.** Any change to the prose is either the
 author's own editing or the direct consequence of the author accepting a recommendation.
+
+**The room acts only when the author addresses it.** No standing critique loop, no
+background analysis, no unsolicited opinion.
 
 **No semantic project management.** The system keeps no records the author is responsible
 for, reconciles no artifacts against each other, and asks nothing to be kept current.

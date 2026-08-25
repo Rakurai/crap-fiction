@@ -101,7 +101,7 @@ describe('Room.dispatch', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('CONTEXT "Room": an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
+  it('an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
@@ -218,7 +218,7 @@ describe('Room.dispatch', () => {
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
-  it('SPEC "Dispatch": submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
+  it('submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
@@ -294,7 +294,7 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
-  it('UX_DESIGN "Every specialist call failed... that call fails too": settles with nothing in it at all, without ever emitting an error event', async () => {
+  it('settles with nothing in it at all when every call failed, without ever emitting an error event', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
@@ -420,7 +420,7 @@ describe('Room.apply', () => {
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
   })
 
-  it("SPEC \"Applying a recommendation\": carries the recommendation, the author's constraint and the draft verbatim, beside the full current conversation including discussion after the recommendation", async () => {
+  it("carries the recommendation, the author's constraint and the draft verbatim, beside the full current conversation including discussion after the recommendation", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room: laterRoom } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -453,9 +453,9 @@ describe('Room.apply', () => {
   })
 
   /**
-   * SPEC "Model access": one lock, held across the studio rather than per piece, because
-   * no runtime holds more than one dispatch-or-apply call at a time. One property, so it
-   * is stated once over every pair that can contend for it rather than once per pair.
+   * One conversation-action state, held across the studio rather than per piece, because no runtime
+   * holds more than one dispatch-or-apply call at a time. One property, so it is stated once over
+   * every pair that can contend for it rather than once per pair.
    */
   it('admits one dispatch or application at a time, whichever piece asks, and names the piece holding it', async () => {
     const { pieceId } = await pieceWithRecommendation()
@@ -623,7 +623,7 @@ describe('Room.capture', () => {
     await room.capture(workspaceDir, piece.id, 'c2', 'text')
   })
 
-  it('CONTEXT "Capture context": runs beside a dispatch on the same piece in either order, sharing the model seam but not the room\'s dispatch-and-apply lock', async () => {
+  it("runs beside a dispatch on the same piece in either order, sharing the model seam but not the dispatch-and-apply operation state", async () => {
     const first = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const second = await createPiece(workspaceDir, 'Kettle', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
@@ -657,7 +657,7 @@ describe('Room.capture', () => {
     await capturing
   })
 
-  it("SPEC \"Seams\": is unaffected by abandon(), which targets the dispatch-and-apply operation and never reaches capture", async () => {
+  it("is unaffected by abandon(), which targets the dispatch-and-apply operation and never reaches capture", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
@@ -768,7 +768,7 @@ describe('Room.approveCapture', () => {
     })
   })
 
-  it('SPEC "Context capture": keeps the destination that succeeded when the other write fails, naming which one', async () => {
+  it('keeps the destination that succeeded when the other write fails, naming which one', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom(dataRoot, {})
     chmodSync(path.join(workspaceDir, piece.id), 0o500)

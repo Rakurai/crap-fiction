@@ -2,10 +2,11 @@
 
 **Owns:** author behaviour, mode scope and mode data, the behaviour required of role
 definitions, functional requirements, what is out of scope, and explicit future scope.
-**Does not own:** purpose and principles (VISION), vocabulary (CONTEXT), composition and
-presentation (UX_DESIGN), implementation (SPEC).
-**Authority:** VISION → CONTEXT → PRD → UX_DESIGN → SPEC. A requirement here states what must
-be true for the author, never how it is presented or built.
+**Does not own:** purpose and principles, vocabulary, composition and presentation,
+implementation.
+
+A requirement here states what must be true for the author, never how it is presented or
+built.
 
 ## The software
 
@@ -25,9 +26,9 @@ Works alone, locally, in long sittings. Came here to finish stories.
 writing is time the system has failed to earn. This is the most useful test to apply to any
 proposed requirement.
 
-The second test, applied to every artifact and background behaviour: **what repeated author
-behaviour requires this to exist?** *Otherwise an edge case is ambiguous* is not an answer.
-Neither is *we might want the history later.*
+Applied to every artifact and background behaviour: **what repeated author behaviour requires
+this to exist?** *Otherwise an edge case is ambiguous* is not an answer. Neither is *we might
+want the history later.*
 
 ## Interaction frequency
 
@@ -58,8 +59,6 @@ Mode data. None of it is architectural, and a longer form answers each question 
 | **Compression** | Word choice, omission, the last sentence | A sentence doing work an omission would do better; a figure that announces its own reveal |
 | **Interiority** | Character knowledge, want and need, what is felt but unsaid | Interiority asserted rather than implied; a want with no cost attached |
 
-The Story Editor is present alongside them and is not one of them.
-
 Deliberately absent at this length: act structure, subplot, continuity across chapters,
 scene and sequel rhythm. No devil's-advocate role is assigned, because manufactured conflict
 is worse than agreement.
@@ -72,8 +71,8 @@ readily as at the grain of the piece.
 
 ## Role definitions
 
-A participant's role definition is shipped data the author does not configure, and several
-guarantees below are achievable nowhere else. What every role definition must establish:
+A participant's role is data the author does not configure, and the guarantees below are
+achievable nowhere else. What every role definition must establish:
 
 **A handle.** One single-token name the author can address the participant by, distinct from its
 display name.
@@ -129,6 +128,11 @@ Flash is a length-constrained form, so approximate length is part of judging the
 *Done when:* the story's current length is visible while writing, as a fact about the machine
 rather than a measure of the work, with no target enforced and no progress implied.
 
+**Keep the work when a write fails** — *constant*
+*Done when:* the author keeps writing and keeps their prose, nothing is discarded or rolled
+back, the failure stays stated until it clears, the next ordinary write retries it, and
+nothing resolves optimistically.
+
 **Get the story out** — *per piece*
 *Done when:* the draft file is publishable prose as it sits on disk, with no stripping step
 and no tool artifacts of any kind in it.
@@ -160,7 +164,9 @@ Commentary was useful but named no action. *Show me what you'd change.*
 carries any clarification the author adds.
 
 **Get independent judgments** — *per message, the core of the product*
-Several specialists answer the same message without seeing each other's answers.
+Several specialists answer the same message without seeing each other's answers. Independence
+is a property of what goes into a call, and is undone by presentation as easily as by
+prompting.
 *Done when:* no specialist's context contains another specialist's response caused by the same
 message, the Story Editor receives that message's specialist responses only after they have
 settled, and nothing in the presentation implies that one specialist answered another.
@@ -181,21 +187,20 @@ where every specialist had nothing is a legible outcome that still answers the a
 failure is never presented as silence.
 
 **Know the room is working** — *per message*
-Every called participant's call is submitted independently, and one local model answers only one at
-a time regardless, so a message takes real time and the author watches it progress.
+A message takes real time and the author watches it progress.
 *Done when:* the room states unconditionally that a conversation action is active the moment one
-opens, a called participant's own progress is shown only once the model layer actually reports it —
-having its model prepared or working — several participants showing progress at once are each shown
-independently, no interim state is composed for a participant the model layer has not reported on,
-the author can keep writing throughout, and no response is rendered before it is complete.
+opens, a called participant's own progress is shown only once the model layer reports it, several
+participants showing progress at once are shown independently, nothing interim is composed for a
+participant the model layer has not reported on, the author can keep writing throughout, and no
+response is rendered before it is complete.
 
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a dispatch,
 an application, a context capture — targets the specific operation the author is looking at rather
-than whichever the room happens to be running, cancelling the call in flight and making none of the
-calls the operation had not reached, responses that landed remain in the conversation, control
-returns the moment abandonment is accepted rather than once the cancelled call finishes unwinding,
-nothing holds the prose beyond the operation the author asked for, and a model that never answers
+than whichever the room happens to be running, cancels the call in flight and makes none of the
+calls the operation had not reached, leaves responses that landed in the conversation, returns
+control the moment abandonment is accepted rather than once the cancelled call finishes unwinding,
+holds nothing of the prose beyond the operation the author asked for, and a model that never answers
 resolves itself without the author having to act.
 
 **Handle a bad response as housekeeping** — *per session*
@@ -323,31 +328,15 @@ capturing context are each assigned a model the same way without entering the ro
 
 ## Out of scope
 
-**Analytics, crash reporting, and anything that phones home.** Offline operation is a
-requirement and a local single-user tool has no one to report to.
-
-**Metrics that rate the work or the author** — story scores, structure grades, progress
-measures, streaks, levels.
-
-**Volume metrics presented as content** — tokens, words, or any measure of how much a
-participant produced.
-
-Operational state is the opposite case and is required: elapsed time, participant state, how many
-participants have settled, model identity, story length. The line is whether the number describes
-the machine or the work.
-
-## Anti-requirements
-
 Stated so they do not get built.
 
-**A standing critique loop.** The room acts on author input and on nothing else. No
-background analysis, no automatic review after an application, no unsolicited opinion.
+**Volume metrics presented as content** — tokens, words, or any measure of how much a
+participant produced. Operational state is the opposite case and is required: elapsed time,
+participant state, how many participants have settled, model identity, story length. The line
+is whether the number describes the machine or the work.
 
 **Automatic changes to durable context.** No inference from discussion, no silent revision, no
 proposal the author did not ask for.
-
-**Manuscript versioning.** No snapshots, no browsable past states, no branching, and no
-conversation-driven restoration of earlier prose.
 
 **Staleness machinery.** Nothing decides that a recommendation has expired, that a response no
 longer applies, or that the conversation and the manuscript need reconciling.
@@ -365,47 +354,6 @@ reversal.
 **Author-assigned categories for responses.** Which participant spoke is the category.
 
 **A task list of what the room is waiting on.** Knowing is a state; a queue is a job.
-
-**Forced participation.** No participant is re-run because a message was quiet.
-
-**A finished story the author didn't make.**
-
-## Cross-cutting guarantees
-
-These hold everywhere and belong to no single requirement. Each is a way the product fails
-quietly rather than loudly.
-
-**The author never blocks on the room's thinking.** Writing continues while it thinks, any
-operation can be abandoned, and responses that landed are useful alone. Applying a
-recommendation is the one deliberate exception and holds the manuscript only for that call's
-duration. The failure this prevents: *a room too expensive to consult stops being consulted.*
-
-**The manuscript changes only by the author's hand or by an explicit application.** Nothing
-else writes prose.
-
-**Current-dispatch independence is a property of what goes into a call**, not of what a prompt
-asks for, and it can be undone by presentation as easily as by prompting. The failure this
-prevents: *a room that converges on one voice while every dispatch still looks independent.*
-
-**Failure and silence are ordinary, and are never conflated.** A design that treats either as
-an exception is wrong about how local models behave.
-
-**The artifacts are the record.** Nothing is derived from a log in order to be true, and no
-state is rebuilt by replay. The failure this prevents: *a file the author edited becomes a lie
-the application corrects.*
-
-**A write that failed is never presented as a write that succeeded.** The author keeps
-writing, the work stays in hand, the failure stays stated until it clears, and the next
-attempt retries it.
-
-**Every model call is traceable to an author action.** There is no background inference.
-
-**Nothing on screen is generated that could be computed.** No model call produces a summary,
-label or status line for text the software already has. This decides what the interface is
-allowed to promise.
-
-**The author maintains nothing.** No artifact requires upkeep, no list requires pruning, and
-no record exists that the author is responsible for keeping true.
 
 ## Future ideas
 
