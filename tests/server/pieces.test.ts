@@ -18,8 +18,9 @@ import {
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftStore, readAppliedChanges, writeAppliedChange, writeConversation } from '../../src/server/store/index.js'
+import { ConversationEntryStore, DraftStore, readAppliedChanges, writeAppliedChange } from '../../src/server/store/index.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
+import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',
@@ -111,14 +112,15 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
-    const opened = getPiece(workspaceDir, created.id, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
     expect(opened).toEqual({
       ...created,
       draft: '',
       storyContext: {},
       currentConversationId: null,
       conversations: [],
-      roundInFlight: null,
+      conversationActionInFlight: null,
+      captureInFlight: null,
       cast: [
         { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
         { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
@@ -134,7 +136,7 @@ describe('pieces', () => {
       'utf8',
     )
 
-    expect(getPiece(workspaceDir, created.id, null, specialists).storyContext).toEqual({
+    expect(getPiece(workspaceDir, created.id, null, null, specialists).storyContext).toEqual({
       Premise: ['two cups, one left behind'],
       'Point of view': ['close third, past tense'],
     })
@@ -144,16 +146,16 @@ describe('pieces', () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
 
-    const opened = getPiece(workspaceDir, created.id, null, specialists)
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
     expect(opened.draft).toBe('Two small words.')
   })
 
   it('reports a missing piece as a stated PieceNotFoundError', () => {
-    expect(() => getPiece(workspaceDir, 'nothing-here', null, specialists)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, 'nothing-here', null, null, specialists)).toThrowError(PieceNotFoundError)
   })
 
   it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
-    expect(() => getPiece(workspaceDir, '../../etc', null, specialists)).toThrowError(PieceNotFoundError)
+    expect(() => getPiece(workspaceDir, '../../etc', null, null, specialists)).toThrowError(PieceNotFoundError)
   })
 })
 
@@ -177,7 +179,7 @@ describe('setPieceCast', () => {
       { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
       { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, specialists).cast).toEqual(view)
+    expect(getPiece(workspaceDir, created.id, null, null, specialists).cast).toEqual(view)
   })
 
   it('re-enables a specialist disabled earlier, simply making it eligible again', async () => {
@@ -189,7 +191,7 @@ describe('setPieceCast', () => {
     expect(view.find((member) => member.id === 'compression')?.enabled).toBe(true)
   })
 
-  it('never widens the room past the mode\'s cast: an id outside it is a stated UnknownCastMemberError', async () => {
+  it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
 
     await expect(setPieceCast(workspaceDir, created.id, specialists, ['shape', 'story-editor'])).rejects.toThrowError(
@@ -219,7 +221,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(workspaceDir, 'cups', null, specialists).title).toBe('The Cups')
+    expect(getPiece(workspaceDir, 'cups', null, null, specialists).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {
@@ -255,7 +257,7 @@ describe('DraftWriter', () => {
     return new DraftWriter(new DraftStore())
   }
 
-  it('writes an existing piece\'s draft through to the store', async () => {
+  it("writes an existing piece's draft through to the store", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
 
     await draftWriter().save(workspaceDir, piece.id, 'Two small words.')
@@ -288,38 +290,46 @@ describe('getConversation', () => {
     expect(() => getConversation(workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
   })
 
-  it('joins each applied change onto the response that caused it, by round and participant, and leaves the rest with none', async () => {
+  it('joins an application onto the change it produced, by identity, and leaves an unapplied response with none', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'c1', {
-      id: 'c1',
-      rounds: [
-        {
-          id: 'r1',
-          addressed: [],
-          brought: [],
-          outcome: 'settled',
-          participants: [
-            { participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
-            { participantId: 'compression', result: { kind: 'response', outcome: 'commentary', claim: 'it holds' } },
-          ],
-        },
-      ],
-    })
-    const change: AppliedChange = {
-      id: 'change1',
-      roundId: 'r1',
+    const store = new ConversationEntryStore()
+    const authorMessage: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'a message', audience: [], brought: [] }
+    const response: ConversationEntry = {
+      id: 'e2',
+      kind: 'participantResponse',
       participantId: 'shape',
-      content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] },
+      causeId: 'e1',
+      outcome: 'applicableSuggestion',
+      claim: 'cut the second paragraph',
     }
+    const otherResponse: ConversationEntry = {
+      id: 'e3',
+      kind: 'participantResponse',
+      participantId: 'compression',
+      causeId: 'e1',
+      outcome: 'commentary',
+      claim: 'it holds',
+    }
+    const application: ConversationEntry = { id: 'e4', kind: 'application', responseId: 'e2', changeId: 'change1' }
+    for (const entry of [authorMessage, response, otherResponse, application]) await store.append(workspaceDir, piece.id, 'c1', entry)
+
+    const change: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] } }
     await writeAppliedChange(workspaceDir, piece.id, change)
 
     const conversation = getConversation(workspaceDir, piece.id, 'c1')
 
-    const [round] = conversation.rounds
-    const shape = round?.participants.find((participant) => participant.participantId === 'shape')
-    const compression = round?.participants.find((participant) => participant.participantId === 'compression')
-    expect(shape?.appliedChanges).toEqual([change])
-    expect(compression?.appliedChanges).toEqual([])
+    const applicationView = conversation.entries.find((entry) => entry.kind === 'application')
+    expect(applicationView).toMatchObject({ responseId: 'e2', changeId: 'change1', change: change.content })
+  })
+
+  it('degrades to the application shown without its change when the change file is missing, rather than erroring', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const store = new ConversationEntryStore()
+    const application: ConversationEntry = { id: 'e1', kind: 'application', responseId: 'no-such-response', changeId: 'never-written' }
+    await store.append(workspaceDir, piece.id, 'c1', application)
+
+    const conversation = getConversation(workspaceDir, piece.id, 'c1')
+    expect(conversation.entries[0]).toMatchObject({ kind: 'application', change: undefined })
   })
 })
 
@@ -339,38 +349,41 @@ describe('listConversations', () => {
     expect(listConversations(workspaceDir, piece.id)).toEqual([])
   })
 
-  it('shows the author\'s own opening words, from the first round that carries a message', async () => {
+  it("shows the author's own opening words, from the first entry that carries verbatim text", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'c1', {
-      id: 'c1',
-      rounds: [
-        { id: 'r1', message: 'does the opening earn its length', addressed: [], brought: [], outcome: 'settled', participants: [] },
-      ],
+    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
+      id: 'e1',
+      kind: 'authorMessage',
+      text: 'does the opening earn its length',
+      audience: [],
+      brought: [],
     })
 
     const [summary] = listConversations(workspaceDir, piece.id)
     expect(summary).toMatchObject({ id: 'c1', opening: 'does the opening earn its length' })
   })
 
-  it('reads down through earlier message-less rounds to the first the author actually wrote', async () => {
+  it('reports the clarification of a concrete-change request as the opening where the conversation has no author message', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'c1', {
-      id: 'c1',
-      rounds: [
-        { id: 'r1', addressed: [], brought: [], outcome: 'settled', participants: [] },
-        { id: 'r2', message: 'what would you change about it', addressed: [], brought: [], outcome: 'settled', participants: [] },
-      ],
+    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
+      id: 'e1',
+      kind: 'concreteChangeRequest',
+      target: 'shape',
+      respondingTo: 'e0',
+      clarification: 'just the opening line',
     })
 
     const [summary] = listConversations(workspaceDir, piece.id)
-    expect(summary?.opening).toBe('what would you change about it')
+    expect(summary?.opening).toBe('just the opening line')
   })
 
-  it('reports no opening words for a conversation that carries no author message at all', async () => {
+  it('reports no opening words for a conversation that carries no author-written text at all', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'c1', {
-      id: 'c1',
-      rounds: [{ id: 'r1', addressed: [], brought: [], outcome: 'settled', participants: [] }],
+    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
+      id: 'e1',
+      kind: 'participantNoComment',
+      participantId: 'shape',
+      causeId: 'e0',
     })
 
     const [summary] = listConversations(workspaceDir, piece.id)
@@ -379,10 +392,12 @@ describe('listConversations', () => {
 
   it('orders the listing by last activity, most recent first', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'older', { id: 'older', rounds: [] })
+    const store = new ConversationEntryStore()
+    const anyEntry: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] }
+    await store.append(workspaceDir, piece.id, 'older', anyEntry)
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, piece.id, 'conversations', 'older.json'), past, past)
-    await writeConversation(workspaceDir, piece.id, 'newer', { id: 'newer', rounds: [] })
+    await store.append(workspaceDir, piece.id, 'newer', anyEntry)
 
     expect(listConversations(workspaceDir, piece.id).map((c) => c.id)).toEqual(['newer', 'older'])
   })
@@ -406,26 +421,13 @@ describe('deleteConversation', () => {
 
   it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await writeConversation(workspaceDir, piece.id, 'c1', {
-      id: 'c1',
-      rounds: [
-        {
-          id: 'r1',
-          addressed: [],
-          brought: [],
-          outcome: 'settled',
-          participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' } }],
-        },
-      ],
-    })
-    await writeConversation(workspaceDir, piece.id, 'c2', { id: 'c2', rounds: [] })
-    const ownChange: AppliedChange = {
-      id: 'change1',
-      roundId: 'r1',
-      participantId: 'shape',
-      content: { kind: 'passages', passages: [{ before: 'it', after: '' }] },
-    }
-    const unrelatedChange: AppliedChange = { id: 'change2', roundId: 'r9', participantId: 'shape', content: { kind: 'rewrittenWhole' } }
+    const store = new ConversationEntryStore()
+    await store.append(workspaceDir, piece.id, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await store.append(workspaceDir, piece.id, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
+    await store.append(workspaceDir, piece.id, 'c2', { id: 'e1', kind: 'authorMessage', text: 'y', audience: [], brought: [] })
+
+    const ownChange: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } }
+    const unrelatedChange: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
     await writeAppliedChange(workspaceDir, piece.id, ownChange)
     await writeAppliedChange(workspaceDir, piece.id, unrelatedChange)
 

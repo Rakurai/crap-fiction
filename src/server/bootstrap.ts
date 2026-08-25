@@ -12,7 +12,7 @@ import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { authorContextStore, durableContextReader } from './room/durableContext.js'
 import { Room } from './room/room.js'
 import { resolveRoster } from './room/roster.js'
-import { DraftStore } from './store/index.js'
+import { ConversationEntryStore, DraftStore } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -35,6 +35,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     modelAccess,
     durableContextReader(env.dataRoot),
     authorContextStore(env.dataRoot),
+    new ConversationEntryStore(),
     roster,
     charter,
     SHIPPED_HISTORY_POLICY,

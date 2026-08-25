@@ -1,6 +1,6 @@
 import type { Charter } from '../model/charter.js'
 import type { RoleDefinition } from '../model/roles.js'
-import { substantiveResponse, type Conversation, type RoundRecord } from '../../shared/conversationViews.js'
+import type { ConversationEntry } from '../../shared/conversationEntries.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
 
@@ -10,7 +10,9 @@ export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'response'; participantId: string; claim: string; note: string | undefined }>
 
-export type ParticipantEvidence = Readonly<{ participantId: string; claim: string; note: string | undefined }>
+export type ParticipantEvidence =
+  | Readonly<{ kind: 'substantive'; participantId: string; claim: string; note: string | undefined }>
+  | Readonly<{ kind: 'noComment'; participantId: string }>
 
 export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
 
@@ -25,7 +27,7 @@ export type ContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
-  conversation: Conversation | undefined
+  entries: readonly ConversationEntry[] | undefined
   policy: HistoryPolicy
 }>
 
@@ -42,25 +44,19 @@ export type Context = Readonly<{
   evidence: readonly ParticipantEvidence[]
 }>
 
-function substantiveResponses(round: RoundRecord): readonly HistoryEntry[] {
-  return round.participants.flatMap((record) => {
-    const response = substantiveResponse(record.result)
-    if (response === undefined) return []
-    return [{ kind: 'response', participantId: record.participantId, claim: response.claim, note: response.note } as const]
-  })
-}
-
-function deriveHistory(conversation: Conversation | undefined, policy: HistoryPolicy, roleId: string): readonly HistoryEntry[] {
-  if (conversation === undefined) return []
-
-  const entries: HistoryEntry[] = []
-  for (const round of conversation.rounds) {
-    if (round.message !== undefined) entries.push({ kind: 'message', text: round.message })
-
-    const responses = substantiveResponses(round)
-    entries.push(...(policy === 'shared' ? responses : responses.filter((entry) => entry.kind === 'response' && entry.participantId === roleId)))
+function deriveHistory(entries: readonly ConversationEntry[] | undefined, policy: HistoryPolicy, roleId: string): readonly HistoryEntry[] {
+  const result: HistoryEntry[] = []
+  for (const entry of entries ?? []) {
+    if (entry.kind === 'authorMessage') {
+      result.push({ kind: 'message', text: entry.text })
+      continue
+    }
+    if (entry.kind !== 'participantResponse') continue
+    if (policy === 'shared' || entry.participantId === roleId) {
+      result.push({ kind: 'response', participantId: entry.participantId, claim: entry.claim, note: entry.note })
+    }
   }
-  return entries
+  return result
 }
 
 function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
@@ -73,7 +69,7 @@ function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
-    history: deriveHistory(input.conversation, input.policy, input.role.id),
+    history: deriveHistory(input.entries, input.policy, input.role.id),
     evidence,
   }
 }
@@ -93,8 +89,7 @@ export type ApplyContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
-  conversation: Conversation
-  throughRoundId: string
+  entries: readonly ConversationEntry[]
 }>
 
 export type ApplyContext = Readonly<{
@@ -107,14 +102,13 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
-function historyThrough(conversation: Conversation, throughRoundId: string | undefined): readonly HistoryEntry[] {
-  const entries: HistoryEntry[] = []
-  for (const round of conversation.rounds) {
-    if (round.message !== undefined) entries.push({ kind: 'message', text: round.message })
-    entries.push(...substantiveResponses(round))
-    if (throughRoundId !== undefined && round.id === throughRoundId) break
+function fullHistory(entries: readonly ConversationEntry[]): readonly HistoryEntry[] {
+  const result: HistoryEntry[] = []
+  for (const entry of entries) {
+    if (entry.kind === 'authorMessage') result.push({ kind: 'message', text: entry.text })
+    else if (entry.kind === 'participantResponse') result.push({ kind: 'response', participantId: entry.participantId, claim: entry.claim, note: entry.note })
   }
-  return entries
+  return result
 }
 
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
@@ -125,7 +119,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
-    history: historyThrough(input.conversation, input.throughRoundId),
+    history: fullHistory(input.entries),
   }
 }
 
@@ -187,8 +181,14 @@ function historyText(history: readonly HistoryEntry[]): string {
 
 function evidenceText(evidence: readonly ParticipantEvidence[]): string {
   if (evidence.length === 0) return ''
-  const lines = evidence.map((entry) => (entry.note !== undefined ? `${entry.participantId}: ${entry.claim} ${entry.note}` : `${entry.participantId}: ${entry.claim}`))
-  return section('Readings from this round', lines.join('\n'))
+  const lines = evidence.map((entry) =>
+    entry.kind === 'noComment'
+      ? `${entry.participantId} found nothing material in its discipline.`
+      : entry.note !== undefined
+        ? `${entry.participantId}: ${entry.claim} ${entry.note}`
+        : `${entry.participantId}: ${entry.claim}`,
+  )
+  return section('Specialist readings', lines.join('\n'))
 }
 
 export function renderPrompt(context: Context, charter: Charter): string {
@@ -215,7 +215,7 @@ export type CaptureContextInput = Readonly<{
   authorContext: string | undefined
   storyContext: string | undefined
   draft: string
-  conversation: Conversation | undefined
+  entries: readonly ConversationEntry[] | undefined
 }>
 
 export type CaptureContext = Readonly<{
@@ -230,7 +230,7 @@ export function compileCaptureContext(input: CaptureContextInput): CaptureContex
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
-    history: input.conversation === undefined ? [] : historyThrough(input.conversation, undefined),
+    history: input.entries === undefined ? [] : fullHistory(input.entries),
   }
 }
 

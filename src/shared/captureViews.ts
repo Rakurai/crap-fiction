@@ -9,3 +9,10 @@ export const captureOutcomeSchema = z.union([
 ])
 
 export type CaptureOutcome = z.infer<typeof captureOutcomeSchema>
+
+export const captureSnapshotSchema = z.object({
+  conversationId: z.string().min(1),
+  openedAt: z.number().int().positive(),
+})
+
+export type CaptureSnapshot = z.infer<typeof captureSnapshotSchema>

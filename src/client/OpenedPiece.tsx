@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ConversationSummary } from '../shared/conversationViews.js'
+import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
@@ -16,8 +16,8 @@ import {
   approveCapture,
   captureContext,
   createConversation,
+  dispatch,
   fetchConversation,
-  startRound,
   subscribeToRoom,
 } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
@@ -74,13 +74,13 @@ function Surfaces({
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
-  const [applying, setApplying] = useState(false)
+  const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
-  // Keyed on this rather than on `activeConversationId`: `Conversation` reports back the id
-  // it mints on a fresh conversation's first round, and remounting on that report would tear
-  // that round down mid-flight.
+  // Keyed on this rather than on `activeConversationId`, which `Conversation` reports back when it
+  // mints one on a first dispatch: remounting on that report would tear the dispatch down mid-flight.
   const [session, setSession] = useState(0)
   const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
+  const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
 
   function switchTo(conversationId: string | null): void {
     setActiveConversationId(conversationId)
@@ -94,12 +94,17 @@ function Surfaces({
     }
   }
 
+  function closeAndAbandon(): void {
+    if (liveAction !== undefined) void abandonOperation(piece.id, liveAction.conversationId, liveAction.actionId)
+    onClose()
+  }
+
   return (
     <div className={styles.row}>
       <Manuscript
         title={piece.title}
         mode={piece.mode}
-        onClose={onClose}
+        onClose={closeAndAbandon}
         manuscript={manuscript}
         autosave={autosave}
         onOpenRoom={() => setPanel('room')}
@@ -119,10 +124,14 @@ function Surfaces({
           key={session}
           pieceId={piece.id}
           currentConversationId={activeConversationId}
-          roundInFlight={piece.roundInFlight?.conversationId === activeConversationId ? piece.roundInFlight : null}
+          conversationActionInFlight={
+            piece.conversationActionInFlight !== null && piece.conversationActionInFlight.conversationId === activeConversationId
+              ? piece.conversationActionInFlight
+              : null
+          }
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation, applyRecommendation }}
+          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
           mark={roster.mark}
           handle={roster.handle}
@@ -132,6 +141,7 @@ function Surfaces({
           onApplied={manuscript.applyRecommendation}
           onApplyingChange={setApplying}
           onConversationIdChange={setActiveConversationId}
+          onActionIdChange={setLiveAction}
         />
       )}
       {panel === 'room' && (
@@ -181,11 +191,6 @@ function Surfaces({
 export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
-  function leave(): void {
-    void abandonOperation(id)
-    onClose()
-  }
-
   if (piece.status === 'ready') {
     return (
       <Surfaces
@@ -207,14 +212,14 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
           error: piece.conversationsError,
           onDelete: piece.deleteConversation,
         }}
-        onClose={leave}
+        onClose={onClose}
       />
     )
   }
 
   return (
     <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={leave}>
+      <button type="button" className={styles.back} onClick={onClose}>
         ‹ pieces
       </button>
       {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}

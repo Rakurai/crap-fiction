@@ -29,7 +29,7 @@ describe('the fixture studio', () => {
     expect(await res.json()).toMatchObject({ success: true, data: { reachable: true, models: ['fixture'] } })
   })
 
-  it('opens a round over the same routes the author\'s studio serves, with every call site assigned', async () => {
+  it('opens a dispatch over the same routes the author\'s studio serves, with every call site assigned', async () => {
     await app.request('/workspace', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -41,7 +41,7 @@ describe('the fixture studio', () => {
       body: JSON.stringify({ title: 'Cups' }),
     })
 
-    const res = await app.request('/pieces/cups/conversations/c1/rounds', {
+    const res = await app.request('/pieces/cups/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: 'does the opening earn its length', draft: 'The cups sat where she left them.' }),

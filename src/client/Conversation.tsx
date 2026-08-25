@@ -1,14 +1,13 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AppliedChange } from '../shared/appliedChange.js'
+import type { AppliedChangeContent } from '../shared/appliedChange.js'
+import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
+import type { ConversationActivitySnapshot, DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
-import { everyCallFailed, tallyRound, type ProjectedParticipant, type ProjectedRound } from './roundProjection.js'
-import type { RoundSnapshot } from '../shared/roundEvents.js'
-import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import { useApply, type ApplyingResponse } from './useApply.js'
 import type { HandleEntry } from './useRoster.js'
 import { useNow } from './useNow.js'
@@ -21,7 +20,7 @@ const MAX_MENTION_MATCHES = 8
 type ConversationProps = {
   readonly pieceId: string
   readonly currentConversationId: string | null
-  readonly roundInFlight: RoundSnapshot | null
+  readonly conversationActionInFlight: ConversationActivitySnapshot | null
   readonly draft: string
   readonly flushDraft: () => void
   readonly room: RoomAdapters
@@ -29,156 +28,90 @@ type ConversationProps = {
   readonly mark: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
   readonly handles: readonly HandleEntry[]
-  readonly runtime: RuntimeStatus | undefined
+  readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
   readonly onApplied?: (markdown: string) => void
-  readonly onApplyingChange?: (applying: boolean) => void
+  readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
+  readonly onActionIdChange?: (action: { readonly conversationId: string; readonly actionId: string } | undefined) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
 
-const NOTHING_CAME_BACK = 'Every call failed. Nothing came back, and there is no answer to show you.'
-
-const STATE_LABEL: Record<'waiting' | 'preparing' | 'working', string> = {
-  waiting: 'waiting',
-  preparing: 'preparing its model',
-  working: 'thinking',
-}
-
-function participantSays(participant: ProjectedParticipant): ReactNode {
-  if (participant.state !== 'settled') {
-    return <p className={styles.state}>{machineWords(STATE_LABEL[participant.state])}</p>
-  }
-
-  const { result } = participant
-  if (result === undefined || result.kind === 'abandoned') return null
-  if (result.kind === 'response' && result.outcome === 'noComment') return null
-
-  if (result.kind === 'failed') {
-    return (
-      <>
-        <p className={styles.failed}>did not answer — {machineWords(result.reason)}</p>
-        {result.returned !== undefined && <p className={styles.returned}>{result.returned}</p>}
-      </>
-    )
-  }
-
-  return (
-    <>
-      <p className={styles.claim}>{result.claim}</p>
-      {result.note !== undefined && <p className={styles.note}>{result.note}</p>}
-    </>
-  )
-}
-
-function ApplyAction({
-  roundId,
+function ResponseActions({
+  responseId,
   participantId,
+  outcome,
   disabled,
   onApply,
-}: {
-  readonly roundId: string
-  readonly participantId: string
-  readonly disabled: boolean
-  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
-}) {
-  const [constraint, setConstraint] = useState('')
-
-  return (
-    <div className={styles.apply}>
-      <input
-        aria-label="Constraint for applying this recommendation"
-        className={styles.applyConstraint}
-        value={constraint}
-        disabled={disabled}
-        placeholder="a constraint, if there is one"
-        onChange={(event) => setConstraint(event.target.value)}
-      />
-      <button
-        type="button"
-        className={styles.applyButton}
-        disabled={disabled}
-        onClick={() => onApply(roundId, participantId, constraint.trim().length > 0 ? constraint.trim() : undefined)}
-      >
-        apply
-      </button>
-    </div>
-  )
-}
-
-function ReplyAction({
-  participantId,
-  busy,
+  onAsk,
   onReplyEmpty,
   onReply,
 }: {
+  readonly responseId: string
   readonly participantId: string
-  readonly busy: boolean
+  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
+  readonly disabled: boolean
+  readonly onApply: (responseId: string, constraint: string | undefined) => void
+  readonly onAsk: (responseId: string, clarification: string | undefined) => void
   readonly onReplyEmpty: (participantId: string) => void
   readonly onReply: (participantId: string, message: string) => void
 }) {
   const [text, setText] = useState('')
-  const blocked = text.trim().length > 0 && busy
+  const trimmed = text.trim()
+  const withText = trimmed.length > 0
 
-  function submit(): void {
-    const trimmed = text.trim()
-    if (trimmed.length === 0) {
+  function reply(): void {
+    if (!withText) {
       onReplyEmpty(participantId)
       return
     }
-    if (busy) return
+    if (disabled) return
     onReply(participantId, trimmed)
     setText('')
   }
 
+  function apply(): void {
+    if (disabled) return
+    onApply(responseId, withText ? trimmed : undefined)
+    setText('')
+  }
+
+  function ask(): void {
+    if (disabled) return
+    onAsk(responseId, withText ? trimmed : undefined)
+    setText('')
+  }
+
+  const fieldLabel =
+    outcome === 'applicableSuggestion'
+      ? 'Reply or apply, in your own words'
+      : outcome === 'commentary'
+        ? 'Reply or ask for a concrete change, in your own words'
+        : 'Reply, in your own words'
+
   return (
     <div className={styles.actions}>
+      {outcome === 'applicableSuggestion' && (
+        <button type="button" className={styles.applyButton} disabled={disabled} onClick={apply}>
+          apply
+        </button>
+      )}
+      {outcome === 'commentary' && (
+        <button type="button" className={styles.actionButton} disabled={disabled} onClick={ask}>
+          ask for a concrete change
+        </button>
+      )}
+      <button type="button" className={styles.actionButton} disabled={withText && disabled} onClick={reply}>
+        reply
+      </button>
       <input
-        aria-label="Reply, in your own words"
+        aria-label={fieldLabel}
         className={styles.actionField}
         value={text}
         placeholder="in your words — optional"
         onChange={(event) => setText(event.target.value)}
       />
-      <button type="button" className={styles.actionButton} disabled={blocked} onClick={submit}>
-        reply
-      </button>
-    </div>
-  )
-}
-
-function AskAction({
-  roundId,
-  participantId,
-  disabled,
-  onAsk,
-}: {
-  readonly roundId: string
-  readonly participantId: string
-  readonly disabled: boolean
-  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
-}) {
-  const [clarification, setClarification] = useState('')
-
-  return (
-    <div className={styles.actions}>
-      <input
-        aria-label="Clarify what you're asking for"
-        className={styles.actionField}
-        value={clarification}
-        disabled={disabled}
-        placeholder="a clarification, if there is one"
-        onChange={(event) => setClarification(event.target.value)}
-      />
-      <button
-        type="button"
-        className={styles.actionButton}
-        disabled={disabled}
-        onClick={() => onAsk(roundId, participantId, clarification.trim().length > 0 ? clarification.trim() : undefined)}
-      >
-        ask for a concrete change
-      </button>
     </div>
   )
 }
@@ -195,28 +128,30 @@ function ApplyingFlight({ onAbandon }: { readonly onAbandon: () => void }) {
 }
 
 function AppliedChangeView({
-  change,
+  content,
   askDisabled,
   onAskAboutChange,
 }: {
-  readonly change: AppliedChange
+  readonly content: AppliedChangeContent | undefined
   readonly askDisabled: boolean
   readonly onAskAboutChange: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
 
   return (
     <div className={styles.change}>
-      {change.content.kind === 'rewrittenWhole' ? (
+      {content === undefined ? (
+        <span className={styles.changeFacts}>{facts(machineWords('applied'), machineWords('change file missing'))}</span>
+      ) : content.kind === 'rewrittenWhole' ? (
         <span className={styles.changeFacts}>{facts(machineWords('applied'), machineWords('rewritten whole'))}</span>
       ) : (
         <>
           <button type="button" className={styles.changeToggle} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
-            {facts(machineWords('applied'), wordCount(change.content.passages.reduce((sum, passage) => sum + countWords(passage.after), 0)))}
+            {facts(machineWords('applied'), wordCount(content.passages.reduce((sum, passage) => sum + countWords(passage.after), 0)))}
           </button>
           {open && (
             <div className={styles.changeDiff}>
-              {change.content.passages.map((passage, index) => (
+              {content.passages.map((passage, index) => (
                 <div key={index} className={styles.changePassage}>
                   <p className={styles.changeBefore}>{passage.before}</p>
                   <p className={styles.changeAfter}>{passage.after}</p>
@@ -233,161 +168,162 @@ function AppliedChangeView({
   )
 }
 
-function ParticipantBlock({
-  participant,
-  roundId,
-  name,
-  mark,
-  applying,
-  applyDisabled,
-  onApply,
-  onAbandonApply,
-  onAskAboutChange,
-  onReplyEmpty,
-  onReply,
-  onAsk,
-}: {
-  readonly participant: ProjectedParticipant
-  readonly roundId: string
-  readonly name: string
-  readonly mark: string
-  readonly applying: boolean
-  readonly applyDisabled: boolean
-  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
-  readonly onAbandonApply: () => void
-  readonly onAskAboutChange: () => void
-  readonly onReplyEmpty: (participantId: string) => void
-  readonly onReply: (participantId: string, message: string) => void
-  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
-}) {
-  const says = participantSays(participant)
-  if (says === null) return null
-
-  const recommends =
-    participant.state === 'settled' && participant.result?.kind === 'response' && participant.result.outcome === 'applicableSuggestion'
-  const offeredAReading =
-    participant.state === 'settled' && participant.result?.kind === 'response' && participant.result.outcome === 'commentary'
-
-  return (
-    <div className={styles.participant}>
-      <div className={styles.identity}>
-        <span className={styles.mark} style={{ background: mark }} aria-hidden="true" />
-        <span className={styles.name}>{name}</span>
-      </div>
-      {says}
-      {participant.appliedChanges.map((change) => (
-        <AppliedChangeView key={change.id} change={change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
-      ))}
-      {recommends &&
-        (applying ? (
-          <ApplyingFlight onAbandon={onAbandonApply} />
-        ) : (
-          <ApplyAction roundId={roundId} participantId={participant.participantId} disabled={applyDisabled} onApply={onApply} />
-        ))}
-      {offeredAReading && <AskAction roundId={roundId} participantId={participant.participantId} disabled={applyDisabled} onAsk={onAsk} />}
-      <ReplyAction participantId={participant.participantId} busy={applyDisabled} onReplyEmpty={onReplyEmpty} onReply={onReply} />
-    </div>
-  )
-}
-
-function roundFacts(round: ProjectedRound, nowMs: number): string {
-  const tally = tallyRound(round)
-  const counts = [
-    [tally.working, 'WORKING'],
-    [tally.preparing, 'PREPARING'],
-    [tally.answered, 'ANSWERED'],
-    [tally.waiting, 'WAITING'],
-  ] as const
-  const said = counts.filter(([count]) => count > 0).map(([count, noun]) => `${count} ${noun}`)
-  return facts(...said, ...(round.openedAt === undefined ? [] : [elapsed(round.openedAt, nowMs)]))
-}
-
 function roomChangedText(names: readonly string[]): string {
   const [only] = names
   if (names.length === 1 && only !== undefined) return `${only} was addressed and is now in the room.`
   return `${names.join(', ')} were addressed and are now in the room.`
 }
 
-function askedText(name: string): string {
-  return `${name} was asked for a concrete change.`
-}
-
-function RoundFlight({ round, nowMs, onAbandon }: { readonly round: ProjectedRound; readonly nowMs: number; readonly onAbandon: () => void }) {
+function RoomChanged({ names }: { readonly names: readonly string[] }) {
   return (
-    <div className={styles.flight}>
-      <span className={styles.roundFacts}>{roundFacts(round, nowMs)}</span>
-      <button type="button" className={styles.abandon} onClick={onAbandon}>
-        abandon
-      </button>
+    <div className={styles.roomChanged}>
+      <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
+      <span className={styles.roomChangedWords}>{roomChangedText(names)}</span>
     </div>
   )
 }
 
-function RoundView({
-  round,
-  nowMs,
-  displayName,
-  mark,
-  onAbandon,
-  applying,
-  applyDisabled,
-  onApply,
-  onAbandonApply,
-  onAskAboutChange,
-  onReplyEmpty,
-  onReply,
-  onAsk,
-}: {
-  readonly round: ProjectedRound
-  readonly nowMs: number
-  readonly displayName: (id: string) => string
-  readonly mark: (id: string) => string
-  readonly onAbandon: () => void
-  readonly applying: ApplyingResponse | undefined
-  readonly applyDisabled: boolean
-  readonly onApply: (roundId: string, participantId: string, constraint: string | undefined) => void
-  readonly onAbandonApply: () => void
-  readonly onAskAboutChange: () => void
-  readonly onReplyEmpty: (participantId: string) => void
-  readonly onReply: (participantId: string, message: string) => void
-  readonly onAsk: (roundId: string, participantId: string, clarification: string | undefined) => void
-}) {
+function askedText(name: string): string {
+  return `${name} was asked for a concrete change.`
+}
+
+function participantNameFor(entries: readonly ConversationEntryView[], responseId: string, displayName: (id: string) => string): string {
+  const entry = entries.find((candidate) => candidate.id === responseId)
+  return displayName(entry?.kind === 'participantResponse' ? entry.participantId : responseId)
+}
+
+const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
+
+type EntryActions = Readonly<{
+  displayName: (id: string) => string
+  mark: (id: string) => string
+  applying: ApplyingResponse | undefined
+  applyDisabled: boolean
+  applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
+  onApply: (responseId: string, constraint: string | undefined) => void
+  onAbandonApply: () => void
+  onAskAboutChange: () => void
+  onReplyEmpty: (participantId: string) => void
+  onReply: (participantId: string, message: string) => void
+  onAsk: (responseId: string, clarification: string | undefined) => void
+}>
+
+function ParticipantIdentity({ name, mark }: { readonly name: string; readonly mark: string }) {
   return (
-    <div className={styles.round}>
-      {round.message !== undefined && <p className={styles.message}>{round.message}</p>}
-      {round.message === undefined && round.respondingTo !== undefined && (
-        <div className={styles.asked}>
-          <span className={styles.askedFacts}>{machineWords('asked')}</span>
-          <span className={styles.askedWords}>{askedText(displayName(round.respondingTo.participantId))}</span>
+    <div className={styles.identity}>
+      <span className={styles.mark} style={{ background: mark }} aria-hidden="true" />
+      <span className={styles.name}>{name}</span>
+    </div>
+  )
+}
+
+function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
+  const { displayName, mark, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } = actions
+
+  switch (entry.kind) {
+    case 'authorMessage':
+      return (
+        <>
+          <p className={styles.message}>{entry.text}</p>
+          {entry.brought.length > 0 && <RoomChanged names={entry.brought.map(displayName)} />}
+        </>
+      )
+    case 'concreteChangeRequest':
+      return (
+        <>
+          <div className={styles.asked}>
+            <span className={styles.askedFacts}>{machineWords('asked')}</span>
+            <span className={styles.askedWords}>{askedText(displayName(entry.target))}</span>
+          </div>
+          {entry.clarification !== undefined && <p className={styles.message}>{entry.clarification}</p>}
+        </>
+      )
+    case 'participantNoComment':
+      return null
+    case 'participantFailure':
+      return (
+        <div className={styles.participant}>
+          <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
+          <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
+          {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
+          <ResponseActions
+            responseId={entry.id}
+            participantId={entry.participantId}
+            outcome="failed"
+            disabled={applyDisabled}
+            onApply={onApply}
+            onAsk={onAsk}
+            onReplyEmpty={onReplyEmpty}
+            onReply={onReply}
+          />
         </div>
-      )}
-      {round.clarification !== undefined && <p className={styles.message}>{round.clarification}</p>}
-      {round.brought.length > 0 && (
-        <div className={styles.roomChanged}>
-          <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
-          <span className={styles.roomChangedWords}>{roomChangedText(round.brought.map(displayName))}</span>
+      )
+    case 'participantResponse': {
+      const applyingThis = applying?.responseId === entry.id
+      const applications = applicationsFor(entry.id)
+      return (
+        <div className={styles.participant}>
+          <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
+          <p className={styles.claim}>{entry.claim}</p>
+          {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
+          {applications.map((application) => (
+            <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+          ))}
+          {applyingThis ? (
+            <ApplyingFlight onAbandon={onAbandonApply} />
+          ) : (
+            <ResponseActions
+              responseId={entry.id}
+              participantId={entry.participantId}
+              outcome={entry.outcome}
+              disabled={applyDisabled}
+              onApply={onApply}
+              onAsk={onAsk}
+              onReplyEmpty={onReplyEmpty}
+              onReply={onReply}
+            />
+          )}
         </div>
+      )
+    }
+    case 'application':
+      return null
+    default: {
+      const exhaustive: never = entry
+      return exhaustive
+    }
+  }
+}
+
+function DispatchFlight({
+  activity,
+  displayName,
+  nowMs,
+  onAbandon,
+}: {
+  readonly activity: DispatchActivitySnapshot
+  readonly displayName: (participantId: string) => string
+  readonly nowMs: number
+  readonly onAbandon: () => void
+}) {
+  const active = Object.keys(activity.states)
+  return (
+    <div className={styles.flightWrapper}>
+      <div className={styles.flight}>
+        <span className={styles.activityFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
+        <button type="button" className={styles.abandon} onClick={onAbandon}>
+          abandon
+        </button>
+      </div>
+      {active.length > 0 && (
+        <ul className={styles.progress}>
+          {active.map((participantId) => (
+            <li key={participantId} className={styles.progressLine}>
+              {displayName(participantId)} is thinking.
+            </li>
+          ))}
+        </ul>
       )}
-      {round.outcome === 'inFlight' && <RoundFlight round={round} nowMs={nowMs} onAbandon={onAbandon} />}
-      {round.participants.map((participant) => (
-        <ParticipantBlock
-          key={participant.participantId}
-          participant={participant}
-          roundId={round.roundId}
-          name={displayName(participant.participantId)}
-          mark={mark(participant.participantId)}
-          applying={applying?.roundId === round.roundId && applying.participantId === participant.participantId}
-          applyDisabled={applyDisabled}
-          onApply={onApply}
-          onAbandonApply={onAbandonApply}
-          onAskAboutChange={onAskAboutChange}
-          onReplyEmpty={onReplyEmpty}
-          onReply={onReply}
-          onAsk={onAsk}
-        />
-      ))}
-      {round.outcome === 'abandoned' && <p className={styles.abandoned}>ABANDONED</p>}
-      {everyCallFailed(round) && <p className={styles.nothing}>{NOTHING_CAME_BACK}</p>}
     </div>
   )
 }
@@ -395,7 +331,7 @@ function RoundView({
 export function Conversation({
   pieceId,
   currentConversationId,
-  roundInFlight,
+  conversationActionInFlight,
   draft,
   flushDraft,
   room,
@@ -408,6 +344,7 @@ export function Conversation({
   onApplied = () => {},
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
+  onActionIdChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -430,15 +367,56 @@ export function Conversation({
     textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
   }, [caretOffset])
 
-  const conversation = useConversation(pieceId, currentConversationId, roundInFlight, flushDraft, () => draft, room)
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, conversation.attachAppliedChange, room)
+  const conversation = useConversation(pieceId, currentConversationId, conversationActionInFlight, flushDraft, () => draft, room)
+
+  const initialApplying: ApplyingResponse | undefined = useMemo(
+    () => (conversationActionInFlight?.kind === 'apply' ? { responseId: conversationActionInFlight.sourceEntryId } : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, initialApplying)
+
+  useEffect(() => {
+    onApplyingChange(
+      apply.applying === undefined
+        ? undefined
+        : { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) },
+    )
+  }, [apply.applying, conversation.projection.entries, displayName, onApplyingChange])
+
+  function abandonCurrentAction(): void {
+    conversation.abandon()
+    apply.clear()
+  }
+
+  useEffect(() => {
+    const conversationId = conversation.conversationId
+    onActionIdChange(
+      conversation.actionId === undefined || conversationId === null ? undefined : { conversationId, actionId: conversation.actionId },
+    )
+  }, [conversation.actionId, conversation.conversationId, onActionIdChange])
+
+  const applicationsByResponse = useMemo(() => {
+    const map = new Map<string, ApplicationEntryView[]>()
+    for (const entry of conversation.projection.entries) {
+      if (entry.kind !== 'application') continue
+      const list = map.get(entry.responseId)
+      if (list === undefined) map.set(entry.responseId, [entry])
+      else list.push(entry)
+    }
+    return map
+  }, [conversation.projection.entries])
+
+  function applicationsFor(responseId: string): readonly ApplicationEntryView[] {
+    return applicationsByResponse.get(responseId) ?? EMPTY_APPLICATIONS
+  }
 
   useEffect(() => {
     if (conversation.conversationId !== null) onConversationIdChange(conversation.conversationId)
   }, [conversation.conversationId, onConversationIdChange])
 
-  const counting = conversation.projection.rounds.some((round) => round.outcome === 'inFlight')
-  const nowMs = useNow(counting, clock)
+  const nowMs = useNow(conversation.projection.activity !== undefined, clock)
   const roomBusy = conversation.busy || apply.applying !== undefined
 
   function askAboutChange(): void {
@@ -461,9 +439,9 @@ export function Conversation({
     conversation.reply(participantId, text)
   }
 
-  function askForConcreteChange(roundId: string, participantId: string, clarification: string | undefined): void {
+  function askForConcreteChange(responseId: string, clarification: string | undefined): void {
     if (roomBusy) return
-    conversation.askForConcreteChange(roundId, participantId, clarification)
+    conversation.askForConcreteChange(responseId, clarification)
   }
 
   function submit() {
@@ -484,27 +462,29 @@ export function Conversation({
     textareaRef.current?.focus()
   }
 
+  const actions: EntryActions = {
+    displayName,
+    mark,
+    applying: apply.applying,
+    applyDisabled: roomBusy,
+    applicationsFor,
+    onApply: apply.apply,
+    onAbandonApply: abandonCurrentAction,
+    onAskAboutChange: askAboutChange,
+    onReplyEmpty: replyEmpty,
+    onReply: reply,
+    onAsk: askForConcreteChange,
+  }
+
   return (
     <div className={styles.wrapper}>
-      <div className={styles.rounds}>
-        {conversation.projection.rounds.map((round) => (
-          <RoundView
-            key={round.roundId}
-            round={round}
-            nowMs={nowMs}
-            displayName={displayName}
-            mark={mark}
-            onAbandon={conversation.abandon}
-            applying={apply.applying}
-            applyDisabled={roomBusy}
-            onApply={apply.apply}
-            onAbandonApply={apply.abandon}
-            onAskAboutChange={askAboutChange}
-            onReplyEmpty={replyEmpty}
-            onReply={reply}
-            onAsk={askForConcreteChange}
-          />
+      <div className={styles.transcript}>
+        {conversation.projection.entries.map((entry) => (
+          <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
+        {conversation.projection.activity !== undefined && (
+          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} onAbandon={abandonCurrentAction} />
+        )}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
         <p className={styles.error} role="alert">
@@ -573,7 +553,7 @@ export function Conversation({
           </Ariakit.ComboboxPopover>
         </div>
         <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-          {conversation.busy ? '…' : 'send'}
+          send
         </button>
       </form>
     </div>

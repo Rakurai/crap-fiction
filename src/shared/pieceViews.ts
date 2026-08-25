@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { conversationSummarySchema } from './conversationViews.js'
+import { captureSnapshotSchema } from './captureViews.js'
+import { conversationSummarySchema } from './conversationEntries.js'
+import { conversationActivitySnapshotSchema } from './conversationEvents.js'
 import { durableContextSchema } from './durableContext.js'
-import { roundSnapshotSchema } from './roundEvents.js'
 
 export const pieceStatusSchema = z.enum(['drafting', 'finished', 'abandoned'])
 
@@ -35,7 +36,8 @@ export const pieceDetailSchema = pieceSummaryShape
     storyContext: durableContextSchema,
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
-    roundInFlight: roundSnapshotSchema.nullable(),
+    conversationActionInFlight: conversationActivitySnapshotSchema.nullable(),
+    captureInFlight: captureSnapshotSchema.nullable(),
     cast: z.array(castMemberViewSchema).readonly(),
   })
   .readonly()

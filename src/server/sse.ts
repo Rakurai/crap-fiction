@@ -1,10 +1,10 @@
 import type { SSEStreamingApi } from 'hono/streaming'
 
 export const SSE_EVENT_NAMES = [
-  'round.opened',
-  'participant.state',
-  'participant.settled',
-  'round.closed',
+  'action.started',
+  'participant.activity',
+  'entry.appended',
+  'action.finished',
   'error',
 ] as const
 

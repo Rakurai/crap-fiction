@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildTestApp } from '../../support/harness.js'
-import { writeAppliedChange, writeConversation } from '../../../src/server/store/index.js'
+import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
 
 describe('/pieces', () => {
   let dataRoot: string
@@ -281,9 +281,12 @@ describe('/pieces/:id/conversations/:cid', () => {
 
   it('reports the piece\'s conversations, in the listing GET /pieces/:id already carries', async () => {
     const { app, dir } = await withPiece()
-    await writeConversation(dir, 'cups', 'c1', {
-      id: 'c1',
-      rounds: [{ id: 'r1', message: 'does the opening earn its length', addressed: [], brought: [], outcome: 'settled', participants: [] }],
+    await new ConversationEntryStore().append(dir, 'cups', 'c1', {
+      id: 'e1',
+      kind: 'authorMessage',
+      text: 'does the opening earn its length',
+      audience: [],
+      brought: [],
     })
 
     const res = await app.request('/pieces/cups')
@@ -293,22 +296,11 @@ describe('/pieces/:id/conversations/:cid', () => {
 
   it('deletes a conversation and the change files its applications name', async () => {
     const { app, dir } = await withPiece()
-    await writeConversation(dir, 'cups', 'c1', {
-      id: 'c1',
-      rounds: [
-        {
-          id: 'r1',
-          addressed: [],
-          brought: [],
-          outcome: 'settled',
-          participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut it' } }],
-        },
-      ],
-    })
+    const store = new ConversationEntryStore()
+    await store.append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await store.append(dir, 'cups', 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
     await writeAppliedChange(dir, 'cups', {
       id: 'change1',
-      roundId: 'r1',
-      participantId: 'shape',
       content: { kind: 'passages', passages: [{ before: 'it', after: '' }] },
     })
 

@@ -2,19 +2,17 @@ import { z } from 'zod'
 import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
 import { captureApproveOutcomeSchema, type CaptureApproveOutcome, type CaptureProposal } from '../shared/captureProposal.js'
 import { captureOutcomeSchema, type CaptureOutcome } from '../shared/captureViews.js'
-import { conversationViewSchema, type ConversationView } from '../shared/conversationViews.js'
+import { entryConversationViewSchema, type EntryConversationView } from '../shared/conversationEntryViews.js'
 import {
-  participantSettledEventSchema,
-  participantStateEventSchema,
-  roomErrorEventSchema,
-  roundClosedEventSchema,
-  roundOpenedEventSchema,
-  type RoomErrorEvent,
-} from '../shared/roundEvents.js'
+  actionFinishedEventSchema,
+  actionStartedEventSchema,
+  conversationErrorEventSchema,
+  entryAppendedEventSchema,
+  participantActivityEventSchema,
+  type ConversationErrorEvent,
+} from '../shared/conversationEvents.js'
+import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
-import type { RoundEvent } from './roundProjection.js'
-
-export type RoomEvent = RoundEvent | Readonly<{ type: 'error'; data: RoomErrorEvent }>
 
 function readJson(text: string): unknown {
   try {
@@ -35,8 +33,8 @@ export function fetchConversation(
   pieceId: string,
   conversationId: string,
   signal?: AbortSignal,
-): Promise<RequestResult<ConversationView>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, conversationViewSchema, {
+): Promise<RequestResult<EntryConversationView>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, entryConversationViewSchema, {
     signal: signal ?? null,
   })
 }
@@ -48,21 +46,21 @@ export function deleteConversation(pieceId: string, conversationId: string, sign
   })
 }
 
-const startRoundResultSchema = z.object({ conversationId: z.string(), roundId: z.string() })
+const dispatchResultSchema = z.object({ conversationId: z.string(), actionId: z.string() })
 
-export type RoundOpening =
+export type DispatchOpening =
   | Readonly<{ message: string }>
   | Readonly<{ target: string; message: string }>
-  | Readonly<{ respondingTo: Readonly<{ roundId: string; participantId: string }>; clarification: string | undefined }>
+  | Readonly<{ respondingTo: string; clarification: string | undefined }>
 
-export function startRound(
+export function dispatch(
   pieceId: string,
   conversationId: string,
-  opening: RoundOpening,
+  opening: DispatchOpening,
   draft: string,
   signal?: AbortSignal,
-): Promise<RequestResult<{ conversationId: string; roundId: string }>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/rounds`, startRoundResultSchema, {
+): Promise<RequestResult<{ conversationId: string; actionId: string }>> {
+  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...opening, draft }),
@@ -73,8 +71,7 @@ export function startRound(
 export function applyRecommendation(
   pieceId: string,
   conversationId: string,
-  roundId: string,
-  participantId: string,
+  responseId: string,
   draft: string,
   constraint: string | undefined,
   signal?: AbortSignal,
@@ -82,7 +79,7 @@ export function applyRecommendation(
   return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ roundId, participantId, draft, constraint }),
+    body: JSON.stringify({ responseId, draft, constraint }),
     signal: signal ?? null,
   })
 }
@@ -114,11 +111,17 @@ export function approveCapture(
   })
 }
 
-export function abandonOperation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/abandon`, z.null(), {
-    method: 'POST',
-    signal: signal ?? null,
-  })
+export function abandonOperation(
+  pieceId: string,
+  conversationId: string,
+  actionId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<null>> {
+  return requestJson(
+    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
+    z.null(),
+    { method: 'POST', signal: signal ?? null },
+  )
 }
 
 export function subscribeToRoom(
@@ -141,11 +144,11 @@ export function subscribeToRoom(
     })
   }
 
-  listen('round.opened', roundOpenedEventSchema, (data) => ({ type: 'round.opened', data }))
-  listen('participant.state', participantStateEventSchema, (data) => ({ type: 'participant.state', data }))
-  listen('participant.settled', participantSettledEventSchema, (data) => ({ type: 'participant.settled', data }))
-  listen('round.closed', roundClosedEventSchema, (data) => ({ type: 'round.closed', data }))
-  listen('error', roomErrorEventSchema, (data) => ({ type: 'error', data }))
+  listen('action.started', actionStartedEventSchema, (data) => ({ type: 'action.started', data }))
+  listen('participant.activity', participantActivityEventSchema, (data) => ({ type: 'participant.activity', data }))
+  listen('entry.appended', entryAppendedEventSchema, (data) => ({ type: 'entry.appended', data }))
+  listen('action.finished', actionFinishedEventSchema, (data) => ({ type: 'action.finished', data }))
+  listen('error', conversationErrorEventSchema, (data: ConversationErrorEvent) => ({ type: 'error', data }))
 
   return () => source.close()
 }

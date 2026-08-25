@@ -30,29 +30,14 @@ Not resolved by deleting them from the table, because the store can already writ
 the routes would each be a one-line adapter over a capability that exists. They stay in the document
 as the shape the write takes if a surface ever asks for it.
 
-## A response with a note and no claim
-
-`src/shared/participantResponse.ts` — `normalizeResponse` promotes a participant's note into the
-claim slot when the model returned no claim, and drops the note. This contradicts three statements:
-`CONTEXT.md` defines the claim as the reading the participant commits to, `UX_DESIGN.md` says the
-participant writes both and neither derives from the other, and `SPEC.md` says nothing is invented to
-fill a field the model left empty.
-
-It survives because a weak local model returning only a note is common, and promoting it salvages a
-response that would otherwise fail as nonconforming after its retries. That is a real cost being
-avoided, and it is being avoided by presenting a note to the author as a claim the participant did
-not make — which is exactly the substitution the documents refuse. The document is right and the
-code is wrong.
-
-The correct behaviour is that a claimless response does not conform, which puts the re-issue where it
-belongs: inside the model module, against the model that got it wrong.
-
 ## Abandoning a context capture
 
 `PRD.md` "Stop waiting" requires abandoning for as long as any model operation is in flight and names
-three; `SPEC.md` "Seams" states that a round, an application and a capture share one abandonment
-path. The room's side of this is built — capture registers as the operation holding the room and
-`POST /pieces/:id/abandon` reaches it — but the hook never asks, and the review surface has no state
-for an analysis still out, so it renders as an analysis that returned nothing.
+three: a dispatch, an application, and a context capture. `SPEC.md` "Operation state" and "Seams" now
+give capture its own activity and abandonment identity, independent of the dispatch-or-application
+state — issue #59 detached it so that capture no longer shares that state, that lock or that
+abandonment path. Nothing in the room, the transport or the client reaches a capture in flight to
+stop it: there is no route, no hook, and the review surface has no state for an analysis still out,
+so a reload or a wait renders as an analysis that returned nothing.
 
 Tracked as issue #55.

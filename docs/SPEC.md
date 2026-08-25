@@ -19,12 +19,12 @@ recording what the behaviour above it forces.
 Three properties of the interaction do the rest of the constraining.
 
 **Independence is context compilation.** No specialist's context may contain another
-specialist's response from the round being formed. This is a property of what goes into a
+specialist's response from the dispatch being formed. This is a property of what goes into a
 call, not of what a prompt asks for, and it is the one seam where a plausible implementation
 defeats the product's central bet with no symptom.
 
 **Asking the room is several slow calls the author must not block on.** They are issued one at a
-time against one local model, so a round costs the sum of its calls. This is an infrastructure
+time against one local model, so a dispatch costs the sum of its calls. This is an infrastructure
 fact before it is an interface one.
 
 **Applying a recommendation is interpretation, not replay.** It reads the current manuscript
@@ -40,16 +40,16 @@ rather than two that drift.
 
 The server serves the client, exposes a local HTTP API, owns the filesystem, and owns
 model access and scheduling. The client owns the editor, the conversation surface, and its own
-projection of round state.
+projection of conversation entries and activity.
 
 **Not Electron** — a localhost URL is sufficient, and packaging is a cost with no return here.
 **No database** — everything a piece needs is in the piece's directory.
 
 Client state is fed by the event stream rather than fetched. This is a local event-stream
 application; modelling it as remote data fetching would be a category error. The shape that
-satisfies it is a hook per concern over React's own state, with the round's accumulation held in
-a pure reducer the hook feeds events to — a store library would be a second state authority
-above the one the framework already supplies.
+satisfies it is a hook per concern over React's own state, with the entries and activity
+accumulation held in a pure reducer the hook feeds events to — a store library would be a second
+state authority above the one the framework already supplies.
 
 **`pino` is the logger, and it writes to stderr and nowhere else.** No file transport, no log directory
 and no second destination, so nothing the logger emits outlives the process — which is what makes the
@@ -162,7 +162,7 @@ management that would otherwise be the second reason to carry it is unused.
 **Where a model must be named, the model is chosen from the runtime's reported models rather than
 typed.** `GET /models` already carries them, so an author who has to type an identifier by hand is
 being asked for something the application knows: one character wrong is a call site that fails as
-unconfigured at the next round, discovered minutes later. It is a closed choice over what the runtime
+unconfigured at the next call, discovered minutes later. It is a closed choice over what the runtime
 holds, plus whatever the site is already assigned — an assignment the runtime no longer reports stays
 offered and stays selected, so a model that is merely not loaded right now is never silently dropped
 from a site the author configured. That is the whole of what a free-text field would have bought, and a
@@ -300,7 +300,7 @@ conversations, and each needs to be named independently of its file's position o
 piece with no draft, no story context and no conversations is a piece the author has only named. A
 piece with no conversations is opened by starting one, which is also what deleting the last one
 leaves behind. A piece's modified time is its draft's, and a conversation's last activity is its last
-round's, so both are facts about the files rather than counters the application maintains.
+entry's, so both are facts about the files rather than counters the application maintains.
 
 ### Formats and shapes
 
@@ -308,11 +308,14 @@ round's, so both are facts about the files rather than counters the application 
 capture proposes changes against identified entries, so the format has to be readable and
 structured at once.
 
-**Conversations are JSON, one file per conversation**, holding the chronological record the
-conversation surface is rebuilt from: each round's author message, which participants were
-addressed, each participant's outcome including recorded no-comment outcomes and failures, and
-each application with the constraint the author supplied and the identifier of the change it
-produced.
+**Conversations are JSON, one file per conversation**, holding an ordered, append-only sequence of
+entries the conversation surface is rebuilt from: an author message or a concrete-change request,
+each carrying the audience it resolved to; each participant's outcome — a response, a recorded
+no-comment, or a failure — carrying the identity of the entry that caused it; and each application,
+carrying the response it embodied, the constraint the author supplied where they gave one, and the
+identifier of the change it produced. Every entry after the first carries the identity of the entry
+that caused it rather than a position in a dispatch or a conversation-wide sequence number, so an
+entry is addressable, and interpretable, without the entries around it.
 
 **A conversation holds no manuscript state, and what an application changed is held beside the
 conversation rather than in it.** An application writes the passages it changed, before and after,
@@ -453,15 +456,15 @@ runtime emits reasoning as a distinct output segment this is structural rather t
 
 **The call site is the whole of what the interface knows about the caller** — a participant, an
 application, or a capture — and it is how the assignment is found. The module never learns that a
-conversation, a round, a participant's history or a manuscript exists, which is most of why replacing
-it is cheap.
+conversation, a dispatch, a participant's history or a manuscript exists, which is most of why
+replacing it is cheap.
 
 **Retry, timeout and model residency are policy inside the module, not parameters on a call.** Every
 call site wants the same policy, and a caller choosing a retry count is a caller reasoning about
 model reliability — which is the thing the module exists to absorb. Loading, holding and evicting
 models is likewise the module's business, and the case worth its attention is a full cast on distinct
-models: evicting after every call would have a round spend more time loading than answering, which is
-a cost the author experiences as the room being slow and has no way to diagnose.
+models: evicting after every call would have a dispatch spend more time loading than answering,
+which is a cost the author experiences as the room being slow and has no way to diagnose.
 
 **How many times a failed call is retried, and how long a call may wait, are this module's values** —
 one place, maintainer-facing, not author configuration and not a knob anywhere on the interface. That a
@@ -470,7 +473,7 @@ author-facing meaning, and putting it in the room, in a route or in a settings f
 number three callers could disagree about.
 
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
-it can answer makes the author wait for a reason the interface can state, and a round in flight is
+it can answer makes the author wait for a reason the interface can state, and a dispatch in flight is
 required to state only what is true. An implementation that cannot tell setup from work simply never
 reports preparing, which is the ceiling principle in its smallest form: the interface admits the
 richer state and a weaker implementation under-reports rather than the interface under-promising.
@@ -523,9 +526,9 @@ is nearly free, not because it is expected to be exercised.
 
 A Python service behind a sidecar or proxy is not eligible: one process and one schema definition are
 what make the artifact shapes a single contract. Nor may the runtime's own agent loop, tool loop or
-chat abstraction be used, because the product's essential rule — that specialists form current-round
-judgments independently and then the Story Editor may see them — has to remain visible and testable in
-this application's own code.
+chat abstraction be used, because the product's essential rule — that specialists form
+current-dispatch judgments independently and then the Story Editor may see them — has to remain
+visible and testable in this application's own code.
 
 **A model is assigned per participant, and applying and capturing are assigned the same way without
 being participants.** Each has its own prompt and its own context compilation, so each carries its own
@@ -564,19 +567,30 @@ one case, and SPEC already declines to fix its call count. Shrinking the schema 
 to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
-one, and so does the Story Editor on a round where nothing substantive landed. Declaring it is then a
+one, and so does the Story Editor on a dispatch where nothing substantive landed. Declaring it is then a
 response that does not conform, which the module re-issues under its own policy before it becomes a
 failure. This is what makes an owed answer enforceable without inspecting what a response says —
 judging the content would take a second model call to do badly, and a model willing to declare
 silence on a direct question is common enough that the guarantee has to hold against it.
 
-**There is no scheduler.** Calls are issued one at a time and no runtime is ever asked to hold more
-than one. Local capacity is bounded by the loaded model, so concurrent calls against it are
-substantially serialized anyway and buy too little wall-clock to be worth the concurrency limits,
-queue positions and cancellation-of-queued-work they would add — and a runtime given more
-simultaneous calls than it is configured for fails rather than queues. A round therefore costs the
-sum of its calls, which is the standing cost concern arriving as an infrastructure fact and is why
-writing through a round is load-bearing rather than a nicety.
+**The interface permits independent submission and promises nothing about it.** A caller may
+submit a further call without awaiting the one before it, and the seam states plainly that it
+guarantees none of their relative start order, completion order, latency, progress or successful
+cancellation across submissions — each call carries its own signal and settles on its own. What an
+implementation owes its own runtime beyond that is the implementation's policy, never a caller's to
+coordinate.
+
+**There is no general scheduler.** Local capacity is bounded by the loaded model, and a runtime
+given more simultaneous calls than it is configured for fails rather than queues — so this runtime
+is never asked to hold more than one, a guarantee the production adapter keeps by queuing every
+submission and running them one at a time regardless of how its caller submitted them. That is a
+fixed, unconditional policy owned entirely by the adapter, not a configurable scheduler, a
+concurrency limit, or a residency abstraction serving several policies. The room uses the seam's
+independence: a dispatch submits every eligible specialist's call without awaiting the one before
+it. On the production adapter a dispatch's wall-clock cost is still the sum of its calls, because
+that adapter's own queuing is the guarantee above; an adapter able to overlap compatible work is
+free to settle several of a dispatch's calls sooner than their sum, and the room does not have to
+change for either.
 
 ## Context compilation
 
@@ -601,7 +615,7 @@ instead.
 ```
 compileContext(call, piece, conversation, policy) → Context
 
-  call = a participant, with the round's input
+  call = a participant, with the dispatch's input
        | an application, with the recommendation and the author's constraint
        | a context capture
 ```
@@ -620,7 +634,7 @@ inference in the context path.
 the difference between them.
 
 **Shared history is the default.** A specialist sees the conversation as it happened: author
-messages, prior rounds' participant responses, and the applications that changed the
+messages, prior dispatches' participant responses, and the applications that changed the
 manuscript.
 
 **Stricter independence is the alternative** and filters other specialists' historical
@@ -630,16 +644,18 @@ empirical question, and switching between them must remain a configuration chang
 a redesign.
 
 **Under every policy, the invariant holds: no specialist's context contains any other
-specialist's response from the round being formed.** It is enforced by construction: every eligible
-specialist's context is compiled before the round's first call is issued, so no specialist response
-from the round exists at the moment any specialist context is built.
+specialist's response from the dispatch being formed.** It is enforced by construction: every
+eligible specialist's context is compiled before any of the dispatch's calls is submitted, so no
+specialist response from the dispatch exists at the moment any specialist context is built.
 
-Sequential execution is why that has to be stated rather than assumed. With calls issued one after
-another, an earlier specialist's response is sitting there when a later call is made, and the only
-thing keeping it out is that the later call's context was already closed. Compiling up front is the
-difference between an invariant and a habit.
+Independent submission is why that has to be stated rather than assumed. Every eligible specialist's
+call is submitted before any of them has settled, and which one settles first is not under the
+room's control — an earlier context that stayed open past submission would let whichever specialist
+answers fastest leak into a sibling's call made a beat later. Compiling every context up front, from
+one snapshot, is what keeps the invariant true regardless of settlement order rather than a habit
+that depended on an order the dispatch no longer has.
 
-**The Story Editor is compiled by the same function** with the round's settled substantive
+**The Story Editor is compiled by the same function** with the dispatch's settled substantive
 specialist responses supplied as an additional input. That is the one asymmetry in the design,
 and it is what the Story Editor's function requires.
 
@@ -651,62 +667,93 @@ to the author.
 
 ## Operation state
 
-One author-initiated model operation runs at a time, so the application's interaction state is
-small enough to name exhaustively and is what the client's controls observe.
+One conversation action runs at a time — a dispatch or an Apply — so that part of the
+application's interaction state is small enough to name exhaustively and is what the client's
+controls observe.
 
 ```
 idle
-  ├─ send a message, or ask a participant for a concrete change ─→ roundInFlight ─→ idle
-  ├─ apply a recommendation ────────────────────────────────────→ applying      ─→ idle
-  └─ capture context ───────────────────────────────────────────→ capturing     ─→ reviewing ─→ idle
+  ├─ send a message, or ask a participant for a concrete change ─→ dispatching ─→ idle
+  └─ apply a recommendation ────────────────────────────────────→ applying    ─→ idle
 ```
 
 Manuscript editing is permitted in every state except `applying`. Abandonment applies to
-`roundInFlight`, `applying` and `capturing`, returning to `idle` with whatever landed kept.
+`dispatching` and `applying`, returning to `idle` with whatever landed kept.
+
+**Context capture is a second, independent operation, with a state of its own:**
+
+```
+capture context ─→ capturing ─→ reviewing ─→ idle
+```
+
 `reviewing` holds capture proposals with nothing in flight, and approving writes context files
-without a model call.
+without a model call. Capture may be entered while a dispatch or an Apply holds, and neither of
+those waits on a capture in flight either — the conversation-action state and capture's own state
+are refused independently, never against each other. Reading the piece reports both: whichever
+conversation action is in flight, and whether a capture is, so a client that reloaded knows what it
+is looking at without any new event.
 
-**The room holds this state and refuses to start an operation unless it is idle.** The client
-disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
-because the guard on the manuscript has to be where the state is, not in the surface that draws the
-buttons. A refused start is reported as an `error` and is never a question put to the author —
-nothing asks which of two operations to keep. Reading the piece reports whatever operation is in
-flight, so a client that reloaded knows what it is looking at without any new event.
+**The room holds the conversation-action state and refuses to start one unless it is idle.** The
+client disables the controls that would start one, so the refusal is unreachable in ordinary use; it
+exists because the guard on the manuscript has to be where the state is, not in the surface that
+draws the buttons. A refused start is reported as an `error` and is never a question put to the
+author — nothing asks which of two operations to keep. Capture is refused only by a capture already
+in flight for the same piece; a dispatch or an Apply in flight is never a reason to refuse it.
 
-**The operation in flight has an identifier, and a result belonging to any other is discarded.** A
+**Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the
-one that replaced it. With a single operation at a time the identifier costs nothing, and it is the
-whole of what keeps an abandoned call from arriving as a live one.
+one that replaced it. With at most one conversation action and one capture per piece at a time, the
+identifier costs nothing, and it is the whole of what keeps an abandoned call from arriving as a
+live one. Abandoning targets this identifier directly rather than "whichever operation this piece is
+running": a request naming an action that has already finished, ordinary or abandoned, is a silent
+no-op rather than a reason to touch whatever runs in its place. Untracking is synchronous with the
+abandon request itself, not with the cancelled call's own eventual settlement, which is what lets the
+room accept the next operation immediately rather than once the abandoned one finishes unwinding.
 
 **Serialization is a simplification, not a principle.** Local capacity is bounded by the loaded
-model, so overlapping operations buy little wall-clock while multiplying the states the interface
-has to compose. Nothing is built to make concurrency impossible; there is no requirement for it.
+model, so overlapping conversation actions would buy little wall-clock while multiplying the states
+the interface has to compose, and nothing is built to make that concurrency impossible — there is no
+requirement for it. Capture overlaps the other two anyway, on the same bounded capacity: gating a
+whole-story analysis the author invokes rarely on whatever the room happens to be doing would cost
+more in waiting than the shared capacity would ever save.
 
-## The round
+## Dispatch
+
+Dispatch is how the room resolves one author action's audience once, writes the entry that
+causes it immediately, and calls the resolved participants over it.
 
 ```
-Round = { message, addressed[] }
+Dispatch = { causeEntry, addressed[] }
   eligible = addressed, or the enabled cast when nothing was addressed
+  append causeEntry durably before any call is issued; its audience is eligible ∪ Story Editor
   compile every eligible participant's context, before any call is issued
-  call them one at a time, in the cast's order, one abort signal per call
-  stream each participant's state and settled response as it lands
-  if nothing was addressed: call the Story Editor over the substantive responses, however few
+  submit every eligible specialist's call independently, one shared abort signal for all of them
+  append each settled outcome as its own entry, in the order it settles, and stream it as it lands
+  once every submitted specialist call has settled: if nothing was addressed, call the Story Editor
+    over the substantive responses, however few
 ```
 
-The order is the content: readings that have not settled cannot be evaluated as evidence, which is
-why the Story Editor's call is last and not merely later.
+Completion is the content: the Story Editor is given only readings that have already settled, which
+is why its call waits for this dispatch's own specialist calls to settle rather than being scheduled
+after them in some fixed position.
 
-**Where nothing was addressed, the Story Editor belongs to the round's participant set from the
-moment it opens** — last in the order, and waiting for its call exactly as an unreached specialist
-is. The author has no use for the fact that a different condition gates it, so `participant.state`
-needs no third value for it, and the guarantee that the readings precede the judgment is carried by
-its position rather than asserted in a label. An addressed round that did not name it does not
-include it at all.
+**Where nothing was addressed, the Story Editor belongs to the dispatch's specialist set from the
+moment it opens** — its call cannot be submitted until every specialist call this dispatch caused has
+settled. The author has no use for the fact that a different condition gates it, so
+`participant.activity` needs no third value for it, and the guarantee that the readings precede the
+judgment is carried by that precondition rather than asserted in a label or a position in a list. An
+addressed dispatch that did not name it does not include it at all, and a directed message or a
+concrete-change request never reaches this gate regardless of how many specialists it happened to
+call.
 
-**The cast's order is the order calls are issued**, so responses land in a stable order the author
-sees fill in. That the order is now observable changes nothing about independence — every context
-was closed before the first call — and it costs the presentation nothing, because the order was
-already required to be stable and independent of who answered first.
+**Responses land in the order they settle, not the cast's order.** Every eligible specialist's call
+is submitted before any of them has settled, so a dispatch calling four specialists on four
+different models can have any one of them answer first, and whichever does is durable first.
+Independence never depended on a stable order: every context was already closed, from one snapshot,
+before any call was submitted, so which one settles when carries no bearing on what any of them was
+asked. The room does not serialize these calls itself and does not infer that all of them are done
+from any shared model-queue state; it tracks only the specialist calls this dispatch's own source
+entry caused, and acts once exactly that set is empty.
 
 **Addressing is parsed out of the author's message by the room, and it is the only thing the
 message is parsed for.** A sigil counts where it begins the message or follows whitespace — so
@@ -716,59 +763,74 @@ Compression. A token matching exactly one handle addresses that participant; a t
 or more than one, is ignored and stays ordinary text. Typo tolerance and fuzzy matching are not
 required. Offering handles as the author types one is the composer's own affair and is the roster's
 combobox; it never becomes a second authority on who was called, because the room reads the text the
-author actually sent. The message itself reaches every call verbatim, sigils included.
+author actually sent. The message itself reaches every call verbatim, sigils included, and is
+written into the author-message entry exactly as sent.
 
-**The room is the only parser, and a round that names its target is not parsed at all.** Replying to
-a participant and asking one for a concrete change each aim at a single participant without the
-author typing a sigil, so those rounds carry an explicit target instead, and a supplied target is the
-whole of the addressing. A client that parsed and posted its own participant list could open a round
-whose addressing contradicted the words about to reach the model; synthesizing a sigil into the
-author's text would put words in the conversation they never wrote.
+**The room is the only parser, and a dispatch that names its target is not parsed at all.** Replying
+to a participant and asking one for a concrete change each aim at a single participant without the
+author typing a sigil, so those dispatches carry an explicit target instead, and a supplied target is
+the whole of the addressing. A client that parsed and posted its own participant list could open a
+dispatch whose addressing contradicted the words about to reach the model; synthesizing a sigil into
+the author's text would put words in the conversation they never wrote.
 
-**Addressing a specialist that is not enabled enables it** before the round opens — the same
-durable write to `piece.yaml` as enabling it directly. The alternative is participation with an
-expiry, which is new domain machinery for something the author reverses in one action.
+**Addressing a specialist that is not enabled enables it** before the dispatch's entry is written —
+the same durable write to `piece.yaml` as enabling it directly, and the same author-message entry
+that carries the resolved audience also names which of them were newly brought in. The alternative
+is participation with an expiry, which is new domain machinery for something the author reverses in
+one action.
 
 **The Story Editor is not a member of the eligible set.** Keeping it out is what stops the
-ambiguity from becoming a double call. An addressed round does not call it unless it was
-addressed; a round addressed to the Story Editor alone is one call.
+ambiguity from becoming a double call. An addressed dispatch does not call it unless it was
+addressed; a dispatch addressed to the Story Editor alone is one call.
 
-**An unaddressed round always calls the Story Editor**, including one where every specialist
-returned no comment and one where every specialist call failed. A round is opened by an author
+**An unaddressed dispatch always calls the Story Editor**, including one where every specialist
+returned no comment and one where every specialist call failed. A dispatch is opened by an author
 message, and an author message is owed an answer; the Story Editor's model is assigned
 independently, so specialist failure is not its failure. With no substantive readings it is a
 generalist reading the story against the author's intent, which is its objective anyway.
 
-**Asking a participant for a concrete change is an ordinary round with no author message.** Its
-record carries the response it was asked about and the author's clarification where they gave one.
-The instruction that makes it concrete is deterministic call instruction and is never displayed, for
-the same reason a synthesized sigil is not. Its answer is a response like any other and lands where
-responses land.
+**Asking a participant for a concrete change is a dispatch caused by a concrete-change-request
+entry rather than an author message.** That entry carries the response it was asked about, by
+identity, and the author's clarification where they gave one. The instruction that makes it concrete
+is deterministic call instruction and is never displayed, for the same reason a synthesized sigil is
+not. Its answer is a response like any other and lands where responses land.
 
-A round is an in-memory object while it runs and a record in the conversation file once it has
-settled or been abandoned.
+A dispatch is in-memory state — an action identifier, its audience, and which of them have settled —
+while it runs. Nothing about the dispatch itself is durable; what is durable is the entries it
+causes and appends, each written as it lands rather than batched into one record at the end. A
+client that reloaded mid-dispatch reconstructs the same picture from the entries already on disk
+plus the activity the piece reports, never from a dispatch record it has to wait for.
 
 **Failure, silence and abandonment are ordinary.**
 
 A participant fails: reported plainly with what came back, once the model layer's retries are
 exhausted, and there is no per-participant re-ask. A participant has nothing material: its
 no-comment outcome is recorded and is not shown, and it is never re-run under an obligation to
-speak. The Story Editor fails: the round degrades to whatever readings landed rather than
-breaking, because the readings do not depend on it — and where nothing landed either, the round
-produced no answer and says so. Abandonment: the call in flight cancels, the calls not yet issued
-are never issued, landed responses stand as ordinary responses, and no Story Editor call is
-attempted — asking for one more call is the wrong question at the moment the author stopped caring.
+speak. The Story Editor fails: the dispatch degrades to whatever readings landed rather than
+breaking, because the readings do not depend on it — and where nothing landed either, the dispatch
+produced no answer and says so. Abandonment: every call this dispatch has in flight shares one
+signal and cancels through it, landed responses stand as ordinary entries, and no Story Editor call
+is attempted — asking for one more call is the wrong question at the moment the author stopped
+caring. A call abandoned mid-flight appends no entry of its own: an abandoned call said nothing, and
+nothing is the one outcome a dispatch does not record. A result settling for a call this dispatch no
+longer tracks — arriving after the dispatch already closed as failed — is likewise discarded rather
+than appended behind an `action.finished` the author already saw.
 
-**The author edits the manuscript mid-round.** The edit lands. Responses in flight were
-compiled against the draft as it was when the round opened, and nothing reconciles that;
-locking the manuscript for a round would break the premise that the author writes while the room
+**The author edits the manuscript mid-dispatch.** The edit lands. Responses in flight were
+compiled against the draft as it was when the dispatch opened, and nothing reconciles that;
+locking the manuscript for a dispatch would break the premise that the author writes while the room
 thinks.
 
 ## Applying a recommendation
 
-**One call.** Its input is the current draft, the conversation through the recommendation being
-applied, the recommendation itself, both durable contexts, and the author's constraint where
-they supplied one. Its output is the manuscript embodying it.
+**One call.** Its input is the current draft, the full current conversation, the recommendation
+itself, both durable contexts, and the author's constraint where they supplied one. Its output
+is the manuscript embodying it.
+
+**Apply resolves its source by response-entry identity and reads the conversation as it stands at
+invocation, not as it stood when the recommendation was made.** Intervening discussion may qualify
+or contradict an old recommendation, and the write process weighs that rather than replaying the
+recommendation against stale history. Apply creates no participant follow-up of its own.
 
 **The manuscript is read-only for the duration of that call.** An application reads the draft at
 one instant and returns the next state of it; an edit landing in between would leave a rewrite to
@@ -800,7 +862,7 @@ side of a whole-manuscript rewrite, which is a complete prior state of the story
 as long as the conversation lives — a manuscript snapshot whatever the file is called, and the one
 thing this product refuses to keep.
 
-**An application is abandonable on the same terms as a round.** In-flight call cancelled, lock
+**An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, lock
 released, manuscript untouched, recommendation still applicable. With the timeout in the model
 layer, a model that never answers releases the manuscript without the author acting.
 
@@ -813,13 +875,15 @@ recommendation stays applicable.
 
 ## Context capture
 
-**One author-triggered operation.** Its input is the draft, the current conversation whole, and
-both existing contexts, as they stand when the author invokes it. The author keeps writing while
-it runs: the analysis holds no lock, and editing afterwards neither cancels it nor is reconciled
-against its proposals, which are advisory and individually approved. Its output is a set of
-proposals, each carrying its
-destination context, the operation it performs — add, revise, replace, remove — the entry it
-concerns where it concerns an existing one, and the proposed text.
+**One author-triggered operation, independent of a dispatch or an application.** Its input is the
+draft, the current conversation whole, and both existing contexts, snapshotted as they stand when
+the author invokes it. The author keeps writing while it runs: the analysis holds no lock, and
+editing afterwards neither cancels it nor is reconciled against its proposals, which are advisory
+and individually approved. It may run while a dispatch or an application is in flight for the same
+piece, and starting either of those never waits on a capture either — see "Operation state" and
+"Seams". Its output is a set of proposals, each carrying its destination context, the operation it
+performs — add, revise, replace, remove — the entry it concerns where it concerns an existing one,
+and the proposed text.
 
 **One call is the normal case and is not a contract.** Where a single call would need a schema large
 enough to defeat constrained decoding, the operation may issue several sequential calls instead —
@@ -840,36 +904,40 @@ approved something that half exists.
 
 ## Transport
 
-**Server-sent events for round activity, plain POST for author actions.** One stream, for the
-open piece, outliving any round.
+**Server-sent events for conversation-action activity, plain POST for author actions.** One
+stream, for the open piece, outliving any single dispatch or Apply.
 
-**The event set is closed, and every event corresponds to a call that produced something or to
-a frame around one.**
+**The event set is closed, and every event corresponds to an entry landing or to a frame around
+one.**
 
 | Event | Carries |
 |---|---|
-| `round.opened` | The conversation, the author's message verbatim, the participants called |
-| `participant.state` | Participant, and whether it is having its model prepared or working |
-| `participant.settled` | Participant, its response and outcome, or its failure |
-| `round.closed` | How it ended — settled, abandoned, or failed |
+| `action.started` | The action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
+| `participant.activity` | Action, participant, and whether it is having its model prepared or working |
+| `entry.appended` | Action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
+| `action.finished` | Action, and how it ended — settled, abandoned, or failed |
 | `error` | A room failure belonging to no participant, in terms the author can act on |
 
 **An event names a participant by its identity and never by its display name.** A name is roster
-data, it is the same for every round, and putting it on every frame would make the stream a second
-place a participant's name is stated — one that would go stale the moment a role definition was
-edited and reloaded. The client resolves names through the roster, and the surface a round is drawn on
-does not render until the roster has landed, so there is no window in which a round could be drawn in
-identities.
+data, it is the same for every dispatch, and putting it on every frame would make the stream a
+second place a participant's name is stated — one that would go stale the moment a role definition
+was edited and reloaded. The client resolves names through the roster, and the surface a
+conversation is drawn on does not render until the roster has landed, so there is no window in
+which a conversation could be drawn in identities.
 
-**A participant waiting for its call is the projection's, not the stream's.** The opened event already
-names every participant the round will call, so waiting is what a named participant that has neither
-reported a state nor settled *is* — deriving it costs a line and emitting it would be an event per
-participant carrying nothing the client did not already have.
+**Nothing in this event set is a waiting state, a waiting count, or a reserved place**, for a
+specialist or for the Story Editor. The started event's resolved audience is a durable fact about
+what the dispatch will call, not a queue the client renders: a client that drew one named participant
+per audience member, empty until it reports something, would be inventing a state the model layer
+never asserted. What the author sees for a participant that has not yet reported anything is nothing
+at all — the dispatch's unconditional activity and the disabled composer are what say the dispatch is
+not yet settled.
 
-**A round closes as failed where the room itself failed**, distinctly from a round the author
-abandoned and from one that settled with failures inside it: a participant's failure is a response the
-author reads, while a room failure is the round not having happened. The close is accompanied by an
-`error` frame, which is where the reason is, so the outcome stays a single word.
+**An action finishes as failed where the room itself failed**, distinctly from an action the author
+abandoned and from a dispatch that settled with failures inside it: a participant's failure is a
+response the author reads, an entry like any other, while a room failure is the action not having
+happened. The finish is accompanied by an `error` frame, which is where the reason is, so the
+outcome stays a single word.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the response envelope is the shape of a reply to a request, and a frame on a stream is not
@@ -883,15 +951,17 @@ the interface to show it.
 **A dropped connection is ordinary and is not a protocol problem.** Reconnecting must not
 produce a duplicate visible response and must not corrupt the durable conversation. The
 conversation is durable, so the simplest sufficient mechanism is the right one — reloading the
-conversation and whatever operation is in flight is enough. Sequence numbers, watermark replay and
-a re-emission protocol are not required, and are worth adding only if a simpler approach
+conversation's entries and whatever action is in flight is enough. Sequence numbers, watermark
+replay and a re-emission protocol are not required, and are worth adding only if a simpler approach
 demonstrably fails.
 
-**What the piece reports about an operation in flight is what the surface needs in order to draw
-it**: which operation it is, its identifier, and for a round the participants it will call, their
-states, and the responses and failures that have already landed. A participant that settled while the
-client was disconnected is in that report, because the conversation file is not written until the
-round settles.
+**What the piece reports about an action in flight is what the surface needs in order to draw
+it**: which conversation action it is, its identifier, the entry that caused it, and for a dispatch
+the audience it resolved to and each participant's activity so far. Landed entries are not part of
+this report: they are already durable, and the client reads them from the conversation itself
+rather than waiting on it. A capture in flight is reported the same way but independently — its own
+identifier, never folded into the conversation-action report, since one of each can be true at
+once.
 
 **A dropped connection during an application or a capture is an ordinary failure.** Those results
 reach the client on the response to the request that started them, so a connection that dropped lost
@@ -900,7 +970,7 @@ applicable, and nothing reissues the call on the author's behalf. A local connec
 enough that a delivery mechanism built to survive it would cost more than the loss does.
 
 **One channel per thing that can fail, so nothing is reported twice.** A participant's failure
-rides its own settled event. An application's failure and a capture failure belong to the
+rides its own appended entry. An application's failure and a capture failure belong to the
 responses of the requests that attempted them. A failed write belongs to the save path.
 Invalid shipped data is a startup failure and never a room event.
 
@@ -927,17 +997,23 @@ one is reported. SSE frames are not wrapped; the event set above is the contract
 GET    /pieces                                     title, mode, status, modified
 POST   /pieces                                     title + mode; enables the mode's default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the operation in flight if there is one
+                                                   the conversation action in flight if there is one,
+                                                   and whether a capture is
 PATCH  /pieces/:id                                 title, status, enabled cast
 PUT    /pieces/:id/draft
 PUT    /pieces/:id/story-context
-GET    /pieces/:id/conversations/:cid
+GET    /pieces/:id/conversations/:cid              the durable entries, each application joined to
+                                                   the change it names
 POST   /pieces/:id/conversations                   returns the new conversation
 DELETE /pieces/:id/conversations/:cid
-POST   /pieces/:id/conversations/:cid/rounds       the author's message, or a target and any
-                                                   clarification
+POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
+                                                   the response answered and any clarification
 POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
-POST   /pieces/:id/abandon                         whatever operation is in flight
+POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
+                                                   targets that action by identity, so a request
+                                                   naming one already finished touches nothing;
+                                                   never a capture, which has no abandon route of
+                                                   its own (issue #55)
 POST   /pieces/:id/capture                         returns proposals
 POST   /pieces/:id/capture/approve                 writes the approved proposals
 GET    /pieces/:id/events                          SSE
@@ -966,7 +1042,7 @@ reached at all, which is the state where the manuscript still opens and only the
 default cast, so a piece is creatable and writable with the runtime not even running.
 
 **Every model operation receives the manuscript as it currently stands**, carried in the request
-that starts it — a round, an application, a capture. `draft.md` remains the sole durable
+that starts it — a dispatch, an application, a capture. `draft.md` remains the sole durable
 representation of the manuscript, and the room never reads it from disk to serve an operation. What
 this prevents is the room working from prose the author has already changed, and it is why model use
 does not depend on a write having succeeded: the author keeps writing through a failed save, and the
@@ -1038,9 +1114,9 @@ That the studio's daily arrangement includes a development server is a consequen
 than hiding.
 
 **Streaming through that server is proven, for the same reason Markdown fidelity was.** It was the
-one part of this arrangement the product depends on and does not control: a round's events reach the
-client as server-sent events, and a dev server that buffered them would break the surface the author
-watches a round in. It streams, held there by a test that puts frames through the real dev server
+one part of this arrangement the product depends on and does not control: a dispatch's events reach
+the client as server-sent events, and a dev server that buffered them would break the surface the
+author watches a dispatch in. It streams, held there by a test that puts frames through the real dev server
 rather than through a mock of it, so the contingency of serving the Hono application from an ordinary
 Node adapter beside a client build is not taken and its adapter is not on the roster.
 
@@ -1103,7 +1179,7 @@ Two are load-bearing and the rest of the orchestration is internal.
 
 | Boundary | Interface | Why it is real |
 |---|---|---|
-| **context** | compile a participant's call input | current-round independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
+| **context** | compile a participant's call input | current-dispatch independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
 | **model** | a call site, a prompt, a schema and an abort signal in; a conforming value, an abandonment, or a stated failure out | the LM Studio implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
 Two further interfaces are expected and useful without being doctrine. A **store** boundary
@@ -1117,12 +1193,16 @@ asserting nothing. A **room** boundary owns the operations the author starts —
 subscribe to its events — which is already the client's contract, so tests and the client cross the
 same surface.
 
-**The room owns all three operations rather than the round alone.** A round, an application and a
-capture share one state machine, one lock on the manuscript and one abandonment path, and a module
-each would leave three shallow modules agreeing about state none of them owns — the shape that
-produces a capture starting during an application. It is also what keeps every route a one-line
-adapter, since a route that decided whether an operation may start would be a route with a decision
-in it.
+**The room owns the dispatch, the application and the capture, but not as one shared operation.** A
+dispatch and an application share one state machine, one lock on the manuscript and one abandonment
+path, and a module each would leave two shallow modules agreeing about state neither owns — the
+shape that produces an application starting during a dispatch it should have refused. Capture is a
+third path through the same room, sharing the model seam with both but owning its own snapshot,
+activity and completion independently of that state machine: nothing about starting, running or
+finishing a capture touches `dispatching` or `applying`, and abandoning that state never reaches
+capture. Keeping all three behind one room rather than splitting it into as many modules is also
+what keeps every route a one-line adapter, since a route that decided whether an operation may start
+would be a route with a decision in it.
 
 **`src/shared/` is deliberately not a seam.** It is a real contract — it is what makes the server's
 response shapes and the client's expectations one set of types rather than two that drift — but a
@@ -1131,24 +1211,25 @@ declaring it one would invite an adapter with nothing on the other side of it. W
 independence rather than substitutability: nothing in it may import from either side, which is a
 property of the import graph and is asserted there.
 
-Behind those, the round loop, the application call, the capture call, the lock, the state machine,
-per-call abort, the tolerant parser and the role registry are internal, with one implementation
-each.
+Behind those, the dispatch loop, the application call, the capture call, the lock, the state
+machine, per-call abort, the tolerant parser and the role registry are internal, with one
+implementation each.
 
-**The client's projection of round events is a pure reducer** — not a boundary, since it has
-one implementation, but named and tested at its own interface because several load-bearing
-rules live in it: participants are seeded in a stable order when the round opens, so an empty
-place reads as waiting or thinking rather than missing; a new round preserves earlier rounds; abandonment
-keeps what landed and adds nothing; a failed participant is distinct from a no-comment one; and
-a response that arrives twice appears once.
+**The client's projection of conversation events is a pure reducer** — not a boundary, since it
+has one implementation, but named and tested at its own interface because several load-bearing
+rules live in it: an entry appended twice appears once; a dispatch's activity holds only the
+participants the model layer has actually reported progress for, clearing one the moment its entry
+lands, never a place for one it has not; an action finishing late for an action no longer current is
+discarded; and reading the piece mid-dispatch and watching one open from the start project
+identically.
 
 ## Test fixtures
 
 **A fixture implementation of the model interface, for tests only.** A test that needs a model call
 declares what that call returns — a conforming value, or any of the failures the interface can state.
-Delays and a preparing state are declarable the same way, which is how a round's progression through
-its calls is exercised, and how a composition gets judged against a state the interface can emit
-rather than only against the ones that are easy to produce.
+Delays and a preparing state are declarable the same way, which is how a dispatch's progression
+through its calls is exercised, and how a composition gets judged against a state the interface can
+emit rather than only against the ones that are easy to produce.
 
 **No shared library of default outputs, and nothing fake outside a test.** Every fixture belongs to
 the test that needs it. There is no dev mode, no demo mode, and no seeded example content: with no
@@ -1172,19 +1253,19 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 
 | Boundary | What must hold |
 |---|---|
-| **context** | no specialist's compiled context contains another specialist's response from the round being formed, under either history policy; every specialist context is compiled before the round's first call is issued; the Story Editor's contains the round's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
-| **room** | an unaddressed round calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed round calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; abandonment stops the round without issuing the calls it had not reached; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a round carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome |
-| **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written |
-| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text |
+| **context** | no specialist's compiled context contains another specialist's response from the dispatch being formed, under either history policy; every specialist context is compiled before the dispatch's first call is issued; the Story Editor's contains the dispatch's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
+| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; every eligible specialist's call is submitted independently before any of them has settled, entries land in completion order rather than cast order, and the Story Editor is called once this dispatch's own specialist set is empty, never inferred from unrelated model work going idle; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment cancels every call this dispatch has in flight through its shared signal, appends no entry for one that lands as abandoned, and skips the Story Editor; a result settling for a call this dispatch no longer tracks is discarded rather than appended; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; abandon targets the action identity currently in flight, so a request naming one already finished touches nothing, and untracking releases the room immediately rather than waiting on the abandoned call's own settlement; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a dispatch coordinate |
+| **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written; two entries accepted together both survive, in the order accepted |
+| **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text; a call submitted without awaiting an earlier one never reaches the runtime until that earlier one has settled, and one settling carries no bearing on the other's outcome |
 | **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
-| **projection** | participants are seeded in a stable order when a round opens, with the Story Editor last where the round will call it and absent where it will not; a new round preserves earlier rounds; abandonment keeps landed responses and adds nothing; a response delivered twice appears once; an operation reported by the piece is drawn the same as one watched from the moment it opened |
+| **projection** | an entry appended twice appears once; a dispatch's activity holds a line only for a participant the model layer has actually reported progress for, never one merely named in the resolved audience, and clears it the moment its entry lands; a finished event for an action that is not the current one is discarded, and a participant-activity event for one is ignored; entries loaded from the file and entries arriving live merge in chronological order regardless of which settles the read race |
 
 **A small number of browser tests over the fixture implementation**, and the count is a ceiling on
 purpose. A browser earns a test only where the thing that can break is a browser: real layout, real
 keystrokes, and the surface reacting to a state a real stream delivered. Where a hook or a component
 can state the property against a modelled DOM, it owns it and the browser does not repeat it.
 
-- Typing stays possible while a round lands, with the keystrokes reaching the editor while the
+- Typing stays possible while a dispatch lands, with the keystrokes reaching the editor while the
   stream is delivering.
 - Applying a recommendation changes the visible manuscript; the manuscript is read-only for the
   duration and editable the moment it settles; and the editor's own undo keystroke restores it.
@@ -1240,9 +1321,10 @@ Stated so they do not accrete.
   duplicate check, and nothing that decides a recommendation has expired.
 - **No durable record of what the author declined.**
 - **No queue of author-initiated operations**, and no dialog asking which of two to keep.
-- **No scheduler and no concurrency limits.** Calls are issued one at a time, and a participant's
-  place in the round is its place in the cast's order rather than a position in a queue anything
-  maintains.
+- **No scheduler and no concurrency limits.** The room submits every eligible specialist's call
+  independently and reasons about none of them relative to another. What the production adapter
+  does with them — queue every one and run it alone — is that adapter's own fixed policy, never a
+  scheduler, a limit, or a residency abstraction the room configures or depends on.
 - **No context-window awareness, no chunking, and no excerpting** of anything sent to a model.
 - **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its
   single-call surface is used.

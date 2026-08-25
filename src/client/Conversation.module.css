@@ -9,7 +9,7 @@
   border-left: 1px solid var(--rule);
 }
 
-.rounds {
+.transcript {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -17,11 +17,6 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-.round {
-  display: flex;
-  flex-direction: column;
 }
 
 .message {
@@ -94,8 +89,9 @@
 }
 
 .failed {
-  font: 400 12.5px/1.55 var(--font-ui);
-  color: var(--ink3);
+  font: 500 12px/1.55 var(--font-facts);
+  color: var(--ink);
+  letter-spacing: 0.02em;
   margin: 0;
 }
 
@@ -107,32 +103,48 @@
   white-space: pre-wrap;
 }
 
+.flightWrapper {
+  margin: 0 0 4px;
+}
+
 .flight {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 4px;
 }
 
-.roundFacts {
+.activityFacts {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.07em;
   flex: 1;
 }
 
+.progress {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.progressLine {
+  font: 400 11.5px/1.5 var(--font-ui);
+  color: var(--ink3);
+}
+
 .abandon {
   flex: none;
   font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink3);
+  color: var(--ink2);
   background: none;
-  border: none;
-  padding: 0;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 6px 9px;
   cursor: pointer;
 }
 
 .abandon:hover {
   color: var(--ink);
+  border-color: var(--ink3);
 }
 
 .apply {
@@ -140,17 +152,6 @@
   align-items: center;
   gap: 8px;
   margin: 3px 0 0;
-}
-
-.applyConstraint {
-  flex: 1;
-  min-width: 0;
-  font: 400 11.5px/1.4 var(--font-ui);
-  color: var(--ink);
-  background: var(--prose);
-  border: 1px solid var(--rule2);
-  border-radius: 4px;
-  padding: 5px 8px;
 }
 
 .applyButton {
@@ -317,28 +318,6 @@
   cursor: default;
 }
 
-.nothing {
-  font: 400 12.5px/1.55 var(--font-ui);
-  color: var(--ink2);
-  padding-top: 11px;
-  border-top: 1px solid var(--rule);
-  margin: 13px 0 0;
-}
-
-.state {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: 0.06em;
-  margin: 0;
-}
-
-.abandoned {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: 0.07em;
-  margin: 0;
-}
-
 .error {
   font: 400 11.5px/1.45 var(--font-ui);
   color: var(--ink2);
@@ -429,6 +408,7 @@
 
 .send {
   flex: none;
+  height: 34px;
   font: 500 11px/1 var(--font-ui);
   color: var(--accentfg);
   background: var(--accent);

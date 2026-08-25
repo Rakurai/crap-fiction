@@ -11,36 +11,35 @@ import {
   type CaptureDestination,
   type CaptureProposal,
 } from '../../shared/captureProposal.js'
+import type { CaptureSnapshot } from '../../shared/captureViews.js'
+import type {
+  ApplicationEntry,
+  AuthorMessageEntry,
+  ConcreteChangeRequestEntry,
+  ConversationEntry,
+} from '../../shared/conversationEntries.js'
+import {
+  type ActionFinishedEvent,
+  type ActionStartedEvent,
+  type ConversationActivitySnapshot,
+  type ConversationErrorEvent,
+  type ConversationFailureCode,
+  type EntryAppendedEvent,
+  type ParticipantActivityEvent,
+} from '../../shared/conversationEvents.js'
 import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
-import { ConversationNotFoundError, PieceNotFoundError } from '../pieces.js'
+import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import {
-  readConversation,
+  ConversationEntryStore,
+  readConversationEntries,
   readPiece,
   readStoryContext,
   TolerantReadError,
   writeAppliedChange,
-  writeConversation,
   writePieceCast,
   writeStoryContext,
 } from '../store/index.js'
-import {
-  conversationSchema,
-  substantiveResponse,
-  type Conversation,
-  type RespondingTo,
-  type RoundParticipantRecord,
-  type RoundRecord,
-} from '../../shared/conversationViews.js'
-import type {
-  ParticipantSettledEvent,
-  ParticipantStateEvent,
-  RoomErrorEvent,
-  RoomFailureCode,
-  RoundClosedEvent,
-  RoundOpenedEvent,
-  RoundSnapshot,
-} from '../../shared/roundEvents.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
 import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
@@ -54,36 +53,37 @@ import {
   renderPrompt,
   type ContextInput,
   type HistoryPolicy,
+  type ParticipantEvidence,
   type SpecialistCriteria,
 } from './context.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
-import { callParticipant, evidenceFrom, type AskContext, type RoundPlan, type RoundResult } from './round.js'
+import { callParticipant, evidenceFrom } from './dispatch.js'
 import type { RoomRoster } from './roster.js'
 
 export type RoomEvent =
-  | { readonly type: 'round.opened'; readonly data: RoundOpenedEvent }
-  | { readonly type: 'participant.state'; readonly data: ParticipantStateEvent }
-  | { readonly type: 'participant.settled'; readonly data: ParticipantSettledEvent }
-  | { readonly type: 'round.closed'; readonly data: RoundClosedEvent }
-  | { readonly type: 'error'; readonly data: RoomErrorEvent }
+  | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
+  | { readonly type: 'participant.activity'; readonly data: ParticipantActivityEvent }
+  | { readonly type: 'entry.appended'; readonly data: EntryAppendedEvent }
+  | { readonly type: 'action.finished'; readonly data: ActionFinishedEvent }
+  | { readonly type: 'error'; readonly data: ConversationErrorEvent }
 
 export class RoomBusyError extends Error {
   constructor(pieceId: string) {
-    super(`a round is already in flight for "${pieceId}"`)
+    super(`an operation is already in flight for "${pieceId}"`)
     this.name = 'RoomBusyError'
   }
 }
 
 export class RecommendationNotFoundError extends Error {
-  constructor(pieceId: string, roundId: string, participantId: string) {
-    super(`no applicable suggestion from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
+  constructor(pieceId: string, responseId: string) {
+    super(`no applicable suggestion at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'RecommendationNotFoundError'
   }
 }
 
 export class CommentaryNotFoundError extends Error {
-  constructor(pieceId: string, roundId: string, participantId: string) {
-    super(`no commentary from "${participantId}" in round "${roundId}" of piece "${pieceId}"`)
+  constructor(pieceId: string, responseId: string) {
+    super(`no commentary at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'CommentaryNotFoundError'
   }
 }
@@ -98,66 +98,73 @@ export class ParticipantNotFoundError extends Error {
 type Listener = (event: RoomEvent) => void
 
 function failureText(err: unknown): string {
-  return err instanceof Error ? err.message : 'the round stopped for a reason the studio cannot name'
+  return err instanceof Error ? err.message : 'the action stopped for a reason the studio cannot name'
 }
 
-function findRecommendation(conversation: Conversation, roundId: string, participantId: string) {
-  const round = conversation.rounds.find((candidate) => candidate.id === roundId)
-  const record = round?.participants.find((candidate) => candidate.participantId === participantId)
-  if (record === undefined) return undefined
-  const response = substantiveResponse(record.result)
-  return response?.outcome === 'applicableSuggestion' ? response : undefined
-}
+export type DispatchOpening =
+  | Readonly<{ kind: 'message'; text: string }>
+  | Readonly<{ kind: 'targeted'; target: string; text: string }>
+  | Readonly<{ kind: 'ask'; respondingTo: string; clarification: string | undefined }>
 
-function findCommentary(conversation: Conversation, roundId: string, participantId: string) {
-  const round = conversation.rounds.find((candidate) => candidate.id === roundId)
-  const record = round?.participants.find((candidate) => candidate.participantId === participantId)
-  if (record === undefined) return undefined
-  const response = substantiveResponse(record.result)
-  return response?.outcome === 'commentary' ? response : undefined
-}
-
-export type RoundOpening =
-  | Readonly<{ kind: 'targeted'; target: string }>
-  | Readonly<{ kind: 'ask'; respondingTo: RespondingTo; clarification: string | undefined }>
-
-type ActiveRound = {
-  readonly kind: 'round'
+type ActiveDispatch = {
+  readonly kind: 'dispatch'
   readonly pieceId: string
   readonly conversationId: string
-  readonly roundId: string
-  readonly message: string | undefined
-  readonly participants: readonly string[]
-  readonly brought: readonly string[]
+  readonly actionId: string
+  readonly sourceEntryId: string
+  readonly audience: readonly string[]
   readonly states: Map<string, 'preparing' | 'working'>
-  readonly settled: RoundParticipantRecord[]
   readonly controller: AbortController
-  readonly openedAt: number
-  readonly ask: AskContext | undefined
+  readonly startedAt: number
 }
 
-type RunningRound = ActiveRound & {
+type RunningDispatch = ActiveDispatch & {
   readonly settlement: Promise<void>
 }
 
 type ActiveApply = {
   readonly kind: 'apply'
   readonly pieceId: string
+  readonly conversationId: string
+  readonly actionId: string
+  readonly sourceEntryId: string
   readonly controller: AbortController
+  readonly startedAt: number
 }
 
 type ActiveCapture = {
-  readonly kind: 'capture'
   readonly pieceId: string
+  readonly conversationId: string
   readonly controller: AbortController
+  readonly openedAt: number
 }
 
-type ActiveOperation = RunningRound | ActiveApply | ActiveCapture
+type ActiveOperation = RunningDispatch | ActiveApply
+
+type DispatchPlan = Readonly<{
+  causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
+  message: string | undefined
+  ask: { claim: string; note: string | undefined; clarification: string | undefined } | undefined
+  addressedIds: readonly string[]
+  eligibleSpecialists: readonly RoleDefinition[]
+  storyEditorIncluded: boolean
+  existingEntries: readonly ConversationEntry[]
+  draft: string
+}>
+
+function findResponse(
+  entries: readonly ConversationEntry[],
+  id: string,
+): Extract<ConversationEntry, { kind: 'participantResponse' }> | undefined {
+  const entry = entries.find((candidate) => candidate.id === id)
+  return entry?.kind === 'participantResponse' ? entry : undefined
+}
 
 export class Room {
   readonly #modelAccess: ModelAccess
   readonly #readDurableContext: ReadDurableContext
   readonly #authorContextStore: AuthorContextStore
+  readonly #entries: ConversationEntryStore
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
@@ -166,12 +173,14 @@ export class Room {
   readonly #storyEditor: RoleDefinition
   readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
   readonly #listeners = new Map<string, Set<Listener>>()
+  readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
 
   constructor(
     modelAccess: ModelAccess,
     readDurableContext: ReadDurableContext,
     authorContextStore: AuthorContextStore,
+    entries: ConversationEntryStore,
     roster: RoomRoster,
     charter: Charter,
     policy: HistoryPolicy,
@@ -181,6 +190,7 @@ export class Room {
     this.#modelAccess = modelAccess
     this.#readDurableContext = readDurableContext
     this.#authorContextStore = authorContextStore
+    this.#entries = entries
     this.#logger = logger
     this.#now = now
     this.#charter = charter
@@ -209,57 +219,91 @@ export class Room {
     return this.#operation?.pieceId === pieceId ? this.#operation : undefined
   }
 
-  snapshot(pieceId: string): RoundSnapshot | undefined {
+  activitySnapshot(pieceId: string): ConversationActivitySnapshot | undefined {
     const operation = this.#operationFor(pieceId)
-    if (operation === undefined || operation.kind !== 'round') return undefined
+    if (operation === undefined) return undefined
+    if (operation.kind === 'apply') {
+      return {
+        actionId: operation.actionId,
+        conversationId: operation.conversationId,
+        kind: 'apply',
+        sourceEntryId: operation.sourceEntryId,
+        startedAt: operation.startedAt,
+      }
+    }
     return {
+      actionId: operation.actionId,
       conversationId: operation.conversationId,
-      roundId: operation.roundId,
-      message: operation.message,
-      participants: operation.participants,
-      brought: operation.brought,
+      kind: 'dispatch',
+      sourceEntryId: operation.sourceEntryId,
+      audience: operation.audience,
       states: Object.fromEntries(operation.states),
-      settled: [...operation.settled],
-      openedAt: operation.openedAt,
-      respondingTo: operation.ask?.respondingTo,
-      clarification: operation.ask?.clarification,
+      startedAt: operation.startedAt,
     }
   }
 
-  async startRound(
+  captureSnapshot(pieceId: string): CaptureSnapshot | undefined {
+    const capture = this.#captures.get(pieceId)
+    return capture === undefined ? undefined : { conversationId: capture.conversationId, openedAt: capture.openedAt }
+  }
+
+  settlement(pieceId: string): Promise<void> | undefined {
+    const operation = this.#operationFor(pieceId)
+    return operation?.kind === 'dispatch' ? operation.settlement : undefined
+  }
+
+  abandon(pieceId: string, actionId: string): void {
+    const operation = this.#operationFor(pieceId)
+    if (operation === undefined || operation.actionId !== actionId) return
+    operation.controller.abort()
+    this.#operation = undefined
+  }
+
+  async dispatch(
     workspaceDir: string,
     pieceId: string,
     conversationId: string,
-    message: string | undefined,
+    opening: DispatchOpening,
     draft: string,
-    opening?: RoundOpening,
-  ): Promise<{ conversationId: string; roundId: string }> {
+  ): Promise<{ conversationId: string; actionId: string }> {
     const holder = this.#operation
     if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
+    const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
     const roster = [...this.#specialists, this.#storyEditor]
 
     let addressedIds: readonly string[]
-    let ask: AskContext | undefined
+    let causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
+    let ask: { claim: string; note: string | undefined; clarification: string | undefined } | undefined
+    let message: string | undefined
 
-    if (opening === undefined) {
-      addressedIds = message === undefined ? [] : parseAddressing(message, roster).map((role) => role.id)
+    if (opening.kind === 'message') {
+      addressedIds = parseAddressing(opening.text, roster).map((role) => role.id)
+      message = opening.text
       ask = undefined
+      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [] }
     } else if (opening.kind === 'targeted') {
       if (!roster.some((role) => role.id === opening.target)) throw new ParticipantNotFoundError(pieceId, opening.target)
       addressedIds = [opening.target]
+      message = opening.text
       ask = undefined
+      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [] }
     } else {
-      const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
-      if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
-      const { roundId: respondingToRoundId, participantId: respondingToParticipantId } = opening.respondingTo
-      const commentary = findCommentary(conversation, respondingToRoundId, respondingToParticipantId)
-      if (commentary === undefined) throw new CommentaryNotFoundError(pieceId, respondingToRoundId, respondingToParticipantId)
-      addressedIds = [respondingToParticipantId]
-      ask = { claim: commentary.claim, note: commentary.note, clarification: opening.clarification, respondingTo: opening.respondingTo }
+      const response = findResponse(existingEntries, opening.respondingTo)
+      if (response === undefined || response.outcome !== 'commentary') throw new CommentaryNotFoundError(pieceId, opening.respondingTo)
+      addressedIds = [response.participantId]
+      message = undefined
+      ask = { claim: response.claim, note: response.note, clarification: opening.clarification }
+      causeEntry = {
+        id: nanoid(),
+        kind: 'concreteChangeRequest',
+        target: response.participantId,
+        respondingTo: opening.respondingTo,
+        clarification: opening.clarification,
+      }
     }
 
     const eligibleSpecialists =
@@ -268,115 +312,246 @@ export class Room {
         : this.#specialists.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
-    if (brought.length > 0) {
-      await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
-    }
+    if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
+    const audience = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
 
-    const roundId = nanoid()
-    const plan: RoundPlan = {
-      roundId,
-      message,
-      addressedIds,
-      brought,
-      specialists: eligibleSpecialists,
-      storyEditor: storyEditorIncluded ? this.#storyEditor : undefined,
-      ask,
-    }
-    const participants = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
+    const actionId = nanoid()
+    const startedAt = this.#now()
 
-    const openedAt = this.#now()
-    const round: ActiveRound = {
-      kind: 'round',
+    const dispatchState: ActiveDispatch = {
+      kind: 'dispatch',
       pieceId,
       conversationId,
-      roundId,
-      message,
-      participants,
-      brought,
+      actionId,
+      sourceEntryId: causeEntry.id,
+      audience,
       states: new Map(),
-      settled: [],
       controller: new AbortController(),
-      openedAt,
-      ask,
+      startedAt,
     }
-    this.#emit(pieceId, {
-      type: 'round.opened',
-      data: { conversationId, roundId, message, participants, brought, openedAt, respondingTo: ask?.respondingTo, clarification: ask?.clarification },
-    })
-    this.#logger.info({ pieceId, conversationId, roundId, participants, brought }, 'round opened')
 
-    const settlement = this.#run(workspaceDir, pieceId, conversationId, plan, draft, round)
-      .catch((err: unknown) => {
-        this.#fail(pieceId, roundId, 'UNEXPECTED_FAILURE', failureText(err), err)
-      })
+    const plan: DispatchPlan = {
+      causeEntry,
+      message,
+      ask,
+      addressedIds,
+      eligibleSpecialists,
+      storyEditorIncluded,
+      existingEntries,
+      draft,
+    }
+    const cause = causeEntry
+
+    const written = (async () => {
+      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
+      await this.#entries.append(workspaceDir, pieceId, conversationId, cause)
+    })()
+
+    const settlement = written
+      .then(
+        () => {
+          this.#emit(pieceId, {
+            type: 'action.started',
+            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience },
+          })
+          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause } })
+          return this.#run(workspaceDir, pieceId, conversationId, plan, dispatchState).catch((err: unknown) => {
+            this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
+          })
+        },
+        () => {},
+      )
       .finally(() => {
-        this.#operation = undefined
+        if (this.#operation?.actionId === actionId) this.#operation = undefined
       })
-    this.#operation = { ...round, settlement }
+    this.#operation = { ...dispatchState, settlement }
 
-    return { conversationId, roundId }
+    await written
+    return { conversationId, actionId }
   }
 
-  settlement(pieceId: string): Promise<void> | undefined {
-    const operation = this.#operationFor(pieceId)
-    return operation?.kind === 'round' ? operation.settlement : undefined
+  #fail(pieceId: string, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+    this.#logger.error({ pieceId, actionId, code, err: cause }, 'conversation action failed')
+    this.#emit(pieceId, { type: 'error', data: { code, message } })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed' } })
   }
 
-  abandon(pieceId: string): void {
-    this.#operationFor(pieceId)?.controller.abort()
+  async #run(
+    workspaceDir: string,
+    pieceId: string,
+    conversationId: string,
+    plan: DispatchPlan,
+    operation: ActiveDispatch,
+  ): Promise<void> {
+    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, storyEditorIncluded, existingEntries, draft } = plan
+    const { actionId, controller } = operation
+    const signal = controller.signal
+
+    let durableContext: CompiledDurableContext
+    try {
+      durableContext = this.#readDurableContext(workspaceDir, pieceId)
+    } catch (err) {
+      if (err instanceof TolerantReadError) {
+        this.#fail(pieceId, actionId, 'CONTEXT_UNREADABLE', err.message, err)
+        return
+      }
+      throw err
+    }
+
+    const shared = {
+      message,
+      ask,
+      authorContext: durableContext.authorContext,
+      storyContext: durableContext.storyContext,
+      draft,
+      entries: existingEntries,
+      policy: this.#policy,
+    }
+    const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
+      ...shared,
+      role,
+      criteria: this.#criteria.get(role.id),
+      owesAnswer,
+    })
+
+    const onState = (participantId: string, state: 'preparing' | 'working'): void => {
+      operation.states.set(participantId, state)
+      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
+    }
+
+    const calls = eligibleSpecialists.map((role) => {
+      const owesAnswer = addressedIds.includes(role.id)
+      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
+    })
+
+    const evidence: ParticipantEvidence[] = []
+    let abandoned = false
+    let failed = false
+
+    const reportFailureOnce = (message: string, err: unknown): void => {
+      if (failed) return
+      failed = true
+      this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+    }
+
+    const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
+      const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
+        onState(call.role.id, state),
+      )
+      operation.states.delete(call.role.id)
+
+      if (outcome.kind === 'abandoned') {
+        abandoned = true
+        return
+      }
+      if (failed) return
+
+      try {
+        await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+      } catch (err) {
+        reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
+        return
+      }
+      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+
+      const gathered = evidenceFrom(outcome, call.role.id)
+      if (gathered !== undefined) evidence.push(gathered)
+    }
+
+    await Promise.all(calls.map(settleSpecialist))
+
+    if (!abandoned && !failed && storyEditorIncluded) {
+      if (signal.aborted) {
+        abandoned = true
+      } else {
+        const owesAnswer = addressedIds.includes(this.#storyEditor.id) || evidence.length === 0
+        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#charter)
+        const outcome = await callParticipant(this.#storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
+          onState(this.#storyEditor.id, state),
+        )
+        operation.states.delete(this.#storyEditor.id)
+        if (outcome.kind === 'abandoned') {
+          abandoned = true
+        } else {
+          try {
+            await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+          } catch (err) {
+            reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
+          }
+          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+        }
+      }
+    }
+
+    if (!failed) {
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled' } })
+      this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
+    }
   }
 
   async apply(
     workspaceDir: string,
     pieceId: string,
     conversationId: string,
-    roundId: string,
-    participantId: string,
+    responseId: string,
     constraint: string | undefined,
     draft: string,
-  ): Promise<CallResult<{ manuscript: string; change: AppliedChange | undefined }>> {
+  ): Promise<{ actionId: string; result: CallResult<{ manuscript: string; change: AppliedChange | undefined; entryId: string | undefined }> }> {
     const holder = this.#operation
     if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
-    if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
-
-    const recommendation = findRecommendation(conversation, roundId, participantId)
-    if (recommendation === undefined) throw new RecommendationNotFoundError(pieceId, roundId, participantId)
+    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+    const response = findResponse(entries, responseId)
+    if (response === undefined || response.outcome !== 'applicableSuggestion') throw new RecommendationNotFoundError(pieceId, responseId)
 
     const durableContext = this.#readDurableContext(workspaceDir, pieceId)
 
+    const actionId = nanoid()
     const controller = new AbortController()
-    this.#operation = { kind: 'apply', pieceId, controller }
+    this.#operation = { kind: 'apply', pieceId, conversationId, actionId, sourceEntryId: responseId, controller, startedAt: this.#now() }
+    this.#emit(pieceId, {
+      type: 'action.started',
+      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt: this.#operation.startedAt },
+    })
 
     try {
       const context = compileApplyContext({
-        recommendationClaim: recommendation.claim,
-        recommendationNote: recommendation.note,
+        recommendationClaim: response.claim,
+        recommendationNote: response.note,
         constraint,
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
-        conversation,
-        throughRoundId: roundId,
+        entries,
       })
       const prompt = renderApplyPrompt(context, this.#charter)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
-      if (result.outcome !== 'value') return result
+      if (result.outcome !== 'value') {
+        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: result.outcome === 'abandoned' ? 'abandoned' : 'failed' } })
+        return { actionId, result }
+      }
 
       const { manuscript } = result.value
-      if (manuscript === draft) return { outcome: 'value', value: { manuscript, change: undefined } }
+      if (manuscript === draft) {
+        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
+        return { actionId, result: { outcome: 'value', value: { manuscript, change: undefined, entryId: undefined } } }
+      }
 
-      const change: AppliedChange = { id: nanoid(), roundId, participantId, content: computeAppliedChangeContent(draft, manuscript) }
+      const changeId = nanoid()
+      const change: AppliedChange = { id: changeId, content: computeAppliedChangeContent(draft, manuscript) }
       await writeAppliedChange(workspaceDir, pieceId, change)
-      return { outcome: 'value', value: { manuscript, change } }
+      const application: ApplicationEntry = { id: nanoid(), kind: 'application', responseId, changeId, constraint }
+      await this.#entries.append(workspaceDir, pieceId, conversationId, application)
+      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: change.content } } })
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
+      return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
     } finally {
-      this.#operation = undefined
+      if (this.#operation?.actionId === actionId) this.#operation = undefined
     }
   }
 
@@ -386,24 +561,23 @@ export class Room {
     conversationId: string,
     draft: string,
   ): Promise<CallResult<{ proposals: readonly CaptureProposal[] }>> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    if (this.#captures.has(pieceId)) throw new RoomBusyError(pieceId)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries
     const durableContext = this.#readDurableContext(workspaceDir, pieceId)
 
     const controller = new AbortController()
-    this.#operation = { kind: 'capture', pieceId, controller }
+    this.#captures.set(pieceId, { pieceId, conversationId, controller, openedAt: this.#now() })
 
     try {
       const context = compileCaptureContext({
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
-        conversation,
+        entries,
       })
       const prompt = renderCapturePrompt(context)
       const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
@@ -411,7 +585,7 @@ export class Room {
 
       return { outcome: 'value', value: { proposals: toCaptureProposals(result.value.proposals) } }
     } finally {
-      this.#operation = undefined
+      this.#captures.delete(pieceId)
     }
   }
 
@@ -448,153 +622,5 @@ export class Room {
     }
 
     return { written, failures }
-  }
-
-  #fail(pieceId: string, roundId: string, code: RoomFailureCode, message: string, cause: unknown): void {
-    this.#logger.error({ pieceId, roundId, code, err: cause }, 'round failed')
-    this.#emit(pieceId, { type: 'error', data: { code, message } })
-    this.#emit(pieceId, { type: 'round.closed', data: { roundId, outcome: 'failed' } })
-  }
-
-  async #run(
-    workspaceDir: string,
-    pieceId: string,
-    conversationId: string,
-    plan: RoundPlan,
-    draft: string,
-    operation: ActiveRound,
-  ): Promise<void> {
-    let existing: Conversation | undefined
-    try {
-      existing = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
-    } catch (err) {
-      if (err instanceof TolerantReadError) {
-        this.#fail(pieceId, plan.roundId, 'CONVERSATION_UNREADABLE', err.message, err)
-        return
-      }
-      throw err
-    }
-
-    let durableContext: CompiledDurableContext
-    try {
-      durableContext = this.#readDurableContext(workspaceDir, pieceId)
-    } catch (err) {
-      if (err instanceof TolerantReadError) {
-        this.#fail(pieceId, plan.roundId, 'CONTEXT_UNREADABLE', err.message, err)
-        return
-      }
-      throw err
-    }
-
-    const result: RoundResult = await this.#runRound(pieceId, plan, draft, durableContext, existing, operation)
-
-    const record: RoundRecord = {
-      id: plan.roundId,
-      message: plan.message,
-      addressed: plan.addressedIds,
-      brought: plan.brought,
-      respondingTo: plan.ask?.respondingTo,
-      clarification: plan.ask?.clarification,
-      participants: result.participants,
-      outcome: result.outcome,
-    }
-    try {
-      await writeConversation(workspaceDir, pieceId, conversationId, {
-        id: conversationId,
-        rounds: [...(existing?.rounds ?? []), record],
-      })
-    } catch (err) {
-      this.#fail(
-        pieceId,
-        plan.roundId,
-        'CONVERSATION_NOT_WRITTEN',
-        err instanceof Error ? err.message : 'the conversation could not be written',
-        err,
-      )
-      return
-    }
-
-    this.#emit(pieceId, { type: 'round.closed', data: { roundId: plan.roundId, outcome: result.outcome } })
-    this.#logger.info({ pieceId, roundId: plan.roundId, outcome: result.outcome }, 'round closed')
-  }
-
-  async #runRound(
-    pieceId: string,
-    plan: RoundPlan,
-    draft: string,
-    durableContext: CompiledDurableContext,
-    conversation: Conversation | undefined,
-    operation: ActiveRound,
-  ): Promise<RoundResult> {
-    const signal = operation.controller.signal
-    const shared = {
-      message: plan.message,
-      ask: plan.ask,
-      authorContext: durableContext.authorContext,
-      storyContext: durableContext.storyContext,
-      draft,
-      conversation,
-      policy: this.#policy,
-    }
-    const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
-      ...shared,
-      role,
-      criteria: this.#criteria.get(role.id),
-      owesAnswer,
-    })
-
-    const onState = (participantId: string, state: 'preparing' | 'working'): void => {
-      operation.states.set(participantId, state)
-      this.#emit(pieceId, { type: 'participant.state', data: { roundId: plan.roundId, participantId, state } })
-    }
-    const onSettled = (participantId: string, record: RoundParticipantRecord): void => {
-      operation.states.delete(participantId)
-      operation.settled.push(record)
-      this.#emit(pieceId, { type: 'participant.settled', data: { roundId: plan.roundId, participantId, result: record.result } })
-    }
-
-    const calls = plan.specialists.map((role) => {
-      const owesAnswer = plan.addressedIds.includes(role.id)
-      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
-    })
-
-    const records: RoundParticipantRecord[] = []
-    let abandoned = false
-
-    for (const call of calls) {
-      if (signal.aborted) {
-        abandoned = true
-        break
-      }
-
-      const record = await callParticipant(call.role, call.prompt, call.owesAnswer, this.#modelAccess, signal, (state) =>
-        onState(call.role.id, state),
-      )
-      records.push(record)
-      onSettled(call.role.id, record)
-      if (record.result.kind === 'abandoned') {
-        abandoned = true
-        break
-      }
-    }
-
-    const storyEditor = plan.storyEditor
-    if (!abandoned && storyEditor !== undefined) {
-      if (signal.aborted) {
-        abandoned = true
-      } else {
-        const evidence = evidenceFrom(records)
-        const owesAnswer = plan.addressedIds.includes(storyEditor.id) || evidence.length === 0
-        const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence), this.#charter)
-        const record = await callParticipant(storyEditor, prompt, owesAnswer, this.#modelAccess, signal, (state) =>
-          onState(storyEditor.id, state),
-        )
-        records.push(record)
-        onSettled(storyEditor.id, record)
-        if (record.result.kind === 'abandoned') abandoned = true
-      }
-    }
-
-    return { participants: records, outcome: abandoned ? 'abandoned' : 'settled' }
   }
 }

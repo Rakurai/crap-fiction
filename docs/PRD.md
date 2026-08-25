@@ -36,7 +36,7 @@ Frequency is a fact about the author and is what prominence is derived from.
 | Frequency | Meaning |
 |---|---|
 | **Constant** | Many times per hour of work |
-| **Per round** | Every time the author addresses the room |
+| **Per message** | Every time the author addresses the room |
 | **Per session** | A few times a sitting |
 | **Per piece** | Once or twice in a story's life |
 | **Rare** | Setup, troubleshooting, curiosity |
@@ -83,13 +83,13 @@ changes that address its concern as a whole, rather than options the author must
 anything can be done.
 
 **A direct question is owed an answer.** A participant that was addressed answers, even where
-the answer is that it sees no material issue. Saying nothing is for a round the participant was
+the answer is that it sees no material issue. Saying nothing is for a message the participant was
 merely eligible for. Otherwise a craft question four specialists were best placed to answer gets
 one generalist reply.
 
 **The Story Editor answers where nobody else did.** It may have nothing to add when specialists
-have already given the author something substantive. Where the round holds nothing else, it
-answers — even if the answer is that it sees no material problem worth changing.
+have already given the author something substantive. Otherwise it answers — even if the answer
+is that it sees no material problem worth changing.
 
 **Nothing reasons about the author's question.** No participant remarks on how a question was
 phrased, whether it was answerable, or what the software did with it: that is the room blaming
@@ -135,7 +135,7 @@ and no tool artifacts of any kind in it.
 
 ### Talking to the room
 
-**Say anything to the room** — *per round*
+**Say anything to the room** — *per message*
 Broad — *read this and tell me what you think*. Specific — *the ending feels too easy, what
 isn't working?* Directed — *does the opening earn its length?* Or drafting — *write the next
 paragraph*, *give me three possible endings*, *try a version where she already knows*.
@@ -145,54 +145,58 @@ separate interaction.
 
 **Address one participant, or several** — *per session*
 *Done when:* naming participants in the message calls only those, naming several calls each
-of them, and a named round does not call the Story Editor unless it was named.
+of them, and a directed message does not call the Story Editor unless it was named.
 
-**Reply to what one participant said** — *per round*
+**Reply to what one participant said** — *per message*
 The author engages with a specific response rather than restating which participant they
 mean.
 *Done when:* replying to a response either addresses that participant in the main input for
 the author to continue composing, or sends the reply directly, without the author typing the
 participant's name.
 
-**Ask a participant to get concrete** — *per round*
+**Ask a participant to get concrete** — *per message*
 Commentary was useful but named no action. *Show me what you'd change.*
 *Done when:* asking a participant for a concrete change is one action from its response, and
 carries any clarification the author adds.
 
-**Get independent judgments** — *per round, the core of the product*
+**Get independent judgments** — *per message, the core of the product*
 Several specialists answer the same message without seeing each other's answers.
-*Done when:* no specialist's context contains another specialist's response from the round
-being formed, the Story Editor receives the round's specialist responses only after they have
+*Done when:* no specialist's context contains another specialist's response caused by the same
+message, the Story Editor receives that message's specialist responses only after they have
 settled, and nothing in the presentation implies that one specialist answered another.
 
-**Get the story weighed as a whole** — *per round*
+**Get the story weighed as a whole** — *per message*
 The Story Editor evaluates the piece against the author's intent using the specialists'
 readings as evidence.
-*Done when:* it is called on every round that names no one — including a round in which no
-specialist had anything to say and a round in which every specialist call failed — it may
+*Done when:* it is called on every message that names no one — including a message in which no
+specialist had anything to say and a message in which every specialist call failed — it may
 endorse, reject, name a tradeoff, reframe, or say nothing where the specialists have already
 given the author something substantive, its response carries the same actions as a specialist's,
 and it is never presented as a verdict or as a summary of the others.
 
-**Trust that silence is real** — *per round*
+**Trust that silence is real** — *per message*
 *Done when:* every eligible specialist is genuinely called, a no-comment response occupies no
-space in the settled discussion, no participant is re-run under an obligation to speak, a round
+space in the settled discussion, no participant is re-run under an obligation to speak, a message
 where every specialist had nothing is a legible outcome that still answers the author, and
 failure is never presented as silence.
 
-**Know the room is working** — *per round*
-The room's calls happen one after another against one local model, so a round takes real time and
-the author watches it progress.
-*Done when:* each called participant's state is visible as it changes — waiting for its turn, having
-its model prepared, working, or answered — the author can keep writing throughout, no interim state
-is composed by a model, and no response is rendered before it is complete.
+**Know the room is working** — *per message*
+Every called participant's call is submitted independently, and one local model answers only one at
+a time regardless, so a message takes real time and the author watches it progress.
+*Done when:* the room states unconditionally that a conversation action is active the moment one
+opens, a called participant's own progress is shown only once the model layer actually reports it —
+having its model prepared or working — several participants showing progress at once are each shown
+independently, no interim state is composed for a participant the model layer has not reported on,
+the author can keep writing throughout, and no response is rendered before it is complete.
 
 **Stop waiting** — *per session*
-*Done when:* abandoning is available for as long as any model operation is in flight — a round,
-an application, a context capture — cancelling the call in flight and making none of the calls the
-operation had not reached, responses that landed remain in the conversation, nothing holds the prose
-beyond the operation the author asked for, and a model that never answers resolves itself
-without the author having to act.
+*Done when:* abandoning is available for as long as any model operation is in flight — a dispatch,
+an application, a context capture — targets the specific operation the author is looking at rather
+than whichever the room happens to be running, cancelling the call in flight and making none of the
+calls the operation had not reached, responses that landed remain in the conversation, control
+returns the moment abandonment is accepted rather than once the cancelled call finishes unwinding,
+nothing holds the prose beyond the operation the author asked for, and a model that never answers
+resolves itself without the author having to act.
 
 **Handle a bad response as housekeeping** — *per session*
 A response is incoherent, misreads the story, or the call failed outright. Local models do
@@ -205,18 +209,18 @@ ordinary message rather than an affordance.
 **Change who is in the room** — *per piece*
 *Done when:* specialists are enabled and disabled in one lightweight action, addressing a
 specialist that is not in the room brings it in and shows that it did, the change affects only
-which specialists are called on subsequent unaddressed rounds, historical conversation is
+which specialists are called on subsequent unaddressed messages, historical conversation is
 untouched, and no rationale is generated to justify the cast.
 
 ### Working the prose
 
 **Apply a recommendation** — *constant*
 *Done when:* one action makes the manuscript embody the recommendation, interpreted against
-the draft as it currently stands together with the conversation up to that recommendation,
-with no second acceptance step and no automatic critique of the result; the manuscript is not
-editable for as long as that call is in flight and is editable again the moment it settles,
-fails or is abandoned; and nothing in the manuscript changes beyond what embodying the
-recommendation and the author's constraint requires.
+the draft and the full current conversation as they currently stand, with no second acceptance
+step and no automatic critique of the result; the manuscript is not editable for as long as
+that call is in flight and is editable again the moment it settles, fails or is abandoned; and
+nothing in the manuscript changes beyond what embodying the recommendation and the author's
+constraint requires.
 
 **Apply with a constraint** — *per session*
 *Done when:* text the author supplies alongside the action is carried verbatim as an
@@ -239,7 +243,7 @@ one history action however many places it changed, and reversal needs no applica
 affordance.
 
 **Ask the room about a change just made** — *per session*
-*Done when:* it opens an ordinary round and nothing about it is a distinct reasoning mode.
+*Done when:* it opens an ordinary message and nothing about it is a distinct reasoning mode.
 
 ### Durable context
 
@@ -248,7 +252,7 @@ affordance.
 call, without the author assembling anything.
 
 **Keep exploration inconsequential** — *constant*
-*Done when:* no discussion, edit, application or round changes author context or story
+*Done when:* no discussion, edit, application or message changes author context or story
 context, and no analysis of the conversation happens that the author did not ask for.
 
 **Consolidate what has settled** — *per session*
@@ -362,7 +366,7 @@ reversal.
 
 **A task list of what the room is waiting on.** Knowing is a state; a queue is a job.
 
-**Forced participation.** No participant is re-run because a round was quiet.
+**Forced participation.** No participant is re-run because a message was quiet.
 
 **A finished story the author didn't make.**
 
@@ -379,9 +383,9 @@ duration. The failure this prevents: *a room too expensive to consult stops bein
 **The manuscript changes only by the author's hand or by an explicit application.** Nothing
 else writes prose.
 
-**Current-round independence is a property of what goes into a call**, not of what a prompt
+**Current-dispatch independence is a property of what goes into a call**, not of what a prompt
 asks for, and it can be undone by presentation as easily as by prompting. The failure this
-prevents: *a room that converges on one voice while every round still looks independent.*
+prevents: *a room that converges on one voice while every dispatch still looks independent.*
 
 **Failure and silence are ordinary, and are never conflated.** A design that treats either as
 an exception is wrong about how local models behave.

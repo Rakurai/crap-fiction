@@ -41,18 +41,17 @@ const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
-const postRoundSchema = z.union([
+const postDispatchSchema = z.union([
   z.strictObject({ message: z.string().min(1), draft: z.string() }),
   z.strictObject({ target: z.string().min(1), message: z.string().min(1), draft: z.string() }),
   z.strictObject({
-    respondingTo: z.object({ roundId: z.string().min(1), participantId: z.string().min(1) }),
+    respondingTo: z.string().min(1),
     clarification: z.string().min(1).optional(),
     draft: z.string(),
   }),
 ])
 const postApplySchema = z.object({
-  roundId: z.string().min(1),
-  participantId: z.string().min(1),
+  responseId: z.string().min(1),
   constraint: z.string().min(1).optional(),
   draft: z.string(),
 })
@@ -102,7 +101,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.snapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -117,7 +116,7 @@ export function createApp(
       await setPieceCast(workspaceDir, id, room.specialists(), cast)
     }
 
-    return c.json(ok(getPiece(workspaceDir, id, room.snapshot(id) ?? null, room.specialists())))
+    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
@@ -139,35 +138,32 @@ export function createApp(
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations/:cid/rounds', body(postRoundSchema), async (c) => {
+  app.post('/pieces/:id/conversations/:cid/dispatch', body(postDispatchSchema), async (c) => {
     const parsed = c.req.valid('json')
     const workspaceDir = workspace.require()
     const pieceId = c.req.param('id')
     const conversationId = c.req.param('cid')
 
-    const result =
+    const opening =
       'respondingTo' in parsed
-        ? await room.startRound(workspaceDir, pieceId, conversationId, undefined, parsed.draft, {
-            kind: 'ask',
-            respondingTo: parsed.respondingTo,
-            clarification: parsed.clarification,
-          })
+        ? { kind: 'ask' as const, respondingTo: parsed.respondingTo, clarification: parsed.clarification }
         : 'target' in parsed
-          ? await room.startRound(workspaceDir, pieceId, conversationId, parsed.message, parsed.draft, { kind: 'targeted', target: parsed.target })
-          : await room.startRound(workspaceDir, pieceId, conversationId, parsed.message, parsed.draft)
+          ? { kind: 'targeted' as const, target: parsed.target, text: parsed.message }
+          : { kind: 'message' as const, text: parsed.message }
 
+    const result = await room.dispatch(workspaceDir, pieceId, conversationId, opening, parsed.draft)
     return c.json(ok(result))
   })
 
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
-    const { roundId, participantId, constraint, draft } = c.req.valid('json')
-    const result = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), roundId, participantId, constraint, draft)
+    const { responseId, constraint, draft } = c.req.valid('json')
+    const { actionId, result } = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), responseId, constraint, draft)
     const outcome: ApplyOutcome =
       result.outcome === 'value'
-        ? { outcome: 'applied', manuscript: result.value.manuscript, change: result.value.change }
+        ? { outcome: 'applied', actionId, manuscript: result.value.manuscript, change: result.value.change, entryId: result.value.entryId }
         : result.outcome === 'abandoned'
-          ? { outcome: 'abandoned' }
-          : { outcome: 'failed', reason: result.reason, returned: result.returned }
+          ? { outcome: 'abandoned', actionId }
+          : { outcome: 'failed', actionId, reason: result.reason, returned: result.returned }
     return c.json(ok(outcome))
   })
 
@@ -189,9 +185,9 @@ export function createApp(
     return c.json(ok(outcome))
   })
 
-  app.post('/pieces/:id/abandon', (c) => {
+  app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
     workspace.require()
-    room.abandon(c.req.param('id'))
+    room.abandon(c.req.param('id'), c.req.param('actionId'))
     return c.json(ok(null))
   })
 

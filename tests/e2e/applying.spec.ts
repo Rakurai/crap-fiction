@@ -15,13 +15,14 @@ test('applying a recommendation rewrites the manuscript, holds it, releases it, 
   await editor.click()
   await page.keyboard.type(OPENING)
 
-  const roundAbandon = await sendToRoom(page, 'is the opening carrying its weight')
+  const abandon = await sendToRoom(page, 'is the opening carrying its weight')
   await expect(page.getByText(SUGGESTION_CLAIM)).toBeVisible()
-  await expect(roundAbandon).toBeHidden()
+  await expect(abandon).toBeHidden()
 
   await control(page, 'apply').click()
 
   await expect(page.getByText('READ-ONLY')).toBeVisible()
+  await expect(page.getByText("Held while Shape's change is applied.")).toBeVisible()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
   await editor.click()
   await page.keyboard.type(REFUSED)

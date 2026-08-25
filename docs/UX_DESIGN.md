@@ -67,32 +67,36 @@ enabled cast. Addressing a specialist that is not in the room brings it in, and 
 that it now holds one more specialist, so the change is never something the author discovers
 later.
 
-### A round in flight
+### While the room answers
 
-**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing
-about a round in flight is modal, blocking, or a reason to stop typing.
+**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing about
+an author action in flight is modal, blocking, or a reason to stop typing. Chat send and every
+other response-triggering control are disabled for the action's whole duration, visibly so, but
+without losing their ordinary size or position — a control that shrank or relabelled itself would
+read as broken rather than as busy.
 
-**Every participant the round will call is visible from the moment it opens**, in a stable order
-fixed before the first of them is called, with the Story Editor last where the round will reach it
-and absent where it will not. An empty place reads as a participant waiting or thinking rather than
-a participant missing, and the Story Editor waiting in its place is how the author sees that the
-readings come before the judgment.
+**An unconditional signal states that the action is active, and Abandon stands beside it as its own
+distinct, always-available control**, present the instant the action opens and for as long as it
+runs. Neither depends on the model layer reporting anything: a runtime that never reports progress
+still leaves the author certain their message was sent and certain they can stop it.
 
-**In flight, the round states only what is true**, as states and counts rather than composed
-sentences: which participant is working, which is having its model prepared, which are waiting their
-turn, how long it has been. A participant whose model is loading is neither working nor merely
-waiting, and saying which it is costs less than an unexplained thirty seconds does.
-Because the room asks one participant at a time, the round fills in that order, and the interface
-says which participant is being asked rather than implying they are all at work. Nothing is
-attributed to a participant that has not answered, and no response is shown before it is complete.
+**A participant's own line appears only once the model layer reports real progress for it** — having
+its model prepared or working — and disappears the moment that participant's response lands. Several
+participants may show a line at once, because the room calls them independently rather than one at a
+time, and an adapter able to run compatible calls concurrently may settle several of them together.
+There is no reserved place for a participant the action has not yet heard from, no waiting count,
+and no place held for the Story Editor while specialist readings are still arriving: the unconditional
+signal and the disabled composer are what tell the author the action is not yet settled, not a slot
+drawn in advance for a response that has not happened. Nothing is attributed to a participant that has
+not answered, and no response is shown before it is complete.
 
-**Filling in order must not read as a chain.** Each participant was asked the author's question,
-not the previous answer, and nothing in the composition may suggest otherwise — no connective
-framing, no visual thread between adjacent responses, no arrangement in which a later response
-appears to take up an earlier one. Sequential arrival makes this easier to get wrong than
-simultaneous arrival did, and it is the same guarantee.
+**Nothing in the composition suggests one participant answered another.** Each was asked the
+author's question independently, whichever order their lines and responses happen to arrive in, and
+no connective framing, visual thread, or arrangement may imply otherwise. Responses land in
+completion order rather than a fixed one, which makes this guardrail more load-bearing than it would
+be otherwise.
 
-### A settled round
+### Once responses land
 
 **Responses stand as the participants' own.** Nothing frames one as answering another,
 subordinates the specialists to the Story Editor, or presents the Story Editor as a verdict
@@ -100,21 +104,21 @@ over them. The Story Editor's response is distinguishable as its own contributio
 the same actions as any other.
 
 **A no-comment response occupies no space.** It is not a row, not a line, not a dimmed
-placeholder. It is recorded and absent. What the author sees is that the round settled, not a
+placeholder. It is recorded and absent. What the author sees is that the action settled, not a
 census of who declined to speak.
 
 **A response that was directly addressed always appears**, including when its substance is
 that the participant sees no material issue.
 
-**The conversation accumulates.** Earlier rounds stay where they were, scrollable, with their
-responses and their actions intact. Nothing collapses, resolves or evicts an earlier round
+**The conversation accumulates.** Earlier messages, requests and responses stay where they were,
+scrollable, with their actions intact. Nothing collapses, resolves or evicts an earlier exchange
 when a new one opens.
 
 ## Participant responses
 
-**A response is one kind of thing** — a participant's contribution to a round — presented the
-same way whether it reads the story or recommends a change. Nothing about a response that
-offers no action looks diminished for it; frequently it is the most useful thing in the
+**A response is one kind of thing** — a participant's contribution to the conversation —
+presented the same way whether it reads the story or recommends a change. Nothing about a response
+that offers no action looks diminished for it; frequently it is the most useful thing in the
 conversation.
 
 Every visible response carries the participant's identity, what it said, and its actions.
@@ -122,8 +126,8 @@ Identity is identity only: it never encodes agreement, severity or confidence.
 
 **What a response says arrives in two parts.** Its **claim** is one sentence and is always visible.
 Its **note** elaborates and is optional. The two are typographically distinct, so the author can read
-a round's claims down the column and stop at the ones worth the elaboration — which is what keeps
-five calls scannable when one participant wrote three lines and another fifteen.
+the conversation's claims down the column and stop at the ones worth the elaboration — which is what
+keeps five calls scannable when one participant wrote three lines and another fifteen.
 
 Neither part is a generated summary of the other. The participant writes both, and a response that is
 a claim alone is complete rather than truncated: nothing marks it as missing something, and nothing
@@ -147,11 +151,11 @@ focuses it, leaving the author composing; with text, it sends that text to that 
 immediately.
 
 Both applying and asking for a concrete change are model calls that take real time, and each shows
-that work is under way in the same register as a round in flight — but not in the same place.
-Applying shows it on the response being applied, because that response is where the before-and-after
-will land. Asking shows it where its answer will appear, at the foot of the conversation with the
-response it was asked about named, because an answer that arrived beside a response scrolled far up
-the conversation is an answer the author has to go looking for.
+that work is under way in the same register as any other action in flight — but not in the same
+place. Applying shows it on the response being applied, because that response is where the
+before-and-after will land. Asking shows it where its answer will appear, at the foot of the
+conversation, because an answer that arrived beside a response scrolled far up the conversation is
+an answer the author has to go looking for.
 
 ### Applying, and seeing what it did
 
@@ -168,11 +172,12 @@ tell them.
 the passage as it now stands reads as current, in the register the room's words are in — not as a
 code diff, because the author is reading sentences and judging whether they are better.
 
-**The before-and-after is disclosed on the author's action.** The claim and the note stay visible as
-on any other response; the change itself opens and closes, and closed it is a count of what was
-altered in the register facts about the machine are in. Length therefore does not constrain it — a
-long change is a closed line until the author wants it. This is the author operating a response they
-are looking at, not the interface deciding an earlier round has been dealt with.
+**The before-and-after is disclosed on the author's action.** Applying opens it; the claim and the
+note stay visible as on any other response, and the change itself opens and closes, closed it is a
+count of what was altered in the register facts about the machine are in. Length therefore does not
+constrain it — a long change is a closed line until the author wants it. This is the author operating
+a response they are looking at, not the interface deciding earlier work has been dealt with, and
+neither a reload nor navigating away and back auto-collapses it on the author's behalf.
 
 **It says what changed and never where.** No paragraph number, no position, and nothing that jumps
 to the passage in the prose. The author reads the change on the response and finds the prose by
@@ -188,24 +193,32 @@ have to compose.
 
 ## An operation in flight
 
-Three things the author starts take real model time: a round, an application, and capturing
-context. One of them runs at a time.
+Three things the author starts take real model time: a conversation action — sending a message,
+replying to a response, or asking one for a concrete change — an application, and capturing
+context. A conversation action and an application cannot overlap each other. Capturing context is
+independent of both — it may run alongside either, and neither waits for it.
 
-**Controls that would start another are disabled while one runs.** Nothing queues, warns, or asks
-the author to choose between the operation they started and the one they are starting, because
-the state that would need explaining is unreachable.
+**Controls that would start a second conversation action or application are disabled while one
+runs.** Nothing queues, warns, or asks the author to choose between the operation they started and
+the one they are starting, because the state that would need explaining is unreachable. Capture's
+own control is never part of that exclusion in either direction: a conversation action or an
+application in flight never disables it, and it never disables them.
 
 **Abandoning is available for as long as an operation is in flight**, and is not offered once it
-has produced its result — a round that came back is not one the author is abandoning.
+has produced its result — a response that landed is not one the author is abandoning.
 
-**The three share one register for work under way and are not one state.** During a round and
-during a capture the prose is fully editable and a live cursor stays in it. During an application
-the prose is visibly read-only, and reads as the manuscript being held for a moment rather than
-as the application being busy. One undifferentiated *something is happening* treatment would tell
-the author to stop typing when they do not have to.
+**A conversation action, an application and a capture do not share one register for work under
+way.** During a conversation action and during a capture the prose is fully editable and a live
+cursor stays in it. During an application the prose is visibly read-only, and reads as the
+manuscript being held for a moment rather than as the application being busy. One undifferentiated
+*something is happening* treatment would tell the author to stop typing when they do not have to —
+and would also collapse a conversation action and a capture running together into a single busy
+signal neither of them alone produced.
 
 **A locked manuscript is accounted for by the response being applied**, so what the author cannot
-type into is explained by something they just did.
+type into is explained by something they just did. That accounting names the participant even where
+the response holding it has scrolled out of view, so the lock is never left unexplained merely
+because the conversation has moved on since the author reached for Apply.
 
 ## The room
 
@@ -214,8 +227,8 @@ static role descriptions**, reached in one action and left in one action. No rat
 generated, no lifecycle is presented, and disabling explains nothing to the author beyond
 what the role description already says.
 
-The change takes effect on the next unaddressed round. Nothing in the conversation is
-altered by it, and a specialist re-enabled after several rounds simply appears again.
+The change takes effect on the next unaddressed message. Nothing in the conversation is
+altered by it, and a specialist re-enabled after several messages simply appears again.
 
 ## Conversations
 
@@ -225,16 +238,17 @@ discussion where the author left them.
 **A lightweight listing offers the piece's conversations**, each recognizable by the author's own
 opening words, truncated, and when it was last active — ordered by last activity, which is also
 the order that decides which one opening the piece lands in. Nothing else appears in the listing:
-no round counts, no participant rosters, no sizes. Starting a new conversation and deleting one
+no response counts, no participant rosters, no sizes. Starting a new conversation and deleting one
 are available from the same place. It is not a project-management surface: no titles to maintain,
 no organization, no metadata to curate.
 
 **Where the author wrote no opening words, the listing finds the first they did write.** A
-conversation that began by asking a participant for a concrete change has no author message in its
-first round, because none was supplied. The listing reads down to the first message the author
-actually wrote, wherever it falls; only where a conversation holds none at all does it show what the
-author did instead, stated as a fact about the machine beside the time. Nothing is ever recognizable
-by the room's words standing in for the author's.
+conversation that began by asking a participant for a concrete change has no author message at its
+start, because none was supplied. The listing reads down to the first message the author actually
+wrote, wherever it falls, including a clarification supplied with a concrete-change request; only
+where a conversation holds no author-written text at all does it show what the author did instead,
+stated as a fact about the machine beside the time. Nothing is ever recognizable by the room's words
+standing in for the author's.
 
 **A resumed conversation is presented exactly as it was said.** Nothing marks a passage as
 having been written against earlier prose, nothing warns that the manuscript has moved on, and
@@ -300,16 +314,16 @@ and the models shape everything and are decided almost never.
 **These are the normal case.** Local models are slow, uneven and frequently wrong, so every
 composition here must be judged in these conditions before it is believed.
 
-**Nothing back yet.** The round shows who was called, which one is being asked, whether its model is
-still being prepared, and which are waiting their turn. Nothing is attributed to a participant that
-has not answered.
+**Nothing back yet.** The unconditional activity signal states that the room is working before any
+participant has anything to show. A participant's own line appears only once its model reports real
+progress; nothing is attributed to one that has not answered, and none is shown waiting its turn.
 
-**A long round.** Because the room asks one participant at a time, a full cast and the Story Editor
-are five calls and a round can run for minutes. The round stays legible for its whole duration, the
-author is writing throughout, and nothing about the wait is presented as a problem to resolve or as
-a reason to stop typing.
+**A long wait.** A full cast and the Story Editor together are several calls, and where the model
+layer cannot run them concurrently the room can take minutes to answer all of them. The transcript
+stays legible for the whole wait, the author is writing throughout, and nothing about it is
+presented as a problem to resolve or as a reason to stop typing.
 
-**Uneven latency.** One participant answers in seconds and another after a minute. The round
+**Uneven latency.** One participant answers in seconds and another after a minute. The transcript
 remains readable throughout and settles without rearranging what the author was already
 reading.
 
@@ -320,13 +334,13 @@ tuned to short responses of similar length has not been tested.
 **A failed call.** Stated plainly with what came back. Never presented as silence, and never as
 something authoritative. The author's next move is an ordinary message, not a repair action.
 
-**A quiet round.** Every specialist had nothing material, and the Story Editor answered the
-author anyway. The round is legibly settled, the outcome reads as information rather than as
+**A quiet outcome.** Every specialist had nothing material, and the Story Editor answered the
+author anyway. The exchange is legibly settled, the outcome reads as information rather than as
 breakage, and nothing suggests the author's question was at fault.
 
 **Every specialist call failed.** The failures are stated and the Story Editor's answer stands
-beside them as an ordinary response. A round with nothing in it at all is what happens when that
-call fails too, and it says so.
+beside them as an ordinary response. Nothing landing at all is what happens when that call fails
+too, and it says so.
 
 **A failed application.** The manuscript is unchanged, editable again, and says so. Nothing is
 half-applied, and the recommendation remains applicable.
@@ -349,7 +363,7 @@ so nothing about this state may compose as one.
 
 **One participant unavailable and the rest of the room fine.** A single participant's model cannot be
 served — it needs a network, a sign-in, or a machine that is asleep. Its failure is stated as its own
-and the round settles around it; nothing presents the room as down, because it isn't.
+and the conversation settles around it; nothing presents the room as down, because it isn't.
 
 ## Guardrails
 
@@ -361,8 +375,9 @@ room becomes untrustworthy if it hides what it is doing.
 independently is a caption apologising for a composition. Compose it correctly and delete the
 label.
 
-**Independence is composed, not annotated.** Stable order everywhere, no arrangement in which
-one response reads as a reply to another, and no device that relates two specialists' readings
+**Independence is composed, not annotated.** Fixed participant identity and response anatomy carry
+that guarantee now that responses land in completion order rather than a stable one: no arrangement
+may read as one response replying to another, and no device relates two specialists' readings
 except the Story Editor's own words.
 
 **Prose and conversation stay adjacent.** The author never chooses between seeing the
@@ -389,5 +404,5 @@ header holds.
 and writing.
 
 **Durable author state shown as current corresponds to what is on disk.** Operational and
-in-flight state — participant state, elapsed time, a round being formed — is
+in-flight state — participant state, elapsed time, an action under way — is
 transient by nature and reads as transient.

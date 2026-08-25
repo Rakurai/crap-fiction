@@ -1,4 +1,4 @@
-import type { ConversationSummary } from '../shared/conversationViews.js'
+import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { Clock } from '../shared/clock.js'
 import { machineWords, whenChanged } from './facts.js'
 import styles from './ConversationSwitcher.module.css'

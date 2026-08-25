@@ -13,7 +13,7 @@ import {
   type HistoryPolicy,
 } from '../../../src/server/room/context.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
-import type { Conversation } from '../../../src/shared/conversationViews.js'
+import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE } from '../../support/charter.js'
 
 const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
@@ -30,7 +30,7 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
-    conversation: undefined,
+    entries: undefined,
     policy: 'shared',
     ...overrides,
   }
@@ -42,24 +42,13 @@ function sectionOf(prompt: string, heading: string): string {
   return body.split('\n## ')[0] ?? body
 }
 
-const conversationWithMixedHistory: Conversation = {
-  id: 'c1',
-  rounds: [
-    {
-      id: 'r1',
-      message: 'first question',
-      addressed: [],
-      brought: [],
-      outcome: 'settled',
-      participants: [
-        { participantId: 'shape', result: { kind: 'response', outcome: 'commentary', claim: 'the entry is late' } },
-        { participantId: 'compression', result: { kind: 'response', outcome: 'noComment' } },
-      ],
-    },
-  ],
-}
+const entriesWithMixedHistory: readonly ConversationEntry[] = [
+  { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
+  { id: 'e2', kind: 'participantResponse', participantId: 'shape', causeId: 'e1', outcome: 'commentary', claim: 'the entry is late' },
+  { id: 'e3', kind: 'participantNoComment', participantId: 'compression', causeId: 'e1' },
+]
 
-function applyContextInput(overrides: Partial<ApplyContextInput> & { conversation: ApplyContextInput['conversation']; throughRoundId: string }): ApplyContextInput {
+function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: ApplyContextInput['entries'] }): ApplyContextInput {
   return {
     recommendationClaim: 'cut the second paragraph',
     recommendationNote: undefined,
@@ -71,29 +60,20 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { conversatio
   }
 }
 
-const conversationWithTwoRounds: Conversation = {
-  id: 'c1',
-  rounds: [
-    {
-      id: 'r1',
-      message: 'first question',
-      addressed: [],
-      brought: [],
-      outcome: 'settled',
-      participants: [
-        { participantId: 'shape', result: { kind: 'response', outcome: 'applicableSuggestion', claim: 'cut the second paragraph', note: 'it repeats the opening' } },
-      ],
-    },
-    {
-      id: 'r2',
-      message: 'a later question',
-      addressed: [],
-      brought: [],
-      outcome: 'settled',
-      participants: [{ participantId: 'compression', result: { kind: 'response', outcome: 'commentary', claim: 'the ending still drags' } }],
-    },
-  ],
-}
+const entriesWithTwoMessages: readonly ConversationEntry[] = [
+  { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
+  {
+    id: 'e2',
+    kind: 'participantResponse',
+    participantId: 'shape',
+    causeId: 'e1',
+    outcome: 'applicableSuggestion',
+    claim: 'cut the second paragraph',
+    note: 'it repeats the opening',
+  },
+  { id: 'e3', kind: 'authorMessage', text: 'a later question', audience: [], brought: [] },
+  { id: 'e4', kind: 'participantResponse', participantId: 'compression', causeId: 'e3', outcome: 'commentary', claim: 'the ending still drags' },
+]
 
 describe('compileApplyContext', () => {
   it('carries the recommendation, the constraint and both durable contexts through untouched', () => {
@@ -105,8 +85,7 @@ describe('compileApplyContext', () => {
         authorContext: 'prefers short sentences',
         storyContext: 'a flash piece about a breakup',
         draft: 'The cups sat where she left them.',
-        conversation: conversationWithTwoRounds,
-        throughRoundId: 'r1',
+        entries: entriesWithTwoMessages,
       }),
     )
 
@@ -118,17 +97,19 @@ describe('compileApplyContext', () => {
     expect(context.draft).toBe('The cups sat where she left them.')
   })
 
-  it('reads history through the round the recommendation came from, and no further', () => {
-    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+  it('SPEC "Applying a recommendation": reads the full current conversation, past the response the recommendation came from', () => {
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.history).toEqual([
       { kind: 'message', text: 'first question' },
       { kind: 'response', participantId: 'shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
+      { kind: 'message', text: 'a later question' },
+      { kind: 'response', participantId: 'compression', claim: 'the ending still drags', note: undefined },
     ])
   })
 
   it('carries no constraint when the author supplied none', () => {
-    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.constraint).toBeUndefined()
   })
@@ -140,8 +121,7 @@ describe('renderApplyPrompt', () => {
       applyContextInput({
         recommendationClaim: 'cut the second paragraph',
         constraint: 'keep the last line',
-        conversation: conversationWithTwoRounds,
-        throughRoundId: 'r1',
+        entries: entriesWithTwoMessages,
       }),
     )
 
@@ -152,14 +132,14 @@ describe('renderApplyPrompt', () => {
   })
 
   it('omits the constraint section when the author supplied none', () => {
-    const context = compileApplyContext(applyContextInput({ conversation: conversationWithTwoRounds, throughRoundId: 'r1' }))
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(renderApplyPrompt(context, charter)).not.toContain("The author's constraint")
   })
 
   it('always carries the manuscript, unexcerpted', () => {
     const context = compileApplyContext(
-      applyContextInput({ draft: 'The cups sat where she left them.', conversation: conversationWithTwoRounds, throughRoundId: 'r1' }),
+      applyContextInput({ draft: 'The cups sat where she left them.', entries: entriesWithTwoMessages }),
     )
 
     expect(renderApplyPrompt(context, charter)).toContain('The cups sat where she left them.')
@@ -171,7 +151,7 @@ function captureContextInput(overrides: Partial<CaptureContextInput> = {}): Capt
     authorContext: undefined,
     storyContext: undefined,
     draft: 'text',
-    conversation: undefined,
+    entries: undefined,
     ...overrides,
   }
 }
@@ -197,8 +177,8 @@ describe('compileCaptureContext', () => {
     expect(context.history).toEqual([])
   })
 
-  it('reads the conversation whole, past any one round — unlike an application, it has none to stop at', () => {
-    const context = compileCaptureContext(captureContextInput({ conversation: conversationWithTwoRounds }))
+  it('reads the conversation whole, past any one response', () => {
+    const context = compileCaptureContext(captureContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.history).toEqual([
       { kind: 'message', text: 'first question' },
@@ -272,7 +252,7 @@ describe('compileSpecialistContext', () => {
     expect(context.storyContext).toBeUndefined()
   })
 
-  it('is empty of history for the first round of a conversation', () => {
+  it('is empty of history for the first message of a conversation', () => {
     const context = compileSpecialistContext(contextInput({ role: shape, message: 'a message' }))
 
     expect(context.history).toEqual([])
@@ -280,7 +260,7 @@ describe('compileSpecialistContext', () => {
 
   it('shared history includes every prior message and every substantive response, regardless of who gave it', () => {
     const context = compileSpecialistContext(
-      contextInput({ role: compression, message: 'a second question', conversation: conversationWithMixedHistory }),
+      contextInput({ role: compression, message: 'a second question', entries: entriesWithMixedHistory }),
     )
 
     expect(context.history).toEqual([
@@ -291,9 +271,9 @@ describe('compileSpecialistContext', () => {
 
   it('the stricter policy filters another specialist\'s unapplied historical response and keeps the participant\'s own', () => {
     const stricter: HistoryPolicy = 'stricter'
-    const forShape = compileSpecialistContext(contextInput({ role: shape, conversation: conversationWithMixedHistory, policy: stricter }))
+    const forShape = compileSpecialistContext(contextInput({ role: shape, entries: entriesWithMixedHistory, policy: stricter }))
     const forCompression = compileSpecialistContext(
-      contextInput({ role: compression, conversation: conversationWithMixedHistory, policy: stricter }),
+      contextInput({ role: compression, entries: entriesWithMixedHistory, policy: stricter }),
     )
 
     expect(forShape.history).toEqual([
@@ -303,57 +283,56 @@ describe('compileSpecialistContext', () => {
     expect(forCompression.history).toEqual([{ kind: 'message', text: 'first question' }])
   })
 
-  it('SPEC "Context compilation": carries no reading from the round being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
+  it('SPEC "Context compilation": carries no reading from the dispatch being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
     for (const policy of ['shared', 'stricter'] as const) {
-      const context = compileSpecialistContext(contextInput({ role: shape, conversation: conversationWithMixedHistory, policy }))
+      const context = compileSpecialistContext(contextInput({ role: shape, entries: entriesWithMixedHistory, policy }))
 
       expect(context.evidence).toEqual([])
     }
   })
 
-  it('keeps the author\'s message from a round that was abandoned, since the message was still said', () => {
-    const abandonedRound: Conversation = {
-      id: 'c1',
-      rounds: [
-        {
-          id: 'r1',
-          message: 'the question that went unanswered',
-          addressed: [],
-          brought: [],
-          outcome: 'abandoned',
-          participants: [{ participantId: 'shape', result: { kind: 'abandoned' } }],
-        },
-      ],
-    }
+  it('keeps the author\'s message from a dispatch that was abandoned, since the message was still said, and never invents an entry for the call it never issued', () => {
+    const afterAbandonment: readonly ConversationEntry[] = [
+      { id: 'e1', kind: 'authorMessage', text: 'the question that went unanswered', audience: [], brought: [] },
+    ]
 
-    const context = compileSpecialistContext(contextInput({ role: shape, conversation: abandonedRound }))
+    const context = compileSpecialistContext(contextInput({ role: shape, entries: afterAbandonment }))
 
     expect(context.history).toEqual([{ kind: 'message', text: 'the question that went unanswered' }])
   })
 })
 
 describe('compileStoryEditorContext', () => {
-  it('SPEC "Context compilation": alone weighs the round\'s own readings, beside the history every call gets', () => {
+  it('SPEC "Context compilation": alone weighs the dispatch\'s own readings, beside the history every call gets', () => {
     const context = compileStoryEditorContext(
-      contextInput({ role: shape, message: 'a second question', conversation: conversationWithMixedHistory }),
-      [{ participantId: 'compression', claim: 'a reading from this very round', note: undefined }],
+      contextInput({ role: shape, message: 'a second question', entries: entriesWithMixedHistory }),
+      [{ kind: 'substantive', participantId: 'compression', claim: 'a reading from this very dispatch', note: undefined }],
     )
 
-    expect(context.evidence).toEqual([{ participantId: 'compression', claim: 'a reading from this very round', note: undefined }])
+    expect(context.evidence).toEqual([{ kind: 'substantive', participantId: 'compression', claim: 'a reading from this very dispatch', note: undefined }])
     expect(context.history).toEqual([
       { kind: 'message', text: 'first question' },
       { kind: 'response', participantId: 'shape', claim: 'the entry is late', note: undefined },
     ])
   })
 
-  it('renders the round\'s readings as their own section, distinct from the conversation so far', () => {
-    const context = compileStoryEditorContext(contextInput({ role: shape, conversation: conversationWithMixedHistory }), [
-      { participantId: 'compression', claim: 'the third line carries nothing', note: undefined },
+  it('renders the dispatch\'s readings as their own section, distinct from the conversation so far', () => {
+    const context = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
+      { kind: 'substantive', participantId: 'compression', claim: 'the third line carries nothing', note: undefined },
     ])
 
     const prompt = renderPrompt(context, charter)
-    expect(prompt).toContain('Readings from this round')
+    expect(prompt).toContain('Specialist readings')
     expect(prompt).toContain('the third line carries nothing')
+  })
+
+  it('renders a no-comment as an attributed craft finding, never as a roster or a tally', () => {
+    const context = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
+      { kind: 'noComment', participantId: 'compression' },
+    ])
+
+    const prompt = renderPrompt(context, charter)
+    expect(prompt).toContain('compression found nothing material in its discipline.')
   })
 })
 

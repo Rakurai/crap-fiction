@@ -1,29 +1,22 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { ConversationView, RoundView } from '../../../src/shared/conversationViews.js'
-import type { RoundSnapshot } from '../../../src/shared/roundEvents.js'
+import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
+import type { DispatchActivitySnapshot } from '../../../src/shared/conversationEvents.js'
 import type { RequestResult } from '../../../src/client/request.js'
-import type { RoomEvent } from '../../../src/client/roomClient.js'
+import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import { useConversation, type RoomAdapters } from '../../../src/client/useConversation.js'
 
-const OPENED_AT = 1_700_000_000_000
+const STARTED_AT = 1_700_000_000_000
 
-function settledRound(id: string): RoundView {
-  return {
-    id,
-    message: `what about ${id}`,
-    addressed: ['shape'],
-    brought: [],
-    participants: [{ participantId: 'shape', result: { kind: 'response', outcome: 'noComment' }, appliedChanges: [] }],
-    outcome: 'settled',
-  }
+function authorMessage(id: string, text: string): ConversationEntryView {
+  return { id, kind: 'authorMessage', text, audience: [], brought: [] }
 }
 
-function snapshot(roundId: string): RoundSnapshot {
-  return { conversationId: 'c1', roundId, message: 'the live one', participants: ['shape'], brought: [], states: {}, settled: [], openedAt: OPENED_AT }
+function activitySnapshot(actionId: string): DispatchActivitySnapshot {
+  return { actionId, conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', audience: ['shape'], states: {}, startedAt: STARTED_AT }
 }
 
-function roomWithHeldConversation(conversation: ConversationView) {
+function roomWithHeldConversation(entries: readonly ConversationEntryView[]) {
   let deliver: (event: RoomEvent) => void = () => {
     throw new Error('the room was never subscribed to')
   }
@@ -31,14 +24,14 @@ function roomWithHeldConversation(conversation: ConversationView) {
     throw new Error('the conversation was never asked for')
   }
 
-  const held = new Promise<RequestResult<ConversationView>>((resolve) => {
-    answer = () => resolve({ outcome: 'value', value: conversation })
+  const held = new Promise<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>((resolve) => {
+    answer = () => resolve({ outcome: 'value', value: { id: 'c1', entries } })
   })
 
   const room: RoomAdapters = {
     createConversation: vi.fn(),
     fetchConversation: vi.fn(() => held),
-    startRound: vi.fn(),
+    dispatch: vi.fn(),
     abandonOperation: vi.fn(),
     applyRecommendation: vi.fn(),
     subscribeToRoom: vi.fn((_pieceId, onEvent) => {
@@ -60,11 +53,8 @@ function roomWithHeldConversation(conversation: ConversationView) {
 }
 
 describe('merging the conversation on disk with the one being streamed', () => {
-  it('keeps a round that opened while the file was still being read, behind the rounds that preceded it', async () => {
-    const { room, stream, answerTheConversationRead } = roomWithHeldConversation({
-      id: 'c1',
-      rounds: [settledRound('r1'), settledRound('r2')],
-    })
+  it('keeps an entry that landed while the file was still being read, behind the entries that preceded it', async () => {
+    const { room, stream, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1'), authorMessage('e2', 'what about e2')])
 
     const { result } = renderHook(() =>
       useConversation(
@@ -78,29 +68,29 @@ describe('merging the conversation on disk with the one being streamed', () => {
     )
 
     stream({
-      type: 'round.opened',
-      data: { conversationId: 'c1', roundId: 'r3', message: 'and now', participants: ['shape'], brought: [], openedAt: OPENED_AT },
+      type: 'action.started',
+      data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e3', startedAt: STARTED_AT, audience: ['shape'] },
     })
+    stream({ type: 'entry.appended', data: { actionId: 'a1', entry: authorMessage('e3', 'and now') } })
 
-    expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r3'])
+    expect(result.current.projection.entries.map((entry) => entry.id)).toEqual(['e3'])
     expect(result.current.busy).toBe(true)
 
     await answerTheConversationRead()
 
     await waitFor(() => {
-      expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r1', 'r2', 'r3'])
+      expect(result.current.projection.entries.map((entry) => entry.id)).toEqual(['e1', 'e2', 'e3'])
     })
-    expect(result.current.projection.rounds.map((round) => round.outcome)).toEqual(['settled', 'settled', 'inFlight'])
   })
 
-  it('keeps the round the piece reported in flight behind the file\'s rounds too, and busy from the first render', async () => {
-    const { room, answerTheConversationRead } = roomWithHeldConversation({ id: 'c1', rounds: [settledRound('r1')] })
+  it("keeps the dispatch the piece reported in flight behind the file's entries too, and busy from the first render", async () => {
+    const { room, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1')])
 
     const { result } = renderHook(() =>
       useConversation(
         'the-lighthouse',
         'c1',
-        snapshot('r2'),
+        activitySnapshot('a1'),
         () => {},
         () => 'the draft',
         room,
@@ -108,13 +98,72 @@ describe('merging the conversation on disk with the one being streamed', () => {
     )
 
     expect(result.current.busy).toBe(true)
-    expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r2'])
+    expect(result.current.projection.activity?.actionId).toBe('a1')
 
     await answerTheConversationRead()
 
     await waitFor(() => {
-      expect(result.current.projection.rounds.map((round) => round.roundId)).toEqual(['r1', 'r2'])
+      expect(result.current.projection.entries.map((entry) => entry.id)).toEqual(['e1'])
     })
+  })
+})
+
+describe('releasing the controls an action holds', () => {
+  function streamingRoom() {
+    let deliver: (event: RoomEvent) => void = () => {
+      throw new Error('the room was never subscribed to')
+    }
+
+    const room: RoomAdapters = {
+      createConversation: vi.fn(),
+      fetchConversation: vi.fn(),
+      dispatch: vi.fn(),
+      abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
+      applyRecommendation: vi.fn(),
+      subscribeToRoom: vi.fn((_pieceId, onEvent) => {
+        deliver = onEvent
+        return () => {}
+      }),
+    }
+
+    return { room, stream: (...events: readonly RoomEvent[]) => act(() => events.forEach((event) => deliver(event))) }
+  }
+
+  it('holds them for the newer action when the one it replaced settles behind it', () => {
+    const { room, stream } = streamingRoom()
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
+    )
+
+    act(() => {
+      result.current.abandon()
+    })
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a2', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e1', startedAt: STARTED_AT, audience: ['shape'] },
+    })
+    stream({ type: 'action.finished', data: { actionId: 'a1', outcome: 'abandoned' } })
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.actionId).toBe('a2')
+  })
+
+  it('releases them for an action started and finished in the same batch of frames', () => {
+    const { room, stream } = streamingRoom()
+
+    const { result } = renderHook(() => useConversation('the-lighthouse', null, null, () => {}, () => 'the draft', room))
+
+    stream(
+      {
+        type: 'action.started',
+        data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e1', startedAt: STARTED_AT, audience: ['shape'] },
+      },
+      { type: 'action.finished', data: { actionId: 'a1', outcome: 'settled' } },
+    )
+
+    expect(result.current.busy).toBe(false)
+    expect(result.current.actionId).toBeUndefined()
   })
 })
 
@@ -125,7 +174,7 @@ describe('abandoning an operation', () => {
     return {
       createConversation: vi.fn(),
       fetchConversation: vi.fn(),
-      startRound: vi.fn(),
+      dispatch: vi.fn(),
       abandonOperation,
       applyRecommendation: vi.fn(),
       subscribeToRoom: vi.fn(() => () => {}),
@@ -136,14 +185,29 @@ describe('abandoning an operation', () => {
     const room = idleRoom()
 
     const { result } = renderHook(() =>
-      useConversation('the-lighthouse', null, snapshot('r1'), () => {}, () => 'the draft', room),
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
     )
 
     await act(async () => {
       result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
+  })
+
+  it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', () => {
+    const room = idleRoom(vi.fn(() => new Promise<RequestResult<null>>(() => {})))
+
+    const { result } = renderHook(() =>
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
+    )
+
+    act(() => {
+      result.current.abandon()
+    })
+
+    expect(result.current.busy).toBe(false)
+    expect(result.current.projection.activity).toBeUndefined()
   })
 
   it('asks nothing when no operation is in flight', () => {
@@ -162,7 +226,7 @@ describe('abandoning an operation', () => {
     const room = idleRoom(vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })))
 
     const { result } = renderHook(() =>
-      useConversation('the-lighthouse', null, snapshot('r1'), () => {}, () => 'the draft', room),
+      useConversation('the-lighthouse', null, activitySnapshot('a1'), () => {}, () => 'the draft', room),
     )
 
     await act(async () => {
