@@ -57,7 +57,7 @@ import {
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
-import type { SurfaceId } from '../../shared/surfaces.js'
+import { WORKED_SURFACE } from '../../shared/surfaces.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
@@ -104,9 +104,6 @@ export class ModeNotFoundError extends Error {
     this.name = 'ModeNotFoundError'
   }
 }
-
-// No operation here is wired to any editing surface but the manuscript.
-const OPERATION_SURFACE: SurfaceId = 'draft'
 
 type Listener = (event: RoomEvent) => void
 
@@ -307,7 +304,7 @@ export class Room {
 
     const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
     const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
-    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, OPERATION_SURFACE)
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, WORKED_SURFACE)
     const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
@@ -449,7 +446,7 @@ export class Room {
       authorContext: durableContext.authorContext,
       storyContext: durableContext.storyContext,
       draft,
-      surface: OPERATION_SURFACE,
+      surface: WORKED_SURFACE,
       entries: existingEntries,
       policy: this.#policy,
       modeDescription,
@@ -575,7 +572,7 @@ export class Room {
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
-        surface: OPERATION_SURFACE,
+        surface: WORKED_SURFACE,
         entries,
         participants: this.#displayNames,
       })
@@ -628,7 +625,7 @@ export class Room {
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
-        surface: OPERATION_SURFACE,
+        surface: WORKED_SURFACE,
         entries,
         participants: this.#displayNames,
       })

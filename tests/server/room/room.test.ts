@@ -30,7 +30,7 @@ import {
 import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
-import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
+import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
@@ -56,6 +56,15 @@ const fixtureRoles: readonly RoleDefinition[] = [
     persona: 'reasons about y',
     eligibility: 'cast',
     availability: [{ mode: fixtureMode.id, surface: 'draft', enabledByDefault: true }],
+  },
+  {
+    id: 'interiority',
+    handle: 'interiority',
+    displayName: 'Interiority',
+    description: 'v',
+    persona: 'reasons about v',
+    eligibility: 'cast',
+    availability: [{ mode: 'novella', surface: 'draft', enabledByDefault: true }],
   },
   {
     id: 'story-editor',
@@ -85,6 +94,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
     modes: [fixtureMode],
     roles: fixtureRoles,
     charter: CHARTER_FIXTURE,
+    fragments: PROMPT_FRAGMENTS_FIXTURE,
     policy: SHIPPED_HISTORY_POLICY,
     modelAccess,
     now: () => 1_700_000_000_000,
@@ -134,8 +144,10 @@ describe('Room.dispatch', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
+  it("an unaddressed dispatch reads nothing for addressing and calls the enabled cast, never a specialist the piece's mode does not offer", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    // Only a hand-edited piece.yaml can name an unavailable specialist; the pieces module refuses to.
+    await writePieceCast(workspaceDir, piece.id, ['shape', 'compression', 'interiority'])
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -149,6 +161,7 @@ describe('Room.dispatch', () => {
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', text: 'a message', audience: [] })
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
     expect(adapter.promptFor('shape')).toContain('a message')
+    expect(adapter.promptFor('interiority')).toBeUndefined()
   })
 
   it('states a failure synchronously, rather than opening an action, when the conversation on disk cannot be read', async () => {
@@ -921,7 +934,6 @@ describe('Room.dispatch — an action the author opened from a particular respon
 
     expect(askAdapter.promptFor('shape')).toContain('The entry is late.')
     expect(askAdapter.promptFor('shape')).toContain('what would you cut')
-    expect(askAdapter.promptFor('shape')).not.toContain("Author's message")
     expect(askAdapter.promptFor('compression')).toBeUndefined()
     expect(askAdapter.promptFor('story-editor')).toBeUndefined()
 

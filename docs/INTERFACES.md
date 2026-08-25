@@ -170,10 +170,9 @@ The author hand-edits everything under `config/` and every YAML file in a piece.
 change file are machinery, and nothing invites an edit to them.
 
 Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
-travels with the application and not under the data root. The charter and every participant are one
-Markdown document each, under a content root resolved once at startup; a participant's filename is its
-id. The mode descriptors sit beside the application's own source, each mode paired with a sibling
-document describing its form and scale.
+travels with the application and not under the data root, under a content root resolved once at startup.
+The charter and every participant are one Markdown document each; a participant's filename is its id.
+Each mode is a descriptor paired with a sibling document describing its form and scale.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
 generalist call. It no longer carries the obligation to answer a direct question, which is call-specific

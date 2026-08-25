@@ -9,7 +9,7 @@ import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestApp } from '../../support/harness.js'
 import { buildTestRoom } from '../../support/room.js'
-import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
+import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
  * What the room does with a dispatch, an application or a capture belongs to
@@ -62,6 +62,7 @@ describe('the room over HTTP', () => {
       modes: [MODE],
       roles: ROLES,
       charter: CHARTER_FIXTURE,
+      fragments: PROMPT_FRAGMENTS_FIXTURE,
       policy: SHIPPED_HISTORY_POLICY,
       modelAccess,
       now: () => 1_700_000_000_000,

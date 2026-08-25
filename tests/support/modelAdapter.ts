@@ -84,18 +84,9 @@ export class FixtureModelAdapter implements ModelAccess {
     this.#gates.get(site)?.()
   }
 
-  /** Both halves, concatenated, for a test that does not care which one carried what it is checking for. */
   promptFor(site: string): string | undefined {
     const prompt = this.#prompts.get(site)
     return prompt === undefined ? undefined : prompt.durable + prompt.perCall
-  }
-
-  durableFor(site: string): string | undefined {
-    return this.#prompts.get(site)?.durable
-  }
-
-  perCallFor(site: string): string | undefined {
-    return this.#prompts.get(site)?.perCall
   }
 
   async status(): Promise<RuntimeStatus> {

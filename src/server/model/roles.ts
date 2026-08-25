@@ -1,11 +1,7 @@
 import { z } from 'zod'
 import { handlePattern } from '../../shared/handle.js'
 import { surfaceIdSchema, type SurfaceId } from '../../shared/surfaces.js'
-import { readShippedParticipants, ShippedDataError } from '../store/index.js'
-
-const eligibilitySchema = z.enum(['cast', 'generalist', 'addressed-only'])
-
-export type Eligibility = z.infer<typeof eligibilitySchema>
+import { participantFile, readShippedParticipants, ShippedDataError } from '../store/index.js'
 
 const availabilityEntrySchema = z.object({
   mode: z.string().min(1),
@@ -19,13 +15,19 @@ export type AvailabilityEntry = Readonly<{
   enabledByDefault: boolean
 }>
 
-const participantFrontmatterSchema = z.object({
+const identity = {
   handle: z.string().regex(handlePattern, 'must be one lowercase token, distinct from the display name'),
   displayName: z.string().min(1),
   description: z.string().min(1),
-  eligibility: eligibilitySchema,
-  availability: z.array(availabilityEntrySchema).default([]),
-})
+}
+
+const participantFrontmatterSchema = z.discriminatedUnion('eligibility', [
+  z.strictObject({ ...identity, eligibility: z.literal('cast'), availability: z.array(availabilityEntrySchema) }),
+  z.strictObject({ ...identity, eligibility: z.literal('generalist') }),
+  z.strictObject({ ...identity, eligibility: z.literal('addressed-only') }),
+])
+
+export type Eligibility = z.infer<typeof participantFrontmatterSchema>['eligibility']
 
 export type RoleDefinition = Readonly<{
   id: string
@@ -45,61 +47,36 @@ export class GeneralistCardinalityError extends Error {
   }
 }
 
-export function requireDistinctRoles(roles: readonly RoleDefinition[]): readonly RoleDefinition[] {
+export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): readonly RoleDefinition[] {
+  const documents = readShippedParticipants(contentRoot, participantFrontmatterSchema)
+
+  function refuse(id: string, reason: string): never {
+    throw new ShippedDataError(participantFile(contentRoot, id), id, reason)
+  }
+
+  const roles: RoleDefinition[] = documents.map((document) =>
+    document.eligibility === 'cast' ? document : { ...document, availability: [] },
+  )
+
   const seenIds = new Set<string>()
   const seenHandles = new Set<string>()
   for (const role of roles) {
-    if (seenIds.has(role.id)) {
-      throw new ShippedDataError('the shipped participants', role.id, `duplicate participant id "${role.id}"`)
-    }
-    if (seenHandles.has(role.handle)) {
-      throw new ShippedDataError('the shipped participants', role.id, `duplicate handle "${role.handle}"`)
-    }
+    if (seenIds.has(role.id)) refuse(role.id, `duplicate participant id "${role.id}"`)
+    if (seenHandles.has(role.handle)) refuse(role.id, `duplicate handle "${role.handle}"`)
     seenIds.add(role.id)
     seenHandles.add(role.handle)
-  }
 
-  return roles
-}
-
-export function requireSingleGeneralist(roles: readonly RoleDefinition[]): RoleDefinition {
-  const generalists = roles.filter((role) => role.eligibility === 'generalist')
-  const [generalist, ...rest] = generalists
-  if (generalist === undefined || rest.length > 0) {
-    throw new GeneralistCardinalityError(generalists.map((role) => role.id))
-  }
-  return generalist
-}
-
-export function requireValidAvailability(roles: readonly RoleDefinition[], modeIds: ReadonlySet<string>): readonly RoleDefinition[] {
-  for (const role of roles) {
-    if (role.eligibility !== 'cast' && role.availability.length > 0) {
-      throw new ShippedDataError('the shipped participants', role.id, 'only a cast participant may declare availability')
-    }
-
-    const seen = new Set<string>()
+    const pairs = new Set<string>()
     for (const entry of role.availability) {
-      if (!modeIds.has(entry.mode)) {
-        throw new ShippedDataError('the shipped participants', role.id, `availability names mode "${entry.mode}", which did not load`)
-      }
-      const key = `${entry.mode}:${entry.surface}`
-      if (seen.has(key)) {
-        throw new ShippedDataError(
-          'the shipped participants',
-          role.id,
-          `duplicate availability for mode "${entry.mode}" and surface "${entry.surface}"`,
-        )
-      }
-      seen.add(key)
+      if (!modeIds.has(entry.mode)) refuse(role.id, `availability names mode "${entry.mode}", which did not load`)
+      const pair = `${entry.mode}:${entry.surface}`
+      if (pairs.has(pair)) refuse(role.id, `duplicate availability for mode "${entry.mode}" and surface "${entry.surface}"`)
+      pairs.add(pair)
     }
   }
 
-  return roles
-}
+  const generalists = roles.filter((role) => role.eligibility === 'generalist')
+  if (generalists.length !== 1) throw new GeneralistCardinalityError(generalists.map((role) => role.id))
 
-export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): readonly RoleDefinition[] {
-  const roles = requireDistinctRoles(readShippedParticipants(contentRoot, participantFrontmatterSchema))
-  requireSingleGeneralist(roles)
-  requireValidAvailability(roles, modeIds)
   return roles
 }

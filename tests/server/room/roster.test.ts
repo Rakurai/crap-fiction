@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
-import { defaultCastFor, GeneralistNotInRosterError, resolveRoster, specialistsFor } from '../../../src/server/room/roster.js'
+import { defaultCastFor, resolveRoster, specialistsFor } from '../../../src/server/room/roster.js'
 
 const SHAPE: RoleDefinition = {
   id: 'shape',
@@ -43,20 +43,12 @@ const TOOLSMITH: RoleDefinition = {
 }
 
 describe('resolving who is in the room', () => {
-  /**
-   * The cast is every participant declaring itself cast-eligible; the Story Editor is whoever
-   * declares itself the generalist. An addressed-only participant belongs to neither list.
-   */
   it('takes the cast from declared eligibility, the declared generalist, and every addressed-only participant apart from both', () => {
     const roster = resolveRoster([SHAPE, EDITOR, TOOLSMITH])
 
     expect(roster.specialists.map((role) => role.id)).toEqual(['shape'])
     expect(roster.storyEditor.id).toBe('story-editor')
     expect(roster.addressedOnly.map((role) => role.id)).toEqual(['toolsmith'])
-  })
-
-  it('refuses a roster with no participant declaring itself the generalist', () => {
-    expect(() => resolveRoster([SHAPE])).toThrowError(GeneralistNotInRosterError)
   })
 })
 

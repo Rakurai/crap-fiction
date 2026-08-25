@@ -104,11 +104,6 @@ export class SpecialistIndependenceViolation extends Error {
   }
 }
 
-/**
- * A specialist's compiled context can never carry evidence — only `compileStoryEditorContext` accepts
- * any — so this is a regression guard on that invariant, asserted on the compiled object and before
- * any of these contexts is rendered.
- */
 export function assertSpecialistIndependence(contexts: readonly Context[]): void {
   for (const context of contexts) {
     if (context.evidence.length > 0) throw new SpecialistIndependenceViolation(context.role.displayName)

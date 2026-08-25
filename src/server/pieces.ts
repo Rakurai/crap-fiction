@@ -8,6 +8,7 @@ import type { ConversationActivitySnapshot } from '../shared/conversationEvents.
 import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
+import { WORKED_SURFACE } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import { defaultCastFor, specialistsFor } from './room/roster.js'
@@ -118,7 +119,7 @@ export async function createPiece(
     title,
     mode: modeId,
     status: 'drafting',
-    cast: [...defaultCastFor(specialists, modeId, 'draft')],
+    cast: [...defaultCastFor(specialists, modeId, WORKED_SURFACE)],
   })
 
   return summarize(id, requirePiece(workspaceDir, id))
@@ -138,7 +139,7 @@ export function getPiece(
   storyEditor: RoleDefinition,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, 'draft')
+  const available = specialistsFor(specialists, piece.metadata.mode, WORKED_SURFACE)
   return {
     ...summarize(id, piece),
     draft: piece.draft?.text ?? '',
@@ -159,7 +160,7 @@ export async function setPieceCast(
   cast: readonly string[],
 ): Promise<readonly CastMemberView[]> {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, 'draft')
+  const available = specialistsFor(specialists, piece.metadata.mode, WORKED_SURFACE)
   const ceiling = new Set(available.map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)

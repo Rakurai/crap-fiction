@@ -156,7 +156,6 @@ export class LMStudioAdapter implements ModelAccess {
     announce('preparing')
     const model = await this.#client.llm.model(assignment, { signal })
     announce('working')
-    // The SDK takes one prompt string; joining the two halves is this vendor accommodation's own affair.
     const result = await model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
 
     const returned = result.nonReasoningContent

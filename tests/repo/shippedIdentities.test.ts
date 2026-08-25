@@ -17,7 +17,6 @@ function escapeForRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** An identity appearing as a whole quoted string literal, not merely as a substring of unrelated text. */
 function quotedLiteralPattern(identity: string): RegExp {
   const escaped = escapeForRegExp(identity)
   return new RegExp(`(['"\`])${escaped}\\1`)

@@ -245,10 +245,8 @@ export async function deleteAppliedChange(workspaceDir: string, pieceId: string,
   await deleteFile(changeFile(pieceDir, changeId))
 }
 
-const SHIPPED_ROOT = path.join(import.meta.dirname, '..')
-
-export function readShippedModes<T>(schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
-  const dir = path.join(SHIPPED_ROOT, 'modes')
+export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
+  const dir = path.join(contentRoot, 'modes')
   const modeIds = directoryNames(dir)
   if (modeIds.length === 0) {
     throw new ShippedDataError(dir, '(directory)', 'no data found')
@@ -267,7 +265,15 @@ export function readShippedCharter(contentRoot: string): string {
 }
 
 export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {
-  return readContentDocuments(path.join(contentRoot, 'participants'), schema)
+  return readContentDocuments(participantsDirectory(contentRoot), schema)
+}
+
+export function participantFile(contentRoot: string, id: string): string {
+  return path.join(participantsDirectory(contentRoot), `${id}.md`)
+}
+
+function participantsDirectory(contentRoot: string): string {
+  return path.join(contentRoot, 'participants')
 }
 
 export function readShippedFragment<T>(contentRoot: string, kind: string, name: string, schema: z.ZodType<T>): Readonly<T & { body: string }> {

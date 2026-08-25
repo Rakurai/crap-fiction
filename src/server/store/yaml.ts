@@ -119,17 +119,6 @@ function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {
   return result.data
 }
 
-export function readYamlDirectory<T>(dir: string, schema: z.ZodType<T>): readonly T[] {
-  const files = readdirSync(dir).filter((name) => name.endsWith('.yaml'))
-  const items = files.map((name) => parseShippedYaml(path.join(dir, name), schema))
-
-  if (items.length === 0) {
-    throw new ShippedDataError(dir, '(directory)', 'no data found')
-  }
-
-  return items
-}
-
 export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
   if (!existsSync(filePath)) {
     throw new ShippedDataError(filePath, '(file)', 'not found')

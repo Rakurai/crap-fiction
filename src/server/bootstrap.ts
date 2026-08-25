@@ -32,9 +32,8 @@ export type ShippedContent = Readonly<{
   roster: RoomRoster
 }>
 
-/** Every loader and derivation the application needs before it can start; a release check runs this against real content. */
 export function loadShippedContent(contentRoot: string): ShippedContent {
-  const modes = loadModes()
+  const modes = loadModes(contentRoot)
   const roles = loadRoles(contentRoot, new Set(modes.map((mode) => mode.id)))
   const charter = loadCharter(contentRoot)
   const fragments = loadPromptFragments(contentRoot)

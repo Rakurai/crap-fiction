@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { surfaceIdSchema, type SurfaceId } from '../../shared/surfaces.js'
 import { readShippedFragment } from '../store/index.js'
 
 export type Fragment = Readonly<{
@@ -31,7 +32,6 @@ export function parseFragment(name: string, variables: readonly string[], templa
   return { name, variables, template }
 }
 
-/** Substitution only: no branching, looping or expression evaluation. */
 export function renderFragment(fragment: Fragment, values: Readonly<Record<string, string>>): string {
   if (!sameNames(new Set(fragment.variables), new Set(Object.keys(values)))) {
     throw new FragmentVariableMismatchError(fragment.name, 'the declared variables and the supplied values disagree')
@@ -57,7 +57,6 @@ export type SectionName =
 export type LineName = 'historyMessage' | 'historyResponse' | 'readingSubstantive' | 'readingNoComment'
 export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply' | 'capture'
 export type OperationRoleName = 'apply' | 'capture'
-export type SurfaceFramingName = 'draft' | 'storyContext' | 'authorContext'
 
 const SECTION_NAMES: readonly SectionName[] = [
   'charter',
@@ -77,17 +76,16 @@ const SECTION_NAMES: readonly SectionName[] = [
 const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'readingSubstantive', 'readingNoComment']
 const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply', 'capture']
 const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply', 'capture']
-const SURFACE_FRAMING_NAMES: readonly SurfaceFramingName[] = ['draft', 'storyContext', 'authorContext']
 
 export type PromptFragments = Readonly<{
   sections: Readonly<Record<SectionName, Fragment>>
   lines: Readonly<Record<LineName, Fragment>>
   tasks: Readonly<Record<TaskName, Fragment>>
   roles: Readonly<Record<OperationRoleName, Fragment>>
-  surfaces: Readonly<Record<SurfaceFramingName, Fragment>>
+  surfaces: Readonly<Record<SurfaceId, Fragment>>
 }>
 
-const fragmentFrontmatterSchema = z.object({ variables: z.array(z.string().min(1)).default([]) })
+const fragmentFrontmatterSchema = z.strictObject({ variables: z.array(z.string().min(1)) })
 
 function loadFragment(contentRoot: string, kind: string, name: string): Fragment {
   const { variables, body } = readShippedFragment(contentRoot, kind, name, fragmentFrontmatterSchema)
@@ -104,6 +102,6 @@ export function loadPromptFragments(contentRoot: string): PromptFragments {
     lines: loadAll(contentRoot, 'lines', LINE_NAMES),
     tasks: loadAll(contentRoot, 'tasks', TASK_NAMES),
     roles: loadAll(contentRoot, 'roles', OPERATION_ROLE_NAMES),
-    surfaces: loadAll(contentRoot, 'surfaces', SURFACE_FRAMING_NAMES),
+    surfaces: loadAll(contentRoot, 'surfaces', surfaceIdSchema.options),
   }
 }

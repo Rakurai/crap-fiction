@@ -3,6 +3,7 @@ import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
 import { createLogger } from '../../src/server/logger.js'
 import type { Charter } from '../../src/server/model/charter.js'
+import type { Fragment, PromptFragments } from '../../src/server/model/prompts.js'
 import { callSites } from '../../src/server/model/callSites.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
@@ -13,6 +14,7 @@ import { DraftStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
+import { PROMPT_FRAGMENTS_FIXTURE } from './roomFixtures.js'
 import { buildTestRoom } from './room.js'
 
 export type AppSpec = Readonly<{
@@ -32,13 +34,31 @@ export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
  * harness data. The roster comes from the mode and roles the test itself stated,
  * because the routes report it.
  */
-const UNREACHED_CHARTER: Charter = 'unreached: no prompt is rendered in this scenario'
+const UNREACHED = 'unreached: no prompt is rendered in this scenario'
+
+const UNREACHED_CHARTER: Charter = UNREACHED
+
+function unreachedFragments(): PromptFragments {
+  const marked = <K extends string>(kind: Readonly<Record<K, Fragment>>): Record<K, Fragment> =>
+    Object.fromEntries(
+      Object.entries<Fragment>(kind).map(([name, fragment]) => [name, { ...fragment, template: `${UNREACHED} ${fragment.template}` }]),
+    ) as Record<K, Fragment>
+
+  return {
+    sections: marked(PROMPT_FRAGMENTS_FIXTURE.sections),
+    lines: marked(PROMPT_FRAGMENTS_FIXTURE.lines),
+    tasks: marked(PROMPT_FRAGMENTS_FIXTURE.tasks),
+    roles: marked(PROMPT_FRAGMENTS_FIXTURE.roles),
+    surfaces: marked(PROMPT_FRAGMENTS_FIXTURE.surfaces),
+  }
+}
 
 function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {
     modes,
     roles,
     charter: UNREACHED_CHARTER,
+    fragments: unreachedFragments(),
     policy: SHIPPED_HISTORY_POLICY,
     modelAccess: FixtureModelAdapter.bySite({}, undefined),
     now: () => {

@@ -219,11 +219,11 @@ model once is on that model for every piece; and the interface theme. With no th
 interface follows the operating system — an absent key means the author has not chosen, which is a
 different thing from a value the application supplied on their behalf.
 
-**Shipped data travels with the application**, not under the data root: the mode descriptors sit beside
-their own source, and the charter, every participant and every prompt fragment are documents under a
-content root resolved once at startup. Where exactly the content root and the source-adjacent files sit
-is the store boundary's, like the rest of the layout — the modules that read them state what each must
-contain and never where it is. It is kept apart from author configuration because conflating them means
+**Shipped data travels with the application**, not under the data root: the charter, every participant,
+every mode descriptor and every prompt fragment are documents under a content root resolved once at
+startup. Where exactly that root sits is the store boundary's, like the rest of the layout — the modules
+that read it state what each document must contain and never where it is. It is kept apart from author
+configuration because conflating them means
 an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
 validated at startup, and invalid shipped data is a startup failure, since a document that parses
 partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
@@ -675,6 +675,12 @@ typing a sigil, so those dispatches carry an explicit target instead, and a supp
 of the addressing. A client that parsed and posted its own participant list could open a dispatch whose
 addressing contradicted the words about to reach the model; synthesizing a sigil into the author's text
 would put words in the conversation they never wrote.
+
+**The available roster is the ceiling on who can be addressed.** A specialist the piece's mode makes
+available is addressable whether or not it is enabled; one the mode does not make available is not
+addressable at all, and its handle resolves to nothing. Both the surface that suggests a handle as the
+author types and the resolver that reads the finished message derive that set the same way, so the author
+is never offered a handle the dispatch would then ignore.
 
 **Addressing a specialist that is not enabled enables it** before the dispatch's entry is written — the
 same durable write as enabling it directly, and the same author-message entry that carries the resolved

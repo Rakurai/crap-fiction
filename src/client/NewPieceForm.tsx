@@ -13,10 +13,10 @@ export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFor
   const [naming, setNaming] = useState(false)
   const [title, setTitle] = useState('')
   const [mode, setMode] = useState<string | undefined>(undefined)
+  const chosen = mode ?? modes[0]?.id
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const chosen = mode ?? modes[0]?.id
     if (chosen === undefined) return
     onSubmit(title, chosen)
     setTitle('')
@@ -55,7 +55,7 @@ export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFor
           <select
             aria-label="mode"
             className={styles.select}
-            value={mode ?? modes[0]?.id}
+            value={chosen}
             onChange={(event) => setMode(event.target.value)}
           >
             {modes.map((candidate) => (

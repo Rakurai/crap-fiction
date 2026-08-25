@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assertSpecialistIndependence,
   compileApplyContext,
   compileCaptureContext,
   compileSpecialistContext,
@@ -7,8 +8,10 @@ import {
   renderApplyPrompt,
   renderCapturePrompt,
   renderPrompt,
+  SpecialistIndependenceViolation,
   type ApplyContextInput,
   type CaptureContextInput,
+  type Context,
   type ContextInput,
   type HistoryPolicy,
 } from '../../../src/server/room/context.js'
@@ -91,6 +94,18 @@ function captureContextInput(overrides: Partial<CaptureContextInput> = {}): Capt
 
 function wholeOf(rendered: { durable: string; perCall: string }): string {
   return rendered.durable + rendered.perCall
+}
+
+function markerIndices(text: string, markers: readonly string[]): readonly number[] {
+  return markers.map((marker) => {
+    const index = text.indexOf(marker)
+    if (index === -1) throw new Error(`marker "${marker}" not found in "${text}"`)
+    return index
+  })
+}
+
+function isAscending(values: readonly number[]): boolean {
+  return values.every((value, i) => i === 0 || value > (values[i - 1] as number))
 }
 
 function sectionOf(prompt: string, marker: string): string {
@@ -356,5 +371,89 @@ describe('rendering a prompt', () => {
     const ordinary = wholeOf(renderPrompt(bareSpecialist, fragments, charter))
     expect(ordinary).not.toContain('FIXTURE_READING_HEADING')
     expect(ordinary).not.toContain('FIXTURE_MESSAGE_HEADING')
+  })
+})
+
+describe('the order the two halves compose in', () => {
+  it('orders a participant call widest-frame to narrowest-responsibility, and its per-call half task through the current material', () => {
+    const context = compileSpecialistContext(
+      contextInput({
+        role: shape,
+        owesAnswer: true,
+        message: 'does the opening earn its length',
+        authorContext: 'prefers short sentences',
+      }),
+    )
+
+    const { durable, perCall } = renderPrompt(context, fragments, charter)
+
+    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
+    expect(
+      isAscending(
+        markerIndices(perCall, [
+          'FIXTURE_SPECIALIST_TASK',
+          'FIXTURE_DRAFT_SURFACE',
+          'FIXTURE_ADDRESSED_HEADING',
+          'FIXTURE_AUTHOR_CONTEXT_HEADING',
+          'FIXTURE_MANUSCRIPT_HEADING',
+          'FIXTURE_MESSAGE_HEADING',
+        ]),
+      ),
+    ).toBe(true)
+  })
+
+  it('orders an operation call mode description then operation role, and its per-call half task through the current material', () => {
+    const context = compileApplyContext(
+      applyContextInput({
+        authorContext: 'prefers short sentences',
+        storyContext: 'a flash piece about a breakup',
+        entries: [],
+      }),
+    )
+
+    const { durable, perCall } = renderApplyPrompt(context, fragments)
+
+    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
+    expect(
+      isAscending(
+        markerIndices(perCall, [
+          'FIXTURE_APPLY_TASK',
+          'FIXTURE_DRAFT_SURFACE',
+          'FIXTURE_AUTHOR_CONTEXT_HEADING',
+          'FIXTURE_STORY_CONTEXT_HEADING',
+          'FIXTURE_MANUSCRIPT_HEADING',
+          'FIXTURE_RECOMMENDATION_HEADING',
+        ]),
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('specialist independence', () => {
+  const ordinaryContext: Context = {
+    role: shape,
+    modeDescription: MODE_DESCRIPTION,
+    owesAnswer: false,
+    message: undefined,
+    ask: undefined,
+    authorContext: undefined,
+    storyContext: undefined,
+    draft: 'text',
+    surface: 'draft',
+    history: [],
+    evidence: [],
+  }
+
+  it('accepts a compiled specialist context, which carries no evidence from the dispatch being formed', () => {
+    expect(() => assertSpecialistIndependence([ordinaryContext])).not.toThrow()
+  })
+
+  it('rejects a compiled context that carries a reading from the dispatch being formed, before it is rendered', () => {
+    const contaminated: Context = {
+      ...ordinaryContext,
+      evidence: [{ kind: 'substantive', participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }],
+    }
+
+    expect(() => assertSpecialistIndependence([contaminated])).toThrow(SpecialistIndependenceViolation)
   })
 })

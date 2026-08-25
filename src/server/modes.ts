@@ -12,6 +12,6 @@ export type ModeDescriptor = Readonly<{
   description: string
 }>
 
-export function loadModes(): readonly ModeDescriptor[] {
-  return readShippedModes(modeSchema)
+export function loadModes(contentRoot: string): readonly ModeDescriptor[] {
+  return readShippedModes(contentRoot, modeSchema)
 }
