@@ -34,11 +34,8 @@ import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
-  name: 'Flash',
-  cast: [
-    { id: 'shape', attendsTo: 'x', defect: 'y' },
-    { id: 'compression', attendsTo: 'x', defect: 'y' },
-  ],
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
 }
 
 const fixtureRoles: readonly RoleDefinition[] = [
@@ -47,6 +44,8 @@ const fixtureRoles: readonly RoleDefinition[] = [
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'z', persona: 'reasons about z', eligibility: 'generalist' },
   { id: 'toolsmith', handle: 'toolsmith', displayName: 'Toolsmith', description: 'w', persona: 'reasons about w', eligibility: 'addressed-only' },
 ]
+
+const fixtureSpecialists: readonly RoleDefinition[] = fixtureRoles.filter((role) => role.eligibility === 'cast')
 
 /** Everything a room turns on except the seam under test, which each caller supplies. */
 function roomSpecWith(modelAccess: ModelAccess) {
@@ -104,7 +103,7 @@ describe('Room.dispatch', () => {
   })
 
   it('an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -121,7 +120,7 @@ describe('Room.dispatch', () => {
   })
 
   it('states a failure synchronously, rather than opening an action, when the conversation on disk cannot be read', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     mkdirSync(path.join(workspaceDir, piece.id, 'conversations'), { recursive: true })
     writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'c1.json'), '{ not valid json', 'utf8')
     const { room } = buildRoom(dataRoot, {})
@@ -133,7 +132,7 @@ describe('Room.dispatch', () => {
   })
 
   it('closes the action as failed, naming the failure, when the durable context cannot be read', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     writeFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), 'Premise: 42\n', 'utf8')
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -158,7 +157,7 @@ describe('Room.dispatch', () => {
   })
 
   it("owns the dispatch's own collapse: a seam that throws instead of failing closes the action and is stated, not rethrown into nothing", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const broken: ModelAccess = {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
@@ -183,7 +182,7 @@ describe('Room.dispatch', () => {
   })
 
   it('writes the author entry before any participant is called, then appends each response as it lands, reporting each as working first', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } }, held: true, states: ['working'] },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true, states: ['working'] },
@@ -221,7 +220,7 @@ describe('Room.dispatch', () => {
   })
 
   it('submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'compression reading' } }, held: true },
@@ -252,7 +251,7 @@ describe('Room.dispatch', () => {
   })
 
   it('reaches the Story Editor from an empty tracked set while unrelated model work — a capture on the same piece — is still active', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -275,9 +274,9 @@ describe('Room.dispatch', () => {
   })
 
   it('durably enables a specialist addressed from outside the enabled cast, naming it as brought — and brings nobody where addressing names only the cast', async () => {
-    const brought = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const brought = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     await writePieceCast(workspaceDir, brought.id, ['compression'])
-    const alreadyIn = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const alreadyIn = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, fixtureSpecialists)
 
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } } },
@@ -297,7 +296,7 @@ describe('Room.dispatch', () => {
   })
 
   it('calls a named addressed-only participant alone, enrolling it in nothing and trailing it with no generalist call', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a tool reading' } } },
     })
@@ -315,7 +314,7 @@ describe('Room.dispatch', () => {
   })
 
   it('settles with nothing in it at all when every call failed, without ever emitting an error event', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
       compression: { result: { outcome: 'failed', reason: 'unreachable' } },
@@ -338,7 +337,7 @@ describe('Room.dispatch', () => {
   })
 
   it('persists no entry for the participant abandoned mid-call, and leaves it stopped at that point', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -356,7 +355,7 @@ describe('Room.dispatch', () => {
   })
 
   it('ABANDON-UNTRACK: lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -406,7 +405,7 @@ describe('Room.apply', () => {
   })
 
   async function pieceWithRecommendation(): Promise<{ pieceId: string }> {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -479,7 +478,7 @@ describe('Room.apply', () => {
    */
   it('admits one dispatch or application at a time, whichever piece asks, and names the piece holding it', async () => {
     const { pieceId } = await pieceWithRecommendation()
-    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -601,7 +600,7 @@ describe('Room.capture', () => {
   })
 
   it("gives each of the model's proposals an identity, calling no participant", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: {
         result: {
@@ -622,7 +621,7 @@ describe('Room.capture', () => {
   })
 
   it('carries the draft and the conversation into the call, and reads an absent conversation as no history', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room: dispatchRoom, adapter: dispatchAdapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -644,8 +643,8 @@ describe('Room.capture', () => {
   })
 
   it("runs beside a dispatch on the same piece in either order, sharing the model seam but not the dispatch-and-apply operation state", async () => {
-    const first = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const first = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
+    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -678,7 +677,7 @@ describe('Room.capture', () => {
   })
 
   it("is unaffected by abandon(), which targets the dispatch-and-apply operation and never reaches capture", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
     })
@@ -693,7 +692,7 @@ describe('Room.capture', () => {
   })
 
   it('refuses a second capture for the same piece while one is already in flight', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
     })
@@ -707,7 +706,7 @@ describe('Room.capture', () => {
   })
 
   it('reports its own activity on captureSnapshot, independently of the dispatch snapshot', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
     })
@@ -726,7 +725,7 @@ describe('Room.capture', () => {
   })
 
   it('reports a failed call as failed, proposing nothing', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'failed', reason: 'unconfigured' } },
     })
@@ -753,8 +752,8 @@ describe('Room.approveCapture', () => {
   })
 
   it('writes exactly the destinations the approved proposals name, and nothing to one no proposal named', async () => {
-    const first = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode)
+    const first = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
+    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {})
 
     const one = await room.approveCapture(workspaceDir, first.id, [
@@ -774,7 +773,7 @@ describe('Room.approveCapture', () => {
   })
 
   it('reads the context fresh rather than from anything the capture call saw, so a hand edit in between is not overwritten', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     await writeStoryContext(workspaceDir, piece.id, { Premise: ['an old premise'] })
     const { room } = buildRoom(dataRoot, {})
 
@@ -789,7 +788,7 @@ describe('Room.approveCapture', () => {
   })
 
   it('keeps the destination that succeeded when the other write fails, naming which one', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {})
     chmodSync(path.join(workspaceDir, piece.id), 0o500)
 
@@ -829,7 +828,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
   })
 
   it('replying addresses the named participant by the act, reading the message for nothing', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -851,7 +850,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
    * refused before an action opens, rather than opened against nobody.
    */
   it('refuses an act naming a participant or a response that is not there, opening no action either way', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room } = buildRoom(dataRoot, {})
 
     await expect(
@@ -866,7 +865,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
   })
 
   it("asking for a concrete change opens a dispatch with no message, calling only the response's own participant", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'The entry is late.', note: 'By a paragraph.' } } },
     })

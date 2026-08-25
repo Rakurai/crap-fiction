@@ -54,7 +54,6 @@ import {
   type ContextInput,
   type HistoryPolicy,
   type ParticipantEvidence,
-  type SpecialistCriteria,
 } from './context.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
@@ -173,7 +172,7 @@ export class Room {
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
-  readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
+  readonly #modeDescription: string
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
@@ -184,6 +183,7 @@ export class Room {
     authorContextStore: AuthorContextStore,
     entries: ConversationEntryStore,
     roster: RoomRoster,
+    modeDescription: string,
     charter: Charter,
     policy: HistoryPolicy,
     logger: Logger,
@@ -200,7 +200,7 @@ export class Room {
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
-    this.#criteria = roster.criteria
+    this.#modeDescription = modeDescription
   }
 
   specialists(): readonly RoleDefinition[] {
@@ -421,11 +421,11 @@ export class Room {
       draft,
       entries: existingEntries,
       policy: this.#policy,
+      modeDescription: this.#modeDescription,
     }
     const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
       ...shared,
       role,
-      criteria: this.#criteria.get(role.id),
       owesAnswer,
     })
 

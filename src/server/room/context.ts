@@ -16,11 +16,9 @@ export type ParticipantEvidence =
 
 export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
 
-export type SpecialistCriteria = Readonly<{ attendsTo: string; defect: string }>
-
 export type ContextInput = Readonly<{
   role: RoleDefinition
-  criteria: SpecialistCriteria | undefined
+  modeDescription: string
   owesAnswer: boolean
   message: string | undefined
   ask: AskContextInput | undefined
@@ -33,7 +31,7 @@ export type ContextInput = Readonly<{
 
 export type Context = Readonly<{
   role: RoleDefinition
-  criteria: SpecialistCriteria | undefined
+  modeDescription: string
   owesAnswer: boolean
   message: string | undefined
   ask: AskContextInput | undefined
@@ -62,7 +60,7 @@ function deriveHistory(entries: readonly ConversationEntry[] | undefined, policy
 function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
   return {
     role: input.role,
-    criteria: input.criteria,
+    modeDescription: input.modeDescription,
     owesAnswer: input.owesAnswer,
     message: input.message,
     ask: input.ask,
@@ -158,17 +156,12 @@ function section(heading: string, body: string | undefined): string {
   return `## ${heading}\n\n${body.trim()}\n\n`
 }
 
+function modeDescriptionText(context: Context): string {
+  return section('The form', context.modeDescription)
+}
+
 function roleText(context: Context): string {
-  const criteria = context.criteria
-  const body =
-    criteria === undefined
-      ? context.role.persona
-      : [
-          context.role.persona,
-          `At this scale you attend to: ${criteria.attendsTo}`,
-          `The defect you are alert to: ${criteria.defect}`,
-        ].join('\n\n')
-  return section('Your role', body)
+  return section('Your role', context.role.persona)
 }
 
 function historyText(history: readonly HistoryEntry[]): string {
@@ -193,6 +186,7 @@ function evidenceText(evidence: readonly ParticipantEvidence[]): string {
 
 export function renderPrompt(context: Context, charter: Charter): string {
   const parts = [
+    modeDescriptionText(context),
     roleText(context),
     section('What "no comment" means', charter.outcomes.noComment),
     section('What commentary means', charter.outcomes.commentary),

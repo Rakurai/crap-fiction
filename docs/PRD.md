@@ -48,20 +48,9 @@ importance earns prominence while it is being exercised.
 
 ## Flash mode
 
-Mode data. None of it is architectural, and a longer form answers each question differently.
-
-### Default cast
-
-| Specialist | Attends to | Treats as a defect |
-|---|---|---|
-| **Shape** | Entry point, the turn, the inevitability of the close | A middle presented as an ending; an entry that costs more than it buys |
-| **Reader Experience** | Implication, negative space, what is withheld and for how long | A revelation with no expectation to break; irony the reader cannot spend |
-| **Compression** | Word choice, omission, the last sentence | A sentence doing work an omission would do better; a figure that announces its own reveal |
-| **Interiority** | Character knowledge, want and need, what is felt but unsaid | Interiority asserted rather than implied; a want with no cost attached |
-
-Deliberately absent at this length: act structure, subplot, continuity across chapters,
-scene and sequel rhythm. No devil's-advocate role is assigned, because manufactured conflict
-is worse than agreement.
+Mode data. None of it is architectural, and a longer form answers each question differently. Mode
+data supplies a shared description of the form and scale, which every participant interprets through
+its own persona.
 
 ### Workflow emphasis
 
@@ -312,9 +301,8 @@ under version control.
 else is reachable until it is set, and it is never asked for again.
 
 **Choose the form** — *per piece*
-*Done when:* mode selection supplies the default cast and each specialist's criteria from
-data, and where one form is implemented the author is shown the form rather than asked to
-choose it.
+*Done when:* mode selection supplies the form's shared description from data, and where one
+form is implemented the author is shown the form rather than asked to choose it.
 
 **Know the models are alive** — *rare, glanceable*
 *Done when:* connection state and model identity are available without being part of the

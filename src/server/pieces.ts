@@ -9,7 +9,6 @@ import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { RoleDefinition } from './model/roles.js'
-import type { ModeDescriptor } from './modes.js'
 import {
   conversationActivity,
   deleteAppliedChange,
@@ -95,14 +94,19 @@ function uniquePieceId(existing: ReadonlySet<string>, title: string): string {
   return `${base}-${n}`
 }
 
-export async function createPiece(workspaceDir: string, title: string, mode: ModeDescriptor): Promise<PieceSummary> {
+export async function createPiece(
+  workspaceDir: string,
+  title: string,
+  modeId: string,
+  specialists: readonly RoleDefinition[],
+): Promise<PieceSummary> {
   const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
   await writePieceMetadata(workspaceDir, id, {
     title,
-    mode: mode.id,
+    mode: modeId,
     status: 'drafting',
-    cast: mode.cast.map((specialist) => specialist.id),
+    cast: specialists.map((role) => role.id),
   })
 
   return summarize(id, requirePiece(workspaceDir, id))

@@ -137,6 +137,13 @@ export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
   return parseShippedYaml(filePath, schema)
 }
 
+export function readShippedTextFile(filePath: string): string {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
+  return readFileSync(filePath, 'utf8').trim()
+}
+
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 
 function parseContentDocument<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { id: string; persona: string }> {

@@ -33,13 +33,14 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   const sites = callSites(roles)
   const draftWriter = new DraftWriter(new DraftStore())
   const modelAccess = makeModelAccess(env, logger)
-  const roster = resolveRoster(mode, roles)
+  const roster = resolveRoster(roles)
   const room = new Room(
     modelAccess,
     durableContextReader(env.dataRoot),
     authorContextStore(env.dataRoot),
     new ConversationEntryStore(),
     roster,
+    mode.description,
     charter,
     SHIPPED_HISTORY_POLICY,
     logger,

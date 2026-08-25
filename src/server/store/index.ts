@@ -14,10 +14,11 @@ import {
   fileNames,
   readContentDocuments,
   readJsonArtifact,
+  readShippedTextFile,
   readTextArtifact,
   readYamlArtifact,
-  readYamlDirectory,
   readYamlFile,
+  ShippedDataError,
   writeJsonArtifact,
   writeTextArtifact,
   writeYamlArtifact,
@@ -245,8 +246,19 @@ export async function deleteAppliedChange(workspaceDir: string, pieceId: string,
 
 const SHIPPED_ROOT = path.join(import.meta.dirname, '..')
 
-export function readShippedModes<T>(schema: z.ZodType<T>): readonly T[] {
-  return readYamlDirectory(path.join(SHIPPED_ROOT, 'modes'), schema)
+export function readShippedModes<T>(schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
+  const dir = path.join(SHIPPED_ROOT, 'modes')
+  const modeIds = directoryNames(dir)
+  if (modeIds.length === 0) {
+    throw new ShippedDataError(dir, '(directory)', 'no data found')
+  }
+
+  return modeIds.map((id) => {
+    const modeDir = path.join(dir, id)
+    const descriptor = readYamlFile(path.join(modeDir, 'mode.yaml'), schema)
+    const description = readShippedTextFile(path.join(modeDir, 'description.md'))
+    return { ...descriptor, description }
+  })
 }
 
 export function readShippedCharter<T>(schema: z.ZodType<T>): T {

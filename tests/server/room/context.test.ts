@@ -35,10 +35,11 @@ const compression: RoleDefinition = {
 
 const charter = CHARTER_FIXTURE
 const MANUSCRIPT = 'The cups sat where she left them.'
+const MODE_DESCRIPTION = 'A short piece read in one sitting.'
 
 function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition }): ContextInput {
   return {
-    criteria: undefined,
+    modeDescription: MODE_DESCRIPTION,
     owesAnswer: false,
     message: undefined,
     ask: undefined,
@@ -281,22 +282,11 @@ describe('rendering a prompt', () => {
     expect(renderPrompt(withNoComment, charter)).toContain('compression found nothing material in its discipline.')
   })
 
-  it("states the mode's criteria for this specialist beside its role description, and only the description where the mode names none", () => {
-    const withCriteria = compileSpecialistContext(
-      contextInput({
-        role: shape,
-        criteria: { attendsTo: 'Entry point, the turn, the inevitability of the close', defect: 'A middle presented as an ending' },
-      }),
-    )
-    const roleSection = sectionOf(renderPrompt(withCriteria, charter), 'Your role')
-    expect(roleSection).toContain(shape.persona)
-    expect(roleSection).toContain('Entry point, the turn, the inevitability of the close')
-    expect(roleSection).toContain('A middle presented as an ending')
-
-    const bare = renderPrompt(bareSpecialist, charter)
-    expect(bare).toContain(shape.persona)
-    expect(bare).not.toContain('you attend to')
-    expect(bare).not.toContain('defect')
+  it("states the mode's shared description of form and scale alongside the role's own persona", () => {
+    const compiled = compileSpecialistContext(contextInput({ role: shape }))
+    const prompt = renderPrompt(compiled, charter)
+    expect(sectionOf(prompt, 'The form')).toContain(MODE_DESCRIPTION)
+    expect(sectionOf(prompt, 'Your role')).toContain(shape.persona)
   })
 
   it('states that an answer is owed only when the call owes one', () => {

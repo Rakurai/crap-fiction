@@ -4,8 +4,8 @@ import type { ModeDescriptor } from '../../src/server/modes.js'
 
 export const MODE_FIXTURE: ModeDescriptor = {
   id: 'flash',
-  name: 'Flash',
-  cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }],
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
 }
 
 export const ROLES_FIXTURE: readonly RoleDefinition[] = [

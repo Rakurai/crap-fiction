@@ -16,8 +16,8 @@ import { buildTestApp } from '../../support/harness.js'
 
 const MODE: ModeDescriptor = {
   id: 'flash',
-  name: 'Flash',
-  cast: [{ id: 'shape', attendsTo: 'the shape of the piece', defect: 'a shapeless middle' }],
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
 }
 
 const ROLES: readonly RoleDefinition[] = [

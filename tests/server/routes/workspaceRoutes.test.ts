@@ -6,7 +6,7 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { buildTestApp } from '../../support/harness.js'
 
-const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
+const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
 const ROLES: readonly RoleDefinition[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist' },

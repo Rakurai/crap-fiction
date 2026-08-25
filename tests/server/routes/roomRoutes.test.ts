@@ -22,7 +22,7 @@ import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
  * the piece through the same route the author's studio watches it through.
  */
 
-const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
+const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
 
 const ROLES: readonly RoleDefinition[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast' },

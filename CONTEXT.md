@@ -46,8 +46,9 @@ story context, and conversations.
 
 ## Mode
 
-The form and scale of a piece, expressed as data rather than code. A mode supplies the
-default cast for a new piece and the criteria each specialist applies at that scale.
+The form and scale of a piece, expressed as data rather than code. A mode supplies a shared
+description of that form and scale, which every participant interprets through its own
+persona.
 
 ## Draft
 

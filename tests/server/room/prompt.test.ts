@@ -17,7 +17,7 @@ describe('the prompt a specialist is called with', () => {
     const charter = loadCharter()
     const context = compileSpecialistContext({
       role: shape,
-      criteria: undefined,
+      modeDescription: 'A short piece read in one sitting.',
       owesAnswer: true,
       message: undefined,
       ask: undefined,

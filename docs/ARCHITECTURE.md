@@ -503,14 +503,14 @@ either.
 
 **This is the seam the central bet lives in.** Everything else in the orchestration is plumbing.
 
-A participant call is assembled from the participant's persona, the mode's criteria for that
-participant, the model configuration, and the selected context compilation policy — none of which is
+A participant call is assembled from the participant's persona, the mode's shared description of the
+form and scale, the model configuration, and the selected context compilation policy — none of which is
 an intrinsic property of the participant.
 
-**The mode's criteria are part of that because they are what make the specialists differ at this
-scale.** A compilation that dropped what a specialist attends to and the defect it is alert to would
-separate four participants by persona alone, which is not the room the bet describes. The Story Editor
-has no such criteria, being no part of the cast, and is told what it is for by its own persona instead.
+**The mode's description is part of that because every participant answers to the same form.** It
+states nothing about any one participant's responsibility; each interprets what the form implies
+through its own persona, so the Story Editor receives the same description as every specialist and
+applies it through a different persona rather than being exempted from it.
 
 **Compilation is a pure function**, so the invariant is asserted against the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
@@ -834,8 +834,8 @@ cast and is not togglable, so it is reported as its own thing rather than as a c
 and it is reported rather than left to the client to infer as *the participant that is not in the cast*,
 which is a rule about the room's composition and belongs to the server that resolves the roster.
 
-**Creating a piece makes no model call.** It writes the piece directory and enables the mode's default
-cast, so a piece is creatable and writable with the runtime not even running.
+**Creating a piece makes no model call.** It writes the piece directory and enables every cast-eligible
+participant by default, so a piece is creatable and writable with the runtime not even running.
 
 **Every model operation receives the manuscript as it currently stands**, carried in the request that
 starts it. The draft file remains the sole durable representation of the manuscript, and the room never

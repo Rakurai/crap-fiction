@@ -85,7 +85,7 @@ export function createApp(
 
   app.post('/pieces', body(postPieceSchema), async (c) => {
     const { title } = c.req.valid('json')
-    const piece = await createPiece(workspace.require(), title, mode)
+    const piece = await createPiece(workspace.require(), title, mode.id, room.specialists())
     return c.json(ok(piece))
   })
 

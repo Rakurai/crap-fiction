@@ -126,7 +126,7 @@ One compilation per kind of call, each returning the whole of what its prompt is
 
 | Compilation | What it is additionally given |
 |---|---|
-| a specialist | its role, the mode's criteria for it, whether it owes an answer, and the dispatch's input |
+| a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
 | an application | the recommendation and the author's constraint |
 | a context capture | nothing beyond the shared input |
@@ -137,8 +137,8 @@ stricter independence and is the whole of the difference between them; the other
 conversation whole and have no policy.
 
 The two participant compilations return one type. The other two return their own, because a call that
-is not a participant has no role, no criteria and no owed answer, and a shape carrying those as absent
-would invite something to read them.
+is not a participant has no role, no mode description and no owed answer, and a shape carrying those
+as absent would invite something to read them.
 
 ## Persisted artifacts
 
@@ -163,8 +163,9 @@ change file are machinery, and nothing invites an edit to them.
 
 Shipped data — the participant charter, every participant, and the mode descriptors — travels with the
 application and not under the data root. The charter and the mode descriptors sit beside the
-application's own source; every participant is one Markdown document under a content root resolved
-once at startup, and its filename is its id.
+application's own source, each mode paired with a sibling document describing its form and scale;
+every participant is one Markdown document under a content root resolved once at startup, and its
+filename is its id.
 
 The **charter** is what every participant is told whichever one it is: what the three outcomes mean and
 what makes a recommendation applicable rather than commentary, that a direct question is owed an answer,
@@ -176,6 +177,9 @@ display name of more than one word cannot be recovered from a message — and tw
 **description**, read by the author assigning it a model, and a **persona**, briefing the model with the
 participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
 or `addressed-only`.
+
+A **mode** carries its `id` and its `displayName`, and names no participant. Its sibling document
+carries the shared **description** of its form and scale that every participant call receives.
 
 ## Process environment
 
