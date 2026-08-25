@@ -6,13 +6,6 @@ import type { Charter } from '../model/charter.js'
 import type { PromptFragments } from '../model/prompts.js'
 import type { CallResult, ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
-import {
-  captureResultSchema,
-  type CaptureApproveOutcome,
-  type CaptureDestination,
-  type CaptureProposal,
-} from '../../shared/captureProposal.js'
-import type { CaptureSnapshot } from '../../shared/captureViews.js'
 import type {
   ApplicationEntry,
   AuthorMessageEntry,
@@ -28,37 +21,24 @@ import {
   type EntryAppendedEvent,
   type ParticipantActivityEvent,
 } from '../../shared/conversationEvents.js'
-import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
-import {
-  ConversationEntryStore,
-  readConversationEntries,
-  readPiece,
-  readStoryContext,
-  TolerantReadError,
-  writeAppliedChange,
-  writePieceCast,
-  writeStoryContext,
-} from '../store/index.js'
+import { ConversationEntryStore, readConversationEntries, readPiece, TolerantReadError, writeAppliedChange, writePieceCast } from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
-import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
 import {
   assertSpecialistIndependence,
   compileApplyContext,
-  compileCaptureContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
-  renderCapturePrompt,
   renderPrompt,
   type ContextInput,
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
 import { WORKED_SURFACE } from '../../shared/surfaces.js'
-import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
+import type { CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
@@ -142,13 +122,6 @@ type ActiveApply = {
   readonly startedAt: number
 }
 
-type ActiveCapture = {
-  readonly pieceId: string
-  readonly conversationId: string
-  readonly controller: AbortController
-  readonly openedAt: number
-}
-
 type ActiveOperation = RunningDispatch | ActiveApply
 
 type DispatchPlan = Readonly<{
@@ -175,7 +148,6 @@ function findResponse(
 export class Room {
   readonly #modelAccess: ModelAccess
   readonly #readDurableContext: ReadDurableContext
-  readonly #authorContextStore: AuthorContextStore
   readonly #entries: ConversationEntryStore
   readonly #logger: Logger
   readonly #now: Clock
@@ -188,13 +160,11 @@ export class Room {
   readonly #modeDescriptions: ReadonlyMap<string, string>
   readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
-  readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
 
   constructor(
     modelAccess: ModelAccess,
     readDurableContext: ReadDurableContext,
-    authorContextStore: AuthorContextStore,
     entries: ConversationEntryStore,
     roster: RoomRoster,
     modes: readonly ModeDescriptor[],
@@ -206,7 +176,6 @@ export class Room {
   ) {
     this.#modelAccess = modelAccess
     this.#readDurableContext = readDurableContext
-    this.#authorContextStore = authorContextStore
     this.#entries = entries
     this.#logger = logger
     this.#now = now
@@ -270,11 +239,6 @@ export class Room {
       states: Object.fromEntries(operation.states),
       startedAt: operation.startedAt,
     }
-  }
-
-  captureSnapshot(pieceId: string): CaptureSnapshot | undefined {
-    const capture = this.#captures.get(pieceId)
-    return capture === undefined ? undefined : { conversationId: capture.conversationId, openedAt: capture.openedAt }
   }
 
   settlement(pieceId: string): Promise<void> | undefined {
@@ -600,77 +564,5 @@ export class Room {
     } finally {
       if (this.#operation?.actionId === actionId) this.#operation = undefined
     }
-  }
-
-  async capture(
-    workspaceDir: string,
-    pieceId: string,
-    conversationId: string,
-    draft: string,
-  ): Promise<CallResult<{ proposals: readonly CaptureProposal[] }>> {
-    if (this.#captures.has(pieceId)) throw new RoomBusyError(pieceId)
-
-    const piece = readPiece(workspaceDir, pieceId)
-    if (piece === undefined) throw new PieceNotFoundError(pieceId)
-
-    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries
-    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
-
-    const controller = new AbortController()
-    this.#captures.set(pieceId, { pieceId, conversationId, controller, openedAt: this.#now() })
-
-    try {
-      const context = compileCaptureContext({
-        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
-        authorContext: durableContext.authorContext,
-        storyContext: durableContext.storyContext,
-        draft,
-        surface: WORKED_SURFACE,
-        entries,
-        participants: this.#displayNames,
-      })
-      const prompt = renderCapturePrompt(context, this.#fragments)
-      const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
-      if (result.outcome !== 'value') return result
-
-      return { outcome: 'value', value: { proposals: toCaptureProposals(result.value.proposals) } }
-    } finally {
-      this.#captures.delete(pieceId)
-    }
-  }
-
-  async approveCapture(workspaceDir: string, pieceId: string, approved: readonly CaptureProposal[]): Promise<CaptureApproveOutcome> {
-    const piece = readPiece(workspaceDir, pieceId)
-    if (piece === undefined) throw new PieceNotFoundError(pieceId)
-
-    const byDestination = new Map<CaptureDestination, CaptureProposal[]>()
-    for (const proposal of approved) {
-      const forDestination = byDestination.get(proposal.destination)
-      if (forDestination === undefined) byDestination.set(proposal.destination, [proposal])
-      else forDestination.push(proposal)
-    }
-
-    const written: CaptureDestination[] = []
-    const failures: { destination: CaptureDestination; message: string }[] = []
-
-    for (const destination of ['authorContext', 'storyContext'] as const) {
-      const proposals = byDestination.get(destination)
-      if (proposals === undefined) continue
-
-      try {
-        if (destination === 'authorContext') {
-          const next = applyProposals(this.#authorContextStore.read(), proposals)
-          await this.#authorContextStore.write(next)
-        } else {
-          const current: DurableContext = readStoryContext(workspaceDir, pieceId, durableContextSchema) ?? {}
-          await writeStoryContext(workspaceDir, pieceId, applyProposals(current, proposals))
-        }
-        written.push(destination)
-      } catch (err) {
-        failures.push({ destination, message: err instanceof Error ? err.message : 'the write failed' })
-      }
-    }
-
-    return { written, failures }
   }
 }

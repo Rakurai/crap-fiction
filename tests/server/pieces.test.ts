@@ -90,7 +90,7 @@ describe('pieces', () => {
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
     const piece = await createPiece(workspaceDir, 'A Long Way', epic.id, [flash, epic], specialists)
     expect(piece.mode).toBe('epic')
-    expect(getPiece(workspaceDir, piece.id, null, null, specialists, storyEditor).mode).toBe('epic')
+    expect(getPiece(workspaceDir, piece.id, null, specialists, storyEditor).mode).toBe('epic')
 
     await expect(createPiece(workspaceDir, 'Nope', 'novella', [flash, epic], specialists)).rejects.toThrowError(UnknownModeError)
   })
@@ -135,7 +135,7 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    const opened = getPiece(workspaceDir, created.id, null, null, specialists, storyEditor)
+    const opened = getPiece(workspaceDir, created.id, null, specialists, storyEditor)
     expect(opened).toEqual({
       ...created,
       draft: '',
@@ -143,7 +143,6 @@ describe('pieces', () => {
       currentConversationId: null,
       conversations: [],
       conversationActionInFlight: null,
-      captureInFlight: null,
       cast: [
         { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
         { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
@@ -161,7 +160,7 @@ describe('pieces', () => {
       'utf8',
     )
 
-    const opened = getPiece(workspaceDir, created.id, null, null, specialists, storyEditor)
+    const opened = getPiece(workspaceDir, created.id, null, specialists, storyEditor)
     expect(opened.draft).toBe('Two small words.')
     expect(opened.storyContext).toEqual({
       Premise: ['two cups, one left behind'],
@@ -176,7 +175,7 @@ describe('pieces', () => {
    */
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
-      expect(() => getPiece(workspaceDir, id, null, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
+      expect(() => getPiece(workspaceDir, id, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
       await expect(setPieceCast(workspaceDir, id, specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
       await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
@@ -204,7 +203,7 @@ describe('setPieceCast', () => {
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, null, specialists, storyEditor).cast).toEqual(disabled)
+    expect(getPiece(workspaceDir, created.id, null, specialists, storyEditor).cast).toEqual(disabled)
 
     const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
@@ -236,7 +235,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(workspaceDir, 'cups', null, null, specialists, storyEditor).title).toBe('The Cups')
+    expect(getPiece(workspaceDir, 'cups', null, specialists, storyEditor).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {

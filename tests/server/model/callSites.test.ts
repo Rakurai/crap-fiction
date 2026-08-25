@@ -13,17 +13,16 @@ describe('callSites', () => {
    * somebody in the room and is addressed by one, while an operation is a place a model is called
    * from and has none. Both say what the model there is for, because both are chosen the same way.
    */
-  it('lists every participant by its handle, followed by the two operation call sites, each of which says what it is for', () => {
+  it('lists every participant by its handle, followed by the operation call site, which says what it is for', () => {
     const sites = callSites(roles)
 
-    expect(sites.map((site) => site.site)).toEqual(['shape', 'story-editor', 'apply', 'capture'])
+    expect(sites.map((site) => site.site)).toEqual(['shape', 'story-editor', 'apply'])
     expect(sites.find((site) => site.site === 'shape')).toMatchObject({ handle: 'shape', displayName: 'Shape', description: 'x' })
 
     const apply = sites.find((site) => site.site === 'apply')
     expect(apply?.handle).toBeNull()
     expect(apply?.displayName).toBe('Apply')
     expect(apply?.description).toMatch(/manuscript/)
-    expect(sites.find((site) => site.site === 'capture')?.description).toMatch(/manuscript/)
   })
 
   it('fails when a participant id collides with an operation call site', () => {

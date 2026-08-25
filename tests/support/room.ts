@@ -6,7 +6,7 @@ import type { ModelAccess } from '../../src/server/model/types.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { HistoryPolicy } from '../../src/server/room/context.js'
-import { authorContextStore, durableContextReader } from '../../src/server/room/durableContext.js'
+import { durableContextReader } from '../../src/server/room/durableContext.js'
 import { Room } from '../../src/server/room/room.js'
 import { resolveRoster } from '../../src/server/room/roster.js'
 import { ConversationEntryStore } from '../../src/server/store/index.js'
@@ -26,7 +26,6 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
   return new Room(
     spec.modelAccess,
     durableContextReader(dataRoot),
-    authorContextStore(dataRoot),
     new ConversationEntryStore(),
     resolveRoster(spec.roles),
     spec.modes,

@@ -28,20 +28,4 @@ export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
   interiority: commentary('a reading from the fixture model implementation'),
   'story-editor': commentary('an answer from the fixture model implementation'),
   apply: { result: { outcome: 'value', value: { manuscript: APPLIED_MANUSCRIPT } }, delayMs: 4 * CALL_MS },
-  capture: {
-    result: {
-      outcome: 'value',
-      value: {
-        proposals: [
-          {
-            destination: 'storyContext',
-            section: 'Places',
-            operation: 'add',
-            text: 'The harbour is east of the house, so the morning light arrives over the water.',
-          },
-        ],
-      },
-    },
-    delayMs: CALL_MS,
-  },
 }

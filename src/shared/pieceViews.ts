@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { captureSnapshotSchema } from './captureViews.js'
 import { conversationSummarySchema } from './conversationEntries.js'
 import { conversationActivitySnapshotSchema } from './conversationEvents.js'
 import { durableContextSchema } from './durableContext.js'
@@ -47,7 +46,6 @@ export const pieceDetailSchema = pieceSummaryShape
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
     conversationActionInFlight: conversationActivitySnapshotSchema.nullable(),
-    captureInFlight: captureSnapshotSchema.nullable(),
     cast: z.array(castMemberViewSchema).readonly(),
     storyEditor: storyEditorViewSchema,
   })

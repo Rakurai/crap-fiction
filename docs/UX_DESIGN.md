@@ -193,24 +193,20 @@ have to compose.
 ## An operation in flight
 
 A conversation action — sending a message, replying to a response, or asking one for a concrete
-change — an application, and capturing context each take real model time. A conversation action and
-an application cannot overlap each other. Capturing context is independent of both.
+change — and an application each take real model time, and cannot overlap each other.
 
 **Controls that would start a second conversation action or application are disabled while one
 runs.** Nothing queues, warns, or asks the author to choose between the operation they started and
-the one they are starting, because the state that would need explaining is unreachable. Capture's
-own control is never part of that exclusion in either direction.
+the one they are starting, because the state that would need explaining is unreachable.
 
 **Abandoning is available for as long as an operation is in flight**, and is not offered once it
 has produced its result — a response that landed is not one the author is abandoning.
 
-**A conversation action, an application and a capture do not share one register for work under
-way.** During a conversation action and during a capture the prose is fully editable and a live
-cursor stays in it. During an application the prose is visibly read-only, and reads as the
-manuscript being held for a moment rather than as the application being busy. One undifferentiated
-*something is happening* treatment would tell the author to stop typing when they do not have to,
-and would collapse a conversation action and a capture running together into a single busy signal
-neither of them alone produced.
+**A conversation action and an application do not share one register for work under way.** During a
+conversation action the prose is fully editable and a live cursor stays in it. During an application
+the prose is visibly read-only, and reads as the manuscript being held for a moment rather than as
+the application being busy. One undifferentiated *something is happening* treatment would tell the
+author to stop typing when they do not have to.
 
 **A locked manuscript is accounted for by the response being applied**, so what the author cannot
 type into is explained by something they just did. That accounting names the participant even where
@@ -261,19 +257,6 @@ beside the time. Nothing is ever recognizable by the room's words standing in fo
 having been written against earlier prose, nothing warns that the manuscript has moved on, and
 nothing offers to reconcile them.
 
-## Capture context
-
-**One action starts it, and it is always the author's.** Nothing suggests it, prompts for it,
-or runs it on a schedule.
-
-**The proposals arrive in a temporary review surface** that leaves the manuscript in place —
-a short list of granular changes, each stating what it would change and which durable context
-it belongs to, each approved or ignored on its own. Approving is per proposal and ignoring is
-the default: closing the review writes only what was approved.
-
-**The review is where the distinction between the two contexts is visible**, because the
-destination is the consequential part of a proposal.
-
 ## Registers
 
 Kinds of text are on screen and the author must feel which is which without thinking about it:
@@ -297,9 +280,7 @@ Derived from how often the author does each thing.
 response.
 
 **One action away** — the reading view; the Markdown view; choosing or starting a
-conversation; editing the room; capture context.
-
-**Owns the screen while it is being exercised, then gone** — reviewing context proposals.
+conversation; editing the room.
 
 **A place the author goes** — model assignment, the workspace, other pieces, the interface theme.
 

@@ -12,7 +12,7 @@ import { buildTestRoom } from '../../support/room.js'
 import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
- * What the room does with a dispatch, an application or a capture belongs to
+ * What the room does with a dispatch or an application belongs to
  * `room/room.test.ts`. These tests own the adapter over it: the act each request body
  * names, the outcome each answer is translated to, the in-flight views a reload reads,
  * and the envelope each stated refusal arrives in.
@@ -181,52 +181,9 @@ describe('the room over HTTP', () => {
     expect(entries.find((entry) => entry.kind === 'application')).toMatchObject({ responseId, changeId: applied.change.id, change: applied.change.content })
   })
 
-  it('reports a capture in flight beside a conversation that has none, and answers with the proposals the call made, each given an identity', async () => {
-    const { app, modelAccess } = await withPiece({
-      capture: {
-        result: {
-          outcome: 'value',
-          value: { proposals: [{ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }] },
-        },
-        held: true,
-      },
-    })
-
-    const capturing = app.request('/pieces/cups/capture', {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ conversationId: 'c1', draft: 'The cups sat where she left them.' }),
-    })
-    await new Promise((resolve) => setImmediate(resolve))
-
-    const watching = (await piece(app)).data
-    expect(watching.conversationActionInFlight).toBeNull()
-    expect(watching.captureInFlight).toMatchObject({ conversationId: 'c1' })
-
-    modelAccess.release('capture')
-    const { data } = await (await capturing).json()
-
-    expect(data.outcome).toBe('captured')
-    expect(data.proposals).toHaveLength(1)
-    expect(data.proposals[0]).toMatchObject({ id: expect.any(String), destination: 'storyContext', section: 'Premise', text: 'two cups, one left behind' })
-    expect((await piece(app)).data.captureInFlight).toBeNull()
-  })
-
-  /** The two acts that reach no model at all, and so answer within the request that opened them. */
-  it('reports which destinations the approved proposals landed in, and accepts abandoning an action nothing is running without complaint', async () => {
+  /** The act that reaches no model at all, and so answers within the request that opened it. */
+  it('accepts abandoning an action nothing is running without complaint', async () => {
     const { app } = await withPiece({})
-
-    const approved = await app.request('/pieces/cups/capture/approve', {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({
-        approved: [{ id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' }],
-      }),
-    })
-
-    expect(approved.status).toBe(200)
-    expect(await approved.json()).toMatchObject({ success: true, data: { written: ['storyContext'], failures: [] } })
-    expect((await piece(app)).data.storyContext).toEqual({ Premise: ['two cups, one left behind'] })
 
     const abandoned = await app.request('/pieces/cups/conversations/c1/actions/no-such-action/abandon', { method: 'POST' })
 

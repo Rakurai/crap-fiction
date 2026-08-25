@@ -184,13 +184,13 @@ participant the model layer has not reported on, the author can keep writing thr
 response is rendered before it is complete.
 
 **Stop waiting** — *per session*
-*Done when:* abandoning is available for as long as any model operation is in flight — a dispatch,
-an application, a context capture — targets the specific operation the author is looking at rather
-than whichever the room happens to be running, cancels the call in flight and makes none of the
-calls the operation had not reached, leaves responses that landed in the conversation, returns
-control the moment abandonment is accepted rather than once the cancelled call finishes unwinding,
-holds nothing of the prose beyond the operation the author asked for, and a model that never answers
-resolves itself without the author having to act.
+*Done when:* abandoning is available for as long as any model operation is in flight — a dispatch or
+an application — targets the specific operation the author is looking at rather than whichever the
+room happens to be running, cancels the call in flight and makes none of the calls the operation had
+not reached, leaves responses that landed in the conversation, returns control the moment
+abandonment is accepted rather than once the cancelled call finishes unwinding, holds nothing of the
+prose beyond the operation the author asked for, and a model that never answers resolves itself
+without the author having to act.
 
 **Handle a bad response as housekeeping** — *per session*
 A response is incoherent, misreads the story, or the call failed outright. Local models do
@@ -364,7 +364,7 @@ software has no need for and therefore does not have.
 readings of structure, if actual use earns them.
 
 **Richer context management.** A dedicated editing surface for author and story context, if
-hand-editing plus context capture proves insufficient.
+hand-editing proves insufficient.
 
 **Locating an applied change in the prose.** A transient jump-to or highlight affordance for
 finding what an application changed in a longer manuscript, if the before-and-after shown with

@@ -3,7 +3,6 @@ import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
-import { captureProposalSchema } from '../shared/captureProposal.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
 import { themeSchema } from '../shared/theme.js'
@@ -29,7 +28,7 @@ import {
   updatePiece,
 } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
-import { applyOutcome, captureOutcome } from './room/outcomes.js'
+import { applyOutcome } from './room/outcomes.js'
 import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
@@ -46,8 +45,6 @@ const postApplySchema = z.object({
   constraint: z.string().min(1).optional(),
   draft: z.string(),
 })
-const postCaptureSchema = z.object({ conversationId: z.string().min(1), draft: z.string() })
-const postCaptureApproveSchema = z.object({ approved: z.array(captureProposalSchema) })
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
@@ -96,7 +93,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -105,7 +102,7 @@ export function createApp(
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
@@ -137,18 +134,6 @@ export function createApp(
     const { responseId, constraint, draft } = c.req.valid('json')
     const { actionId, result } = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), responseId, constraint, draft)
     return c.json(ok(applyOutcome(actionId, result)))
-  })
-
-  app.post('/pieces/:id/capture', body(postCaptureSchema), async (c) => {
-    const { conversationId, draft } = c.req.valid('json')
-    const result = await room.capture(workspace.require(), c.req.param('id'), conversationId, draft)
-    return c.json(ok(captureOutcome(result)))
-  })
-
-  app.post('/pieces/:id/capture/approve', body(postCaptureApproveSchema), async (c) => {
-    const { approved } = c.req.valid('json')
-    const outcome = await room.approveCapture(workspace.require(), c.req.param('id'), approved)
-    return c.json(ok(outcome))
   })
 
   app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {

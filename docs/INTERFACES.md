@@ -43,9 +43,8 @@ GET    /pieces                                     title, mode, status, length, 
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the room (the cast and the Story Editor), the
-                                                   conversation action in flight if there is one,
-                                                   and whether a capture is
+                                                   the room (the cast and the Story Editor), and the
+                                                   conversation action in flight if there is one
 PATCH  /pieces/:id                                 title, status, enabled cast
 PUT    /pieces/:id/draft
 GET    /pieces/:id/conversations/:cid              the durable entries, each application joined to
@@ -57,10 +56,7 @@ POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a targe
 POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
 POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
                                                    targets that action by identity, so a request
-                                                   naming one already finished touches nothing;
-                                                   never a capture
-POST   /pieces/:id/capture                         returns proposals
-POST   /pieces/:id/capture/approve                 writes the approved proposals
+                                                   naming one already finished touches nothing
 GET    /pieces/:id/events                          the event stream
 GET    /workspace                                  the configured directory, or that there is none
 PUT    /workspace                                  the directory the author chose
@@ -137,16 +133,15 @@ One compilation per kind of call, each returning the whole of what its prompt is
 | a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
 | an application | the recommendation and the author's constraint |
-| a context capture | nothing beyond the shared input |
 
 Every kind receives both durable contexts, the current draft whole, the surface it is compiling for, and
 the conversation's entries. A participant compilation also receives the history policy, which selects
 between shared history and stricter independence and is the whole of the difference between them; the
-other two kinds read the conversation whole and have no policy.
+application compilation reads the conversation whole and has no policy.
 
-The two participant compilations return one type. The other two return their own, because a call that
-is not a participant has no role, no mode description and no owed answer, and a shape carrying those
-as absent would invite something to read them.
+The two participant compilations return one type. The application compilation returns its own, because a
+call that is not a participant has no role, no mode description and no owed answer, and a shape carrying
+those as absent would invite something to read them.
 
 ## Persisted artifacts
 

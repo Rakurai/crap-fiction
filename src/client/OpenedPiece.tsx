@@ -3,25 +3,14 @@ import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation, type HandleEntry } from './Conversation.js'
-import { ContextReview } from './ContextReview.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
 import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
 import { RoomEditor } from './RoomEditor.js'
-import {
-  abandonOperation,
-  applyRecommendation,
-  approveCapture,
-  captureContext,
-  createConversation,
-  dispatch,
-  fetchConversation,
-  subscribeToRoom,
-} from './roomClient.js'
+import { abandonOperation, applyRecommendation, createConversation, dispatch, fetchConversation, subscribeToRoom } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
-import { useCapture } from './useCapture.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
 import { useRoster } from './useRoster.js'
@@ -74,13 +63,12 @@ function Surfaces({
   const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
-  const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
+  const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
   const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
   // Keyed on this rather than on `activeConversationId`, which `Conversation` reports back when it
   // mints one on a first dispatch: remounting on that report would tear the dispatch down mid-flight.
   const [session, setSession] = useState(0)
-  const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
   const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
 
   const addressable: readonly HandleEntry[] = [
@@ -117,10 +105,6 @@ function Surfaces({
         onOpenConversations={() => {
           conversations.onRefresh()
           setPanel('conversations')
-        }}
-        onOpenCapture={() => {
-          setPanel('capture')
-          if (!capture.capturing && capture.proposals.length === 0) capture.capture()
         }}
         lifecycle={lifecycle}
         applying={applying}
@@ -175,19 +159,6 @@ function Surfaces({
           }}
           onDelete={deleteConversation}
           onClose={() => setPanel('none')}
-        />
-      )}
-      {panel === 'capture' && (
-        <ContextReview
-          proposals={capture.proposals}
-          approved={capture.approved}
-          closing={capture.closing}
-          error={capture.error}
-          onToggle={capture.toggle}
-          onClose={() => {
-            capture.close()
-            setPanel('none')
-          }}
         />
       )}
       {room.error !== undefined && (

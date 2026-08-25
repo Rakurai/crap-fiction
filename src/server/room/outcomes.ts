@@ -1,7 +1,5 @@
 import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { ApplyOutcome } from '../../shared/applyViews.js'
-import type { CaptureProposal } from '../../shared/captureProposal.js'
-import type { CaptureOutcome } from '../../shared/captureViews.js'
 import type { CallResult } from '../model/types.js'
 
 /**
@@ -11,8 +9,6 @@ import type { CallResult } from '../model/types.js'
  */
 
 export type ApplyResult = CallResult<{ manuscript: string; change: AppliedChange | undefined; entryId: string | undefined }>
-
-export type CaptureResult = CallResult<{ proposals: readonly CaptureProposal[] }>
 
 export function applyOutcome(actionId: string, result: ApplyResult): ApplyOutcome {
   if (result.outcome === 'value') {
@@ -26,10 +22,4 @@ export function applyOutcome(actionId: string, result: ApplyResult): ApplyOutcom
   }
   if (result.outcome === 'abandoned') return { outcome: 'abandoned', actionId }
   return { outcome: 'failed', actionId, reason: result.reason, returned: result.returned }
-}
-
-export function captureOutcome(result: CaptureResult): CaptureOutcome {
-  if (result.outcome === 'value') return { outcome: 'captured', proposals: [...result.value.proposals] }
-  if (result.outcome === 'abandoned') return { outcome: 'abandoned' }
-  return { outcome: 'failed', reason: result.reason, returned: result.returned }
 }

@@ -55,8 +55,8 @@ export type SectionName =
   | 'constraint'
 
 export type LineName = 'historyMessage' | 'historyResponse' | 'readingSubstantive' | 'readingNoComment'
-export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply' | 'capture'
-export type OperationRoleName = 'apply' | 'capture'
+export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
+export type OperationRoleName = 'apply'
 
 const SECTION_NAMES: readonly SectionName[] = [
   'charter',
@@ -74,8 +74,8 @@ const SECTION_NAMES: readonly SectionName[] = [
   'constraint',
 ]
 const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'readingSubstantive', 'readingNoComment']
-const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply', 'capture']
-const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply', 'capture']
+const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply']
+const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply']
 
 export type PromptFragments = Readonly<{
   sections: Readonly<Record<SectionName, Fragment>>

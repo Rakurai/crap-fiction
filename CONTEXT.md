@@ -223,21 +223,6 @@ additional instruction. *Keep the opening image intact.*
 An ordinary message that asks the room to evaluate the current prose in light of a change just
 made. A convenience for something the author could type; not a distinct mode of reasoning.
 
-## Capture context
-
-An author-invoked analysis that proposes changes to the durable contexts, reading the
-current draft, the current conversation, and both existing contexts.
-
-It produces **proposals**: granular, individually approvable changes, each identifying
-whether it belongs to story context or author context. A proposal may add, revise, replace a
-statement that no longer holds, or remove something no longer true. The question it answers
-is what should change, not what was mentioned.
-
-The threshold differs by destination. Story context is appropriate where information appears
-settled or intentionally preserved about this piece. Author context requires substantially
-stronger evidence that a preference generalizes beyond it, so author-context proposals are
-rare.
-
 ## Durable state
 
 Everything the application keeps: author context, and per piece its metadata, draft, story

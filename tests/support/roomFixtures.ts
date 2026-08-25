@@ -67,11 +67,9 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     generalist: fixedFragment('tasks/generalist', 'FIXTURE_GENERALIST_TASK'),
     concreteChange: fixedFragment('tasks/concreteChange', 'FIXTURE_CONCRETE_CHANGE_TASK'),
     apply: fixedFragment('tasks/apply', 'FIXTURE_APPLY_TASK'),
-    capture: fixedFragment('tasks/capture', 'FIXTURE_CAPTURE_TASK'),
   },
   roles: {
     apply: fixedFragment('roles/apply', 'FIXTURE_APPLY_ROLE'),
-    capture: fixedFragment('roles/capture', 'FIXTURE_CAPTURE_ROLE'),
   },
   surfaces: {
     draft: fixedFragment('surfaces/draft', 'FIXTURE_DRAFT_SURFACE'),

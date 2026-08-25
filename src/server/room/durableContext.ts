@@ -1,5 +1,5 @@
 import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
-import { readAuthorContext, readStoryContext, writeAuthorContext } from '../store/index.js'
+import { readAuthorContext, readStoryContext } from '../store/index.js'
 
 export type CompiledDurableContext = Readonly<{
   authorContext: string | undefined
@@ -23,16 +23,4 @@ export function durableContextReader(dataRoot: string): ReadDurableContext {
     authorContext: renderDurableContext(readAuthorContext(dataRoot, durableContextSchema)),
     storyContext: renderDurableContext(readStoryContext(workspaceDir, pieceId, durableContextSchema)),
   })
-}
-
-export type AuthorContextStore = Readonly<{
-  read: () => DurableContext
-  write: (context: DurableContext) => Promise<void>
-}>
-
-export function authorContextStore(dataRoot: string): AuthorContextStore {
-  return {
-    read: () => readAuthorContext(dataRoot, durableContextSchema) ?? {},
-    write: (context) => writeAuthorContext(dataRoot, context),
-  }
 }

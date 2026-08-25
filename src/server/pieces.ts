@@ -1,7 +1,6 @@
 import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
-import type { CaptureSnapshot } from '../shared/captureViews.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
 import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
@@ -134,7 +133,6 @@ export function getPiece(
   workspaceDir: string,
   id: string,
   conversationActionInFlight: ConversationActivitySnapshot | null,
-  captureInFlight: CaptureSnapshot | null,
   specialists: readonly RoleDefinition[],
   storyEditor: RoleDefinition,
 ): PieceDetail {
@@ -147,7 +145,6 @@ export function getPiece(
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     conversations: listConversations(workspaceDir, id),
     conversationActionInFlight,
-    captureInFlight,
     cast: castView(available, piece.metadata.cast),
     storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
   }

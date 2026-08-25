@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   assertSpecialistIndependence,
   compileApplyContext,
-  compileCaptureContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
-  renderCapturePrompt,
   renderPrompt,
   SpecialistIndependenceViolation,
   type ApplyContextInput,
-  type CaptureContextInput,
   type Context,
   type ContextInput,
   type HistoryPolicy,
@@ -74,19 +71,6 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: Ap
     storyContext: undefined,
     draft: 'text',
     surface: 'draft',
-    participants: PARTICIPANTS,
-    ...overrides,
-  }
-}
-
-function captureContextInput(overrides: Partial<CaptureContextInput> = {}): CaptureContextInput {
-  return {
-    modeDescription: MODE_DESCRIPTION,
-    authorContext: undefined,
-    storyContext: undefined,
-    draft: 'text',
-    surface: 'draft',
-    entries: undefined,
     participants: PARTICIPANTS,
     ...overrides,
   }
@@ -169,15 +153,6 @@ describe('compiling a context', () => {
       draft: MANUSCRIPT,
     })
 
-    const forCapture = compileCaptureContext(
-      captureContextInput({ authorContext: 'prefers short sentences', storyContext: 'a flash piece about a breakup', draft: MANUSCRIPT }),
-    )
-    expect(forCapture).toMatchObject({
-      authorContext: 'prefers short sentences',
-      storyContext: 'a flash piece about a breakup',
-      draft: MANUSCRIPT,
-    })
-
     const forSpecialist = compileSpecialistContext(
       contextInput({
         role: shape,
@@ -204,11 +179,8 @@ describe('compiling a context', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).constraint).toBeUndefined()
   })
 
-  it('an apply and a capture read the conversation whole, past any one response, and report none where there is none yet', () => {
+  it('an apply reads the conversation whole, past any one response, and reports none where there is none yet', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
-    expect(compileCaptureContext(captureContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
-
-    expect(compileCaptureContext(captureContextInput()).history).toEqual([])
     expect(compileSpecialistContext(contextInput({ role: shape, message: 'a message' })).history).toEqual([])
   })
 
@@ -261,7 +233,6 @@ describe('rendering a prompt', () => {
     expect(
       wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments)),
     ).toContain(MANUSCRIPT)
-    expect(wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput({ draft: MANUSCRIPT })), fragments))).toContain(MANUSCRIPT)
   })
 
   it('renders a line fragment once per supplied history entry, never collapsing or duplicating them', () => {
@@ -278,7 +249,7 @@ describe('rendering a prompt', () => {
 
     for (const prompt of [
       wholeOf(renderPrompt(compileSpecialistContext(contextInput({ role: shape, ...written })), fragments, charter)),
-      wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput(written)), fragments)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ ...written, entries: [] })), fragments)),
     ]) {
       expect(prompt).toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).toContain('prefers short sentences')
@@ -288,7 +259,7 @@ describe('rendering a prompt', () => {
 
     for (const prompt of [
       wholeOf(renderPrompt(bareSpecialist, fragments, charter)),
-      wholeOf(renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments)),
     ]) {
       expect(prompt).not.toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).not.toContain('FIXTURE_STORY_CONTEXT_HEADING')
@@ -306,14 +277,6 @@ describe('rendering a prompt', () => {
 
     const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
     expect(wholeOf(renderApplyPrompt(unconstrained, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
-  })
-
-  it('composes the mode description and the operation role into the durable half of a capture prompt, and its task into the per-call half', () => {
-    const { durable, perCall } = renderCapturePrompt(compileCaptureContext(captureContextInput()), fragments)
-
-    expect(durable).toContain(MODE_DESCRIPTION)
-    expect(durable).toContain('FIXTURE_CAPTURE_ROLE')
-    expect(perCall).toContain('FIXTURE_CAPTURE_TASK')
   })
 
   it("gives the story editor the dispatch's readings as their own section, a no-comment among them as an attributed craft finding rather than a tally, naming the participant by display name", () => {

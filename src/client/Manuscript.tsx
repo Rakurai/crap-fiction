@@ -24,7 +24,6 @@ type ManuscriptProps = {
   readonly autosave: AutosaveViewModel
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
-  readonly onOpenCapture: () => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName: string } | undefined
 }
@@ -72,7 +71,7 @@ function EditableTitle({ title, saving, onRetitle }: { readonly title: string; r
 /** How long the way out of the reading view stands after the author last moved the pointer. */
 const WAY_BACK_HOLDS_MS = 2400
 
-export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, onOpenCapture, lifecycle, applying }: ManuscriptProps) {
+export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, lifecycle, applying }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
   const [wayBackRevealed, setWayBackRevealed] = useState(false)
   const wayBackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -139,9 +138,6 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
             </button>
             <button type="button" className={styles.control} onClick={onOpenRoom}>
               room
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenCapture}>
-              capture context
             </button>
           </div>
         </div>

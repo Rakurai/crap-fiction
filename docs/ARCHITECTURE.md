@@ -275,8 +275,8 @@ leaves behind. A piece's modified time is its draft's, and a conversation's last
 entry's, so both are facts about the files rather than counters the application maintains.
 
 **Durable context and piece metadata are YAML; conversations are JSON.** The author hand-edits the
-first two, and context capture proposes changes against identified entries, so that format has to be
-readable and structured at once. A conversation is machinery the author does not edit.
+first two, so that format has to be readable and structured at once. A conversation is machinery
+the author does not edit.
 
 **A conversation is an ordered, append-only sequence of entries the conversation surface is rebuilt
 from.** Every entry after the first carries the identity of the entry that caused it rather than a
@@ -368,7 +368,7 @@ Nothing asks the author to confirm discarding anything, and the manuscript stays
 ## Model access
 
 **One narrow internal interface for every model call**, and every call in the product goes through
-it: a specialist's response, the Story Editor's response, an application, and context capture.
+it: a specialist's response, the Story Editor's response, and an application.
 
 **An interface is a ceiling, not a floor.** It states what this application needs, and every
 implementation owes that whether its runtime provides it or not. Defining the seam at what all
@@ -395,10 +395,10 @@ owes repair and re-issue.
 either, because a field the application can read is a field something eventually renders. Where the
 runtime emits reasoning as a distinct output segment this is structural rather than textual.
 
-**The call site is the whole of what the interface knows about the caller** — a participant, an
-application, or a capture — and it is how the assignment is found. The module never learns that a
-conversation, a dispatch, a participant's history or a manuscript exists, which is most of why
-replacing it is cheap.
+**The call site is the whole of what the interface knows about the caller** — a participant or an
+application — and it is how the assignment is found. The module never learns that a conversation, a
+dispatch, a participant's history or a manuscript exists, which is most of why replacing it is
+cheap.
 
 **Retry, timeout and model residency are policy inside the module, not parameters on a call.** A
 caller choosing a retry count is reasoning about model reliability, which is what the module exists
@@ -495,9 +495,8 @@ failure.
 **Schemas are as small as the call allows, because that is what makes constrained decoding hold.** A
 specialist's response is flat — its declared outcome, its claim, and its note — and a local model
 holds that reliably where it falls apart on a nested structure. The note is optional, so a claim
-standing alone conforms and nothing has to be invented to fill a field. Where a call would need a
-large schema, several small calls are the better shape, and context capture is the one such case.
-Shrinking the schema is always preferred to adding machinery that repairs what a larger one returned.
+standing alone conforms and nothing has to be invented to fill a field. Shrinking the schema is
+always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
 one, and so does the Story Editor on a dispatch where nothing substantive landed. Declaring it is then
@@ -594,23 +593,11 @@ idle
 
 Abandonment applies to `dispatching` and `applying`, returning to `idle` with whatever landed kept.
 
-**Context capture is a second, independent operation, with a state of its own:**
-
-```
-capture context ─→ capturing ─→ reviewing ─→ idle
-```
-
-`reviewing` holds capture proposals with nothing in flight, and approving writes context files without
-a model call. Capture may be entered while a dispatch or an Apply holds, and neither of those waits on
-a capture in flight either — the conversation-action state and capture's own state are refused
-independently, never against each other. Reading the piece reports both, so a client that reloaded
-knows what it is looking at without any new event.
-
 **The room holds the conversation-action state and refuses to start one unless it is idle.** The client
 disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
 because the guard on the manuscript has to be where the state is, not in the surface that draws the
 buttons. A refused start is a failure and is never a question put to the author — nothing asks which of
-two operations to keep. Capture is refused only by a capture already in flight for the same piece.
+two operations to keep.
 
 **Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the one
@@ -621,9 +608,7 @@ eventual settlement, which is what lets the room accept the next operation immed
 
 **Serialization is a simplification, not a principle.** Overlapping conversation actions would buy
 little wall-clock against capacity bounded by the loaded model while multiplying the states the
-interface has to compose, and nothing is built to make that concurrency impossible. Capture overlaps
-the other two anyway: gating a whole-story analysis the author invokes rarely on whatever the room
-happens to be doing would cost more in waiting than the shared capacity would ever save.
+interface has to compose, and nothing is built to make that concurrency impossible.
 
 ## Dispatch
 
@@ -781,29 +766,6 @@ against whatever the manuscript is at the moment it is applied, which is what ma
 recommendation applicable at all. **A failed application changes nothing** — no partial write, no
 half-applied manuscript, and the recommendation stays applicable.
 
-## Context capture
-
-**One author-triggered operation, independent of a dispatch or an application.** Its input is the draft,
-the current conversation whole, and both existing contexts, snapshotted as they stand when the author
-invokes it. The author keeps writing while it runs, and editing afterwards neither cancels it nor is
-reconciled against its proposals, which are advisory and individually approved.
-
-**One call is the normal case and is not a contract.** Where a single call would need a schema large
-enough to defeat constrained decoding, the operation may issue several sequential calls instead. Nothing
-in the interface encodes how many calls it took.
-
-**Only approved proposals are written**, as an ordinary atomic write to the destination context. Nothing
-is written on the author's behalf, and no proposal is retained after the review closes. Proposals exist
-for the life of the review and nowhere else, so a reload during it discards them and the author invokes
-the analysis again — which is cheaper than a durable queue of pending items, and is the one thing the
-product refuses to keep.
-
-**Each destination is its own write, and a review closes only once its writes have succeeded.** A review
-approving proposals against both contexts performs two writes with no transaction over them; where one
-fails, the review stays open with the failure stated and its proposals still approved, and retrying
-writes only the destination that failed. Otherwise the author closes a review believing they approved
-something that half exists.
-
 ## Transport
 
 **Server-sent events for conversation-action activity, plain POST for author actions.** One stream, for
@@ -840,18 +802,17 @@ required, and are worth adding only if a simpler approach demonstrably fails.
 **What the piece reports about an action in flight is what the surface needs in order to draw it**: which
 conversation action it is, its identifier, the entry that caused it, and for a dispatch the audience it
 resolved to and each participant's activity so far. Landed entries are not part of this report: they are
-already durable, and the client reads them from the conversation itself rather than waiting on it. A
-capture in flight is reported the same way but independently, since one of each can be true at once.
+already durable, and the client reads them from the conversation itself rather than waiting on it.
 
-**A dropped connection during an application or a capture is an ordinary failure.** Those results reach
+**A dropped connection during an application is an ordinary failure.** Those results reach
 the client on the response to the request that started them, so a connection that dropped lost the
 result: the state returns to what it was, the manuscript is editable, the recommendation stays applicable,
 and nothing reissues the call on the author's behalf. A local connection dropping is rare enough that a
 delivery mechanism built to survive it would cost more than the loss does.
 
 **One channel per thing that can fail, so nothing is reported twice.** A participant's failure rides its
-own appended entry. An application's failure and a capture failure belong to the responses of the requests
-that attempted them. A failed write belongs to the save path. Invalid shipped data is a startup failure
+own appended entry. An application's failure belongs to the response of the request
+that attempted it. A failed write belongs to the save path. Invalid shipped data is a startup failure
 and never a room event.
 
 **The HTTP surface is a thin adapter with no logic of its own** — every route maps to one call on the room
@@ -997,14 +958,12 @@ implementation against a temporary directory, and a second implementation with n
 be a premature seam asserting nothing. A **room** boundary owns the operations the author starts, which is
 already the client's contract, so tests and the client cross the same surface.
 
-**The room owns the dispatch, the application and the capture, but not as one shared operation.** A dispatch
+**The room owns the dispatch and the application, but not as one shared operation.** A dispatch
 and an application share one state machine and one abandonment path, and a module each would leave two
 shallow modules agreeing about state neither owns — the shape that produces an
-application starting during a dispatch it should have refused. Capture is a third path through the same room,
-sharing the model seam with both but owning its own snapshot, activity and completion independently of that
-state machine. Keeping all three behind one room rather than splitting it into as many modules is also what
-keeps every route a one-line adapter, since a route that decided whether an operation may start would be a
-route with a decision in it.
+application starting during a dispatch it should have refused. Keeping both behind one room rather than
+splitting it into two modules is also what keeps every route a one-line adapter, since a route that
+decided whether an operation may start would be a route with a decision in it.
 
 **The shared type surface between server and client is deliberately not a seam.** It is a real contract — it
 is what makes the server's response shapes and the client's expectations one set of types rather than two that
@@ -1013,7 +972,7 @@ and declaring it one would invite an adapter with nothing on the other side of i
 independence rather than substitutability: nothing in it may import from either side, which is a property of
 the import graph and is asserted there.
 
-Behind those, the dispatch loop, the application call, the capture call, the state machine, per-call
+Behind those, the dispatch loop, the application call, the state machine, per-call
 abort, the tolerant parser and the role registry are internal, with one implementation each.
 
 **The client's projection of conversation events is a pure reducer** — not a boundary, since it has one
