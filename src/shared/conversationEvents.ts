@@ -42,7 +42,7 @@ export const actionFinishedEventSchema = z.object({
 
 export type ActionFinishedEvent = z.infer<typeof actionFinishedEventSchema>
 
-export const conversationFailureCodeSchema = z.enum(['CONVERSATION_NOT_WRITTEN', 'CONTEXT_UNREADABLE', 'UNEXPECTED_FAILURE'])
+export const conversationFailureCodeSchema = z.enum(['CONVERSATION_NOT_WRITTEN', 'UNEXPECTED_FAILURE'])
 
 export type ConversationFailureCode = z.infer<typeof conversationFailureCodeSchema>
 

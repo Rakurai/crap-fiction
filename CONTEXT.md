@@ -37,6 +37,9 @@ default voice tendencies that genuinely hold across stories.
 It changes rarely. A choice that worked in one story is not thereby an author-level
 preference.
 
+Author context is opaque text: the application never parses, validates or normalizes it, so a
+hand-written comment or an idiosyncratic layout survives exactly as the author left it.
+
 ## Piece
 
 One story. The unit of work. A piece has a title, a mode, a status, a room, a draft, a
@@ -68,6 +71,9 @@ durable notes.
 
 Story context may change considerably as a piece develops, but never without the author
 saying so. Ordinary discussion and ordinary editing do not rewrite it.
+
+Like author context, story context is opaque text: the application never parses, validates or
+normalizes it.
 
 ## Surface
 

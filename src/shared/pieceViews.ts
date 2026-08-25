@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { conversationSummarySchema } from './conversationEntries.js'
 import { conversationActivitySnapshotSchema } from './conversationEvents.js'
-import { durableContextSchema } from './durableContext.js'
 
 export const pieceStatusSchema = z.enum(['drafting', 'finished', 'abandoned'])
 
@@ -42,7 +41,7 @@ export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 export const pieceDetailSchema = pieceSummaryShape
   .extend({
     draft: z.string(),
-    storyContext: durableContextSchema,
+    storyContext: z.string(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
     conversationActionInFlight: conversationActivitySnapshotSchema.nullable(),

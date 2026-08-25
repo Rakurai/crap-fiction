@@ -134,10 +134,12 @@ One compilation per kind of call, each returning the whole of what its prompt is
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
 | an application | the recommendation and the author's constraint |
 
-Every kind receives both durable contexts, the current draft whole, the surface it is compiling for, and
-the conversation's entries. A participant compilation also receives the history policy, which selects
-between shared history and stricter independence and is the whole of the difference between them; the
-application compilation reads the conversation whole and has no policy.
+Every kind receives both context documents, the current draft whole, the surface it is compiling for, and
+the conversation's entries. Author context and story context arrive as opaque text — exactly the bytes on
+disk — and no compilation parses, validates or reorders either one. A participant compilation also
+receives the history policy, which selects between shared history and stricter independence and is the
+whole of the difference between them; the application compilation reads the conversation whole and has no
+policy.
 
 The two participant compilations return one type. The application compilation returns its own, because a
 call that is not a participant has no role, no mode description and no owed answer, and a shape carrying
@@ -162,7 +164,9 @@ those as absent would invite something to read them.
 ```
 
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
-change file are machinery, and nothing invites an edit to them.
+change file are machinery, and nothing invites an edit to them. `piece.yaml` is validated on read;
+`author-context.yaml` and `story-context.yaml` keep the name by convention but are opaque text — nothing
+parses them, and a save replaces one with exactly the bytes it was given.
 
 Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
 travels with the application and not under the data root, under a content root resolved once at startup.

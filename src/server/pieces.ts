@@ -4,7 +4,6 @@ import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
 import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
-import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import { WORKED_SURFACE } from '../shared/surfaces.js'
@@ -141,7 +140,7 @@ export function getPiece(
   return {
     ...summarize(id, piece),
     draft: piece.draft?.text ?? '',
-    storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
+    storyContext: readStoryContext(workspaceDir, id) ?? '',
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     conversations: listConversations(workspaceDir, id),
     conversationActionInFlight,

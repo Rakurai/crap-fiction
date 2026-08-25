@@ -23,7 +23,7 @@ import {
 } from '../../shared/conversationEvents.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
-import { ConversationEntryStore, readConversationEntries, readPiece, TolerantReadError, writeAppliedChange, writePieceCast } from '../store/index.js'
+import { ConversationEntryStore, readConversationEntries, readPiece, writeAppliedChange, writePieceCast } from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
 import {
@@ -38,7 +38,7 @@ import {
   type ParticipantEvidence,
 } from './context.js'
 import { WORKED_SURFACE } from '../../shared/surfaces.js'
-import type { CompiledDurableContext, ReadDurableContext } from './durableContext.js'
+import type { ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
@@ -393,16 +393,7 @@ export class Room {
     const { actionId, controller } = operation
     const signal = controller.signal
 
-    let durableContext: CompiledDurableContext
-    try {
-      durableContext = this.#readDurableContext(workspaceDir, pieceId)
-    } catch (err) {
-      if (err instanceof TolerantReadError) {
-        this.#fail(pieceId, actionId, 'CONTEXT_UNREADABLE', err.message, err)
-        return
-      }
-      throw err
-    }
+    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
 
     const shared = {
       message,

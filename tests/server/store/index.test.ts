@@ -25,7 +25,6 @@ import {
   writeStoryContext,
 } from '../../../src/server/store/index.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
-import { durableContextSchema } from '../../../src/shared/durableContext.js'
 
 const CUPS = { title: 'Cups', mode: 'flash', status: 'drafting' as const, cast: ['shape'] }
 
@@ -100,28 +99,20 @@ describe('the tolerant reader', () => {
   }
 
   const settingsFile = (): string => path.join(dataRoot, 'config', 'settings.yaml')
-  const authorContextFile = (): string => path.join(dataRoot, 'config', 'author-context.yaml')
   const pieceFile = (): string => path.join(workspaceDir, 'cups', 'piece.yaml')
 
   it('trims the whitespace an author leaves around a value, wherever a string is read', () => {
     handWrite(settingsFile(), 'workspace: "  my-writing  "\n')
     handWrite(pieceFile(), 'title: "  Cups  "\nmode: flash\nstatus: drafting\ncast:\n  - shape\n')
-    handWrite(authorContextFile(), 'Voice:\n  - "  wry and close  "\n')
 
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readPiece(workspaceDir, 'cups')?.metadata.title).toBe('Cups')
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
   })
 
   it('reads a lone value written where a list belongs as a list of that one value', () => {
     handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\ncast: shape\n')
-    handWrite(authorContextFile(), 'Prose tendencies:\n  - overwrites dialogue tags\nPatterns disliked: rhetorical questions\n')
 
     expect(readPiece(workspaceDir, 'cups')?.metadata.cast).toEqual(['shape'])
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
-      'Prose tendencies': ['overwrites dialogue tags'],
-      'Patterns disliked': ['rhetorical questions'],
-    })
   })
 
   it('states a failure naming the entry it could not make sense of, rather than guessing at it', () => {
@@ -130,9 +121,6 @@ describe('the tolerant reader', () => {
 
     handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(/cast/)
-
-    handWrite(authorContextFile(), 'Voice:\n  - nested:\n      - not prose\n')
-    expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(/Voice/)
   })
 
   it('states a failure, rather than an error from whatever it handed the text to, where the file does not parse', async () => {
@@ -174,10 +162,10 @@ describe('path containment', () => {
     expect(() => resolveWorkspaceDirectory(dataRoot, '/etc/passwd')).toThrow(PathEscapesRootError)
 
     expect(readPiece(workspaceDir, '../../etc')).toBeUndefined()
-    expect(readStoryContext(workspaceDir, '../../etc', durableContextSchema)).toBeUndefined()
+    expect(readStoryContext(workspaceDir, '../../etc')).toBeUndefined()
 
     await expect(writePieceMetadata(workspaceDir, '../../etc', { ...CUPS, cast: [] })).rejects.toThrowError(PathEscapesRootError)
-    await expect(writeStoryContext(workspaceDir, '../../etc', { Premise: ['x'] })).rejects.toThrowError(PathEscapesRootError)
+    await expect(writeStoryContext(workspaceDir, '../../etc', 'Premise: x\n')).rejects.toThrowError(PathEscapesRootError)
     await expect(new DraftStore().write(workspaceDir, '../../escaped', 'text')).rejects.toThrowError(PathEscapesRootError)
   })
 
@@ -221,7 +209,7 @@ describe("a piece's metadata", () => {
   })
 })
 
-describe('the durable contexts', () => {
+describe('the context documents', () => {
   let dataRoot: string
   let workspaceDir: string
 
@@ -237,29 +225,23 @@ describe('the durable contexts', () => {
   })
 
   it('reads a context nothing has written to as a declared absence rather than as an empty one', () => {
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
-    expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toBeUndefined()
+    expect(readAuthorContext(dataRoot)).toBeUndefined()
+    expect(readStoryContext(workspaceDir, 'cups')).toBeUndefined()
   })
 
   /**
-   * Both contexts are files the author may have written in by hand, so a whole-file write must
-   * leave a comment standing — which is only observable in the text itself, not through a read.
+   * Opaque text: whatever the author wrote, including comments and presentation a parser would
+   * discard, reads back exactly as written because nothing in the path parses it.
    */
-  it('writes either context whole, keeping a hand-written comment the write did not touch', async () => {
-    mkdirSync(path.join(dataRoot, 'config'), { recursive: true })
-    writeFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), '# author notes\nVoice:\n  - wry and close\n', 'utf8')
-    writeFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), '# what this is about\n', 'utf8')
+  it('saves and reads back either context byte-identical, comments, presentation and all', async () => {
+    const authorText = '# author notes\nVoice:\n  - wry and close\nnot: [valid yaml\n'
+    const storyText = '# what this is about\nPremise:   two cups, one left behind\n'
 
-    await writeAuthorContext(dataRoot, { Voice: ['wry and close'], 'Patterns disliked': ['rhetorical questions'] })
-    await writeStoryContext(workspaceDir, 'cups', { Premise: ['two cups, one left behind'] })
+    await writeAuthorContext(dataRoot, authorText)
+    await writeStoryContext(workspaceDir, 'cups', storyText)
 
-    expect(readFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), 'utf8')).toContain('# author notes')
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
-      Voice: ['wry and close'],
-      'Patterns disliked': ['rhetorical questions'],
-    })
-    expect(readFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), 'utf8')).toContain('# what this is about')
-    expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(readAuthorContext(dataRoot)).toBe(authorText)
+    expect(readStoryContext(workspaceDir, 'cups')).toBe(storyText)
   })
 })
 

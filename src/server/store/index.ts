@@ -47,12 +47,16 @@ export async function writeSettingsSection(dataRoot: string, section: SettingsSe
   await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
 }
 
-export function readAuthorContext<T>(dataRoot: string, schema: z.ZodType<T>): T | undefined {
-  return readYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), schema)
+function authorContextFile(dataRoot: string): string {
+  return path.join(dataRoot, 'config', 'author-context.yaml')
 }
 
-export async function writeAuthorContext(dataRoot: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
-  await writeYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), { ...context })
+export function readAuthorContext(dataRoot: string): string | undefined {
+  return readTextArtifact(authorContextFile(dataRoot))?.text
+}
+
+export async function writeAuthorContext(dataRoot: string, text: string): Promise<void> {
+  await writeTextArtifact(authorContextFile(dataRoot), text)
 }
 
 export function resolveWorkspaceDirectory(dataRoot: string, candidate: string): string {
@@ -94,14 +98,14 @@ function storyContextFile(pieceDir: string): string {
   return path.join(pieceDir, 'story-context.yaml')
 }
 
-export function readStoryContext<T>(workspaceDir: string, id: string, schema: z.ZodType<T>): T | undefined {
+export function readStoryContext(workspaceDir: string, id: string): string | undefined {
   const pieceDir = pieceDirectory(workspaceDir, id)
   if (pieceDir === undefined) return undefined
-  return readYamlArtifact(storyContextFile(pieceDir), schema)
+  return readTextArtifact(storyContextFile(pieceDir))?.text
 }
 
-export async function writeStoryContext(workspaceDir: string, id: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
-  await writeYamlArtifact(storyContextFile(resolveWithinRoot(workspaceDir, id)), { ...context })
+export async function writeStoryContext(workspaceDir: string, id: string, text: string): Promise<void> {
+  await writeTextArtifact(storyContextFile(resolveWithinRoot(workspaceDir, id)), text)
 }
 
 export function pieceIds(workspaceDir: string): readonly string[] {

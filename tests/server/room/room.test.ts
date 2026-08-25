@@ -166,29 +166,19 @@ describe('Room.dispatch', () => {
     expect(room.activitySnapshot(piece.id)).toBeUndefined()
   })
 
-  it('closes the action as failed, naming the failure, when the durable context cannot be read', async () => {
+  it('reaches a compiled prompt exactly as written, comments and malformed YAML alike, since story context is opaque text', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
-    writeFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), 'Premise: 42\n', 'utf8')
-    const { room } = buildRoom(dataRoot, {
+    writeFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), '# notes\nPremise: not valid: [yaml\n', 'utf8')
+    const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
 
-    const events: RoomEvent[] = []
-    room.subscribe(piece.id, (event) => events.push(event))
-
     await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     await settlementOf(room, piece.id)
 
-    expect(events.map((event) => event.type)).toEqual(['action.started', 'entry.appended', 'error', 'action.finished'])
-    const failure = events.find((event) => event.type === 'error')
-    expect(failure?.data).toMatchObject({ code: 'CONTEXT_UNREADABLE' })
-    const finished = events.find((event) => event.type === 'action.finished')
-    expect(finished?.data).toMatchObject({ outcome: 'failed' })
-
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
-    expect(readConversationEntries(workspaceDir, piece.id, 'c1')?.entries).toEqual([expect.objectContaining({ kind: 'authorMessage' })])
+    expect(adapter.promptFor('shape')).toContain('# notes\nPremise: not valid: [yaml')
   })
 
   it("owns the dispatch's own collapse: a seam that throws instead of failing closes the action and is stated, not rethrown into nothing", async () => {

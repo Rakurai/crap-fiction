@@ -274,9 +274,11 @@ piece with no conversations is opened by starting one, which is also what deleti
 leaves behind. A piece's modified time is its draft's, and a conversation's last activity is its last
 entry's, so both are facts about the files rather than counters the application maintains.
 
-**Durable context and piece metadata are YAML; conversations are JSON.** The author hand-edits the
-first two, so that format has to be readable and structured at once. A conversation is machinery
-the author does not edit.
+**Piece metadata is YAML; conversations are JSON; author context and story context are text.** The
+author hand-edits piece metadata and both contexts; a conversation is machinery the author does not
+edit. Author context and story context keep a `.yaml` name for the author's sake, but the application
+never parses either one: a read hands back the bytes on disk and a save replaces them with exactly
+what it was given. Piece metadata is the only one of the three that is validated.
 
 **A conversation is an ordered, append-only sequence of entries the conversation surface is rebuilt
 from.** Every entry after the first carries the identity of the entry that caused it rather than a
@@ -292,29 +294,36 @@ remember to apply. A file that is missing degrades to the application shown with
 is never an error, because nothing may be derived from it in order to be true. Deleting a conversation
 deletes the change files its applications name.
 
-**There is one representation, so it carries no version and no compatibility layer.** Structured files
-are validated on read, and nothing the author wrote is silently discarded.
+**There is one representation for a structured file, so it carries no version and no compatibility
+layer.** Piece metadata and settings are validated on read, and nothing the author wrote is silently
+discarded. Author context and story context have no representation to version: there is nothing in
+either to validate, so there is nothing for a version to describe.
 
-**What a tolerant read of a hand-edited file tolerates is a closed list**: a key the current schema
-does not know is kept and survives a write; a scalar where a list is expected reads as a one-item
-list; an absent optional section reads as empty; surrounding whitespace is trimmed. Anything else — a
-value of the wrong kind, a required entry missing, YAML that does not parse — is a stated failure
-naming the file and the entry, reported to the author and never worked around. The list is closed
-because the alternative is a parser that keeps acquiring one more reasonable reading until it is
+**What a tolerant read of a hand-edited structured file tolerates is a closed list**: a key the
+current schema does not know is kept and survives a write; a scalar where a list is expected reads as
+a one-item list; an absent optional section reads as empty; surrounding whitespace is trimmed. Anything
+else — a value of the wrong kind, a required entry missing, YAML that does not parse — is a stated
+failure naming the file and the entry, reported to the author and never worked around. The list is
+closed because the alternative is a parser that keeps acquiring one more reasonable reading until it is
 recovery code, and because a reader who cannot say what the tolerance is cannot tell a tolerated file
-from a misread one.
+from a misread one. Author context and story context have no tolerance list, because nothing about
+them is ever parsed: comment, YAML, or text that is neither reaches a model call exactly as the author
+left it, and none of it is a failure.
 
-**A write preserves what the author's file carried and the schema does not describe.** Comments and
-key order survive a round trip, for the same reason an unknown key does: the author is invited to
-hand-edit these files, and a read-then-rewrite that drops the notes they left themselves has edited
-their file without saying so. This is a property of the read-and-write path rather than a reading of
-malformed input, so it is not one of the tolerances.
+**A write preserves what the author's file carried and a schema does not describe.** For piece
+metadata, comments and key order survive a round trip for the same reason an unknown key does: the
+author is invited to hand-edit the file, and a read-then-rewrite that drops the notes they left
+themselves has edited their file without saying so. For author context and story context this is the
+whole of the write, not a property alongside a schema: the studio is not in a position to strip
+anything, because it never holds a parsed form to write back from.
 
-**No tolerance ever supplies a value the author did not write.** A missing required entry is a
-failure, never a filled-in default: a default here would put words in the author context or the story
-context that the author never said, and every participant would then read them as the author's own.
+**Nothing ever supplies a value the author did not write.** For piece metadata, a missing required
+entry is a stated failure, never a filled-in default. Author context and story context cannot have a
+missing entry, because they have no entries the studio knows the name of: a context file nothing has
+written to is empty text, never a template with words already in it, and a participant reads only what
+the author put there.
 
-**Piece metadata, both durable contexts and the model assignments are read when a piece is opened and
+**Piece metadata, both context documents and the model assignments are read when a piece is opened and
 again when a model call is compiled.** Nothing watches the filesystem and nothing polls: a file the
 author edited by hand is picked up by the next call that uses it, which is the only moment its content
 matters. Re-reading at compilation is what stops an external edit from being ignored for a whole

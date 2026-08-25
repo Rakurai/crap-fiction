@@ -139,7 +139,7 @@ describe('pieces', () => {
     expect(opened).toEqual({
       ...created,
       draft: '',
-      storyContext: {},
+      storyContext: '',
       currentConversationId: null,
       conversations: [],
       conversationActionInFlight: null,
@@ -151,21 +151,15 @@ describe('pieces', () => {
     })
   })
 
-  it('opens a piece carrying the draft and the story context the author wrote, section by section', async () => {
+  it('opens a piece carrying the draft and the story context the author wrote, verbatim', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
-    writeFileSync(
-      path.join(workspaceDir, created.id, 'story-context.yaml'),
-      'Premise:\n  - two cups, one left behind\nPoint of view:\n  - close third, past tense\n',
-      'utf8',
-    )
+    const storyContextText = '# notes\nPremise: two cups, one left behind\nPoint of view: close third, past tense\n'
+    writeFileSync(path.join(workspaceDir, created.id, 'story-context.yaml'), storyContextText, 'utf8')
 
     const opened = getPiece(workspaceDir, created.id, null, specialists, storyEditor)
     expect(opened.draft).toBe('Two small words.')
-    expect(opened.storyContext).toEqual({
-      Premise: ['two cups, one left behind'],
-      'Point of view': ['close third, past tense'],
-    })
+    expect(opened.storyContext).toBe(storyContextText)
   })
 
   /**
