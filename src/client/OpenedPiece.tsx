@@ -74,7 +74,7 @@ function Surfaces({
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
-  const [applying, setApplying] = useState(false)
+  const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
   // Keyed on this rather than on `activeConversationId`: `Conversation` reports back the id
   // it mints on a fresh conversation's first round, and remounting on that report would tear

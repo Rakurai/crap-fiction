@@ -1,7 +1,7 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AppliedChangeContent } from '../shared/appliedChange.js'
-import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
+import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import { countWords } from '../shared/storyLength.js'
@@ -32,44 +32,11 @@ type ConversationProps = {
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
   readonly onApplied?: (markdown: string) => void
-  readonly onApplyingChange?: (applying: boolean) => void
+  readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
-
-function ApplyAction({
-  responseId,
-  disabled,
-  onApply,
-}: {
-  readonly responseId: string
-  readonly disabled: boolean
-  readonly onApply: (responseId: string, constraint: string | undefined) => void
-}) {
-  const [constraint, setConstraint] = useState('')
-
-  return (
-    <div className={styles.apply}>
-      <input
-        aria-label="Constraint for applying this recommendation"
-        className={styles.applyConstraint}
-        value={constraint}
-        disabled={disabled}
-        placeholder="a constraint, if there is one"
-        onChange={(event) => setConstraint(event.target.value)}
-      />
-      <button
-        type="button"
-        className={styles.applyButton}
-        disabled={disabled}
-        onClick={() => onApply(responseId, constraint.trim().length > 0 ? constraint.trim() : undefined)}
-      >
-        apply
-      </button>
-    </div>
-  )
-}
 
 function ReplyAction({
   participantId,
@@ -112,35 +79,76 @@ function ReplyAction({
   )
 }
 
-function AskAction({
+// One field serves every response-local action (UX_DESIGN "Actions on a response"): its content
+// is carried verbatim as the constraint, the clarification, or the reply text, and it never
+// competes with a second field on the same response.
+function ResponseActions({
   responseId,
+  participantId,
+  outcome,
   disabled,
+  onApply,
   onAsk,
+  onReplyEmpty,
+  onReply,
 }: {
   readonly responseId: string
+  readonly participantId: string
+  readonly outcome: 'commentary' | 'applicableSuggestion'
   readonly disabled: boolean
+  readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void
+  readonly onReplyEmpty: (participantId: string) => void
+  readonly onReply: (participantId: string, message: string) => void
 }) {
-  const [clarification, setClarification] = useState('')
+  const [text, setText] = useState('')
+  const canApply = outcome === 'applicableSuggestion'
+  const trimmed = text.trim()
+  const withText = trimmed.length > 0
+
+  function reply(): void {
+    if (!withText) {
+      onReplyEmpty(participantId)
+      return
+    }
+    if (disabled) return
+    onReply(participantId, trimmed)
+    setText('')
+  }
+
+  function apply(): void {
+    if (disabled) return
+    onApply(responseId, withText ? trimmed : undefined)
+    setText('')
+  }
+
+  function ask(): void {
+    if (disabled) return
+    onAsk(responseId, withText ? trimmed : undefined)
+    setText('')
+  }
 
   return (
     <div className={styles.actions}>
-      <input
-        aria-label="Clarify what you're asking for"
-        className={styles.actionField}
-        value={clarification}
-        disabled={disabled}
-        placeholder="a clarification, if there is one"
-        onChange={(event) => setClarification(event.target.value)}
-      />
-      <button
-        type="button"
-        className={styles.actionButton}
-        disabled={disabled}
-        onClick={() => onAsk(responseId, clarification.trim().length > 0 ? clarification.trim() : undefined)}
-      >
-        ask for a concrete change
+      {canApply ? (
+        <button type="button" className={styles.applyButton} disabled={disabled} onClick={apply}>
+          apply
+        </button>
+      ) : (
+        <button type="button" className={styles.actionButton} disabled={disabled} onClick={ask}>
+          ask for a concrete change
+        </button>
+      )}
+      <button type="button" className={styles.actionButton} disabled={withText && disabled} onClick={reply}>
+        reply
       </button>
+      <input
+        aria-label={canApply ? 'Reply or apply, in your own words' : 'Reply or ask for a concrete change, in your own words'}
+        className={styles.actionField}
+        value={text}
+        placeholder="in your words — optional"
+        onChange={(event) => setText(event.target.value)}
+      />
     </div>
   )
 }
@@ -165,7 +173,10 @@ function AppliedChangeView({
   readonly askDisabled: boolean
   readonly onAskAboutChange: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  // UX_DESIGN "Applying, and seeing what it did": applying opens the disclosure, and it stays open
+  // through reload or navigation until the author closes it themselves — there is no author choice
+  // to remember across a load, so every render of a landed application starts open.
+  const [open, setOpen] = useState(true)
 
   return (
     <div className={styles.change}>
@@ -214,11 +225,19 @@ function askedText(name: string): string {
   return `${name} was asked for a concrete change.`
 }
 
+function participantNameFor(entries: readonly ConversationEntryView[], responseId: string, displayName: (id: string) => string): string {
+  const entry = entries.find((candidate) => candidate.id === responseId)
+  return displayName(entry?.kind === 'participantResponse' ? entry.participantId : responseId)
+}
+
+const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
+
 type EntryActions = Readonly<{
   displayName: (id: string) => string
   mark: (id: string) => string
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
+  applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
   onApply: (responseId: string, constraint: string | undefined) => void
   onAbandonApply: () => void
   onAskAboutChange: () => void
@@ -237,7 +256,7 @@ function ParticipantIdentity({ name, mark }: { readonly name: string; readonly m
 }
 
 function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
-  const { displayName, mark, applying, applyDisabled, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } = actions
+  const { displayName, mark, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } = actions
 
   switch (entry.kind) {
     case 'authorMessage':
@@ -269,23 +288,42 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
         </div>
       )
     case 'participantResponse': {
-      const recommends = entry.outcome === 'applicableSuggestion'
-      const offeredAReading = entry.outcome === 'commentary'
       const applyingThis = applying?.responseId === entry.id
+      // SPEC "Applying a recommendation": the applied change renders on the response that caused
+      // it, never as its own item at the application entry's own append position.
+      const applications = applicationsFor(entry.id)
       return (
         <div className={styles.participant}>
           <ParticipantIdentity name={displayName(entry.participantId)} mark={mark(entry.participantId)} />
           <p className={styles.claim}>{entry.claim}</p>
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
-          {recommends &&
-            (applyingThis ? <ApplyingFlight onAbandon={onAbandonApply} /> : <ApplyAction responseId={entry.id} disabled={applyDisabled} onApply={onApply} />)}
-          {offeredAReading && <AskAction responseId={entry.id} disabled={applyDisabled} onAsk={onAsk} />}
-          <ReplyAction participantId={entry.participantId} busy={applyDisabled} onReplyEmpty={onReplyEmpty} onReply={onReply} />
+          {applications.map(
+            (application) =>
+              application.change !== undefined && (
+                <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+              ),
+          )}
+          {applyingThis ? (
+            <ApplyingFlight onAbandon={onAbandonApply} />
+          ) : (
+            <ResponseActions
+              responseId={entry.id}
+              participantId={entry.participantId}
+              outcome={entry.outcome}
+              disabled={applyDisabled}
+              onApply={onApply}
+              onAsk={onAsk}
+              onReplyEmpty={onReplyEmpty}
+              onReply={onReply}
+            />
+          )}
         </div>
       )
     }
     case 'application':
-      return entry.change === undefined ? null : <AppliedChangeView content={entry.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+      // Its durable position is its true append order, but it presents only as state on the
+      // originating response above — no second visible marker at the foot of the chat.
+      return null
     default: {
       const exhaustive: never = entry
       return exhaustive
@@ -365,7 +403,27 @@ export function Conversation({
   }, [caretOffset])
 
   const conversation = useConversation(pieceId, currentConversationId, conversationActionInFlight, flushDraft, () => draft, room)
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, onApplyingChange, conversation.attachEntry, room)
+
+  function handleApplyingChange(next: ApplyingResponse | undefined): void {
+    onApplyingChange(next === undefined ? undefined : { participantName: participantNameFor(conversation.projection.entries, next.responseId, displayName) })
+  }
+
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, handleApplyingChange, conversation.attachEntry, room)
+
+  const applicationsByResponse = useMemo(() => {
+    const map = new Map<string, ApplicationEntryView[]>()
+    for (const entry of conversation.projection.entries) {
+      if (entry.kind !== 'application') continue
+      const list = map.get(entry.responseId)
+      if (list === undefined) map.set(entry.responseId, [entry])
+      else list.push(entry)
+    }
+    return map
+  }, [conversation.projection.entries])
+
+  function applicationsFor(responseId: string): readonly ApplicationEntryView[] {
+    return applicationsByResponse.get(responseId) ?? EMPTY_APPLICATIONS
+  }
 
   useEffect(() => {
     if (conversation.conversationId !== null) onConversationIdChange(conversation.conversationId)
@@ -422,6 +480,7 @@ export function Conversation({
     mark,
     applying: apply.applying,
     applyDisabled: roomBusy,
+    applicationsFor,
     onApply: apply.apply,
     onAbandonApply: apply.abandon,
     onAskAboutChange: askAboutChange,

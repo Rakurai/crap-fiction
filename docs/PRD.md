@@ -212,11 +212,11 @@ untouched, and no rationale is generated to justify the cast.
 
 **Apply a recommendation** — *constant*
 *Done when:* one action makes the manuscript embody the recommendation, interpreted against
-the draft as it currently stands together with the conversation up to that recommendation,
-with no second acceptance step and no automatic critique of the result; the manuscript is not
-editable for as long as that call is in flight and is editable again the moment it settles,
-fails or is abandoned; and nothing in the manuscript changes beyond what embodying the
-recommendation and the author's constraint requires.
+the draft and the full current conversation as they currently stand, with no second acceptance
+step and no automatic critique of the result; the manuscript is not editable for as long as
+that call is in flight and is editable again the moment it settles, fails or is abandoned; and
+nothing in the manuscript changes beyond what embodying the recommendation and the author's
+constraint requires.
 
 **Apply with a constraint** — *per session*
 *Done when:* text the author supplies alongside the action is carried verbatim as an

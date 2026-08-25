@@ -462,6 +462,25 @@ describe('Room.apply', () => {
     expect(adapter.promptFor('apply')).toContain('draft text')
   })
 
+  it('SPEC "Applying a recommendation": carries the full current conversation, including discussion after the recommendation', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room: laterRoom } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } } },
+    })
+    await laterRoom.dispatch(workspaceDir, pieceId, 'c1', { kind: 'message', text: 'a later, unrelated question' }, 'draft text')
+    await settlementOf(laterRoom, pieceId)
+
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
+    })
+
+    await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+
+    expect(adapter.promptFor('apply')).toContain('a later, unrelated question')
+  })
+
   it('refuses when no such applicable suggestion stands at that identity', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {})

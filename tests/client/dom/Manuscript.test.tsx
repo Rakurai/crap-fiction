@@ -26,7 +26,7 @@ const DEFAULT_PROPS = {
     statusError: undefined as string | undefined,
     onSetStatus: vi.fn(),
   },
-  applying: false,
+  applying: undefined as { readonly participantName: string } | undefined,
 }
 
 function Harness(props: typeof DEFAULT_PROPS) {
@@ -196,20 +196,21 @@ describe('the reading view', () => {
 describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 
-  it('holds the source textarea read-only, and says so in the register, while an application runs', () => {
-    renderManuscript({ applying: true })
+  it('holds the source textarea read-only, and names the response holding it, while an application runs', () => {
+    renderManuscript({ applying: { participantName: 'Compression' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('READ-ONLY')).toBeTruthy()
+    expect(screen.getByText("Held while Compression's change is applied.")).toBeTruthy()
   })
 
   it('is editable again, with no trace of the notice, the instant the application is no longer applying', () => {
-    const { rerender } = renderManuscript({ applying: true })
+    const { rerender } = renderManuscript({ applying: { participantName: 'Compression' } })
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
 
-    rerender(<Harness {...DEFAULT_PROPS} applying={false} />)
+    rerender(<Harness {...DEFAULT_PROPS} applying={undefined} />)
 
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false)
     expect(screen.queryByText('READ-ONLY')).toBeNull()

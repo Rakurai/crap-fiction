@@ -208,9 +208,9 @@ constraint supplied with the Apply.
 
 Semantic acceptance of a recommendation: make the current manuscript embody it.
 
-Apply interprets the recommendation against the draft as it stands at the moment the author
-applies it, together with the conversation up to that recommendation and any constraint the
-author supplies. It does not replay a stored edit.
+Apply interprets the recommendation against the draft and the full conversation as they stand
+at the moment the author applies it, together with any constraint the author supplies. It does
+not replay a stored edit.
 
 **Apply is the author's approval.** Prose that arrives through Apply is ordinary manuscript
 prose immediately, with no further acceptance state.

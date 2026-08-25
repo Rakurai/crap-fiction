@@ -98,7 +98,6 @@ export type ApplyContextInput = Readonly<{
   storyContext: string | undefined
   draft: string
   entries: readonly ConversationEntry[]
-  throughEntryId: string
 }>
 
 export type ApplyContext = Readonly<{
@@ -111,16 +110,19 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
-function historyThrough(entries: readonly ConversationEntry[], throughEntryId: string | undefined): readonly HistoryEntry[] {
+function fullHistory(entries: readonly ConversationEntry[]): readonly HistoryEntry[] {
   const result: HistoryEntry[] = []
   for (const entry of entries) {
     if (entry.kind === 'authorMessage') result.push({ kind: 'message', text: entry.text })
     else if (entry.kind === 'participantResponse') result.push({ kind: 'response', participantId: entry.participantId, claim: entry.claim, note: entry.note })
-    if (throughEntryId !== undefined && entry.id === throughEntryId) break
   }
   return result
 }
 
+// SPEC "Applying a recommendation": Apply reads the full current conversation at the moment it is
+// invoked, not the prefix through the recommendation — intervening discussion may qualify or
+// contradict an old recommendation, and the write process must weigh that rather than replay against
+// stale history.
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
     recommendationClaim: input.recommendationClaim,
@@ -129,7 +131,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
-    history: historyThrough(input.entries, input.throughEntryId),
+    history: fullHistory(input.entries),
   }
 }
 
@@ -243,7 +245,7 @@ export function compileCaptureContext(input: CaptureContextInput): CaptureContex
     authorContext: input.authorContext,
     storyContext: input.storyContext,
     draft: input.draft,
-    history: input.entries === undefined ? [] : historyThrough(input.entries, undefined),
+    history: input.entries === undefined ? [] : fullHistory(input.entries),
   }
 }
 

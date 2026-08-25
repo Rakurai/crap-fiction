@@ -180,10 +180,10 @@ const RESPONSE_WITH_RECOMMENDATION: ConversationEntryView = {
   claim: 'cut the second paragraph',
 }
 
-describe('the applied change, shown as its own entry', () => {
+describe('the applied change, shown on its originating response', () => {
   afterEach(cleanup)
 
-  it("presents a bounded change collapsed to a computed count, disclosed on the author's action", async () => {
+  it('opens disclosed on the author applying it, and closes to an unambiguous summary', async () => {
     const room: RoomAdapters = {
       ...roomHolding([RESPONSE_WITH_RECOMMENDATION]),
       applyRecommendation: () =>
@@ -204,12 +204,15 @@ describe('the applied change, shown as its own entry', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
 
     const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
-    expect(screen.queryByText('the old line')).toBeNull()
+    expect(screen.getByText('the old line')).toBeTruthy()
+    expect(screen.getByText('the new line')).toBeTruthy()
+    // The response that caused the change still carries its own actions — Apply created no
+    // participant follow-up, and the change is presented on the response rather than as a new item.
+    expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy()
 
     fireEvent.click(toggle)
 
-    expect(await screen.findByText('the old line')).toBeTruthy()
-    expect(screen.getByText('the new line')).toBeTruthy()
+    expect(screen.queryByText('the old line')).toBeNull()
   })
 
   it('presents a whole-manuscript rewrite as the bare statement, with nothing to disclose', async () => {
@@ -302,7 +305,7 @@ describe('replying to a response', () => {
 
     renderConversation([RESPONSE_WITH_COMMENTARY], { room })
 
-    const field = await screen.findByLabelText('Reply, in your own words')
+    const field = await screen.findByLabelText('Reply or ask for a concrete change, in your own words')
     fireEvent.change(field, { target: { value: 'say more about that' } })
     fireEvent.click(screen.getByRole('button', { name: 'reply' }))
 
@@ -349,6 +352,23 @@ describe('asking for a concrete change', () => {
     )
   })
 
+  it('carries text left in the shared field as the clarification', async () => {
+    const dispatch = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_COMMENTARY]), dispatch }
+
+    renderConversation([RESPONSE_WITH_COMMENTARY], { room })
+
+    const field = await screen.findByLabelText('Reply or ask for a concrete change, in your own words')
+    fireEvent.change(field, { target: { value: 'what would you cut' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ask for a concrete change' }))
+
+    await waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, 'First light.'),
+    )
+  })
+
   it('shows the naming at the entry it occupies, in place of the author message a concrete-change request never had', async () => {
     renderConversation([
       { id: 'e1', kind: 'concreteChangeRequest', target: 'shape', respondingTo: 'e0' },
@@ -358,6 +378,44 @@ describe('asking for a concrete change', () => {
     await screen.findByText('cut the aside')
 
     expect(screen.getByText('Shape was asked for a concrete change.')).toBeTruthy()
+  })
+})
+
+describe('one response-local field shared by every action on the response', () => {
+  afterEach(cleanup)
+
+  it('offers exactly one text field on a response that offered a reading, serving both reply and asking for a concrete change', async () => {
+    renderConversation([RESPONSE_WITH_COMMENTARY])
+
+    await screen.findByText('It holds.')
+
+    expect(screen.getAllByRole('textbox')).toHaveLength(1) // the one shared field on the response
+  })
+
+  it('offers exactly one text field on a response that recommends something concrete, serving both reply and apply', async () => {
+    renderConversation([RESPONSE_WITH_RECOMMENDATION])
+
+    await screen.findByRole('button', { name: 'apply' })
+
+    expect(screen.getAllByRole('textbox')).toHaveLength(1) // the one shared field on the response
+  })
+
+  it('carries text left in the shared field as the constraint when Apply is chosen', async () => {
+    const applyRecommendation = vi.fn(() =>
+      Promise.resolve({
+        outcome: 'value' as const,
+        value: { outcome: 'applied' as const, actionId: 'a1', entryId: 'e-app1', manuscript: 'revised', change: undefined },
+      }),
+    )
+    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_RECOMMENDATION]), applyRecommendation }
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+
+    const field = await screen.findByLabelText('Reply or apply, in your own words')
+    fireEvent.change(field, { target: { value: 'keep the last line' } })
+    fireEvent.click(screen.getByRole('button', { name: 'apply' }))
+
+    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'e1', 'First light.', 'keep the last line'))
   })
 })
 

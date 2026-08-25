@@ -26,7 +26,7 @@ type ManuscriptProps = {
   readonly onOpenConversations: () => void
   readonly onOpenCapture: () => void
   readonly lifecycle: LifecycleProps
-  readonly applying: boolean
+  readonly applying: { readonly participantName: string } | undefined
 }
 
 function EditableTitle({ title, saving, onRetitle }: { readonly title: string; readonly saving: boolean; readonly onRetitle: (title: string) => void }) {
@@ -82,7 +82,7 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
   }, [manuscript.view, manuscript.showRendered])
 
   useEffect(() => {
-    manuscript.editor?.setEditable(!reading && !applying)
+    manuscript.editor?.setEditable(!reading && applying === undefined)
   }, [manuscript.editor, reading, applying])
 
   return (
@@ -94,7 +94,6 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
           <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
-          {applying && <span className={styles.applying}>READ-ONLY</span>}
           <select
             aria-label="Piece status"
             className={styles.status}
@@ -133,6 +132,13 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
         </p>
       )}
 
+      {!reading && applying !== undefined && (
+        <div className={styles.applyingBanner}>
+          <span className={styles.applyingBannerFacts}>READ-ONLY</span>
+          <span className={styles.applyingBannerWords}>{`Held while ${applying.participantName}'s change is applied.`}</span>
+        </div>
+      )}
+
       <div ref={manuscript.containerRef} className={reading ? styles.readingScroll : styles.scroll}>
         <div className={reading ? styles.readingMeasure : styles.measure}>
           {reading && <h1 className={styles.readingTitle}>{title}</h1>}
@@ -141,7 +147,7 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
               aria-label="Manuscript source"
               className={styles.source}
               value={manuscript.sourceText}
-              disabled={applying}
+              disabled={applying !== undefined}
               onChange={(event) => manuscript.setSourceText(event.target.value)}
             />
           ) : (

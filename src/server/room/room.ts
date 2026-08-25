@@ -537,7 +537,6 @@ export class Room {
         storyContext: durableContext.storyContext,
         draft,
         entries,
-        throughEntryId: responseId,
       })
       const prompt = renderApplyPrompt(context, this.#charter)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)

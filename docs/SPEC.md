@@ -819,9 +819,14 @@ thinks.
 
 ## Applying a recommendation
 
-**One call.** Its input is the current draft, the conversation through the recommendation being
-applied, the recommendation itself, both durable contexts, and the author's constraint where
-they supplied one. Its output is the manuscript embodying it.
+**One call.** Its input is the current draft, the full current conversation, the recommendation
+itself, both durable contexts, and the author's constraint where they supplied one. Its output
+is the manuscript embodying it.
+
+**Apply resolves its source by response-entry identity and reads the conversation as it stands at
+invocation, not as it stood when the recommendation was made.** Intervening discussion may qualify
+or contradict an old recommendation, and the write process weighs that rather than replaying the
+recommendation against stale history. Apply creates no participant follow-up of its own.
 
 **The manuscript is read-only for the duration of that call.** An application reads the draft at
 one instant and returns the next state of it; an edit landing in between would leave a rewrite to

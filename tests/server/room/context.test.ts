@@ -48,7 +48,7 @@ const entriesWithMixedHistory: readonly ConversationEntry[] = [
   { id: 'e3', kind: 'participantNoComment', participantId: 'compression', causeId: 'e1' },
 ]
 
-function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: ApplyContextInput['entries']; throughEntryId: string }): ApplyContextInput {
+function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: ApplyContextInput['entries'] }): ApplyContextInput {
   return {
     recommendationClaim: 'cut the second paragraph',
     recommendationNote: undefined,
@@ -86,7 +86,6 @@ describe('compileApplyContext', () => {
         storyContext: 'a flash piece about a breakup',
         draft: 'The cups sat where she left them.',
         entries: entriesWithTwoMessages,
-        throughEntryId: 'e2',
       }),
     )
 
@@ -98,17 +97,19 @@ describe('compileApplyContext', () => {
     expect(context.draft).toBe('The cups sat where she left them.')
   })
 
-  it('reads history through the response the recommendation came from, and no further', () => {
-    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages, throughEntryId: 'e2' }))
+  it('SPEC "Applying a recommendation": reads the full current conversation, past the response the recommendation came from', () => {
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.history).toEqual([
       { kind: 'message', text: 'first question' },
       { kind: 'response', participantId: 'shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
+      { kind: 'message', text: 'a later question' },
+      { kind: 'response', participantId: 'compression', claim: 'the ending still drags', note: undefined },
     ])
   })
 
   it('carries no constraint when the author supplied none', () => {
-    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages, throughEntryId: 'e2' }))
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.constraint).toBeUndefined()
   })
@@ -121,7 +122,6 @@ describe('renderApplyPrompt', () => {
         recommendationClaim: 'cut the second paragraph',
         constraint: 'keep the last line',
         entries: entriesWithTwoMessages,
-        throughEntryId: 'e2',
       }),
     )
 
@@ -132,14 +132,14 @@ describe('renderApplyPrompt', () => {
   })
 
   it('omits the constraint section when the author supplied none', () => {
-    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages, throughEntryId: 'e2' }))
+    const context = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
 
     expect(renderApplyPrompt(context, charter)).not.toContain("The author's constraint")
   })
 
   it('always carries the manuscript, unexcerpted', () => {
     const context = compileApplyContext(
-      applyContextInput({ draft: 'The cups sat where she left them.', entries: entriesWithTwoMessages, throughEntryId: 'e2' }),
+      applyContextInput({ draft: 'The cups sat where she left them.', entries: entriesWithTwoMessages }),
     )
 
     expect(renderApplyPrompt(context, charter)).toContain('The cups sat where she left them.')
@@ -177,7 +177,7 @@ describe('compileCaptureContext', () => {
     expect(context.history).toEqual([])
   })
 
-  it('reads the conversation whole, past any one response — unlike an application, it has none to stop at', () => {
+  it('reads the conversation whole, past any one response', () => {
     const context = compileCaptureContext(captureContextInput({ entries: entriesWithTwoMessages }))
 
     expect(context.history).toEqual([

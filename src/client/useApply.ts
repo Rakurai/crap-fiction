@@ -22,7 +22,7 @@ export function useApply(
   conversationId: string | null,
   getDraft: () => string,
   onApplied: (markdown: string) => void,
-  onApplyingChange: (applying: boolean) => void,
+  onApplyingChange: (applying: ApplyingResponse | undefined) => void,
   onApplicationEntry: (entry: ApplicationEntryView) => void,
   adapters: ApplyAdapters,
 ): ApplyViewModel {
@@ -35,11 +35,11 @@ export function useApply(
     const cid = conversationId
     setError(undefined)
     setApplying({ responseId })
-    onApplyingChange(true)
+    onApplyingChange({ responseId })
 
     function stop(message: string | undefined): void {
       setApplying(undefined)
-      onApplyingChange(false)
+      onApplyingChange(undefined)
       if (message !== undefined) setError(message)
     }
 

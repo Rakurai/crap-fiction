@@ -168,11 +168,12 @@ tell them.
 the passage as it now stands reads as current, in the register the room's words are in — not as a
 code diff, because the author is reading sentences and judging whether they are better.
 
-**The before-and-after is disclosed on the author's action.** The claim and the note stay visible as
-on any other response; the change itself opens and closes, and closed it is a count of what was
-altered in the register facts about the machine are in. Length therefore does not constrain it — a
-long change is a closed line until the author wants it. This is the author operating a response they
-are looking at, not the interface deciding an earlier round has been dealt with.
+**The before-and-after is disclosed on the author's action.** Applying opens it; the claim and the
+note stay visible as on any other response, and the change itself opens and closes, closed it is a
+count of what was altered in the register facts about the machine are in. Length therefore does not
+constrain it — a long change is a closed line until the author wants it. This is the author operating
+a response they are looking at, not the interface deciding an earlier round has been dealt with, and
+neither a reload nor navigating away and back auto-collapses it on the author's behalf.
 
 **It says what changed and never where.** No paragraph number, no position, and nothing that jumps
 to the passage in the prose. The author reads the change on the response and finds the prose by
@@ -209,7 +210,9 @@ would tell the author to stop typing when they do not have to — and would also
 a capture running together into a single busy signal neither of them alone produced.
 
 **A locked manuscript is accounted for by the response being applied**, so what the author cannot
-type into is explained by something they just did.
+type into is explained by something they just did. That accounting names the participant even where
+the response holding it has scrolled out of view, so the lock is never left unexplained merely
+because the conversation has moved on since the author reached for Apply.
 
 ## The room
 
