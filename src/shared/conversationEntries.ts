@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { failureReasonSchema } from './modelResult.js'
 
-// The substrate for the conversation cutover (#58): a durable conversation is an ordered,
-// append-only sequence of these entries rather than a nested round record. Nothing here is wired
-// into the active room or conversation path yet — see SPEC_GAPS.md.
+// A durable conversation is an ordered, append-only sequence of these entries: an author's message
+// or concrete-change request, each participant's outcome, and each application, all carrying the
+// identity of the entry that caused them rather than a round coordinate.
 
 export const authorMessageEntrySchema = z.object({
   id: z.string().min(1),
@@ -62,6 +62,7 @@ export const applicationEntrySchema = z.object({
   kind: z.literal('application'),
   responseId: z.string().min(1),
   changeId: z.string().min(1),
+  constraint: z.string().min(1).optional(),
 })
 
 export type ApplicationEntry = z.infer<typeof applicationEntrySchema>
@@ -83,3 +84,28 @@ export const entryConversationSchema = z.object({
 })
 
 export type EntryConversation = z.infer<typeof entryConversationSchema>
+
+export function substantiveEntry(entry: ConversationEntry): ParticipantResponseEntry | undefined {
+  return entry.kind === 'participantResponse' ? entry : undefined
+}
+
+// CONTEXT "Conversation": listing reads the first verbatim author text in entry order, including a
+// concrete-change clarification, and falls back to a machine fact only where the conversation holds
+// no author-written text at all.
+export function openingWords(entries: readonly ConversationEntry[]): string | undefined {
+  for (const entry of entries) {
+    if (entry.kind === 'authorMessage') return entry.text
+    if (entry.kind === 'concreteChangeRequest' && entry.clarification !== undefined) return entry.clarification
+  }
+  return undefined
+}
+
+export const conversationSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    opening: z.string().min(1).optional(),
+    lastActivity: z.number(),
+  })
+  .readonly()
+
+export type ConversationSummary = z.infer<typeof conversationSummarySchema>

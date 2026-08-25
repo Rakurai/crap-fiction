@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { ConversationSummary } from '../shared/conversationViews.js'
+import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { useLoaded } from './load.js'
 import { fetchPiece, updatePiece } from './piecesClient.js'

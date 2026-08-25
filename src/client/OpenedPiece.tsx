@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ConversationSummary } from '../shared/conversationViews.js'
+import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation } from './Conversation.js'
@@ -16,8 +16,8 @@ import {
   approveCapture,
   captureContext,
   createConversation,
+  dispatch,
   fetchConversation,
-  startRound,
   subscribeToRoom,
 } from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
@@ -119,10 +119,14 @@ function Surfaces({
           key={session}
           pieceId={piece.id}
           currentConversationId={activeConversationId}
-          roundInFlight={piece.roundInFlight?.conversationId === activeConversationId ? piece.roundInFlight : null}
+          conversationActionInFlight={
+            piece.conversationActionInFlight?.kind === 'dispatch' && piece.conversationActionInFlight.conversationId === activeConversationId
+              ? piece.conversationActionInFlight
+              : null
+          }
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation, applyRecommendation }}
+          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
           mark={roster.mark}
           handle={roster.handle}

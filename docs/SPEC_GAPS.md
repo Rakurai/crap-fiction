@@ -30,22 +30,21 @@ Not resolved by deleting them from the table, because the store can already writ
 the routes would each be a one-line adapter over a capability that exists. They stay in the document
 as the shape the write takes if a surface ever asks for it.
 
-## The conversation-cutover substrate exists ahead of its wiring
+## The chronological transcript is basic, ahead of the full composition
 
-`src/shared/conversationEntries.ts` defines the causally-linked durable entries — author messages,
-concrete-change requests, participant responses, no-comment outcomes, failures, applications — that
-issue #58 replaces rounds with, and `ConversationEntryStore` in `src/server/store/index.ts` gives
-them a serialized append operation. Both are exercised only by their own tests.
+Issue #61 cuts ordinary conversation over to the durable entry substrate end to end — the room
+dispatches over entries, the transport is entry- and action-oriented, and the client renders a
+flat, chronological list of them with current activity overlaid. `UX_DESIGN.md` "A round in
+flight" and "A settled round" still describe the fuller round-shaped composition: every participant
+a dispatch will call visible from the moment it opens, in a stable seeded order, and a round's
+worth of outcomes read together as one unit. The client built here shows neither: an unanswered
+participant is a count in the activity line rather than a named, waiting row, and entries are not
+grouped by the action that caused them.
 
-Nothing reads or writes them otherwise. `src/server/room/room.ts` still holds the shared
-round-and-application operation "Operation state" and "Seams" describe, `Conversation`
-in `src/shared/conversationViews.ts` is still the round-shaped record `readConversation` and
-`writeConversation` use, and a round still calls its participants one at a time. `SPEC.md` "Files"
-correctly names `conversations/<conversation-id>.json` as that round-shaped record; the entry store
-would write a different shape to the same path if anything called it, and nothing does. This is
-deliberate expand-step work for the wide refactor issue #58 specifies; the cutover that makes the
-entries and the store load-bearing, and updates "Files" and "The round" to describe them, is that
-issue's, not this entry's.
+Not a defect in what #61 built — its own acceptance criteria call for exactly this, a basic
+transcript, and explicitly leave the full composition for later. Finishing the chronological chat
+composition to match `UX_DESIGN.md`, including cast-at-rest visibility and per-cause anchoring
+without a projected grouping container, is issue #65's.
 
 ## Abandoning a context capture
 

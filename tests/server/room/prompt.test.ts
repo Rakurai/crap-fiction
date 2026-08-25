@@ -17,7 +17,7 @@ describe('the prompt a specialist is called with', () => {
       authorContext: undefined,
       storyContext: undefined,
       draft: 'text',
-      conversation: undefined,
+      entries: undefined,
       policy: 'shared',
     })
 

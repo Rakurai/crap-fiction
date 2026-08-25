@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ConversationSummary } from '../../../src/shared/conversationViews.js'
+import type { ConversationSummary } from '../../../src/shared/conversationEntries.js'
 import { ConversationSwitcher } from '../../../src/client/ConversationSwitcher.js'
 
 const NOW = 1_700_000_000_000

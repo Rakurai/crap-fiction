@@ -38,11 +38,11 @@ describe('the room over HTTP', () => {
 
   function settlementOf(room: Room, pieceId: string): Promise<void> {
     const settlement = room.settlement(pieceId)
-    if (settlement === undefined) throw new Error(`no round in flight for "${pieceId}"`)
+    if (settlement === undefined) throw new Error(`no dispatch in flight for "${pieceId}"`)
     return settlement
   }
 
-  it('mints a conversation id that writes nothing until the first round opens', async () => {
+  it('mints a conversation id that writes nothing until the first dispatch opens', async () => {
     const { app } = await withPiece()
 
     const res = await app.request('/pieces/cups/conversations', { method: 'POST' })
@@ -55,38 +55,38 @@ describe('the room over HTTP', () => {
     expect(await getRes.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
   })
 
-  it('opens a round over HTTP and reports it no longer in flight once it settles', async () => {
+  it('opens a dispatch over HTTP and reports it no longer in flight once it settles', async () => {
     const { app, room } = await withPiece()
 
-    const roundRes = await app.request('/pieces/cups/conversations/c1/rounds', {
+    const dispatchRes = await app.request('/pieces/cups/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: '@shape does the opening earn its length', draft: 'The cups sat where she left them.' }),
     })
-    expect(roundRes.status).toBe(200)
-    const { conversationId, roundId } = (await roundRes.json()).data
+    expect(dispatchRes.status).toBe(200)
+    const { conversationId, actionId } = (await dispatchRes.json()).data
     expect(typeof conversationId).toBe('string')
-    expect(typeof roundId).toBe('string')
+    expect(typeof actionId).toBe('string')
 
     await settlementOf(room, 'cups')
 
     const pieceRes = await app.request('/pieces/cups')
     const pieceBody = await pieceRes.json()
     expect(pieceBody.data.currentConversationId).toBe(conversationId)
-    expect(pieceBody.data.roundInFlight).toBeNull()
+    expect(pieceBody.data.conversationActionInFlight).toBeNull()
   })
 
-  it('refuses a second author-initiated round while one is in flight, with ROOM_BUSY', async () => {
+  it('refuses a second author-initiated dispatch while one is in flight, with ROOM_BUSY', async () => {
     const { app, room } = await withPiece(50)
 
-    const first = await app.request('/pieces/cups/conversations/c1/rounds', {
+    const first = await app.request('/pieces/cups/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: 'a message', draft: 'text' }),
     })
     expect(first.status).toBe(200)
 
-    const second = await app.request('/pieces/cups/conversations/c1/rounds', {
+    const second = await app.request('/pieces/cups/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: 'another message', draft: 'text' }),
@@ -109,10 +109,10 @@ describe('the room over HTTP', () => {
     expect(accepted.status).toBe(200)
   })
 
-  it('reports the round in flight on the piece before it settles, so a reload mid-round knows what it is watching', async () => {
+  it('reports the dispatch in flight on the piece before it settles, so a reload mid-dispatch knows what it is watching', async () => {
     const { app, room } = await withPiece(50)
 
-    await app.request('/pieces/cups/conversations/c1/rounds', {
+    await app.request('/pieces/cups/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: 'a message', draft: 'text' }),
@@ -120,30 +120,35 @@ describe('the room over HTTP', () => {
 
     const pieceRes = await app.request('/pieces/cups')
     const pieceBody = await pieceRes.json()
-    expect(pieceBody.data.roundInFlight).not.toBeNull()
-    expect(pieceBody.data.roundInFlight.participants).toContain('shape')
+    expect(pieceBody.data.conversationActionInFlight).not.toBeNull()
+    expect(pieceBody.data.conversationActionInFlight.kind).toBe('dispatch')
+    expect(pieceBody.data.conversationActionInFlight.audience).toContain('shape')
 
     await settlementOf(room, 'cups')
   })
 
   describe('replying and asking for a concrete change', () => {
-    async function withCommentary(): Promise<{ app: Hono; room: Room; conversationId: string; roundId: string }> {
+    async function withCommentary(): Promise<{ app: Hono; room: Room; conversationId: string; responseId: string }> {
       const { app, room } = await withPiece()
 
-      const roundRes = await app.request('/pieces/cups/conversations/c1/rounds', {
+      const dispatchRes = await app.request('/pieces/cups/conversations/c1/dispatch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ message: 'a message', draft: 'text' }),
       })
-      const { conversationId, roundId } = (await roundRes.json()).data
+      const { conversationId } = (await dispatchRes.json()).data
       await settlementOf(room, 'cups')
-      return { app, room, conversationId, roundId }
+
+      const conversationRes = await app.request(`/pieces/cups/conversations/${conversationId}`)
+      const { data: conversation } = await conversationRes.json()
+      const response = conversation.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
+      return { app, room, conversationId, responseId: response.id }
     }
 
     it('sends a reply to the named participant, addressed by the act rather than by the words', async () => {
       const { app, room, conversationId } = await withCommentary()
 
-      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ target: 'shape', message: 'say more, @story-editor', draft: 'text' }),
@@ -153,37 +158,34 @@ describe('the room over HTTP', () => {
 
       const conversationRes = await app.request(`/pieces/cups/conversations/${conversationId}`)
       const { data: conversation } = await conversationRes.json()
-      const round = conversation.rounds[1]
-      expect(round.message).toBe('say more, @story-editor')
-      expect(round.addressed).toEqual(['shape'])
+      const message = conversation.entries.find((entry: { kind: string; text?: string }) => entry.kind === 'authorMessage' && entry.text === 'say more, @story-editor')
+      expect(message.audience).toEqual(['shape'])
     })
 
-    it('asks the named response for a concrete change, opening a round with no author message', async () => {
-      const { app, room, conversationId, roundId } = await withCommentary()
+    it('asks the named response for a concrete change, opening a dispatch with no author message', async () => {
+      const { app, room, conversationId, responseId } = await withCommentary()
 
-      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ respondingTo: { roundId, participantId: 'shape' }, clarification: 'be specific', draft: 'text' }),
+        body: JSON.stringify({ respondingTo: responseId, clarification: 'be specific', draft: 'text' }),
       })
       expect(res.status).toBe(200)
       await settlementOf(room, 'cups')
 
       const conversationRes = await app.request(`/pieces/cups/conversations/${conversationId}`)
       const { data: conversation } = await conversationRes.json()
-      const round = conversation.rounds[1]
-      expect(round.message).toBeUndefined()
-      expect(round.respondingTo).toEqual({ roundId, participantId: 'shape' })
-      expect(round.clarification).toBe('be specific')
+      const request = conversation.entries.find((entry: { kind: string }) => entry.kind === 'concreteChangeRequest')
+      expect(request).toMatchObject({ respondingTo: responseId, clarification: 'be specific' })
     })
 
     it('refuses asking about a response that never gave commentary, with COMMENTARY_NOT_FOUND', async () => {
-      const { app, conversationId, roundId } = await withCommentary()
+      const { app, conversationId } = await withCommentary()
 
-      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ respondingTo: { roundId, participantId: 'no-such-participant' }, draft: 'text' }),
+        body: JSON.stringify({ respondingTo: 'no-such-response', draft: 'text' }),
       })
       expect(res.status).toBe(404)
       expect(await res.json()).toMatchObject({ success: false, error: { code: 'COMMENTARY_NOT_FOUND' } })
@@ -192,7 +194,7 @@ describe('the room over HTTP', () => {
     it('refuses replying to an unknown participant, with PARTICIPANT_NOT_FOUND', async () => {
       const { app, conversationId } = await withCommentary()
 
-      const res = await app.request(`/pieces/cups/conversations/${conversationId}/rounds`, {
+      const res = await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ target: 'no-such-participant', message: 'a reply', draft: 'text' }),
@@ -203,7 +205,7 @@ describe('the room over HTTP', () => {
   })
 
   describe('applying a recommendation', () => {
-    async function withRecommendation(): Promise<{ app: Hono; room: Room; roundId: string }> {
+    async function withRecommendation(): Promise<{ app: Hono; room: Room; responseId: string }> {
       const modelAccess = FixtureModelAdapter.bySite(
         {
           shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } } },
@@ -220,23 +222,26 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ title: 'Cups' }),
       })
-      const roundRes = await app.request('/pieces/cups/conversations/c1/rounds', {
+      await app.request('/pieces/cups/conversations/c1/dispatch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: '@shape a direct question', draft: 'The cups sat where she left them.' }),
+        body: JSON.stringify({ target: 'shape', message: 'a direct question', draft: 'The cups sat where she left them.' }),
       })
-      const { roundId } = (await roundRes.json()).data
       await settlementOf(room, 'cups')
-      return { app, room, roundId }
+
+      const conversationRes = await app.request('/pieces/cups/conversations/c1')
+      const { data: conversation } = await conversationRes.json()
+      const response = conversation.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
+      return { app, room, responseId: response.id }
     }
 
     it('reaches the manuscript the model returned, on the same request', async () => {
-      const { app, roundId } = await withRecommendation()
+      const { app, responseId } = await withRecommendation()
 
       const res = await app.request('/pieces/cups/conversations/c1/apply', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId, participantId: 'shape', draft: 'The cups sat where she left them.' }),
+        body: JSON.stringify({ responseId, draft: 'The cups sat where she left them.' }),
       })
 
       expect(res.status).toBe(200)
@@ -244,37 +249,35 @@ describe('the room over HTTP', () => {
     })
 
     it('presents the applied change on the response that caused it, once the conversation is read back', async () => {
-      const { app, roundId } = await withRecommendation()
+      const { app, responseId } = await withRecommendation()
 
       const applyRes = await app.request('/pieces/cups/conversations/c1/apply', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId, participantId: 'shape', draft: 'The cups sat where she left them.' }),
+        body: JSON.stringify({ responseId, draft: 'The cups sat where she left them.' }),
       })
       const { data: applied } = await applyRes.json()
-      expect(applied.change).toMatchObject({ roundId, participantId: 'shape' })
 
       const conversationRes = await app.request('/pieces/cups/conversations/c1')
       const { data: conversation } = await conversationRes.json()
-      const round = conversation.rounds.find((candidate: { id: string }) => candidate.id === roundId)
-      const participant = round.participants.find((candidate: { participantId: string }) => candidate.participantId === 'shape')
-      expect(participant.appliedChanges).toEqual([applied.change])
+      const application = conversation.entries.find((entry: { kind: string }) => entry.kind === 'application')
+      expect(application).toMatchObject({ responseId, changeId: applied.change.id, change: applied.change.content })
     })
 
     it('refuses an unknown recommendation with RECOMMENDATION_NOT_FOUND', async () => {
-      const { app, roundId } = await withRecommendation()
+      const { app } = await withRecommendation()
 
       const res = await app.request('/pieces/cups/conversations/c1/apply', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId, participantId: 'compression', draft: 'text' }),
+        body: JSON.stringify({ responseId: 'no-such-response', draft: 'text' }),
       })
 
       expect(res.status).toBe(404)
       expect(await res.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })
     })
 
-    it('refuses to apply while a round is in flight, with ROOM_BUSY', async () => {
+    it('refuses to dispatch while an application is in flight, with ROOM_BUSY', async () => {
       const behavior: FixtureBehavior = {
         result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } },
         delayMs: 50,
@@ -288,28 +291,32 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ title: 'Cups' }),
       })
-      await app.request('/pieces/cups/conversations/c1/rounds', {
+      await app.request('/pieces/cups/conversations/c1/dispatch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: '@shape a direct question', draft: 'text' }),
+        body: JSON.stringify({ target: 'shape', message: 'a direct question', draft: 'text' }),
       })
       await settlementOf(room, 'cups')
 
-      await app.request('/pieces/cups/conversations/c1/rounds', {
+      const conversationRes = await app.request('/pieces/cups/conversations/c1')
+      const { data: conversation } = await conversationRes.json()
+      const response = conversation.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
+
+      const applying = app.request('/pieces/cups/conversations/c1/apply', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ responseId: response.id, draft: 'text' }),
+      })
+
+      const dispatchRes = await app.request('/pieces/cups/conversations/c1/dispatch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ message: 'another message', draft: 'text' }),
       })
+      expect(dispatchRes.status).toBe(409)
+      expect(await dispatchRes.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
 
-      const applyRes = await app.request('/pieces/cups/conversations/c1/apply', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId: 'r1', participantId: 'shape', draft: 'text' }),
-      })
-      expect(applyRes.status).toBe(409)
-      expect(await applyRes.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
-
-      await settlementOf(room, 'cups')
+      await applying
     })
   })
 
@@ -349,7 +356,7 @@ describe('the room over HTTP', () => {
       expect(data.proposals[0]).toMatchObject({ destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' })
     })
 
-    it('CONTEXT "Capture context": proceeds while a round is in flight, sharing the model seam rather than the room\'s round-and-apply lock', async () => {
+    it('CONTEXT "Capture context": proceeds while a dispatch is in flight, sharing the model seam rather than the room\'s dispatch-and-apply lock', async () => {
       const behavior: FixtureBehavior = { result: CONFORMING_RESULT, delayMs: 50 }
       const modelAccess = FixtureModelAdapter.bySite(
         { shape: behavior, 'story-editor': behavior, capture: { result: { outcome: 'value', value: { proposals: [] } } } },
@@ -363,7 +370,7 @@ describe('the room over HTTP', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ title: 'Cups' }),
       })
-      await app.request('/pieces/cups/conversations/c1/rounds', {
+      await app.request('/pieces/cups/conversations/c1/dispatch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ message: 'a message', draft: 'text' }),
@@ -380,7 +387,7 @@ describe('the room over HTTP', () => {
       await settlementOf(room, 'cups')
     })
 
-    it('reports capture activity on the piece independently of the round in flight, and clears it once capture settles', async () => {
+    it('reports capture activity on the piece independently of the dispatch in flight, and clears it once capture settles', async () => {
       const modelAccess = FixtureModelAdapter.bySite(
         { capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true } },
         { reachable: true, models: [] },
@@ -405,7 +412,7 @@ describe('the room over HTTP', () => {
 
       const pieceRes = await app.request('/pieces/cups')
       const pieceBody = await pieceRes.json()
-      expect(pieceBody.data.roundInFlight).toBeNull()
+      expect(pieceBody.data.conversationActionInFlight).toBeNull()
       expect(pieceBody.data.captureInFlight).toMatchObject({ conversationId: 'c1' })
 
       modelAccess.release('capture')

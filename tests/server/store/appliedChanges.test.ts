@@ -7,8 +7,6 @@ import { appliedChangeSchema, type AppliedChange } from '../../../src/shared/app
 
 const cutSentence: AppliedChange = {
   id: 'change1',
-  roundId: 'r1',
-  participantId: 'shape',
   content: { kind: 'passages', passages: [{ before: 'Ruth stood looking at them.', after: '' }] },
 }
 
@@ -34,7 +32,7 @@ describe('applied changes', () => {
   })
 
   it('reads every change a piece holds, one file each', async () => {
-    const rewrite: AppliedChange = { id: 'change2', roundId: 'r2', participantId: 'compression', content: { kind: 'rewrittenWhole' } }
+    const rewrite: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
     await writeAppliedChange(workspaceDir, 'cups', cutSentence)
     await writeAppliedChange(workspaceDir, 'cups', rewrite)
 

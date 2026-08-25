@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AppliedChange } from '../shared/appliedChange.js'
-import type { RoundSnapshot } from '../shared/roundEvents.js'
+import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
+import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import {
+  appendEntry,
+  EMPTY_PROJECTION,
+  initialProjection,
+  projectEvent,
+  withDispatchInFlight,
+  type ConversationProjection,
+} from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
   createConversation as createConversationFn,
+  DispatchOpening,
+  dispatch as dispatchFn,
   fetchConversation as fetchConversationFn,
-  RoundOpening,
-  startRound as startRoundFn,
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
-import {
-  EMPTY_PROJECTION,
-  initialProjection,
-  projectRoundEvent,
-  withAppliedChange,
-  withRoundInFlight,
-  type ConversationProjection,
-} from './roundProjection.js'
 
 const UNSENT = 'the message was not sent'
 
@@ -28,16 +28,16 @@ export type ConversationViewModel = Readonly<{
   error: string | undefined
   sendMessage: (message: string) => void
   reply: (participantId: string, message: string) => void
-  askForConcreteChange: (roundId: string, participantId: string, clarification: string | undefined) => void
+  askForConcreteChange: (respondingTo: string, clarification: string | undefined) => void
   abandon: () => void
   conversationId: string | null
-  attachAppliedChange: (roundId: string, participantId: string, change: AppliedChange) => void
+  attachEntry: (entry: ConversationEntryView) => void
 }>
 
 export type RoomAdapters = Readonly<{
   createConversation: typeof createConversationFn
   fetchConversation: typeof fetchConversationFn
-  startRound: typeof startRoundFn
+  dispatch: typeof dispatchFn
   subscribeToRoom: typeof subscribeToRoomFn
   abandonOperation: typeof abandonOperationFn
   applyRecommendation: typeof applyRecommendationFn
@@ -46,21 +46,21 @@ export type RoomAdapters = Readonly<{
 export function useConversation(
   pieceId: string,
   initialConversationId: string | null,
-  initialRoundInFlight: RoundSnapshot | null,
+  initialActivity: DispatchActivitySnapshot | null,
   flushDraft: () => void,
   getDraft: () => string,
   room: RoomAdapters,
 ): ConversationViewModel {
-  const { createConversation, fetchConversation, startRound, subscribeToRoom, abandonOperation } = room
+  const { createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation } = room
   const [projection, setProjection] = useState<ConversationProjection>(() =>
-    initialRoundInFlight === null ? EMPTY_PROJECTION : withRoundInFlight(EMPTY_PROJECTION, initialRoundInFlight),
+    initialActivity === null ? EMPTY_PROJECTION : withDispatchInFlight(EMPTY_PROJECTION, initialActivity),
   )
-  const [busy, setBusy] = useState(initialRoundInFlight !== null)
+  const [busy, setBusy] = useState(initialActivity !== null)
   const [error, setError] = useState<string | undefined>(undefined)
   const conversationIdRef = useRef<string | null>(initialConversationId)
   // Held rather than read from the prop below: this hook mints an id on a fresh conversation's
-  // first round and reports it upward, and depending on the prop would rebuild the event stream
-  // in the moment that round is opening. The author switching is a remount, not a changed prop.
+  // first dispatch and reports it upward, and depending on the prop would rebuild the event stream
+  // in the moment that dispatch is opening. The author switching is a remount, not a changed prop.
   const [openedWithConversationId] = useState(initialConversationId)
 
   useEffect(() => {
@@ -70,8 +70,8 @@ export function useConversation(
       void fetchConversation(pieceId, openedWithConversationId).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
-          const loaded = initialProjection(result.value.rounds)
-          setProjection((prev) => ({ rounds: [...loaded.rounds, ...prev.rounds] }))
+          const loaded = initialProjection(result.value.entries)
+          setProjection((prev) => ({ ...prev, entries: [...loaded.entries, ...prev.entries] }))
           return
         }
         const message = failureMessage(result)
@@ -87,12 +87,12 @@ export function useConversation(
           setError(event.data.message)
           return
         }
-        if (event.type === 'round.opened') {
+        if (event.type === 'action.started' && event.data.kind === 'dispatch') {
           conversationIdRef.current = event.data.conversationId
           setBusy(true)
         }
-        if (event.type === 'round.closed') setBusy(false)
-        setProjection((prev) => projectRoundEvent(prev, event))
+        if (event.type === 'action.finished') setBusy(false)
+        setProjection((prev) => projectEvent(prev, event))
       },
       (message) => {
         if (active) setError(message)
@@ -105,7 +105,7 @@ export function useConversation(
     }
   }, [pieceId, openedWithConversationId])
 
-  function openRound(opening: RoundOpening): void {
+  function openDispatch(opening: DispatchOpening): void {
     if (busy) return
     flushDraft()
     setError(undefined)
@@ -128,7 +128,7 @@ export function useConversation(
         conversationIdRef.current = created.value.id
       }
 
-      const result = await startRound(pieceId, conversationId, opening, getDraft())
+      const result = await dispatch(pieceId, conversationId, opening, getDraft())
       if (result.outcome !== 'value') stop(failureMessage(result))
     }
 
@@ -138,15 +138,15 @@ export function useConversation(
   }
 
   function sendMessage(message: string): void {
-    openRound({ message })
+    openDispatch({ message })
   }
 
   function reply(participantId: string, message: string): void {
-    openRound({ target: participantId, message })
+    openDispatch({ target: participantId, message })
   }
 
-  function askForConcreteChange(roundId: string, participantId: string, clarification: string | undefined): void {
-    openRound({ respondingTo: { roundId, participantId }, clarification })
+  function askForConcreteChange(respondingTo: string, clarification: string | undefined): void {
+    openDispatch({ respondingTo, clarification })
   }
 
   function abandon(): void {
@@ -157,8 +157,8 @@ export function useConversation(
     })
   }
 
-  function attachAppliedChange(roundId: string, participantId: string, change: AppliedChange): void {
-    setProjection((prev) => withAppliedChange(prev, roundId, participantId, change))
+  function attachEntry(entry: ConversationEntryView): void {
+    setProjection((prev) => appendEntry(prev, entry))
   }
 
   return {
@@ -170,6 +170,6 @@ export function useConversation(
     askForConcreteChange,
     abandon,
     conversationId: conversationIdRef.current,
-    attachAppliedChange,
+    attachEntry,
   }
 }

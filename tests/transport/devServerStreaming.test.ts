@@ -5,7 +5,7 @@ import path from 'node:path'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-describe('a round\'s events through the dev server', () => {
+describe('a dispatch\'s events through the dev server', () => {
   let server: ViteDevServer
   let baseUrl: string
   let dataRoot: string
@@ -48,7 +48,7 @@ describe('a round\'s events through the dev server', () => {
     return parsed.data
   }
 
-  it('delivers a round\'s frames while the stream is still open, rather than at the end of it', async () => {
+  it('delivers a dispatch\'s frames while the stream is still open, rather than at the end of it', async () => {
     await fetch(`${baseUrl}/workspace`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -62,7 +62,7 @@ describe('a round\'s events through the dev server', () => {
     if (stream.body === null) throw new Error('the events response carried no body')
     const reader = stream.body.getReader()
 
-    await post(`/pieces/${piece.id}/conversations/${conversation.id}/rounds`, {
+    await post(`/pieces/${piece.id}/conversations/${conversation.id}/dispatch`, {
       message: 'What do you make of this?',
       draft: 'The cups sat where she left them.',
     })
@@ -70,16 +70,16 @@ describe('a round\'s events through the dev server', () => {
     const decoder = new TextDecoder()
     let received = ''
     let names: readonly string[] = []
-    while (!names.includes('round.closed')) {
+    while (!names.includes('action.finished')) {
       const { done, value } = await reader.read()
-      if (done) throw new Error(`the stream ended before the round closed, having delivered ${names.join(', ')}`)
+      if (done) throw new Error(`the stream ended before the action finished, having delivered ${names.join(', ')}`)
       received += decoder.decode(value, { stream: true })
       names = [...received.matchAll(/^event: (.+)$/gm)].map((match) => match[1] ?? '')
     }
     await reader.cancel()
 
-    expect(names[0]).toBe('round.opened')
-    expect(names).toContain('participant.settled')
-    expect(names.at(-1)).toBe('round.closed')
+    expect(names[0]).toBe('action.started')
+    expect(names).toContain('entry.appended')
+    expect(names.at(-1)).toBe('action.finished')
   }, 30_000)
 })

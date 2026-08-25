@@ -2,10 +2,11 @@ import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import type { CaptureSnapshot } from '../shared/captureViews.js'
-import { conversationSchema, type Conversation, type ConversationSummary, type ConversationView } from '../shared/conversationViews.js'
+import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
+import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
+import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
 import { durableContextSchema } from '../shared/durableContext.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
-import type { RoundSnapshot } from '../shared/roundEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
@@ -17,7 +18,7 @@ import {
   pieceExists,
   pieceIds,
   readAppliedChanges,
-  readConversation,
+  readConversationEntries,
   readPiece,
   readStoryContext,
   writePieceCast,
@@ -75,18 +76,11 @@ function castView(specialists: readonly RoleDefinition[], enabled: readonly stri
   }))
 }
 
-function openingWords(conversation: Conversation): string | undefined {
-  for (const round of conversation.rounds) {
-    if (round.message !== undefined) return round.message
-  }
-  return undefined
-}
-
 export function listConversations(workspaceDir: string, pieceId: string): readonly ConversationSummary[] {
   return conversationActivity(workspaceDir, pieceId)
     .map(({ id, modifiedMs }) => {
-      const conversation = readConversation(workspaceDir, pieceId, id, conversationSchema)
-      const opening = conversation === undefined ? undefined : openingWords(conversation)
+      const conversation = readConversationEntries(workspaceDir, pieceId, id)
+      const opening = conversation === undefined ? undefined : openingWords(conversation.entries)
       return { id, opening, lastActivity: modifiedMs }
     })
     .sort((a, b) => b.lastActivity - a.lastActivity)
@@ -121,7 +115,7 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
 export function getPiece(
   workspaceDir: string,
   id: string,
-  roundInFlight: RoundSnapshot | null,
+  conversationActionInFlight: ConversationActivitySnapshot | null,
   captureInFlight: CaptureSnapshot | null,
   specialists: readonly RoleDefinition[],
 ): PieceDetail {
@@ -132,7 +126,7 @@ export function getPiece(
     storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
     currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
     conversations: listConversations(workspaceDir, id),
-    roundInFlight,
+    conversationActionInFlight,
     captureInFlight,
     cast: castView(specialists, piece.metadata.cast),
   }
@@ -168,34 +162,26 @@ export function startConversation(workspaceDir: string, pieceId: string): { read
   return { id: nanoid() }
 }
 
-export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): ConversationView {
-  const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): EntryConversationView {
+  const conversation = readConversationEntries(workspaceDir, pieceId, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
-  const changes = readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema)
-  const changesFor = (roundId: string, participantId: string): readonly AppliedChange[] =>
-    changes.filter((change) => change.roundId === roundId && change.participantId === participantId)
+  const changes = new Map(readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema).map((change) => [change.id, change]))
 
-  return {
-    id: conversation.id,
-    rounds: conversation.rounds.map((round) => ({
-      ...round,
-      participants: round.participants.map((participant) => ({
-        ...participant,
-        appliedChanges: changesFor(round.id, participant.participantId),
-      })),
-    })),
-  }
+  const entries: ConversationEntryView[] = conversation.entries.map((entry) =>
+    entry.kind === 'application' ? { ...entry, change: changes.get(entry.changeId)?.content } : entry,
+  )
+
+  return { id: conversation.id, entries }
 }
 
 export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
-  const conversation = readConversation(workspaceDir, pieceId, conversationId, conversationSchema)
+  const conversation = readConversationEntries(workspaceDir, pieceId, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
-  const roundIds = new Set(conversation.rounds.map((round) => round.id))
-  const changes = readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema).filter((change) => roundIds.has(change.roundId))
-  for (const change of changes) {
-    await deleteAppliedChange(workspaceDir, pieceId, change.id)
+  const changeIds = conversation.entries.flatMap((entry) => (entry.kind === 'application' ? [entry.changeId] : []))
+  for (const changeId of changeIds) {
+    await deleteAppliedChange(workspaceDir, pieceId, changeId)
   }
 
   // Last: a failure partway through leaves the file that names the changes still readable.

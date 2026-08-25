@@ -4,7 +4,6 @@ import { z } from 'zod'
 import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
-import type { Conversation } from '../../shared/conversationViews.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import { resolveWithinRoot } from './containment.js'
 import {
@@ -169,27 +168,6 @@ function conversationsDirectory(pieceDir: string): string {
 
 function conversationFile(pieceDir: string, conversationId: string): string {
   return path.join(conversationsDirectory(pieceDir), `${conversationId}${CONVERSATION_SUFFIX}`)
-}
-
-export function readConversation<T>(
-  workspaceDir: string,
-  pieceId: string,
-  conversationId: string,
-  schema: z.ZodType<T>,
-): T | undefined {
-  const pieceDir = pieceDirectory(workspaceDir, pieceId)
-  if (pieceDir === undefined) return undefined
-  return readJsonArtifact(conversationFile(pieceDir, conversationId), schema)
-}
-
-export async function writeConversation(
-  workspaceDir: string,
-  pieceId: string,
-  conversationId: string,
-  value: Conversation,
-): Promise<void> {
-  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
-  await writeJsonArtifact(conversationFile(pieceDir, conversationId), value)
 }
 
 export function conversationActivity(workspaceDir: string, pieceId: string): readonly { readonly id: string; readonly modifiedMs: number }[] {

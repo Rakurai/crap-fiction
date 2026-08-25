@@ -9,6 +9,7 @@ import { SHIPPED_HISTORY_POLICY, type HistoryPolicy } from '../../src/server/roo
 import { authorContextStore, durableContextReader } from '../../src/server/room/durableContext.js'
 import { Room } from '../../src/server/room/room.js'
 import { resolveRoster } from '../../src/server/room/roster.js'
+import { ConversationEntryStore } from '../../src/server/store/index.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
 
 export const MODE_FIXTURE: ModeDescriptor = {
@@ -40,6 +41,7 @@ export function buildTestRoom(dataRoot: string, overrides: RoomOverrides = {}): 
     overrides.modelAccess ?? unscriptedModelAccess(),
     durableContextReader(dataRoot),
     authorContextStore(dataRoot),
+    new ConversationEntryStore(),
     resolveRoster(overrides.mode ?? MODE_FIXTURE, overrides.roles ?? ROLES_FIXTURE),
     overrides.charter ?? CHARTER_FIXTURE,
     overrides.policy ?? SHIPPED_HISTORY_POLICY,

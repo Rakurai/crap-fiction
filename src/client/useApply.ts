@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AppliedChange } from '../shared/appliedChange.js'
+import type { ApplicationEntryView } from '../shared/conversationEntryViews.js'
 import type { abandonOperation as abandonOperationFn, applyRecommendation as applyRecommendationFn } from './roomClient.js'
 import { failureMessage } from './request.js'
 
@@ -8,12 +8,12 @@ export type ApplyAdapters = Readonly<{
   abandonOperation: typeof abandonOperationFn
 }>
 
-export type ApplyingResponse = Readonly<{ roundId: string; participantId: string }>
+export type ApplyingResponse = Readonly<{ responseId: string }>
 
 export type ApplyViewModel = Readonly<{
   applying: ApplyingResponse | undefined
   error: string | undefined
-  apply: (roundId: string, participantId: string, constraint: string | undefined) => void
+  apply: (responseId: string, constraint: string | undefined) => void
   abandon: () => void
 }>
 
@@ -23,18 +23,18 @@ export function useApply(
   getDraft: () => string,
   onApplied: (markdown: string) => void,
   onApplyingChange: (applying: boolean) => void,
-  onChangeApplied: (roundId: string, participantId: string, change: AppliedChange) => void,
+  onApplicationEntry: (entry: ApplicationEntryView) => void,
   adapters: ApplyAdapters,
 ): ApplyViewModel {
   const { applyRecommendation, abandonOperation } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
 
-  function apply(roundId: string, participantId: string, constraint: string | undefined): void {
+  function apply(responseId: string, constraint: string | undefined): void {
     if (applying !== undefined || conversationId === null) return
     const cid = conversationId
     setError(undefined)
-    setApplying({ roundId, participantId })
+    setApplying({ responseId })
     onApplyingChange(true)
 
     function stop(message: string | undefined): void {
@@ -44,7 +44,7 @@ export function useApply(
     }
 
     async function run(): Promise<void> {
-      const result = await applyRecommendation(pieceId, cid, roundId, participantId, getDraft(), constraint)
+      const result = await applyRecommendation(pieceId, cid, responseId, getDraft(), constraint)
       if (result.outcome !== 'value') {
         stop(failureMessage(result))
         return
@@ -54,7 +54,9 @@ export function useApply(
       if (outcome.outcome === 'applied') {
         stop(undefined)
         onApplied(outcome.manuscript)
-        if (outcome.change !== undefined) onChangeApplied(roundId, participantId, outcome.change)
+        if (outcome.change !== undefined && outcome.entryId !== undefined) {
+          onApplicationEntry({ id: outcome.entryId, kind: 'application', responseId, changeId: outcome.change.id, change: outcome.change.content })
+        }
         return
       }
       if (outcome.outcome === 'failed') {

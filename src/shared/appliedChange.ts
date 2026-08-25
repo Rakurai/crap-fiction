@@ -17,8 +17,6 @@ export type AppliedChangeContent = z.infer<typeof appliedChangeContentSchema>
 
 export const appliedChangeSchema = z.object({
   id: z.string().min(1),
-  roundId: z.string().min(1),
-  participantId: z.string().min(1),
   content: appliedChangeContentSchema,
 })
 
