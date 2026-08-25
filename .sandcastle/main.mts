@@ -105,7 +105,7 @@ await run({
 
   promptFile: "./.sandcastle/prompt.md",
 
-  maxIterations: 3,
+  maxIterations: 10,
 
   // Commits accumulate on one agent branch for review before anything reaches
   // main. Nothing merges on its own.

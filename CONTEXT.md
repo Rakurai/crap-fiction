@@ -114,9 +114,10 @@ The generalist participant, always present. Its objective is its own and holisti
 evaluate the current story against the author's story context and author context, using the
 specialists' readings as evidence, and recommend what best serves the piece as a whole.
 
-It receives the substantive specialist responses caused by the same author action only after
-those responses have been independently formed. Silences and failures are not readings and do
-not reach it, so its reasoning is about the story rather than about the room.
+It receives the round's specialist outcomes only after those outcomes have been independently
+formed. Substantive responses reach it as readings, and a no-comment outcome reaches it as the
+information that the specialist found nothing material to contribute. A specialist that was not
+called is absent rather than silent. Failures do not reach the Story Editor.
 
 It may endorse a specialist strongly, reject a specialist's concern, name a genuine tradeoff,
 or supply a better framing than any specialist offered. It may also have nothing to add, where
