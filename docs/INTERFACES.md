@@ -161,14 +161,20 @@ would invite something to read them.
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them.
 
-Shipped data — the participant charter, the role definitions, the mode descriptors — travels with the
-application's own source and not under the data root. The **charter** is what every participant is told
-whichever one it is: what the three outcomes mean and what makes a recommendation applicable rather
-than commentary, that a direct question is owed an answer, and that nothing reasons about the author's
-question instead of about the story. It is its own kind so that a correction to it is one edit rather
-than one per role. A **role definition** carries the participant's display name and its single-token
-handle, which are different things — a display name of more than one word cannot be recovered from a
-message.
+Shipped data — the participant charter, every participant, and the mode descriptors — travels with the
+application and not under the data root. The charter and the mode descriptors sit beside the
+application's own source; every participant is one Markdown document under a content root resolved
+once at startup, and its filename is its id.
+
+The **charter** is what every participant is told whichever one it is: what the three outcomes mean and
+what makes a recommendation applicable rather than commentary, that a direct question is owed an answer,
+and that nothing reasons about the author's question instead of about the story. It is its own kind so
+that a correction to it is one edit rather than one per participant.
+
+A **participant** carries its display name and its single-token handle, which are different things — a
+display name of more than one word cannot be recovered from a message — and two distinct texts: a short
+**description**, read by the author assigning it a model, and a **persona**, briefing the model with the
+participant's responsibility.
 
 ## Process environment
 

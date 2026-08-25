@@ -41,9 +41,9 @@ const fixtureMode: ModeDescriptor = {
 }
 
 const fixtureRoles = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'compression', handle: 'compression', displayName: 'Compression', roleDescription: 'y' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'z' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x' },
+  { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'y', persona: 'reasons about y' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'z', persona: 'reasons about z' },
 ]
 
 /** Everything a room turns on except the seam under test, which each caller supplies. */

@@ -3,7 +3,7 @@ import { loadCharter } from '../../../src/server/model/charter.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import { compileSpecialistContext, renderPrompt } from '../../../src/server/room/context.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
+const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'reasons about the turn', persona: 'reasons about reasons about the turn' }
 
 describe('the prompt a specialist is called with', () => {
   it('carries every clause of the shipped charter, each in its own section', () => {

@@ -16,8 +16,8 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
 
-const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reasons about the turn' }
-const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', roleDescription: 'reasons about omission' }
+const shape: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the turn' }
+const compression: RoleDefinition = { id: 'compression', handle: 'compression', displayName: 'Compression', description: 'what earns its space', persona: 'reasons about omission' }
 
 const charter = CHARTER_FIXTURE
 const MANUSCRIPT = 'The cups sat where she left them.'
@@ -275,12 +275,12 @@ describe('rendering a prompt', () => {
       }),
     )
     const roleSection = sectionOf(renderPrompt(withCriteria, charter), 'Your role')
-    expect(roleSection).toContain(shape.roleDescription)
+    expect(roleSection).toContain(shape.persona)
     expect(roleSection).toContain('Entry point, the turn, the inevitability of the close')
     expect(roleSection).toContain('A middle presented as an ending')
 
     const bare = renderPrompt(bareSpecialist, charter)
-    expect(bare).toContain(shape.roleDescription)
+    expect(bare).toContain(shape.persona)
     expect(bare).not.toContain('you attend to')
     expect(bare).not.toContain('defect')
   })

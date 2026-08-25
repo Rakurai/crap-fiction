@@ -42,7 +42,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
               >
                 {member.enabled ? 'disable' : 'enable'}
               </button>
-              <p className={styles.role}>{member.roleDescription}</p>
+              <p className={styles.role}>{member.description}</p>
             </li>
           ))}
           {/* The room is the cast and the Story Editor. It is here because it is always here. */}
@@ -52,7 +52,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
               <span className={styles.name}>{storyEditor.displayName}</span>
             </div>
             <span className={styles.always}>{ALWAYS_PRESENT}</span>
-            <p className={styles.role}>{storyEditor.roleDescription}</p>
+            <p className={styles.role}>{storyEditor.description}</p>
           </li>
         </ul>
       </div>

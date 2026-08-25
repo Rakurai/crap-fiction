@@ -65,6 +65,11 @@ durable notes.
 Story context may change considerably as a piece develops, but never without the author
 saying so. Ordinary discussion and ordinary editing do not rewrite it.
 
+## Surface
+
+The closed set of places written material can be edited: the draft, the story context, or the
+author context.
+
 ## Room
 
 The participants engaged on a piece: its specialists and the Story Editor.
@@ -79,7 +84,9 @@ eligible again.
 
 A collaborator that can be addressed and can respond: a specialist, or the Story Editor.
 
-Each participant has a static role description explaining what it contributes.
+Each participant is one authored document holding two distinct texts: a short **description**,
+read by the author when assigning it a model, and a **persona**, briefing the model with the
+participant's responsibility. Neither stands in for the other.
 
 ### Specialist
 

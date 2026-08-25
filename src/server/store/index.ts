@@ -12,6 +12,7 @@ import {
   fileExists,
   fileModifiedMs,
   fileNames,
+  readContentDocuments,
   readJsonArtifact,
   readTextArtifact,
   readYamlArtifact,
@@ -248,10 +249,10 @@ export function readShippedModes<T>(schema: z.ZodType<T>): readonly T[] {
   return readYamlDirectory(path.join(SHIPPED_ROOT, 'modes'), schema)
 }
 
-export function readShippedRoles<T>(schema: z.ZodType<T>): readonly T[] {
-  return readYamlDirectory(path.join(SHIPPED_ROOT, 'model', 'roles'), schema)
-}
-
 export function readShippedCharter<T>(schema: z.ZodType<T>): T {
   return readYamlFile(path.join(SHIPPED_ROOT, 'model', 'charter.yaml'), schema)
+}
+
+export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {
+  return readContentDocuments(path.join(contentRoot, 'participants'), schema)
 }

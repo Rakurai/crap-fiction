@@ -72,7 +72,7 @@ function castView(specialists: readonly RoleDefinition[], enabled: readonly stri
     id: role.id,
     handle: role.handle,
     displayName: role.displayName,
-    roleDescription: role.roleDescription,
+    description: role.description,
     enabled: enabled.includes(role.id),
   }))
 }
@@ -131,7 +131,7 @@ export function getPiece(
     conversationActionInFlight,
     captureInFlight,
     cast: castView(specialists, piece.metadata.cast),
-    storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, roleDescription: storyEditor.roleDescription },
+    storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
   }
 }
 

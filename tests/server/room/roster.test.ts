@@ -3,8 +3,8 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { CastMemberWithoutRoleError, resolveRoster, StoryEditorNotResolvedError } from '../../../src/server/room/roster.js'
 
-const SHAPE: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it' }
-const EDITOR: RoleDefinition = { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'the judgment' }
+const SHAPE: RoleDefinition = { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the shape of it' }
+const EDITOR: RoleDefinition = { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'the judgment', persona: 'reasons about the judgment' }
 
 function mode(cast: ModeDescriptor['cast']): ModeDescriptor {
   return { id: 'flash', name: 'Flash', cast }
@@ -33,7 +33,7 @@ describe('resolving who is in the room', () => {
    * Editor, and with two, which of them judges is stated nowhere.
    */
   it('refuses a roster that does not leave exactly one role outside the cast', () => {
-    const other: RoleDefinition = { id: 'interiority', handle: 'inter', displayName: 'Interiority', roleDescription: 'the inner life' }
+    const other: RoleDefinition = { id: 'interiority', handle: 'inter', displayName: 'Interiority', description: 'the inner life', persona: 'reasons about the inner life' }
 
     expect(() => resolveRoster(mode([{ id: 'shape', attendsTo: 'x', defect: 'y' }]), [SHAPE])).toThrowError(StoryEditorNotResolvedError)
     expect(() => resolveRoster(mode([{ id: 'shape', attendsTo: 'x', defect: 'y' }]), [SHAPE, EDITOR, other])).toThrowError(StoryEditorNotResolvedError)

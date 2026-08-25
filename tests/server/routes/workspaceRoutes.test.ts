@@ -8,8 +8,8 @@ import { buildTestApp } from '../../support/harness.js'
 
 const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y' },
 ]
 
 describe('the workspace routes', () => {

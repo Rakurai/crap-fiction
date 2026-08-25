@@ -25,7 +25,7 @@ export const castMemberViewSchema = z
     id: z.string(),
     handle: z.string(),
     displayName: z.string(),
-    roleDescription: z.string(),
+    description: z.string(),
     enabled: z.boolean(),
   })
   .readonly()
@@ -35,7 +35,7 @@ export const storyEditorViewSchema = z
   .object({
     handle: z.string(),
     displayName: z.string(),
-    roleDescription: z.string(),
+    description: z.string(),
   })
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>

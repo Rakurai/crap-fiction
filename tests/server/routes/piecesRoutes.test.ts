@@ -21,8 +21,8 @@ const MODE: ModeDescriptor = {
 }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reads for the shape of the whole' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'weighs what the room said' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'reads for the shape of the whole', persona: 'reasons about the shape of the whole' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'weighs what the room said', persona: 'reasons about what the room said' },
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
@@ -76,7 +76,7 @@ describe('the piece routes', () => {
         mode: 'flash',
         status: 'drafting',
         draft: 'Two small words.',
-        cast: [{ id: 'shape', displayName: 'Shape', roleDescription: ROLES[0]?.roleDescription, enabled: true }],
+        cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
         conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
       },
     })

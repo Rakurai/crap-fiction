@@ -32,15 +32,16 @@ const flash: ModeDescriptor = {
 }
 
 const specialists: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it' },
-  { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space' },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', persona: 'reasons about the shape of it' },
+  { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', persona: 'reasons about what earns its space' },
 ]
 
 const storyEditor: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
   displayName: 'Story Editor',
-  roleDescription: 'holds the whole of it',
+  description: 'holds the whole of it',
+  persona: 'reasons about the whole of it',
 }
 
 describe('pieces', () => {
@@ -114,10 +115,10 @@ describe('pieces', () => {
       conversationActionInFlight: null,
       captureInFlight: null,
       cast: [
-        { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-        { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
+        { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
+        { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
       ],
-      storyEditor: { handle: 'editor', displayName: 'Story Editor', roleDescription: 'holds the whole of it' },
+      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it' },
     })
   })
 
@@ -170,8 +171,8 @@ describe('setPieceCast', () => {
     const disabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
 
     expect(disabled).toEqual([
-      { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
     ])
     expect(getPiece(workspaceDir, created.id, null, null, specialists, storyEditor).cast).toEqual(disabled)
 

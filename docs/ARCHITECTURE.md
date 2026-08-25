@@ -219,12 +219,13 @@ model once is on that model for every piece; and the interface theme. With no th
 interface follows the operating system — an absent key means the author has not chosen, which is a
 different thing from a value the application supplied on their behalf.
 
-**Shipped data travels with the application**, beside its own source rather than under the data root:
-the participant charter, the role definitions, and the mode descriptors. Where exactly is the store
-boundary's, like the rest of the layout — the modules that read them state what each must contain and
-never where it is. It is kept apart from author configuration because conflating them means an upgrade
-either clobbers the author's assignments or fails to deliver a corrected role definition. It is
-validated at startup, and invalid shipped data is a startup failure, since a descriptor that parses
+**Shipped data travels with the application**, not under the data root: the participant charter and
+the mode descriptors sit beside their own source, and every participant is one document under a
+content root resolved once at startup. Where exactly the content root and the source-adjacent files sit
+is the store boundary's, like the rest of the layout — the modules that read them state what each must
+contain and never where it is. It is kept apart from author configuration because conflating them means
+an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
+validated at startup, and invalid shipped data is a startup failure, since a document that parses
 partially would enable the wrong cast. The mode set shipped is one descriptor, and any other count is a
 startup failure too: everything above reads the mode as singular, so a second one arriving as data would
 be silently ignored rather than offered.
@@ -497,15 +498,14 @@ either.
 
 **This is the seam the central bet lives in.** Everything else in the orchestration is plumbing.
 
-A participant call is assembled from the participant's role definition, the mode's criteria for that
+A participant call is assembled from the participant's persona, the mode's criteria for that
 participant, the model configuration, and the selected context compilation policy — none of which is
 an intrinsic property of the participant.
 
-**The mode's criteria are part of that because they are what make the specialists differ.** A
-compilation that dropped what a specialist attends to and the defect it is alert to would separate
-four participants by one sentence of role description each, which is not the room the bet describes.
-The Story Editor has no such criteria, being no part of the cast, and is told what it is for by its
-role definition instead.
+**The mode's criteria are part of that because they are what make the specialists differ at this
+scale.** A compilation that dropped what a specialist attends to and the defect it is alert to would
+separate four participants by persona alone, which is not the room the bet describes. The Story Editor
+has no such criteria, being no part of the cast, and is told what it is for by its own persona instead.
 
 **Compilation is a pure function**, so the invariant is asserted against the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
@@ -764,7 +764,7 @@ a frame around one.
 
 **An event names a participant by its identity and never by its display name.** A name is roster data, it
 is the same for every dispatch, and putting it on every frame would make the stream a second place a
-participant's name is stated — one that would go stale the moment a role definition was edited and
+participant's name is stated — one that would go stale the moment a participant was edited and
 reloaded. The client resolves names through the roster, and the surface a conversation is drawn on does
 not render until the roster has landed, so there is no window in which a conversation could be drawn in
 identities.
@@ -878,7 +878,7 @@ rebuilt, and the roster changing is the only thing that causes one.
 
 **Everything else is picked up without a restart, and code changes without a rebuild.** The client is
 served by the Vite process the server runs inside, so a client edit hot-reloads and a server edit reloads
-the module graph. Shipped data travels in the repository bind, so correcting a role definition is an edit
+the module graph. Shipped data travels in the repository bind, so correcting a participant is an edit
 and a reload rather than a release; it is validated at startup, so it is a reload and not merely a save.
 Change notification over a bind mount is not dependable, so the watcher polls. Nothing about that reaches
 author data, which is still watched by nothing at all.

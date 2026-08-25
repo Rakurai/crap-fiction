@@ -162,9 +162,9 @@ function roleText(context: Context): string {
   const criteria = context.criteria
   const body =
     criteria === undefined
-      ? context.role.roleDescription
+      ? context.role.persona
       : [
-          context.role.roleDescription,
+          context.role.persona,
           `At this scale you attend to: ${criteria.attendsTo}`,
           `The defect you are alert to: ${criteria.defect}`,
         ].join('\n\n')

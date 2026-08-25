@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import path from 'node:path'
 import { createApp } from './app.js'
 import { loadEnv, type StudioEnv } from './env.js'
 import { createLogger, type Logger } from './logger.js'
@@ -19,13 +20,15 @@ export type Studio = {
   readonly app: Hono
 }
 
+const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
+
 export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => ModelAccess): Studio {
   const env = loadEnv()
   const logger = createLogger(env.logLevel)
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
   const mode = loadModes()
-  const roles = loadRoles()
+  const roles = loadRoles(CONTENT_ROOT)
   const charter = loadCharter()
   const sites = callSites(roles)
   const draftWriter = new DraftWriter(new DraftStore())
