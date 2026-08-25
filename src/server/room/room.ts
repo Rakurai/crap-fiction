@@ -419,6 +419,9 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
     }
 
+    // Compiled once, before any job is submitted (SPEC "Context compilation"): no specialist's
+    // context can contain a sibling's response caused by this same entry, whatever order they settle
+    // in — the exclusion holds by construction rather than by an ordering the calls happen not to race.
     const calls = eligibleSpecialists.map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
       return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
@@ -426,26 +429,36 @@ export class Room {
 
     const evidence: ParticipantEvidence[] = []
     let abandoned = false
+    let failed = false
 
-    for (const call of calls) {
-      if (signal.aborted) {
-        abandoned = true
-        break
-      }
+    const reportFailureOnce = (message: string, err: unknown): void => {
+      if (failed) return
+      failed = true
+      this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+    }
 
+    // Submitted independently and awaited together: this dispatch tracks only the specialist jobs
+    // its own source entry caused, never a global model-queue state, and each settles and appends on
+    // its own schedule. `Promise.all` over exactly these jobs is that tracked set — it resolves the
+    // instant the last of them does, which is the zero-remaining moment the Story Editor waits for.
+    const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
       const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
         onState(call.role.id, state),
       )
       operation.states.delete(call.role.id)
+
       if (outcome.kind === 'abandoned') {
         abandoned = true
-        break
+        return
       }
+      // A result settling after this dispatch already closed as failed is stale and discarded, not
+      // appended behind the `action.finished` the author already saw.
+      if (failed) return
 
       try {
         await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
       } catch (err) {
-        this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', err instanceof Error ? err.message : 'the entry could not be written', err)
+        reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
         return
       }
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
@@ -454,7 +467,11 @@ export class Room {
       if (gathered !== undefined) evidence.push(gathered)
     }
 
-    if (!abandoned && storyEditorIncluded) {
+    // Responses are never rearranged into cast order (SPEC "The round"): each settles and appends
+    // independently, so durable order is completion order.
+    await Promise.all(calls.map(settleSpecialist))
+
+    if (!abandoned && !failed && storyEditorIncluded) {
       if (signal.aborted) {
         abandoned = true
       } else {
@@ -470,16 +487,17 @@ export class Room {
           try {
             await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
           } catch (err) {
-            this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', err instanceof Error ? err.message : 'the entry could not be written', err)
-            return
+            reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
           }
-          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
         }
       }
     }
 
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled' } })
-    this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
+    if (!failed) {
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled' } })
+      this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
+    }
   }
 
   async apply(

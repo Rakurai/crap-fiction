@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelAccess } from '../../../src/server/model/types.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece, PieceNotFoundError } from '../../../src/server/pieces.js'
@@ -59,6 +59,21 @@ function settlementOf(room: Room, pieceId: string): Promise<void> {
   const settlement = room.settlement(pieceId)
   if (settlement === undefined) throw new Error(`no dispatch in flight for "${pieceId}"`)
   return settlement
+}
+
+// Resolves the instant `participantId`'s entry lands, rather than on a fixed delay: subscribing is
+// synchronous, so setting this up before releasing the fixture's gate cannot race the event it waits for.
+function nextEntryAppended(room: Room, pieceId: string, participantId: string): Promise<void> {
+  return new Promise((resolve) => {
+    const unsubscribe = room.subscribe(pieceId, (event) => {
+      if (event.type !== 'entry.appended') return
+      const entry = event.data.entry
+      if ('participantId' in entry && entry.participantId === participantId) {
+        unsubscribe()
+        resolve()
+      }
+    })
+  })
 }
 
 describe('Room.dispatch', () => {
@@ -248,6 +263,65 @@ describe('Room.dispatch', () => {
     for (const participantId of ['shape', 'compression', 'story-editor']) {
       expect(events.indexOf(`state:${participantId}:working`)).toBeLessThan(events.indexOf(`settled:${participantId}`))
     }
+  })
+
+  it('SPEC "The round": submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'compression reading' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const settled = settlementOf(room, piece.id)
+
+    // Both specialist calls are already in flight before either has settled — neither waited for
+    // the other to be submitted, and cast order lists shape before compression.
+    expect(adapter.promptFor('shape')).toBeDefined()
+    expect(adapter.promptFor('compression')).toBeDefined()
+
+    const compressionLanded = nextEntryAppended(room, piece.id, 'compression')
+    adapter.release('compression')
+    await compressionLanded
+    // shape has not settled yet, so the tracked specialist set is not empty: no Story Editor call.
+    expect(adapter.promptFor('story-editor')).toBeUndefined()
+
+    const shapeLanded = nextEntryAppended(room, piece.id, 'shape')
+    adapter.release('shape')
+    await shapeLanded
+    // The story-editor call is issued once the last specialist promise resolves, a further
+    // microtask turn past the entry it just appended — polled rather than assumed on one tick.
+    await vi.waitFor(() => expect(adapter.promptFor('story-editor')).toBeDefined())
+
+    adapter.release('story-editor')
+    await settled
+
+    const landed = entries(workspaceDir, piece.id, conversationId).filter((entry) => entry.kind === 'participantResponse')
+    expect(landed.map((entry) => entry.participantId)).toEqual(['compression', 'shape', 'story-editor'])
+  })
+
+  it('reaches the Story Editor from an empty tracked set while unrelated model work — a capture on the same piece — is still active', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+      capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
+    })
+
+    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(room.captureSnapshot(piece.id)).toBeDefined()
+
+    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    await settlementOf(room, piece.id)
+
+    const landed = entries(workspaceDir, piece.id, conversationId).filter((entry) => entry.kind === 'participantResponse')
+    expect(landed.map((entry) => entry.participantId)).toEqual(['story-editor'])
+
+    adapter.release('capture')
+    await capturing
   })
 
   it('durably enables a specialist that was addressed but not part of the enabled cast', async () => {

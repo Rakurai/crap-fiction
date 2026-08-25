@@ -585,9 +585,12 @@ given more simultaneous calls than it is configured for fails rather than queues
 is never asked to hold more than one, a guarantee the production adapter keeps by queuing every
 submission and running them one at a time regardless of how its caller submitted them. That is a
 fixed, unconditional policy owned entirely by the adapter, not a configurable scheduler, a
-concurrency limit, or a residency abstraction serving several policies. A round still issues its
-calls one at a time and awaits each in turn, so a round still costs the sum of its calls; the seam's
-independence stands ready for a caller that has a reason to use it.
+concurrency limit, or a residency abstraction serving several policies. The room uses the seam's
+independence: a dispatch submits every eligible specialist's call without awaiting the one before
+it. On the production adapter a round's wall-clock cost is still the sum of its calls, because that
+adapter's own queuing is the guarantee above; an adapter able to overlap compatible work is free to
+settle several of a round's calls sooner than their sum, and the room does not have to change for
+either.
 
 ## Context compilation
 
@@ -642,13 +645,15 @@ a redesign.
 
 **Under every policy, the invariant holds: no specialist's context contains any other
 specialist's response from the round being formed.** It is enforced by construction: every eligible
-specialist's context is compiled before the round's first call is issued, so no specialist response
-from the round exists at the moment any specialist context is built.
+specialist's context is compiled before any of the round's calls is submitted, so no specialist
+response from the round exists at the moment any specialist context is built.
 
-Sequential execution is why that has to be stated rather than assumed. With calls issued one after
-another, an earlier specialist's response is sitting there when a later call is made, and the only
-thing keeping it out is that the later call's context was already closed. Compiling up front is the
-difference between an invariant and a habit.
+Independent submission is why that has to be stated rather than assumed. Every eligible specialist's
+call is submitted before any of them has settled, and which one settles first is not under the
+room's control — an earlier context that stayed open past submission would let whichever specialist
+answers fastest leak into a sibling's call made a beat later. Compiling every context up front, from
+one snapshot, is what keeps the invariant true regardless of settlement order rather than a habit
+that depended on an order the round no longer has.
 
 **The Story Editor is compiled by the same function** with the round's settled substantive
 specialist responses supplied as an additional input. That is the one asymmetry in the design,
@@ -718,25 +723,33 @@ Dispatch = { causeEntry, addressed[] }
   eligible = addressed, or the enabled cast when nothing was addressed
   append causeEntry durably before any call is issued; its audience is eligible ∪ Story Editor
   compile every eligible participant's context, before any call is issued
-  call them one at a time, in the cast's order, one abort signal per call
-  append each settled outcome as its own entry, and stream it as it lands
-  if nothing was addressed: call the Story Editor over the substantive responses, however few
+  submit every eligible specialist's call independently, one shared abort signal for all of them
+  append each settled outcome as its own entry, in the order it settles, and stream it as it lands
+  once every submitted specialist call has settled: if nothing was addressed, call the Story Editor
+    over the substantive responses, however few
 ```
 
-The order is the content: readings that have not settled cannot be evaluated as evidence, which is
-why the Story Editor's call is last and not merely later.
+Completion is the content: the Story Editor is given only readings that have already settled, which
+is why its call waits for this dispatch's own specialist calls to settle rather than being scheduled
+after them in some fixed position.
 
-**Where nothing was addressed, the Story Editor belongs to the dispatch's participant set from the
-moment it opens** — last in the order, and waiting for its call exactly as an unreached specialist
-is. The author has no use for the fact that a different condition gates it, so `participant.activity`
-needs no third value for it, and the guarantee that the readings precede the judgment is carried by
-its position rather than asserted in a label. An addressed dispatch that did not name it does not
-include it at all.
+**Where nothing was addressed, the Story Editor belongs to the dispatch's specialist set from the
+moment it opens** — its call cannot be submitted until every specialist call this dispatch caused has
+settled. The author has no use for the fact that a different condition gates it, so
+`participant.activity` needs no third value for it, and the guarantee that the readings precede the
+judgment is carried by that precondition rather than asserted in a label or a position in a list. An
+addressed dispatch that did not name it does not include it at all, and a directed message or a
+concrete-change request never reaches this gate regardless of how many specialists it happened to
+call.
 
-**The cast's order is the order calls are issued**, so responses land in a stable order the author
-sees fill in. That the order is now observable changes nothing about independence — every context
-was closed before the first call — and it costs the presentation nothing, because the order was
-already required to be stable and independent of who answered first.
+**Responses land in the order they settle, not the cast's order.** Every eligible specialist's call
+is submitted before any of them has settled, so a dispatch calling four specialists on four
+different models can have any one of them answer first, and whichever does is durable first.
+Independence never depended on a stable order: every context was already closed, from one snapshot,
+before any call was submitted, so which one settles when carries no bearing on what any of them was
+asked. The room does not serialize these calls itself and does not infer that all of them are done
+from any shared model-queue state; it tracks only the specialist calls this dispatch's own source
+entry caused, and acts once exactly that set is empty.
 
 **Addressing is parsed out of the author's message by the room, and it is the only thing the
 message is parsed for.** A sigil counts where it begins the message or follows whitespace — so
@@ -791,11 +804,13 @@ exhausted, and there is no per-participant re-ask. A participant has nothing mat
 no-comment outcome is recorded and is not shown, and it is never re-run under an obligation to
 speak. The Story Editor fails: the dispatch degrades to whatever readings landed rather than
 breaking, because the readings do not depend on it — and where nothing landed either, the dispatch
-produced no answer and says so. Abandonment: the call in flight cancels, the calls not yet issued
-are never issued, landed responses stand as ordinary entries, and no Story Editor call is
-attempted — asking for one more call is the wrong question at the moment the author stopped caring.
-The call abandoned mid-flight appends no entry of its own: an abandoned call said nothing, and
-nothing is the one outcome a dispatch does not record.
+produced no answer and says so. Abandonment: every call this dispatch has in flight shares one
+signal and cancels through it, landed responses stand as ordinary entries, and no Story Editor call
+is attempted — asking for one more call is the wrong question at the moment the author stopped
+caring. A call abandoned mid-flight appends no entry of its own: an abandoned call said nothing, and
+nothing is the one outcome a dispatch does not record. A result settling for a call this dispatch no
+longer tracks — arriving after the dispatch already closed as failed — is likewise discarded rather
+than appended behind an `action.finished` the author already saw.
 
 **The author edits the manuscript mid-dispatch.** The edit lands. Responses in flight were
 compiled against the draft as it was when the dispatch opened, and nothing reconciles that;
@@ -1224,7 +1239,7 @@ nowhere twice — a rule asserted at two levels is a rule that will be changed a
 | Boundary | What must hold |
 |---|---|
 | **context** | no specialist's compiled context contains another specialist's response from the dispatch being formed, under either history policy; every specialist context is compiled before the dispatch's first call is issued; the Story Editor's contains the dispatch's settled substantive responses and neither no-comment outcomes nor failures; the stricter policy filters other specialists' unapplied historical responses and keeps the participant's own |
-| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; calls are issued one at a time in the cast's order and never overlap; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment stops the dispatch without issuing the calls it had not reached and appends no entry for the one it stopped mid-flight; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a round coordinate |
+| **room** | an unaddressed dispatch calls the enabled cast then the Story Editor, including when every specialist returned no comment and when every specialist call failed; every eligible specialist's call is submitted independently before any of them has settled, entries land in completion order rather than cast order, and the Story Editor is called once this dispatch's own specialist set is empty, never inferred from unrelated model work going idle; an addressed dispatch calls only those named and no Story Editor; addressing an unenabled specialist enables it and calls it; the author's own entry is durable before any call is issued, and is durable even where the dispatch that follows it fails; each participant outcome is appended as its own entry as it lands, never batched; abandonment cancels every call this dispatch has in flight through its shared signal, appends no entry for one that lands as abandoned, and skips the Story Editor; a result settling for a call this dispatch no longer tracks is discarded rather than appended; a no-comment outcome is recorded and yields no visible response; a failed Story Editor leaves the readings intact; an operation is refused unless the room is idle; a result arriving from an abandoned operation is discarded; no operation writes the manuscript, and a failed or abandoned application leaves it as it was; a sigil inside an address-like string addresses nobody, and a dispatch carrying a target is not parsed for addressing; a call that owes an answer cannot return a no-comment outcome; Apply and a reply or a concrete-change request resolve their source and target by entry identity, never by a round coordinate |
 | **store** | atomic writes per artifact; one draft write is in flight at a time and text produced behind it goes out with the next; a failed write is reported and the unwritten text is retained; a hand-edited context file is read as written, and its comments and key order survive a write; it and the assignments are re-read when a call is compiled, so a reassignment reaches the next call without a restart; each tolerated reading is read as intended and everything off that list is a stated failure naming the file and the entry, with no value supplied that the author did not write; an invalid structured file is reported rather than partially loaded, and nothing the author wrote is discarded; a review whose second destination fails stays open with the first written; two entries accepted together both survive, in the order accepted |
 | **model** | a response that cannot be made to conform fails rather than throwing or returning unvalidated text; text that is not the requested structure fails as malformed and a value that parsed and failed the schema fails as nonconforming, each carrying what came back; a call failing at the runtime is retried to the configured policy and then fails as unreachable; a call exceeding the timeout fails as a timeout; cancellation reaches a call in flight and resolves it as abandoned rather than as failed; a call site with no assignment fails as unconfigured without contacting anything; a returned value never contains reasoning text; a call submitted without awaiting an earlier one never reaches the runtime until that earlier one has settled, and one settling carries no bearing on the other's outcome |
 | **draft** | the constrained schema round-trips through Markdown semantically; an application arrives as one history action; a view switch leaves the undo history intact; the reading position is recaptured and reapplied across a view switch without the caller sequencing it |
@@ -1291,9 +1306,10 @@ Stated so they do not accrete.
   duplicate check, and nothing that decides a recommendation has expired.
 - **No durable record of what the author declined.**
 - **No queue of author-initiated operations**, and no dialog asking which of two to keep.
-- **No scheduler and no concurrency limits.** Calls are issued one at a time, and a participant's
-  place in the round is its place in the cast's order rather than a position in a queue anything
-  maintains.
+- **No scheduler and no concurrency limits.** The room submits every eligible specialist's call
+  independently and reasons about none of them relative to another. What the production adapter
+  does with them — queue every one and run it alone — is that adapter's own fixed policy, never a
+  scheduler, a limit, or a residency abstraction the room configures or depends on.
 - **No context-window awareness, no chunking, and no excerpting** of anything sent to a model.
 - **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its
   single-call surface is used.

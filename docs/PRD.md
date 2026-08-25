@@ -181,11 +181,11 @@ where every specialist had nothing is a legible outcome that still answers the a
 failure is never presented as silence.
 
 **Know the room is working** — *per round*
-The room's calls happen one after another against one local model, so a round takes real time and
-the author watches it progress.
-*Done when:* each called participant's state is visible as it changes — waiting for its turn, having
-its model prepared, working, or answered — the author can keep writing throughout, no interim state
-is composed by a model, and no response is rendered before it is complete.
+Every called participant's call is submitted independently, and one local model answers only one at
+a time regardless, so a round takes real time and the author watches it progress.
+*Done when:* each called participant's state is visible as it changes — having its model prepared,
+working, or answered — the author can keep writing throughout, no interim state is composed by a
+model, and no response is rendered before it is complete.
 
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a round,
