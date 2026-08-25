@@ -157,6 +157,33 @@ export async function updatePieceDetails(
   return summarize(id, requirePiece(workspaceDir, id))
 }
 
+/**
+ * What an author may change about a piece in one act. Which of the three arrived, and so which
+ * writes it takes, is this module's decision rather than the route's: a change naming nothing is
+ * a change, and it writes nothing.
+ */
+export type PieceChanges = Readonly<{
+  title?: string | undefined
+  status?: PieceStatus | undefined
+  cast?: readonly string[] | undefined
+}>
+
+export async function updatePiece(
+  workspaceDir: string,
+  id: string,
+  specialists: readonly RoleDefinition[],
+  changes: PieceChanges,
+): Promise<void> {
+  const { title, status, cast } = changes
+
+  if (title !== undefined || status !== undefined) {
+    await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
+  }
+  if (cast !== undefined) {
+    await setPieceCast(workspaceDir, id, specialists, cast)
+  }
+}
+
 export function startConversation(workspaceDir: string, pieceId: string): { readonly id: string } {
   if (!pieceExists(workspaceDir, pieceId)) throw new PieceNotFoundError(pieceId)
   return { id: nanoid() }

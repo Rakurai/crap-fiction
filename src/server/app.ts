@@ -3,9 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
-import type { ApplyOutcome } from '../shared/applyViews.js'
 import { captureProposalSchema } from '../shared/captureProposal.js'
-import type { CaptureOutcome } from '../shared/captureViews.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
 import { themeSchema } from '../shared/theme.js'
@@ -25,11 +23,12 @@ import {
   getPiece,
   listPieces,
   PieceNotFoundError,
-  setPieceCast,
   startConversation,
   UnknownCastMemberError,
-  updatePieceDetails,
+  updatePiece,
 } from './pieces.js'
+import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
+import { applyOutcome, captureOutcome } from './room/outcomes.js'
 import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
@@ -41,15 +40,6 @@ const postPieceSchema = z.object({ title: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
 const putDraftSchema = z.object({ draft: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
-const postDispatchSchema = z.union([
-  z.strictObject({ message: z.string().min(1), draft: z.string() }),
-  z.strictObject({ target: z.string().min(1), message: z.string().min(1), draft: z.string() }),
-  z.strictObject({
-    respondingTo: z.string().min(1),
-    clarification: z.string().min(1).optional(),
-    draft: z.string(),
-  }),
-])
 const postApplySchema = z.object({
   responseId: z.string().min(1),
   constraint: z.string().min(1).optional(),
@@ -105,16 +95,10 @@ export function createApp(
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
-    const { title, status, cast } = c.req.valid('json')
     const id = c.req.param('id')
     const workspaceDir = workspace.require()
 
-    if (title !== undefined || status !== undefined) {
-      await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
-    }
-    if (cast !== undefined) {
-      await setPieceCast(workspaceDir, id, room.specialists(), cast)
-    }
+    await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
     return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists())))
   })
@@ -138,45 +122,22 @@ export function createApp(
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations/:cid/dispatch', body(postDispatchSchema), async (c) => {
-    const parsed = c.req.valid('json')
-    const workspaceDir = workspace.require()
-    const pieceId = c.req.param('id')
-    const conversationId = c.req.param('cid')
-
-    const opening =
-      'respondingTo' in parsed
-        ? { kind: 'ask' as const, respondingTo: parsed.respondingTo, clarification: parsed.clarification }
-        : 'target' in parsed
-          ? { kind: 'targeted' as const, target: parsed.target, text: parsed.message }
-          : { kind: 'message' as const, text: parsed.message }
-
-    const result = await room.dispatch(workspaceDir, pieceId, conversationId, opening, parsed.draft)
+  app.post('/pieces/:id/conversations/:cid/dispatch', body(dispatchRequestSchema), async (c) => {
+    const request = c.req.valid('json')
+    const result = await room.dispatch(workspace.require(), c.req.param('id'), c.req.param('cid'), dispatchOpening(request), request.draft)
     return c.json(ok(result))
   })
 
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
     const { responseId, constraint, draft } = c.req.valid('json')
     const { actionId, result } = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), responseId, constraint, draft)
-    const outcome: ApplyOutcome =
-      result.outcome === 'value'
-        ? { outcome: 'applied', actionId, manuscript: result.value.manuscript, change: result.value.change, entryId: result.value.entryId }
-        : result.outcome === 'abandoned'
-          ? { outcome: 'abandoned', actionId }
-          : { outcome: 'failed', actionId, reason: result.reason, returned: result.returned }
-    return c.json(ok(outcome))
+    return c.json(ok(applyOutcome(actionId, result)))
   })
 
   app.post('/pieces/:id/capture', body(postCaptureSchema), async (c) => {
     const { conversationId, draft } = c.req.valid('json')
     const result = await room.capture(workspace.require(), c.req.param('id'), conversationId, draft)
-    const outcome: CaptureOutcome =
-      result.outcome === 'value'
-        ? { outcome: 'captured', proposals: [...result.value.proposals] }
-        : result.outcome === 'abandoned'
-          ? { outcome: 'abandoned' }
-          : { outcome: 'failed', reason: result.reason, returned: result.returned }
-    return c.json(ok(outcome))
+    return c.json(ok(captureOutcome(result)))
   })
 
   app.post('/pieces/:id/capture/approve', body(postCaptureApproveSchema), async (c) => {

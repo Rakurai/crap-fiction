@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_PROJECTION, projectEvent, type RoomEvent } from '../../src/client/entryProjection.js'
-import type { ConversationEntryView } from '../../src/shared/conversationEntryViews.js'
+import { EMPTY_PROJECTION, projectEvent, type RoomEvent } from '../../../src/client/entryProjection.js'
+import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
 
 const STARTED_AT = 1_700_000_000_000
 
@@ -29,8 +29,8 @@ function finished(actionId: string, outcome: 'settled' | 'abandoned' | 'failed')
 }
 
 describe('projectEvent', () => {
-  it('opens the activity snapshot on a dispatch action.started, with no states yet', () => {
-    const projection = projectEvent(EMPTY_PROJECTION, started('a1'))
+  it('opens the activity snapshot on a dispatch, with no states yet, then tracks each participant through preparing and working', () => {
+    let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
 
     expect(projection.activity).toEqual({
       actionId: 'a1',
@@ -41,19 +41,7 @@ describe('projectEvent', () => {
       states: {},
       startedAt: STARTED_AT,
     })
-  })
 
-  it('ignores an apply action.started, since apply activity is not part of this projection', () => {
-    const projection = projectEvent(EMPTY_PROJECTION, {
-      type: 'action.started',
-      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e0', startedAt: STARTED_AT },
-    })
-
-    expect(projection.activity).toBeUndefined()
-  })
-
-  it('tracks a participant moving through preparing and working', () => {
-    let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
     projection = projectEvent(projection, activity('shape', 'preparing'))
     expect(projection.activity?.states.shape).toBe('preparing')
 
@@ -61,19 +49,16 @@ describe('projectEvent', () => {
     expect(projection.activity?.states.shape).toBe('working')
   })
 
-  it('appends a landed entry and clears that participant from the active states', () => {
+  it('appends a landed entry, clearing the participant that produced it from the active states and leaving one with none alone', () => {
     let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
     projection = projectEvent(projection, activity('shape', 'working'))
     projection = projectEvent(projection, appended(response('e1', 'shape', 'e0')))
 
     expect(projection.entries.map((entry) => entry.id)).toEqual(['e1'])
     expect(projection.activity?.states.shape).toBeUndefined()
-  })
 
-  it('appends an entry with no participant untouched by the states map', () => {
-    const projection = projectEvent(EMPTY_PROJECTION, appended(authorMessage('e1')))
-
-    expect(projection.entries).toEqual([authorMessage('e1')])
+    projection = projectEvent(projection, appended(authorMessage('e2')))
+    expect(projection.entries[1]).toEqual(authorMessage('e2'))
   })
 
   it('a response delivered twice appears once', () => {
@@ -90,17 +75,23 @@ describe('projectEvent', () => {
     expect(projection.activity).toBeUndefined()
   })
 
-  it('ignores a finished event for an action that is not the current one', () => {
-    let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
-    projection = projectEvent(projection, finished('stale-action', 'abandoned'))
+  /**
+   * One claim over every event the projection sees: an event belonging to something other
+   * than the dispatch it is currently tracking cannot move it.
+   */
+  it('ignores an event that is not this dispatch — an apply, or an activity or a finish naming another action', () => {
+    const apply = projectEvent(EMPTY_PROJECTION, {
+      type: 'action.started',
+      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e0', startedAt: STARTED_AT },
+    })
+    expect(apply.activity).toBeUndefined()
 
-    expect(projection.activity?.actionId).toBe('a1')
-  })
-
-  it('ignores participant activity for an action that is not the current one', () => {
     let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
+
     projection = projectEvent(projection, activity('shape', 'working', 'a-different-action'))
-
     expect(projection.activity?.states.shape).toBeUndefined()
+
+    projection = projectEvent(projection, finished('stale-action', 'abandoned'))
+    expect(projection.activity?.actionId).toBe('a1')
   })
 })

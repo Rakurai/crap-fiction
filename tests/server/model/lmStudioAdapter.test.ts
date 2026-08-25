@@ -33,18 +33,13 @@ beforeEach(() => {
 })
 
 describe('the runtime URL the adapter is constructed with', () => {
-  it('accepts the two schemes the runtime is reachable over', () => {
+  it('accepts the two schemes the runtime is reachable over, and refuses anything else naming the variable and what was wrong', () => {
     expect(() => new LMStudioAdapter('ws://localhost:1234', assigned, silent)).not.toThrow()
     expect(() => new LMStudioAdapter('wss://studio.local:1234', assigned, silent)).not.toThrow()
-  })
 
-  it('refuses the plausible wrong scheme, naming the variable and what was wrong with it', () => {
-    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(ModelRuntimeUrlError)
-    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
+    // The plausible wrong scheme, and a value that is no URL at all.
     expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(/must be ws or wss, not http/)
-  })
-
-  it('refuses a value that is not a URL at all', () => {
+    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
     expect(() => new LMStudioAdapter('localhost:1234', assigned, silent)).toThrowError(ModelRuntimeUrlError)
     expect(() => new LMStudioAdapter('localhost:1234', assigned, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
   })
@@ -63,21 +58,8 @@ describe('the runtime URL the adapter is constructed with', () => {
 })
 
 describe('which model a call site is assigned', () => {
-  it('fails as unconfigured without contacting the runtime when a site has no assignment', async () => {
-    const adapter = new LMStudioAdapter('ws://localhost:1234', () => undefined, silent)
-
-    const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
-
-    expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
-    expect(modelFn).not.toHaveBeenCalled()
-  })
-
-  it('never falls back to another assignment: an unconfigured site fails even when others are assigned', async () => {
-    const adapter = new LMStudioAdapter(
-      'ws://localhost:1234',
-      (site) => (site === 'story-editor' ? 'qwen-14b' : undefined),
-      silent,
-    )
+  it('fails an unassigned site as unconfigured without contacting the runtime, never falling back to another site\'s assignment', async () => {
+    const adapter = new LMStudioAdapter('ws://localhost:1234', (site) => (site === 'story-editor' ? 'qwen-14b' : undefined), silent)
 
     const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
 
@@ -129,14 +111,7 @@ describe('LMStudioAdapter.call', () => {
 
     expect(result).toEqual({ outcome: 'failed', reason: 'unreachable' })
     expect(modelFn).toHaveBeenCalledTimes(3)
-  })
-
-  it('states nothing about the runtime it could not reach beyond the reason', async () => {
-    modelFn.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'))
-
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, silent)
-    const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
-
+    // Nothing of the vendor's own diagnostic travels with it.
     expect(Object.keys(result)).toEqual(['outcome', 'reason'])
   })
 

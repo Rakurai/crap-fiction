@@ -181,7 +181,7 @@ describe('abandoning an operation', () => {
     }
   }
 
-  it('asks the room to abandon the piece\'s operation while one is in flight', async () => {
+  it("asks the room to abandon the operation in flight, and asks nothing where there is none", async () => {
     const room = idleRoom()
 
     const { result } = renderHook(() =>
@@ -193,6 +193,15 @@ describe('abandoning an operation', () => {
     })
 
     expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
+
+    const idle = idleRoom()
+    const { result: nothingInFlight } = renderHook(() =>
+      useConversation('the-lighthouse', null, null, () => {}, () => 'the draft', idle),
+    )
+
+    nothingInFlight.current.abandon()
+
+    expect(idle.abandonOperation).not.toHaveBeenCalled()
   })
 
   it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', () => {
@@ -208,18 +217,6 @@ describe('abandoning an operation', () => {
 
     expect(result.current.busy).toBe(false)
     expect(result.current.projection.activity).toBeUndefined()
-  })
-
-  it('asks nothing when no operation is in flight', () => {
-    const room = idleRoom()
-
-    const { result } = renderHook(() =>
-      useConversation('the-lighthouse', null, null, () => {}, () => 'the draft', room),
-    )
-
-    result.current.abandon()
-
-    expect(room.abandonOperation).not.toHaveBeenCalled()
   })
 
   it('reports it when the studio cannot be asked to abandon', async () => {

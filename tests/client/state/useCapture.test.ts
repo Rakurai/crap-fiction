@@ -28,10 +28,11 @@ describe('useCapture', () => {
     expect(result.current.capturing).toBe(false)
   })
 
-  it('holds the proposals the call returned, none of them approved by default', async () => {
+  it('carries the draft into the call and holds what came back — the proposals, none approved yet, or the failure as an error and nothing proposed', async () => {
     const proposals = [proposal({ id: 'p1', destination: 'storyContext' })]
-    const outcome: CaptureOutcome = { outcome: 'captured', proposals }
-    const room = adapters({ captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: outcome })) })
+    const room = adapters({
+      captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: { outcome: 'captured', proposals } })),
+    })
 
     const { result } = renderHook(() => useCapture('the-lighthouse', 'c1', () => 'The cups sat where she left them.', room))
 
@@ -40,37 +41,31 @@ describe('useCapture', () => {
     expect(room.captureContext).toHaveBeenCalledWith('the-lighthouse', 'c1', 'The cups sat where she left them.')
     expect(result.current.proposals).toEqual(proposals)
     expect(result.current.approved.size).toBe(0)
-  })
 
-  it('states a failed call as an error, proposing nothing', async () => {
-    const outcome: CaptureOutcome = { outcome: 'failed', reason: 'unconfigured' }
-    const room = adapters({ captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: outcome })) })
-
-    const { result } = renderHook(() => useCapture('the-lighthouse', 'c1', () => 'draft', room))
-
-    await act(async () => result.current.capture())
-
-    expect(result.current.proposals).toEqual([])
-    expect(result.current.error).toContain('unconfigured')
-  })
-
-  it('closing with nothing approved discards every proposal without a request', async () => {
-    const proposals = [proposal({ id: 'p1', destination: 'storyContext' })]
-    const room = adapters({
-      captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: { outcome: 'captured', proposals } })),
-      approveCapture: vi.fn(),
+    const failing = adapters({
+      captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: { outcome: 'failed', reason: 'unconfigured' } })),
     })
+    const { result: failed } = renderHook(() => useCapture('the-lighthouse', 'c1', () => 'draft', failing))
 
-    const { result } = renderHook(() => useCapture('the-lighthouse', 'c1', () => 'draft', room))
-    await act(async () => result.current.capture())
+    await act(async () => failed.current.capture())
 
-    act(() => result.current.close())
-
-    expect(room.approveCapture).not.toHaveBeenCalled()
-    expect(result.current.proposals).toEqual([])
+    expect(failed.current.proposals).toEqual([])
+    expect(failed.current.error).toContain('unconfigured')
   })
 
-  it('writes only the approved proposals, and discards everything once every write lands', async () => {
+  it('writes only the approved proposals, asking nothing where none were, and discards everything once every write lands', async () => {
+    const nothingApproved = [proposal({ id: 'p1', destination: 'storyContext' })]
+    const idle = adapters({
+      captureContext: vi.fn(async (): Promise<RequestResult<CaptureOutcome>> => ({ outcome: 'value', value: { outcome: 'captured', proposals: nothingApproved } })),
+    })
+    const { result: unapproved } = renderHook(() => useCapture('the-lighthouse', 'c1', () => 'draft', idle))
+    await act(async () => unapproved.current.capture())
+
+    act(() => unapproved.current.close())
+
+    expect(idle.approveCapture).not.toHaveBeenCalled()
+    expect(unapproved.current.proposals).toEqual([])
+
     const proposals = [proposal({ id: 'p1', destination: 'storyContext' }), proposal({ id: 'p2', destination: 'authorContext' })]
     const approveOutcome: CaptureApproveOutcome = { written: ['storyContext'], failures: [] }
     const room = adapters({

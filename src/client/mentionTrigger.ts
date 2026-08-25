@@ -1,14 +1,14 @@
-const HANDLE_CHAR = /[a-zA-Z0-9]/
+import { isHandleCharacter, opensMention } from '../shared/handle.js'
 
 export type MentionQuery = Readonly<{ sigilIndex: number; token: string }>
 
 export function mentionQuery(value: string, caret: number): MentionQuery | undefined {
   let index = caret
-  while (index > 0 && HANDLE_CHAR.test(value[index - 1] ?? '')) index--
+  while (index > 0 && isHandleCharacter(value[index - 1])) index--
   if (index === 0 || value[index - 1] !== '@') return undefined
 
   const sigilIndex = index - 1
-  if (sigilIndex !== 0 && !/\s/.test(value[sigilIndex - 1] ?? '')) return undefined
+  if (!opensMention(value[sigilIndex - 1])) return undefined
 
   return { sigilIndex, token: value.slice(index, caret) }
 }

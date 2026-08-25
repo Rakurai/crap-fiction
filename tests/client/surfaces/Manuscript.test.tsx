@@ -97,29 +97,22 @@ describe('the piece title', () => {
     expect(screen.getByRole('button', { name: 'The Lighthouse' })).toBeTruthy()
   })
 
-  it('withdraws on Escape without retitling', () => {
+  it('asks nothing of the studio for a withdrawal, an unchanged title or a blank one, and withdraws either way', () => {
     const onRetitle = vi.fn()
     renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onRetitle } })
 
     fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
     fireEvent.change(screen.getByLabelText('Piece title'), { target: { value: 'Something else entirely' } })
     fireEvent.keyDown(screen.getByLabelText('Piece title'), { key: 'Escape' })
-
-    expect(onRetitle).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'The Lighthouse' })).toBeTruthy()
-  })
-
-  it('asks nothing of an unchanged or blank title', () => {
-    const onRetitle = vi.fn()
-    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onRetitle } })
 
     fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
     fireEvent.click(screen.getByRole('button', { name: 'save' }))
-    expect(onRetitle).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'The Lighthouse' }))
     fireEvent.change(screen.getByLabelText('Piece title'), { target: { value: '   ' } })
     fireEvent.click(screen.getByRole('button', { name: 'save' }))
+
     expect(onRetitle).not.toHaveBeenCalled()
   })
 })
@@ -144,28 +137,18 @@ describe('the piece status', () => {
   })
 })
 
-describe('editing the room', () => {
+describe('the surfaces the manuscript opens onto', () => {
   afterEach(cleanup)
 
-  it('is one action away, and knows nothing beyond that it was reached', () => {
+  it('reaches the room and the capture in one action each, knowing nothing beyond that each was reached', () => {
     const onOpenRoom = vi.fn()
-    renderManuscript({ onOpenRoom })
+    const onOpenCapture = vi.fn()
+    renderManuscript({ onOpenRoom, onOpenCapture })
 
     fireEvent.click(screen.getByRole('button', { name: 'room' }))
-
-    expect(onOpenRoom).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('capture context', () => {
-  afterEach(cleanup)
-
-  it('is one action away, and knows nothing beyond that it was reached', () => {
-    const onOpenCapture = vi.fn()
-    renderManuscript({ onOpenCapture })
-
     fireEvent.click(screen.getByRole('button', { name: 'capture context' }))
 
+    expect(onOpenRoom).toHaveBeenCalledTimes(1)
     expect(onOpenCapture).toHaveBeenCalledTimes(1)
   })
 })
@@ -173,21 +156,14 @@ describe('capture context', () => {
 describe('the reading view', () => {
   afterEach(cleanup)
 
-  it('holds no control at all, and says so in the register rather than in a footer', () => {
+  it('holds no control at all, says so in the register rather than in a footer, and is left by the keystroke the hint names', () => {
     renderManuscript({ draft: 'First light.' })
 
     fireEvent.click(screen.getByRole('button', { name: 'reading' }))
-
     expect(screen.queryAllByRole('button')).toEqual([])
     expect(screen.getByText('ESC TO RETURN')).toBeTruthy()
-  })
 
-  it('is left by the keystroke the hint names', () => {
-    renderManuscript({ draft: 'First light.' })
-
-    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
     fireEvent.keyDown(window, { key: 'Escape' })
-
     expect(screen.queryByText('ESC TO RETURN')).toBeNull()
     expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
   })
@@ -196,19 +172,13 @@ describe('the reading view', () => {
 describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 
-  it('holds the source textarea read-only, and names the response holding it, while an application runs', () => {
-    renderManuscript({ applying: { participantName: 'Compression' } })
+  it('holds the source read-only naming the response holding it, and is editable again with no trace the instant it settles', () => {
+    const { rerender } = renderManuscript({ applying: { participantName: 'Compression' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('READ-ONLY')).toBeTruthy()
     expect(screen.getByText("Held while Compression's change is applied.")).toBeTruthy()
-  })
-
-  it('is editable again, with no trace of the notice, the instant the application is no longer applying', () => {
-    const { rerender } = renderManuscript({ applying: { participantName: 'Compression' } })
-    fireEvent.click(screen.getByRole('button', { name: 'source' }))
-    expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
 
     rerender(<Harness {...DEFAULT_PROPS} applying={undefined} />)
 
@@ -239,6 +209,9 @@ describe('the manuscript while a save is failing', () => {
     await settle()
 
     expect(screen.getByRole('status').textContent).toContain('Nothing has been discarded — keep writing.')
+    // The refusal is a statement, not a question: nothing is asked and nothing is offered.
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('status').textContent).not.toMatch(/discard\?|are you sure|confirm/i)
     expect(screen.getByRole('status').textContent).not.toMatch(/retry/i)
     expect(screen.getByRole('status').textContent).toContain('The Lighthouse')
     expect(screen.getByText(/^NOT SAVED · \d\d:\d\d$/)).toBeTruthy()
@@ -251,16 +224,5 @@ describe('the manuscript while a save is failing', () => {
     await settle()
     expect(screen.queryByRole('status')).toBeNull()
     expect(leaveControl().disabled).toBe(false)
-  })
-
-  it('asks nothing about discarding — the refusal is not a question', async () => {
-    saveDraft.mockResolvedValue({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'disk unhappy' })
-    renderManuscript({ draft: 'First light.' })
-
-    type('First light. Then none.')
-    await settle()
-
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('status').textContent).not.toMatch(/discard\?|are you sure|confirm/i)
   })
 })

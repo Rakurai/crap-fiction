@@ -22,12 +22,19 @@ function offered(): readonly string[] {
 describe('choosing a model for a call site', () => {
   afterEach(cleanup)
 
-  it('offers every model the runtime reports, whatever is assigned', () => {
+  it('offers every model the runtime reports, showing the standing assignment as chosen even where the runtime no longer reports it', () => {
     const assigned = [{ ...UNASSIGNED[0]!, assignment: 'qwen3-30b' }]
     render(<CallSiteList sites={assigned} known={KNOWN} assigning={undefined} onAssign={vi.fn()} />)
 
     expect(offered()).toEqual(KNOWN)
     expect(chooser().value).toBe('qwen3-30b')
+
+    cleanup()
+    const evicted = [{ ...UNASSIGNED[0]!, assignment: 'evicted-model' }]
+    render(<CallSiteList sites={evicted} known={KNOWN} assigning={undefined} onAssign={vi.fn()} />)
+
+    expect(offered()).toEqual(['evicted-model', ...KNOWN])
+    expect(chooser().value).toBe('evicted-model')
   })
 
   it('assigns the model chosen, without a second action', () => {
@@ -39,32 +46,13 @@ describe('choosing a model for a call site', () => {
     expect(onAssign).toHaveBeenCalledWith('story-editor', 'gemma-3-27b')
   })
 
-  it('reassigns to a different model from an existing assignment', () => {
-    const onAssign = vi.fn()
-    const assigned = [{ ...UNASSIGNED[0]!, assignment: 'qwen3-30b' }]
-    render(<CallSiteList sites={assigned} known={KNOWN} assigning={undefined} onAssign={onAssign} />)
-
-    fireEvent.change(chooser(), { target: { value: 'gemma-3-27b' } })
-
-    expect(onAssign).toHaveBeenCalledWith('story-editor', 'gemma-3-27b')
-  })
-
-  it('keeps offering an assignment the runtime no longer reports', () => {
-    const assigned = [{ ...UNASSIGNED[0]!, assignment: 'evicted-model' }]
-    render(<CallSiteList sites={assigned} known={KNOWN} assigning={undefined} onAssign={vi.fn()} />)
-
-    expect(offered()).toEqual(['evicted-model', ...KNOWN])
-    expect(chooser().value).toBe('evicted-model')
-  })
-
-  it('offers nothing to choose while the runtime is unreachable, and says so', () => {
+  it('offers nothing to choose while the runtime is unreachable, saying so, or while the site is already being assigned', () => {
     render(<CallSiteList sites={UNASSIGNED} known={[]} assigning={undefined} onAssign={vi.fn()} />)
 
     expect(chooser().disabled).toBe(true)
     expect(screen.getByText(/until the runtime is reachable/)).toBeDefined()
-  })
 
-  it('refuses a second choice for the site already being assigned', () => {
+    cleanup()
     render(<CallSiteList sites={UNASSIGNED} known={KNOWN} assigning={'story-editor'} onAssign={vi.fn()} />)
 
     expect(chooser().disabled).toBe(true)

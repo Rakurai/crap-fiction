@@ -5,13 +5,17 @@ import path from 'node:path'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+const STUDIO_VARIABLES = ['STUDIO_DATA_ROOT', 'STUDIO_PORT', 'STUDIO_MODEL_RUNTIME_URL', 'STUDIO_LOG_LEVEL'] as const
+
 describe('a dispatch\'s events through the dev server', () => {
   let server: ViteDevServer
   let baseUrl: string
   let dataRoot: string
+  let restoreEnv: Readonly<Record<string, string | undefined>>
 
   beforeEach(async () => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-streaming-'))
+    restoreEnv = Object.fromEntries(STUDIO_VARIABLES.map((name) => [name, process.env[name]]))
     process.env.STUDIO_DATA_ROOT = dataRoot
     process.env.STUDIO_PORT = '4000'
     process.env.STUDIO_MODEL_RUNTIME_URL = 'ws://127.0.0.1:1234'
@@ -35,6 +39,12 @@ describe('a dispatch\'s events through the dev server', () => {
   afterEach(async () => {
     await server.close()
     rmSync(dataRoot, { recursive: true, force: true })
+    // The environment belongs to the process, not to this file: leave it as it was found.
+    for (const name of STUDIO_VARIABLES) {
+      const previous = restoreEnv[name]
+      if (previous === undefined) delete process.env[name]
+      else process.env[name] = previous
+    }
   })
 
   async function post(pathname: string, body?: unknown): Promise<unknown> {

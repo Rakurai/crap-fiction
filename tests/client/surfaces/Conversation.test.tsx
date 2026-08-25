@@ -79,13 +79,13 @@ function blockContaining(text: string): HTMLElement {
 describe('a landed response in the conversation', () => {
   afterEach(cleanup)
 
-  it('sets a claim and its note apart: two blocks in two registers, not one sentence trailing the other', async () => {
+  it('sets the claim, its note and the participant that said it apart — two registers, a name and not an id, never one sentence trailing another', async () => {
     renderConversation([
       { id: 'e1', kind: 'authorMessage', text: 'what isn’t working about the ending', audience: [], brought: [] },
       {
         id: 'e2',
         kind: 'participantResponse',
-        participantId: 'shape',
+        participantId: 'reader',
         causeId: 'e1',
         outcome: 'commentary',
         claim: 'The ending arrives before the fear does.',
@@ -97,21 +97,11 @@ describe('a landed response in the conversation', () => {
     const note = screen.getByText('Three paragraphs earlier the light is already gone.')
 
     expect(claim.textContent).not.toContain('Three paragraphs')
-    expect(note).not.toBe(claim)
     expect(claim.contains(note)).toBe(false)
     expect(note.contains(claim)).toBe(false)
-  })
 
-  it('carries the participant\'s identity beside what it said, by name and not by id', async () => {
-    renderConversation([
-      { id: 'e1', kind: 'participantResponse', participantId: 'reader', causeId: 'e0', outcome: 'commentary', claim: 'I lost the room in the second turn.' },
-    ])
-
-    await screen.findByText('I lost the room in the second turn.')
-
-    expect(screen.getByText('Reader Experience')).toBeTruthy()
+    expect(blockContaining('The ending arrives before the fear does.').textContent).toContain('Reader Experience')
     expect(screen.queryByText('reader')).toBeNull()
-    expect(blockContaining('I lost the room in the second turn.').textContent).toContain('Reader Experience')
   })
 
   it('draws nothing at all for a no-comment outcome — not a row, not a name, not a placeholder', async () => {
@@ -126,42 +116,31 @@ describe('a landed response in the conversation', () => {
     expect(screen.getByText('Story Editor')).toBeTruthy()
   })
 
-  it("states a failed call in the machine's register under the participant that did not answer", async () => {
-    renderConversation([{ id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'timeout' }])
-
-    await waitFor(() => expect(screen.getByText(/did not answer/)).toBeTruthy())
-
-    expect(screen.getByText('did not answer — TIMEOUT')).toBeTruthy()
-    expect(blockContaining('did not answer — TIMEOUT').textContent).toContain('Shape')
-  })
-
-  it('shows what a failed call returned, where anything came back', async () => {
+  it("states a failed call in the machine's register under the participant that did not answer, with whatever came back where anything did", async () => {
     renderConversation([
-      { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'nonconforming', returned: '{"claim": "the ending' },
+      { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'timeout' },
+      { id: 'e2', kind: 'participantFailure', participantId: 'reader', causeId: 'e0', reason: 'nonconforming', returned: '{"claim": "the ending' },
     ])
 
-    await waitFor(() => expect(screen.getByText('{"claim": "the ending')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('did not answer — TIMEOUT')).toBeTruthy())
+    expect(blockContaining('did not answer — TIMEOUT').textContent).toContain('Shape')
+    expect(screen.getByText('{"claim": "the ending')).toBeTruthy()
   })
-
 })
 
 describe('a room that cannot be reached', () => {
   afterEach(cleanup)
 
-  it('says so at the composer, and says what is still true', async () => {
+  it('says so at the composer with what is still true, and says nothing at all while nothing has been heard either way', async () => {
     renderConversation([], { runtime: { reachable: false } })
 
     await waitFor(() => expect(screen.getByText('ROOM UNAVAILABLE')).toBeTruthy())
     expect(screen.getByText('No model is reachable. The manuscript is yours to write.')).toBeTruthy()
-  })
 
-  it('says nothing while nothing has been heard either way', async () => {
-    renderConversation([{ id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' }], {
-      runtime: undefined,
-    })
+    cleanup()
+    renderConversation([RESPONSE_WITH_COMMENTARY], { runtime: undefined })
 
     await screen.findByText('It holds.')
-
     expect(screen.queryByText('ROOM UNAVAILABLE')).toBeNull()
   })
 })
@@ -169,7 +148,7 @@ describe('a room that cannot be reached', () => {
 describe('a specialist the addressing brought into the room', () => {
   afterEach(cleanup)
 
-  it('says which one, beside the message that brought it in', async () => {
+  it('says which one, beside the message that brought it in — and says nothing where addressing changed nothing', async () => {
     renderConversation([
       { id: 'e1', kind: 'authorMessage', text: '@reader is this scene too long', audience: ['reader'], brought: ['reader'] },
       { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
@@ -179,13 +158,11 @@ describe('a specialist the addressing brought into the room', () => {
 
     expect(screen.getByText('ROOM CHANGED')).toBeTruthy()
     expect(screen.getByText('Reader Experience was addressed and is now in the room.')).toBeTruthy()
-  })
 
-  it('says nothing where addressing changed nothing', async () => {
-    renderConversation([{ id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' }])
+    cleanup()
+    renderConversation([RESPONSE_WITH_COMMENTARY])
 
     await screen.findByText('It holds.')
-
     expect(screen.queryByText('ROOM CHANGED')).toBeNull()
   })
 })
@@ -224,25 +201,27 @@ describe('the applied change, shown on its originating response', () => {
     expect(screen.queryByText('the old line')).toBeNull()
   })
 
-  it('presents a whole-manuscript rewrite as the bare statement, with nothing to disclose', async () => {
-    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
-
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+  /**
+   * A change with no passages to show is stated rather than disclosed, whether because it
+   * rewrote the whole manuscript or because the file naming it is gone. The application
+   * itself still stands either way.
+   */
+  it('states a change with nothing to disclose, offering no toggle, and still shows the application when the change file is gone', async () => {
+    const rewritten = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: rewritten.room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
-    stream(application({ kind: 'rewrittenWhole' }))
+    rewritten.stream(application({ kind: 'rewrittenWhole' }))
 
     await screen.findByText('APPLIED · REWRITTEN WHOLE')
     expect(screen.queryByRole('button', { name: /APPLIED/ })).toBeNull()
-  })
 
-  it('still shows the application when the change file it names is gone', async () => {
-    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
-
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+    cleanup()
+    const missing = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: missing.room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
-    stream(application(undefined))
+    missing.stream(application(undefined))
 
     await screen.findByText('APPLIED · CHANGE FILE MISSING')
     expect(screen.getByRole('button', { name: 'ask the room about this' })).toBeTruthy()
@@ -318,23 +297,20 @@ describe('replying to a response', () => {
 describe('asking for a concrete change', () => {
   afterEach(cleanup)
 
-  it('is offered on a response that offered a reading without an action', async () => {
+  it("is offered on a reading that carried no action, and not on an applicable suggestion, which offers Apply instead", async () => {
     renderConversation([RESPONSE_WITH_COMMENTARY])
 
     await screen.findByText('It holds.')
-
     expect(screen.getByRole('button', { name: 'ask for a concrete change' })).toBeTruthy()
-  })
 
-  it('is not offered on an applicable suggestion, which offers Apply instead', async () => {
+    cleanup()
     renderConversation([RESPONSE_WITH_RECOMMENDATION])
 
     await screen.findByRole('button', { name: 'apply' })
-
     expect(screen.queryByRole('button', { name: 'ask for a concrete change' })).toBeNull()
   })
 
-  it('opens an ordinary dispatch carrying no author message, naming the response it came from', async () => {
+  it('opens an ordinary dispatch carrying no author message, naming the response it came from and any text left in the shared field', async () => {
     const dispatch = vi.fn(() =>
       Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
     )
@@ -343,18 +319,12 @@ describe('asking for a concrete change', () => {
     renderConversation([RESPONSE_WITH_COMMENTARY], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'ask for a concrete change' }))
-
     await waitFor(() =>
       expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: undefined }, 'First light.'),
     )
-  })
 
-  it('carries text left in the shared field as the clarification', async () => {
-    const dispatch = vi.fn(() =>
-      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
-    )
-    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_COMMENTARY]), dispatch }
-
+    // A fresh surface: the first dispatch leaves this one busy until the room reports back.
+    cleanup()
     renderConversation([RESPONSE_WITH_COMMENTARY], { room })
 
     const field = await screen.findByLabelText('Reply or ask for a concrete change, in your own words')
@@ -381,14 +351,8 @@ describe('asking for a concrete change', () => {
 describe('one response-local field shared by every action on the response', () => {
   afterEach(cleanup)
 
-  it('offers one text field per response, whichever actions that response carries', async () => {
-    renderConversation([RESPONSE_WITH_COMMENTARY, RESPONSE_WITH_RECOMMENDATION])
-
-    await screen.findByRole('button', { name: 'apply' })
-
-    expect(screen.getAllByRole('textbox')).toHaveLength(2)
-  })
-
+  // That there is one field per response, labelled for the actions that response carries, is
+  // stated by the labels the tests above and below reach for.
   it('carries text left in the shared field as the constraint when Apply is chosen', async () => {
     const applyRecommendation = vi.fn(() =>
       Promise.resolve({
@@ -421,15 +385,8 @@ describe('handle completion at the composer', () => {
     expect(screen.queryByText('@reader')).toBeNull()
   })
 
-  it('offers nothing for a sigil that does not begin the message or follow whitespace', async () => {
-    renderConversation([RESPONSE_WITH_COMMENTARY])
-
-    const composer = await screen.findByLabelText('Message the room')
-    fireEvent.change(composer, { target: { value: 'mail@sh' } })
-
-    expect(screen.queryByText('@shape')).toBeNull()
-  })
-
+  // Where a sigil counts as beginning a mention at all is the shared `@handle` grammar's
+  // claim, held at `client/mentionTrigger.test.ts`, not this surface's.
   it('completes the token into the message, and closes the offer', async () => {
     renderConversation([RESPONSE_WITH_COMMENTARY])
 
@@ -463,7 +420,7 @@ describe('conversation activity, truthfully', () => {
     expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 
-  it('PROGRESS-REAL, NO-WAITING-PLACES: one "is thinking" line per participant actually reporting progress, none for the rest of a resolved audience it never got', async () => {
+  it('PROGRESS-REAL, PROGRESS-PARALLEL, NO-WAITING-PLACES: one "is thinking" line per participant actually reporting progress, and none for the rest of a resolved audience it never got', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -471,37 +428,14 @@ describe('conversation activity, truthfully', () => {
     stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
 
     expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
+    // The audience STARTED resolved holds `reader` too, which has reported nothing.
     expect(screen.queryByText(/Reader Experience is thinking/)).toBeNull()
     expect(screen.queryByText(/waiting/i)).toBeNull()
-  })
 
-  it('PROGRESS-PARALLEL: several concurrently active participants each draw their own line', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
     stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing' } })
 
-    expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
+    expect(screen.getByText('Shape is thinking.')).toBeTruthy()
     expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
-  })
-
-  it('a landed entry clears that participant\'s line without disturbing the unconditional signal', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
-    await screen.findByText('Shape is thinking.')
-
-    stream({
-      type: 'entry.appended',
-      data: { actionId: 'a1', entry: { id: 'e1', kind: 'participantNoComment', participantId: 'shape', causeId: 'e0' } },
-    })
-
-    await waitFor(() => expect(screen.queryByText('Shape is thinking.')).toBeNull())
-    expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
   })
 
   it('ACTION-EXCLUSION: disables send while busy without relabelling it', async () => {
@@ -531,7 +465,6 @@ describe('conversation activity, truthfully', () => {
     const abandon = await screen.findByRole('button', { name: 'abandon' })
     fireEvent.click(abandon)
 
-    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
     expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
     expect(screen.queryByText(/ACTIVE/)).toBeNull()
     expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)

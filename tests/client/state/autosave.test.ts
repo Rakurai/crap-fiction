@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAutosaveController, type SaveDraft } from '../../src/client/autosave.js'
-import type { RequestResult } from '../../src/client/request.js'
+import { createAutosaveController, type SaveDraft } from '../../../src/client/autosave.js'
+import type { RequestResult } from '../../../src/client/request.js'
 
 const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
 
@@ -22,18 +22,12 @@ describe('createAutosaveController', () => {
     vi.useRealTimers()
   })
 
-  it('does not save on construction, only once the text changes', () => {
-    const save = saver().mockResolvedValue(WROTE)
-    createAutosaveController('draft one', save, vi.fn(), clock, 1000)
-
-    vi.advanceTimersByTime(5000)
-
-    expect(save).not.toHaveBeenCalled()
-  })
-
-  it('debounces a write, sending only the latest text once typing pauses', () => {
+  it('writes nothing until the text changes, then sends only the latest text once typing pauses', () => {
     const save = saver().mockResolvedValue(WROTE)
     const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
+
+    vi.advanceTimersByTime(5000)
+    expect(save).not.toHaveBeenCalled()
 
     controller.update('a')
     vi.advanceTimersByTime(500)
@@ -66,14 +60,17 @@ describe('createAutosaveController', () => {
     expect(save).toHaveBeenNthCalledWith(2, 'second')
   })
 
-  it('states a failed write and retries only on the next ordinary write, not on a timer of its own', async () => {
+  it('states a failed write, stamped with the moment it came back, and retries only on the next ordinary write', async () => {
     const save = saver()
     save.mockResolvedValueOnce(refused('disk unhappy'))
     save.mockResolvedValueOnce(WROTE)
     const onStateChange = vi.fn()
-    const controller = createAutosaveController('', save, onStateChange, clock, 1000)
+    // The clock moves while the write is out, so a stamp taken at scheduling time would differ.
+    let reading = FAILED_AT_MS - 4000
+    const controller = createAutosaveController('', save, onStateChange, () => reading, 1000)
 
     controller.update('first')
+    reading = FAILED_AT_MS
     vi.advanceTimersByTime(1000)
     await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: true, message: 'disk unhappy', atMs: FAILED_AT_MS }))
 
@@ -104,30 +101,7 @@ describe('createAutosaveController', () => {
     expect(onStateChange).toHaveBeenCalledTimes(1)
   })
 
-  it('stamps the failure with the moment the write came back, not the moment it was scheduled', async () => {
-    const save = saver().mockResolvedValueOnce(refused('disk unhappy'))
-    const onStateChange = vi.fn()
-    let reading = FAILED_AT_MS
-    const controller = createAutosaveController('', save, onStateChange, () => reading, 1000)
-
-    controller.update('first')
-    reading = FAILED_AT_MS + 4000
-    vi.advanceTimersByTime(1000)
-
-    await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith(expect.objectContaining({ atMs: FAILED_AT_MS + 4000 })))
-  })
-
-  it('flushes the pending write immediately, without waiting on it', () => {
-    const save = saver().mockResolvedValue(WROTE)
-    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
-
-    controller.update('unsaved')
-    controller.flush()
-
-    expect(save).toHaveBeenCalledWith('unsaved')
-  })
-
-  it('never resolves optimistically: state only changes once the write settles', async () => {
+  it('flushes the pending write immediately and never resolves optimistically: state changes only once the write settles', async () => {
     const save = saver()
     let resolveSave: ((result: RequestResult<null>) => void) | undefined
     save.mockImplementationOnce(() => new Promise((resolve) => (resolveSave = resolve)))
@@ -136,6 +110,8 @@ describe('createAutosaveController', () => {
 
     controller.update('unsaved')
     controller.flush()
+    // Immediately: no debounce interval has elapsed.
+    expect(save).toHaveBeenCalledWith('unsaved')
     expect(onStateChange).not.toHaveBeenCalled()
 
     resolveSave?.(WROTE)

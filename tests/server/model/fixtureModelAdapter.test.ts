@@ -7,43 +7,35 @@ const schema = z.object({ claim: z.string() })
 const runtimeStatus = { reachable: true, models: [] } as const
 
 describe('the fixture model implementation, as a substitute for the seam', () => {
-  it('recovers a scripted value through the caller\'s own schema', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
+  /**
+   * The substitute's whole worth is that an outcome a test scripts is the outcome the room
+   * sees — including the two the real adapter derives rather than is handed: a value that
+   * does not conform, and a named failure.
+   */
+  it("relays every scripted outcome as the seam would — a value through the caller's own schema, one that does not conform as nonconforming carrying what it was, and a failure as its own reason", async () => {
+    const conforming = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
+    expect(await conforming.call('shape', 'prompt', schema, new AbortController().signal)).toEqual({
+      outcome: 'value',
+      value: { claim: 'the room agrees' },
+    })
 
-    const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
+    const muttering = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'muttered' } } }, runtimeStatus)
+    expect(await muttering.call('shape', 'prompt', eligibleResponseValueSchema, new AbortController().signal)).toEqual({
+      outcome: 'failed',
+      reason: 'nonconforming',
+      returned: '{"outcome":"muttered"}',
+    })
 
-    expect(result).toEqual({ outcome: 'value', value: { claim: 'the room agrees' } })
+    const failing = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason: 'timeout' } }, runtimeStatus)
+    expect(await failing.call('shape', 'prompt', schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
   })
 
-  it('reports a scripted value that does not conform as nonconforming, carrying what it was', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'muttered' } } }, runtimeStatus)
-
-    const result = await adapter.call('shape', 'prompt', eligibleResponseValueSchema, new AbortController().signal)
-
-    expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned: '{"outcome":"muttered"}' })
-  })
-
-  it('states each failure reason distinctly', async () => {
-    for (const reason of ['unconfigured', 'unreachable', 'timeout', 'malformed', 'nonconforming'] as const) {
-      const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason } }, runtimeStatus)
-
-      const result = await adapter.call('shape', 'prompt', schema, new AbortController().signal)
-
-      expect(result).toEqual({ outcome: 'failed', reason })
-    }
-  })
-
-  it('resolves cancellation as abandoned rather than as a failure', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
-    const controller = new AbortController()
-
-    const pending = adapter.call('shape', 'prompt', schema, controller.signal)
-    controller.abort()
-
-    expect(await pending).toEqual({ outcome: 'abandoned' })
-  })
-
-  it('delivers scripted states, in order, ahead of the settled outcome', async () => {
+  /**
+   * One claim about how a script plays out over time: whatever states it names arrive in
+   * order and before the outcome settles, and an abandonment interrupting that is abandoned
+   * rather than a failure.
+   */
+  it('delivers scripted states in order ahead of the settled outcome, and resolves cancellation as abandoned rather than as a failure', async () => {
     const adapter = FixtureModelAdapter.uniform(
       { result: { outcome: 'value', value: { claim: 'x' } }, states: ['preparing', 'working'] },
       runtimeStatus,
@@ -53,6 +45,13 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     await adapter.call('shape', 'prompt', schema, new AbortController().signal, (state) => states.push(state))
 
     expect(states).toEqual(['preparing', 'working'])
+
+    const slow = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
+    const controller = new AbortController()
+    const pending = slow.call('shape', 'prompt', schema, controller.signal)
+    controller.abort()
+
+    expect(await pending).toEqual({ outcome: 'abandoned' })
   })
 
   it('keys a per-site script by the call site, and fails loudly on a site a test never scripted', async () => {
@@ -68,15 +67,11 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     await expect(adapter.call('story-editor', 'prompt', schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
   })
 
-  it('refuses to report a runtime status no test stated', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, undefined)
+  it('reports the runtime status a test stated, and refuses to invent one no test stated', async () => {
+    const stated = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, { reachable: true, models: ['llama-3'] })
+    expect(await stated.status()).toEqual({ reachable: true, models: ['llama-3'] })
 
-    await expect(adapter.status()).rejects.toThrow(/no runtime status scripted/)
-  })
-
-  it('reports the runtime status a test stated', async () => {
-    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, { reachable: true, models: ['llama-3'] })
-
-    expect(await adapter.status()).toEqual({ reachable: true, models: ['llama-3'] })
+    const unstated = FixtureModelAdapter.uniform({ result: { outcome: 'abandoned' } }, undefined)
+    await expect(unstated.status()).rejects.toThrow(/no runtime status scripted/)
   })
 })

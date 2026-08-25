@@ -11,40 +11,36 @@ const MEMBERS: readonly CastMemberView[] = [
 describe('editing the room', () => {
   afterEach(cleanup)
 
-  it('lists every specialist with its role description, whichever way it presently sits', () => {
+  /**
+   * The control on each row is the row's own state said aloud, which is also what makes a
+   * toggle in flight legible: only that row goes quiet, the rest stay usable.
+   */
+  it('lists every specialist with its role description and the way it presently sits, disabling only the row a toggle is in flight for', () => {
     render(<RoomEditor members={MEMBERS} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('Shape')).toBeTruthy()
     expect(screen.getByText('the shape of it')).toBeTruthy()
     expect(screen.getByText('Compression')).toBeTruthy()
     expect(screen.getByText('what earns its space')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'enabled' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'disabled' })).toBeTruthy()
-  })
+    expect(screen.getByRole('button', { name: 'enabled' }).hasAttribute('disabled')).toBe(false)
 
-  it('toggles one specialist in one action, generating no rationale and presenting no lifecycle', () => {
-    const onToggle = vi.fn()
-    render(<RoomEditor members={MEMBERS} toggling={undefined} onToggle={onToggle} onClose={vi.fn()} />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'disabled' }))
-
-    expect(onToggle).toHaveBeenCalledWith('compression')
-    expect(onToggle).toHaveBeenCalledTimes(1)
-  })
-
-  it('disables only the row a toggle is in flight for', () => {
+    cleanup()
     render(<RoomEditor members={MEMBERS} toggling="shape" onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'enabled' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'disabled' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('is left in one action', () => {
+  it('toggles one specialist and is left, one action apiece, generating no rationale and presenting no lifecycle', () => {
+    const onToggle = vi.fn()
     const onClose = vi.fn()
-    render(<RoomEditor members={MEMBERS} toggling={undefined} onToggle={vi.fn()} onClose={onClose} />)
+    render(<RoomEditor members={MEMBERS} toggling={undefined} onToggle={onToggle} onClose={onClose} />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'disabled' }))
     fireEvent.click(screen.getByRole('button', { name: 'done' }))
 
+    expect(onToggle).toHaveBeenCalledWith('compression')
+    expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

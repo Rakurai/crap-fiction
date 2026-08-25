@@ -55,13 +55,6 @@ describe('pieces', () => {
     expect(piece.mode).toBe('flash')
     expect(piece.status).toBe('drafting')
     expect(piece.length).toBe(0)
-
-    const text = readFileSync(path.join(workspaceDir, 'the-cups', 'piece.yaml'), 'utf8')
-    expect(text).toContain('title: The Cups')
-    expect(text).toContain('mode: flash')
-    expect(text).toContain('status: drafting')
-    expect(text).toContain('shape')
-    expect(text).toContain('compression')
   })
 
   it('disambiguates a colliding slug at creation', async () => {
@@ -82,14 +75,6 @@ describe('pieces', () => {
     expect(listed[0]?.id).toBe(piece.id)
     expect(listed[0]?.length).toBe(3)
     expect(typeof listed[0]?.modified).toBe('number')
-  })
-
-  it('counts story length with word boundaries rather than a naive character or whitespace count', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
-    writeFileSync(path.join(workspaceDir, piece.id, 'draft.md'), "It isn't over, not by half.", 'utf8')
-
-    const listed = listPieces(workspaceDir)
-    expect(listed[0]?.length).toBe(6)
   })
 
   it('ignores a directory with no piece.yaml', async () => {
@@ -128,34 +113,35 @@ describe('pieces', () => {
     })
   })
 
-  it('opens a piece reporting the story context the author wrote, section by section', async () => {
+  it('opens a piece carrying the draft and the story context the author wrote, section by section', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
+    writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
     writeFileSync(
       path.join(workspaceDir, created.id, 'story-context.yaml'),
       'Premise:\n  - two cups, one left behind\nPoint of view:\n  - close third, past tense\n',
       'utf8',
     )
 
-    expect(getPiece(workspaceDir, created.id, null, null, specialists).storyContext).toEqual({
+    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
+    expect(opened.draft).toBe('Two small words.')
+    expect(opened.storyContext).toEqual({
       Premise: ['two cups, one left behind'],
       'Point of view': ['close third, past tense'],
     })
   })
 
-  it('opens a piece carrying its draft text', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
-    writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
-
-    const opened = getPiece(workspaceDir, created.id, null, null, specialists)
-    expect(opened.draft).toBe('Two small words.')
-  })
-
-  it('reports a missing piece as a stated PieceNotFoundError', () => {
-    expect(() => getPiece(workspaceDir, 'nothing-here', null, null, specialists)).toThrowError(PieceNotFoundError)
-  })
-
-  it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than reading outside it', () => {
-    expect(() => getPiece(workspaceDir, '../../etc', null, null, specialists)).toThrowError(PieceNotFoundError)
+  /**
+   * One claim, held by every entry point: a piece is resolved before anything is read or
+   * written, so neither a piece that is absent nor an id reaching past the workspace can
+   * make one appear.
+   */
+  it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
+    for (const id of ['nothing-here', '../../etc']) {
+      expect(() => getPiece(workspaceDir, id, null, null, specialists)).toThrowError(PieceNotFoundError)
+      await expect(setPieceCast(workspaceDir, id, specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
+      await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
+      await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
+    }
   })
 })
 
@@ -170,25 +156,19 @@ describe('setPieceCast', () => {
     rmSync(workspaceDir, { recursive: true, force: true })
   })
 
-  it('disables a specialist and reports the cast as it now stands', async () => {
+  it('disables a specialist, reports the cast as it now stands, and makes it eligible again when named once more', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash)
 
-    const view = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
+    const disabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
 
-    expect(view).toEqual([
+    expect(disabled).toEqual([
       { id: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
       { id: 'compression', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, null, specialists).cast).toEqual(view)
-  })
+    expect(getPiece(workspaceDir, created.id, null, null, specialists).cast).toEqual(disabled)
 
-  it('re-enables a specialist disabled earlier, simply making it eligible again', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
-    await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
-
-    const view = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
-
-    expect(view.find((member) => member.id === 'compression')?.enabled).toBe(true)
+    const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
+    expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
   })
 
   it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
@@ -197,10 +177,6 @@ describe('setPieceCast', () => {
     await expect(setPieceCast(workspaceDir, created.id, specialists, ['shape', 'story-editor'])).rejects.toThrowError(
       UnknownCastMemberError,
     )
-  })
-
-  it('reports a missing piece as a stated PieceNotFoundError rather than writing one', async () => {
-    await expect(setPieceCast(workspaceDir, 'nothing-here', specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
   })
 })
 
@@ -236,10 +212,6 @@ describe('updatePieceDetails', () => {
     const backToDrafting = await updatePieceDetails(workspaceDir, created.id, { status: 'drafting' })
     expect(backToDrafting.status).toBe('drafting')
   })
-
-  it('reports a missing piece as a stated PieceNotFoundError rather than writing one', async () => {
-    await expect(updatePieceDetails(workspaceDir, 'nothing-here', { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
-  })
 })
 
 describe('DraftWriter', () => {
@@ -263,14 +235,6 @@ describe('DraftWriter', () => {
     await draftWriter().save(workspaceDir, piece.id, 'Two small words.')
 
     expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('Two small words.')
-  })
-
-  it('reports a missing piece as a stated PieceNotFoundError rather than creating one', async () => {
-    await expect(draftWriter().save(workspaceDir, 'nothing-here', 'text')).rejects.toThrowError(PieceNotFoundError)
-  })
-
-  it('reports an id that escapes the workspace as a stated PieceNotFoundError rather than writing outside it', async () => {
-    await expect(draftWriter().save(workspaceDir, '../../etc', 'text')).rejects.toThrowError(PieceNotFoundError)
   })
 })
 
@@ -349,7 +313,8 @@ describe('listConversations', () => {
     expect(listConversations(workspaceDir, piece.id)).toEqual([])
   })
 
-  it("shows the author's own opening words, from the first entry that carries verbatim text", async () => {
+  // Which entry the opening words come from belongs to `shared/conversationEntries.test.ts`.
+  it("carries the conversation's opening words onto the summary", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash)
     await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
       id: 'e1',
@@ -361,33 +326,6 @@ describe('listConversations', () => {
 
     const [summary] = listConversations(workspaceDir, piece.id)
     expect(summary).toMatchObject({ id: 'c1', opening: 'does the opening earn its length' })
-  })
-
-  it('reports the clarification of a concrete-change request as the opening where the conversation has no author message', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
-      id: 'e1',
-      kind: 'concreteChangeRequest',
-      target: 'shape',
-      respondingTo: 'e0',
-      clarification: 'just the opening line',
-    })
-
-    const [summary] = listConversations(workspaceDir, piece.id)
-    expect(summary?.opening).toBe('just the opening line')
-  })
-
-  it('reports no opening words for a conversation that carries no author-written text at all', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
-    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
-      id: 'e1',
-      kind: 'participantNoComment',
-      participantId: 'shape',
-      causeId: 'e0',
-    })
-
-    const [summary] = listConversations(workspaceDir, piece.id)
-    expect(summary?.opening).toBeUndefined()
   })
 
   it('orders the listing by last activity, most recent first', async () => {

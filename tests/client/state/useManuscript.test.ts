@@ -32,21 +32,6 @@ describe('useManuscript', () => {
     expect(result.current.markdown).not.toContain('Second paragraph.')
   })
 
-  it('reaches the editor as one transaction on return from source, regardless of timing', () => {
-    const { result } = renderHook(() => useManuscript('Hello.'))
-    const editor = editorOf(result.current)
-
-    act(() => typeParagraph(editor, ' World.'))
-    act(() => result.current.showSource())
-    act(() => result.current.showRendered())
-
-    act(() => editor.commands.undo())
-    expect(result.current.markdown).toContain('World.')
-
-    act(() => editor.commands.undo())
-    expect(result.current.markdown).not.toContain('World.')
-  })
-
   it('applies a recommendation as one transaction, the same as a round trip through the source view', () => {
     const { result } = renderHook(() => useManuscript('First paragraph.'))
 

@@ -1,11 +1,10 @@
 import { z } from 'zod'
+import { handlePattern } from '../../shared/handle.js'
 import { readShippedRoles, ShippedDataError } from '../store/index.js'
 
 const roleDefinitionSchema = z.object({
   id: z.string().min(1),
-  handle: z
-    .string()
-    .regex(/^[a-z][a-z0-9]*$/, 'must be one lowercase token, distinct from the display name'),
+  handle: z.string().regex(handlePattern, 'must be one lowercase token, distinct from the display name'),
   displayName: z.string().min(1),
   roleDescription: z.string().min(1),
 })
