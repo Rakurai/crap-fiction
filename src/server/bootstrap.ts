@@ -3,9 +3,9 @@ import path from 'node:path'
 import { createApp } from './app.js'
 import { loadEnv, type StudioEnv } from './env.js'
 import { createLogger, type Logger } from './logger.js'
-import { callSites } from './model/callSites.js'
+import { callSites, type CallSiteDescriptor } from './model/callSites.js'
 import { loadCharter, type Charter } from './model/charter.js'
-import { loadPromptFragments } from './model/prompts.js'
+import { loadPromptFragments, type PromptFragments } from './model/prompts.js'
 import type { ModelAccess } from './model/types.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
@@ -13,7 +13,7 @@ import { DraftWriter } from './pieces.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { authorContextStore, durableContextReader } from './room/durableContext.js'
 import { Room } from './room/room.js'
-import { resolveRoster } from './room/roster.js'
+import { resolveRoster, type RoomRoster } from './room/roster.js'
 import { ConversationEntryStore, DraftStore } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
@@ -21,21 +21,36 @@ export type Studio = {
   readonly app: Hono
 }
 
-const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
+export const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
+
+export type ShippedContent = Readonly<{
+  modes: readonly ModeDescriptor[]
+  roles: readonly RoleDefinition[]
+  charter: Charter
+  fragments: PromptFragments
+  sites: readonly CallSiteDescriptor[]
+  roster: RoomRoster
+}>
+
+/** Every loader and derivation the application needs before it can start; a release check runs this against real content. */
+export function loadShippedContent(contentRoot: string): ShippedContent {
+  const modes = loadModes()
+  const roles = loadRoles(contentRoot, new Set(modes.map((mode) => mode.id)))
+  const charter = loadCharter(contentRoot)
+  const fragments = loadPromptFragments(contentRoot)
+  const sites = callSites(roles)
+  const roster = resolveRoster(roles)
+  return { modes, roles, charter, fragments, sites, roster }
+}
 
 export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => ModelAccess): Studio {
   const env = loadEnv()
   const logger = createLogger(env.logLevel)
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
-  const modes = loadModes()
-  const roles = loadRoles(CONTENT_ROOT, new Set(modes.map((mode) => mode.id)))
-  const charter = loadCharter(CONTENT_ROOT)
-  const fragments = loadPromptFragments(CONTENT_ROOT)
-  const sites = callSites(roles)
+  const { modes, charter, fragments, sites, roster } = loadShippedContent(CONTENT_ROOT)
   const draftWriter = new DraftWriter(new DraftStore())
   const modelAccess = makeModelAccess(env, logger)
-  const roster = resolveRoster(roles)
   const room = new Room(
     modelAccess,
     durableContextReader(env.dataRoot),

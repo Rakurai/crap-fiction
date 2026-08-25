@@ -229,6 +229,15 @@ validated at startup, and invalid shipped data is a startup failure, since a doc
 partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
 and sibling description, and none names a participant.
 
+**The same startup validation gates a release, not only a running instance.** Content that could not
+start the application does not ship, so the check that decides this runs the real loaders against the
+real content before a release rather than trusting that whatever passed review also parses. It asserts
+nothing about what the content says — which participants a mode enables, how a persona is worded — only
+that the application can start on it. Source code itself names no shipped mode id, participant id or
+handle, which is what lets a participant or mode be added, renamed or removed as a content edit; a
+shipped identity returning to source is caught apart from that check, by inspecting the repository
+rather than running it.
+
 **Every heading, instruction and repeated line addressed to a model is content, never source.** A
 fragment only substitutes, so which fragments a call composes, in what order, and how many times a
 repeated line renders are decisions the context compilation seam owns and a fragment cannot make for
