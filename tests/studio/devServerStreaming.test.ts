@@ -64,7 +64,7 @@ describe('a dispatch\'s events through the dev server', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ workspace: 'my-writing' }),
     })
-    const piece = (await post('/pieces', { title: 'Cups' })) as { id: string }
+    const piece = (await post('/pieces', { title: 'Cups', mode: 'flash' })) as { id: string }
     const conversation = (await post(`/pieces/${piece.id}/conversations`)) as { id: string }
 
     const stream = await fetch(`${baseUrl}/pieces/${piece.id}/events`)

@@ -1,0 +1,5 @@
+---
+variables:
+  - text
+---
+Author: {{text}}

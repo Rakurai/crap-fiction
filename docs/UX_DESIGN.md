@@ -218,11 +218,16 @@ the response holding it has scrolled out of view.
 
 ## The room
 
-**Enabling and disabling specialists is a short list of the whole room with static role
-descriptions** — the piece's specialists, and the Story Editor, which is always present and is not
-something the author can turn off — reached in one action and left in one action. Members are named by
-the handle they are addressed by. No rationale is generated, no lifecycle is presented, and disabling
-explains nothing to the author beyond what the role description already says.
+**Starting a piece asks for a mode only where more than one is loaded.** With one mode, nothing is
+asked and nothing about mode appears on the surface at all. With several, the author picks among
+them by name alongside the title, and the choice is fixed for that piece from then on.
+
+**Enabling and disabling specialists is a short list of the piece's available roster, each member
+carrying its own description** — every specialist its mode makes available, and the Story Editor, which
+is always present and is not something the author can turn off — reached in one action and left in one
+action. Members are named by the handle they are addressed by. No rationale is generated, no
+lifecycle is presented, and disabling explains nothing to the author beyond what the description
+already says.
 
 Nothing in the conversation is altered by a change to the cast, and a specialist re-enabled after
 several messages simply appears again.

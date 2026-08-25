@@ -15,14 +15,14 @@ function fetchCallSites(): Promise<RequestResult<readonly CallSiteAssignmentView
 }
 
 describe('useRoster', () => {
-  it('offers a handle for every participant and none for an operation call site', async () => {
+  it('names a participant by display name and handle, gives an operation call site no handle, and falls back to the id it was asked about', async () => {
     const { result } = renderHook(() => useRoster(fetchCallSites))
 
     await waitFor(() => expect(result.current.settled).toBe(true))
 
-    expect(result.current.handles).toEqual([
-      { handle: 'shape', displayName: 'Shape' },
-      { handle: 'editor', displayName: 'Story Editor' },
-    ])
+    expect(result.current.displayName('shape')).toBe('Shape')
+    expect(result.current.handle('shape')).toBe('shape')
+    expect(result.current.handle('apply')).toBeUndefined()
+    expect(result.current.displayName('retired')).toBe('retired')
   })
 })

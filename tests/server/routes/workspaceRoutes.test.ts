@@ -2,15 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RoleDefinition } from '../../../src/server/model/roles.js'
-import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { buildTestApp } from '../../support/harness.js'
-
-const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
-const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
-]
+import { MODE_FIXTURE, ROLES_FIXTURE } from '../../support/roomFixtures.js'
 
 describe('the workspace routes', () => {
   let dataRoot: string
@@ -24,7 +17,7 @@ describe('the workspace routes', () => {
   })
 
   function studio() {
-    return buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus: undefined }).app
+    return buildTestApp(dataRoot, { modes: [MODE_FIXTURE], roles: ROLES_FIXTURE, runtimeStatus: undefined }).app
   }
 
   it('reports an unconfigured workspace as null, and the resolved directory on every read after', async () => {

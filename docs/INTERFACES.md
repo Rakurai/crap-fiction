@@ -38,8 +38,10 @@ Every route returns the full result for its scope. There is no pagination.
 ## HTTP routes
 
 ```
+GET    /modes                                      every loaded mode's id and display name
 GET    /pieces                                     title, mode, status, length, modified
-POST   /pieces                                     title; enables the mode's default cast
+POST   /pieces                                     title and the chosen mode; enables that mode's
+                                                   default cast
 GET    /pieces/:id                                 metadata, draft, story context, conversation index,
                                                    the room (the cast and the Story Editor), the
                                                    conversation action in flight if there is one,
@@ -98,6 +100,8 @@ channel it arrived by.
 call(site, prompt, schema, signal, onState?) → CallResult<T>
 status()                                    → whether the runtime is reachable, and what it holds
 
+Prompt = { durable, perCall }               each half a string; see Context compilation
+
 CallResult<T> =
   | { outcome: 'value';     value: T }
   | { outcome: 'abandoned' }
@@ -105,6 +109,10 @@ CallResult<T> =
 
 FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
 ```
+
+`prompt` carries the durable half and the per-call half apart; no caller composes them into one string
+before the seam, and only an implementation constrained to a single-string vendor call joins them, as
+that vendor's own accommodation.
 
 | Reason | Means |
 |---|---|
@@ -126,19 +134,19 @@ One compilation per kind of call, each returning the whole of what its prompt is
 
 | Compilation | What it is additionally given |
 |---|---|
-| a specialist | its role, the mode's criteria for it, whether it owes an answer, and the dispatch's input |
+| a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
 | an application | the recommendation and the author's constraint |
 | a context capture | nothing beyond the shared input |
 
-Every kind receives both durable contexts, the current draft whole, and the conversation's entries.
-A participant compilation also receives the history policy, which selects between shared history and
-stricter independence and is the whole of the difference between them; the other two kinds read the
-conversation whole and have no policy.
+Every kind receives both durable contexts, the current draft whole, the surface it is compiling for, and
+the conversation's entries. A participant compilation also receives the history policy, which selects
+between shared history and stricter independence and is the whole of the difference between them; the
+other two kinds read the conversation whole and have no policy.
 
 The two participant compilations return one type. The other two return their own, because a call that
-is not a participant has no role, no criteria and no owed answer, and a shape carrying those as absent
-would invite something to read them.
+is not a participant has no role, no mode description and no owed answer, and a shape carrying those
+as absent would invite something to read them.
 
 ## Persisted artifacts
 
@@ -161,14 +169,34 @@ would invite something to read them.
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them.
 
-Shipped data — the participant charter, the role definitions, the mode descriptors — travels with the
-application's own source and not under the data root. The **charter** is what every participant is told
-whichever one it is: what the three outcomes mean and what makes a recommendation applicable rather
-than commentary, that a direct question is owed an answer, and that nothing reasons about the author's
-question instead of about the story. It is its own kind so that a correction to it is one edit rather
-than one per role. A **role definition** carries the participant's display name and its single-token
-handle, which are different things — a display name of more than one word cannot be recovered from a
-message.
+Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
+travels with the application and not under the data root, under a content root resolved once at startup.
+The charter and every participant are one Markdown document each; a participant's filename is its id.
+Each mode is a descriptor paired with a sibling document describing its form and scale.
+
+The **charter** is one Markdown document under the content root, composed whole into a specialist or
+generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
+rather than intrinsic to the charter and is composed only where a call addresses a participant directly.
+
+A **participant** carries its display name and its single-token handle, which are different things — a
+display name of more than one word cannot be recovered from a message — and two distinct texts: a short
+**description**, read by the author assigning it a model, and a **persona**, briefing the model with the
+participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
+or `addressed-only`. A `cast` participant additionally declares **availability**: the mode-and-surface
+pairs it is available for, and for each whether it starts enabled.
+
+A **mode** carries its `id` and its `displayName`, and names no participant. Its sibling document
+carries the shared **description** of its form and scale that every participant call receives. Any
+number of modes may load; the roster and initial cast for a given mode and surface are derived from
+every cast participant's declared availability, never listed by the mode.
+
+A **prompt fragment** is one Markdown document under the content root, holding a heading or an
+instruction addressed to a model together with frontmatter declaring the names it interpolates as
+`{{name}}` placeholders. It performs substitution only: no branching, looping or expression evaluation.
+The inventory is closed — a section, a repeated line, a per-call task, an operation role, or a
+surface's framing — and every entry in it is a startup-required file; an absent one fails naming it. A
+rendered prompt names a participant by its display name, never by its internal id, and is never written
+to a log.
 
 ## Process environment
 

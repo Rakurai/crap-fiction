@@ -58,7 +58,7 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
   }
 
   return [
-    ...roles.map((role) => ({ site: role.id, handle: role.handle, displayName: role.displayName, description: role.roleDescription })),
+    ...roles.map((role) => ({ site: role.id, handle: role.handle, displayName: role.displayName, description: role.description })),
     ...OPERATIONS,
   ]
 }

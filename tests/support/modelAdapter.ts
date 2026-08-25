@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
-import type { CallResult, CallState, ModelAccess } from '../../src/server/model/types.js'
+import type { CallPrompt, CallResult, CallState, ModelAccess } from '../../src/server/model/types.js'
 
 export type FixtureBehavior = Readonly<{
   result: CallResult<unknown>
@@ -13,7 +13,7 @@ export class FixtureModelAdapter implements ModelAccess {
   readonly #behaviorFor: (site: string) => FixtureBehavior
   readonly #runtimeStatus: RuntimeStatus | undefined
   readonly #onCall: ((site: string) => void) | undefined
-  readonly #prompts = new Map<string, string>()
+  readonly #prompts = new Map<string, CallPrompt>()
   readonly #released = new Set<string>()
   readonly #gates = new Map<string, () => void>()
 
@@ -49,7 +49,7 @@ export class FixtureModelAdapter implements ModelAccess {
 
   async call<T>(
     site: string,
-    prompt: string,
+    prompt: CallPrompt,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
@@ -85,7 +85,8 @@ export class FixtureModelAdapter implements ModelAccess {
   }
 
   promptFor(site: string): string | undefined {
-    return this.#prompts.get(site)
+    const prompt = this.#prompts.get(site)
+    return prompt === undefined ? undefined : prompt.durable + prompt.perCall
   }
 
   async status(): Promise<RuntimeStatus> {

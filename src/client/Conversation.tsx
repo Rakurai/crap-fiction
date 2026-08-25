@@ -9,13 +9,14 @@ import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplyingResponse } from './useApply.js'
-import type { HandleEntry } from './useRoster.js'
 import { useNow } from './useNow.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
 
 const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
 
 const MAX_MENTION_MATCHES = 8
+
+export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
 type ConversationProps = {
   readonly pieceId: string

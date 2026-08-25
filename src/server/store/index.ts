@@ -12,11 +12,14 @@ import {
   fileExists,
   fileModifiedMs,
   fileNames,
+  readContentDocuments,
+  readContentFragmentFile,
   readJsonArtifact,
+  readShippedTextFile,
   readTextArtifact,
   readYamlArtifact,
-  readYamlDirectory,
   readYamlFile,
+  ShippedDataError,
   writeJsonArtifact,
   writeTextArtifact,
   writeYamlArtifact,
@@ -242,16 +245,37 @@ export async function deleteAppliedChange(workspaceDir: string, pieceId: string,
   await deleteFile(changeFile(pieceDir, changeId))
 }
 
-const SHIPPED_ROOT = path.join(import.meta.dirname, '..')
+export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
+  const dir = path.join(contentRoot, 'modes')
+  const modeIds = directoryNames(dir)
+  if (modeIds.length === 0) {
+    throw new ShippedDataError(dir, '(directory)', 'no data found')
+  }
 
-export function readShippedModes<T>(schema: z.ZodType<T>): readonly T[] {
-  return readYamlDirectory(path.join(SHIPPED_ROOT, 'modes'), schema)
+  return modeIds.map((id) => {
+    const modeDir = path.join(dir, id)
+    const descriptor = readYamlFile(path.join(modeDir, 'mode.yaml'), schema)
+    const description = readShippedTextFile(path.join(modeDir, 'description.md'))
+    return { ...descriptor, description }
+  })
 }
 
-export function readShippedRoles<T>(schema: z.ZodType<T>): readonly T[] {
-  return readYamlDirectory(path.join(SHIPPED_ROOT, 'model', 'roles'), schema)
+export function readShippedCharter(contentRoot: string): string {
+  return readShippedTextFile(path.join(contentRoot, 'charter.md'))
 }
 
-export function readShippedCharter<T>(schema: z.ZodType<T>): T {
-  return readYamlFile(path.join(SHIPPED_ROOT, 'model', 'charter.yaml'), schema)
+export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {
+  return readContentDocuments(participantsDirectory(contentRoot), schema)
+}
+
+export function participantFile(contentRoot: string, id: string): string {
+  return path.join(participantsDirectory(contentRoot), `${id}.md`)
+}
+
+function participantsDirectory(contentRoot: string): string {
+  return path.join(contentRoot, 'participants')
+}
+
+export function readShippedFragment<T>(contentRoot: string, kind: string, name: string, schema: z.ZodType<T>): Readonly<T & { body: string }> {
+  return readContentFragmentFile(path.join(contentRoot, 'prompts', kind, `${name}.md`), schema)
 }

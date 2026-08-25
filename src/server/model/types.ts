@@ -11,10 +11,13 @@ export type CallResult<T> =
 
 export type CallState = 'preparing' | 'working'
 
+/** What is true of the call site before a request, and the task and material a particular request carries. */
+export type CallPrompt = Readonly<{ durable: string; perCall: string }>
+
 export type ModelAccess = {
   call<T>(
     site: string,
-    prompt: string,
+    prompt: CallPrompt,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,

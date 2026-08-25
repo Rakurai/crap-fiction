@@ -14,6 +14,7 @@ import {
   PieceNotFoundError,
   setPieceCast,
   UnknownCastMemberError,
+  UnknownModeError,
   updatePieceDetails,
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
@@ -24,23 +25,45 @@ import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 
 const flash: ModeDescriptor = {
   id: 'flash',
-  name: 'Flash',
-  cast: [
-    { id: 'shape', attendsTo: 'x', defect: 'y' },
-    { id: 'compression', attendsTo: 'x', defect: 'y' },
-  ],
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
+}
+
+const epic: ModeDescriptor = {
+  id: 'epic',
+  displayName: 'Epic',
+  description: 'A piece read over several sittings.',
 }
 
 const specialists: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it' },
-  { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'the shape of it',
+    persona: 'reasons about the shape of it',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
+  {
+    id: 'compression',
+    handle: 'comp',
+    displayName: 'Compression',
+    description: 'what earns its space',
+    persona: 'reasons about what earns its space',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
 ]
 
 const storyEditor: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
+  eligibility: 'generalist',
   displayName: 'Story Editor',
-  roleDescription: 'holds the whole of it',
+  description: 'holds the whole of it',
+  persona: 'reasons about the whole of it',
+  availability: [],
 }
 
 describe('pieces', () => {
@@ -55,7 +78,7 @@ describe('pieces', () => {
   })
 
   it('creates a piece from a title alone, with the mode default cast enabled and no draft written', async () => {
-    const piece = await createPiece(workspaceDir, 'The Cups', flash)
+    const piece = await createPiece(workspaceDir, 'The Cups', flash.id, [flash], specialists)
 
     expect(piece.id).toBe('the-cups')
     expect(piece.title).toBe('The Cups')
@@ -64,16 +87,24 @@ describe('pieces', () => {
     expect(piece.length).toBe(0)
   })
 
+  it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
+    const piece = await createPiece(workspaceDir, 'A Long Way', epic.id, [flash, epic], specialists)
+    expect(piece.mode).toBe('epic')
+    expect(getPiece(workspaceDir, piece.id, null, null, specialists, storyEditor).mode).toBe('epic')
+
+    await expect(createPiece(workspaceDir, 'Nope', 'novella', [flash, epic], specialists)).rejects.toThrowError(UnknownModeError)
+  })
+
   it('disambiguates a colliding slug at creation', async () => {
-    const first = await createPiece(workspaceDir, 'The Cups', flash)
-    const second = await createPiece(workspaceDir, 'The Cups', flash)
+    const first = await createPiece(workspaceDir, 'The Cups', flash.id, [flash], specialists)
+    const second = await createPiece(workspaceDir, 'The Cups', flash.id, [flash], specialists)
 
     expect(first.id).toBe('the-cups')
     expect(second.id).toBe('the-cups-2')
   })
 
   it('lists a directory scan showing each piece length and modified time', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const draftFile = path.join(workspaceDir, piece.id, 'draft.md')
     writeFileSync(draftFile, 'Two small words.', 'utf8')
 
@@ -86,14 +117,14 @@ describe('pieces', () => {
 
   it('ignores a directory with no piece.yaml', async () => {
     mkdirSync(path.join(workspaceDir, 'not-a-piece'))
-    await createPiece(workspaceDir, 'Cups', flash)
+    await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     expect(listPieces(workspaceDir)).toHaveLength(1)
   })
 
   it('orders the listing by most recently modified first', async () => {
-    const older = await createPiece(workspaceDir, 'Older', flash)
-    const newer = await createPiece(workspaceDir, 'Newer', flash)
+    const older = await createPiece(workspaceDir, 'Older', flash.id, [flash], specialists)
+    const newer = await createPiece(workspaceDir, 'Newer', flash.id, [flash], specialists)
 
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, older.id, 'piece.yaml'), past, past)
@@ -103,7 +134,7 @@ describe('pieces', () => {
   })
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const opened = getPiece(workspaceDir, created.id, null, null, specialists, storyEditor)
     expect(opened).toEqual({
       ...created,
@@ -114,15 +145,15 @@ describe('pieces', () => {
       conversationActionInFlight: null,
       captureInFlight: null,
       cast: [
-        { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-        { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: true },
+        { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
+        { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
       ],
-      storyEditor: { handle: 'editor', displayName: 'Story Editor', roleDescription: 'holds the whole of it' },
+      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it' },
     })
   })
 
   it('opens a piece carrying the draft and the story context the author wrote, section by section', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
     writeFileSync(
       path.join(workspaceDir, created.id, 'story-context.yaml'),
@@ -165,13 +196,13 @@ describe('setPieceCast', () => {
   })
 
   it('disables a specialist, reports the cast as it now stands, and makes it eligible again when named once more', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     const disabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
 
     expect(disabled).toEqual([
-      { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'the shape of it', enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', roleDescription: 'what earns its space', enabled: false },
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
     ])
     expect(getPiece(workspaceDir, created.id, null, null, specialists, storyEditor).cast).toEqual(disabled)
 
@@ -180,7 +211,7 @@ describe('setPieceCast', () => {
   })
 
   it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     await expect(setPieceCast(workspaceDir, created.id, specialists, ['shape', 'story-editor'])).rejects.toThrowError(
       UnknownCastMemberError,
@@ -200,7 +231,7 @@ describe('updatePieceDetails', () => {
   })
 
   it('retitles a piece, leaving its mode, status and directory untouched', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
@@ -209,7 +240,7 @@ describe('updatePieceDetails', () => {
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash)
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     const finished = await updatePieceDetails(workspaceDir, created.id, { status: 'finished' })
     expect(finished.status).toBe('finished')
@@ -238,7 +269,7 @@ describe('DraftWriter', () => {
   }
 
   it("writes an existing piece's draft through to the store", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     await draftWriter().save(workspaceDir, piece.id, 'Two small words.')
 
@@ -258,12 +289,12 @@ describe('getConversation', () => {
   })
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
-    await createPiece(workspaceDir, 'Cups', flash)
+    await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     expect(() => getConversation(workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
   })
 
   it('joins an application onto the change it produced, by identity, and leaves an unapplied response with none', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
     const authorMessage: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'a message', audience: [], brought: [] }
     const response: ConversationEntry = {
@@ -295,7 +326,7 @@ describe('getConversation', () => {
   })
 
   it('degrades to the application shown without its change when the change file is missing, rather than erroring', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
     const application: ConversationEntry = { id: 'e1', kind: 'application', responseId: 'no-such-response', changeId: 'never-written' }
     await store.append(workspaceDir, piece.id, 'c1', application)
@@ -317,13 +348,13 @@ describe('listConversations', () => {
   })
 
   it('reports none for a piece with no conversations', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     expect(listConversations(workspaceDir, piece.id)).toEqual([])
   })
 
   // Which entry the opening words come from belongs to `shared/conversationEntries.test.ts`.
   it("carries the conversation's opening words onto the summary", async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
       id: 'e1',
       kind: 'authorMessage',
@@ -337,7 +368,7 @@ describe('listConversations', () => {
   })
 
   it('orders the listing by last activity, most recent first', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
     const anyEntry: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] }
     await store.append(workspaceDir, piece.id, 'older', anyEntry)
@@ -361,12 +392,12 @@ describe('deleteConversation', () => {
   })
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     await expect(deleteConversation(workspaceDir, piece.id, 'never-written')).rejects.toThrowError(ConversationNotFoundError)
   })
 
   it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', flash)
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
     await store.append(workspaceDir, piece.id, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
     await store.append(workspaceDir, piece.id, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })

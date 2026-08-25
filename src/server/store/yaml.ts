@@ -119,22 +119,59 @@ function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {
   return result.data
 }
 
-export function readYamlDirectory<T>(dir: string, schema: z.ZodType<T>): readonly T[] {
-  const files = readdirSync(dir).filter((name) => name.endsWith('.yaml'))
-  const items = files.map((name) => parseShippedYaml(path.join(dir, name), schema))
+export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
+  return parseShippedYaml(filePath, schema)
+}
+
+export function readShippedTextFile(filePath: string): string {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
+  return readFileSync(filePath, 'utf8').trim()
+}
+
+const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
+
+export function readContentFragmentFile<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { body: string }> {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
+  const match = FRONTMATTER_PATTERN.exec(readFileSync(filePath, 'utf8'))
+  if (match === null) {
+    throw new ShippedDataError(filePath, '(frontmatter)', 'missing or malformed frontmatter block')
+  }
+  const [, frontmatterText, body] = match
+  const raw = parse(frontmatterText ?? '')
+  const result = schema.safeParse(raw)
+  if (!result.success) {
+    const { entry, message } = firstSchemaIssue(result.error)
+    throw new ShippedDataError(filePath, entry, message)
+  }
+
+  return { ...result.data, body: (body ?? '').trim() }
+}
+
+function parseContentDocument<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { id: string; persona: string }> {
+  const { body: persona, ...rest } = readContentFragmentFile(filePath, schema)
+  if (persona.length === 0) {
+    throw new ShippedDataError(filePath, 'persona', 'must not be empty')
+  }
+
+  return { ...(rest as T), id: path.basename(filePath, '.md'), persona }
+}
+
+export function readContentDocuments<T>(dir: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {
+  const files = readdirSync(dir).filter((name) => name.endsWith('.md'))
+  const items = files.map((name) => parseContentDocument(path.join(dir, name), schema))
 
   if (items.length === 0) {
     throw new ShippedDataError(dir, '(directory)', 'no data found')
   }
 
   return items
-}
-
-export function readYamlFile<T>(filePath: string, schema: z.ZodType<T>): T {
-  if (!existsSync(filePath)) {
-    throw new ShippedDataError(filePath, '(file)', 'not found')
-  }
-  return parseShippedYaml(filePath, schema)
 }
 
 export function readTextArtifact(filePath: string): { text: string; modifiedMs: number } | undefined {

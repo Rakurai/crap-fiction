@@ -1,20 +1,26 @@
 import { useState, type FormEvent } from 'react'
+import type { ModeSummary } from '../shared/modeViews.js'
 import styles from './NewPieceForm.module.css'
 
 type NewPieceFormProps = {
   readonly submitting: boolean
   readonly error: string | undefined
-  readonly onSubmit: (title: string) => void
+  readonly modes: readonly ModeSummary[]
+  readonly onSubmit: (title: string, mode: string) => void
 }
 
-export function NewPieceForm({ submitting, error, onSubmit }: NewPieceFormProps) {
+export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFormProps) {
   const [naming, setNaming] = useState(false)
   const [title, setTitle] = useState('')
+  const [mode, setMode] = useState<string | undefined>(undefined)
+  const chosen = mode ?? modes[0]?.id
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onSubmit(title)
+    if (chosen === undefined) return
+    onSubmit(title, chosen)
     setTitle('')
+    setMode(undefined)
     setNaming(false)
   }
 
@@ -45,6 +51,20 @@ export function NewPieceForm({ submitting, error, onSubmit }: NewPieceFormProps)
           }}
           required
         />
+        {modes.length > 1 && (
+          <select
+            aria-label="mode"
+            className={styles.select}
+            value={chosen}
+            onChange={(event) => setMode(event.target.value)}
+          >
+            {modes.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.displayName}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="submit" className={styles.submit} disabled={submitting}>
           create
         </button>

@@ -16,13 +16,35 @@ import { buildTestApp } from '../../support/harness.js'
 
 const MODE: ModeDescriptor = {
   id: 'flash',
-  name: 'Flash',
-  cast: [{ id: 'shape', attendsTo: 'the shape of the piece', defect: 'a shapeless middle' }],
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
+}
+
+const EPIC: ModeDescriptor = {
+  id: 'epic',
+  displayName: 'Epic',
+  description: 'A piece read over several sittings.',
 }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reads for the shape of the whole' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'weighs what the room said' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'reads for the shape of the whole',
+    persona: 'reasons about the shape of the whole',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
+  {
+    id: 'story-editor',
+    handle: 'editor',
+    displayName: 'Story Editor',
+    description: 'weighs what the room said',
+    persona: 'reasons about what the room said',
+    eligibility: 'generalist',
+    availability: [],
+  },
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
@@ -38,19 +60,19 @@ describe('the piece routes', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function studio() {
-    return buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus: undefined })
+  function studio(modes: readonly ModeDescriptor[] = [MODE]) {
+    return buildTestApp(dataRoot, { modes, roles: ROLES, runtimeStatus: undefined })
   }
 
-  async function withWorkspace() {
-    const { app, workspace } = studio()
+  async function withWorkspace(modes?: readonly ModeDescriptor[]) {
+    const { app, workspace } = studio(modes)
     const dir = await workspace.set('my-writing')
     return { app, dir }
   }
 
   async function withPiece() {
     const { app, dir } = await withWorkspace()
-    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups' }) })
+    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', mode: 'flash' }) })
     return { app, dir }
   }
 
@@ -76,7 +98,7 @@ describe('the piece routes', () => {
         mode: 'flash',
         status: 'drafting',
         draft: 'Two small words.',
-        cast: [{ id: 'shape', displayName: 'Shape', roleDescription: ROLES[0]?.roleDescription, enabled: true }],
+        cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
         conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
       },
     })
@@ -95,7 +117,7 @@ describe('the piece routes', () => {
   it('reaches the studio on every write it offers, answering each in the envelope', async () => {
     const { app } = await withWorkspace()
 
-    const created = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'The Cups' }) })
+    const created = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'The Cups', mode: 'flash' }) })
     expect(await created.json()).toMatchObject({ success: true, data: { id: 'the-cups' } })
 
     const listed = await app.request('/pieces')
@@ -159,5 +181,25 @@ describe('the piece routes', () => {
     const corrupted = await app.request('/pieces/broken')
     expect(corrupted.status).toBe(500)
     expect(await corrupted.json()).toMatchObject({ success: false, error: { code: 'ARTIFACT_INVALID' } })
+
+    const unknownMode = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Nope', mode: 'novella' }) })
+    expect(unknownMode.status).toBe(400)
+    expect(await unknownMode.json()).toMatchObject({ success: false, error: { code: 'MODE_UNKNOWN' } })
+  })
+
+  it('lists every loaded mode, and persists whichever the author chooses at creation', async () => {
+    const { app } = await withWorkspace([MODE, EPIC])
+
+    const listed = await app.request('/modes')
+    expect(await listed.json()).toMatchObject({
+      success: true,
+      data: [{ id: 'flash', displayName: 'Flash' }, { id: 'epic', displayName: 'Epic' }],
+    })
+
+    const created = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'A Long Way', mode: 'epic' }) })
+    expect(await created.json()).toMatchObject({ success: true, data: { mode: 'epic' } })
+
+    const opened = await app.request('/pieces/a-long-way')
+    expect(await opened.json()).toMatchObject({ success: true, data: { mode: 'epic' } })
   })
 })

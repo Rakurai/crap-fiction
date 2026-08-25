@@ -1,6 +1,7 @@
 import type { Clock } from '../../src/shared/clock.js'
 import { createLogger } from '../../src/server/logger.js'
 import type { Charter } from '../../src/server/model/charter.js'
+import type { PromptFragments } from '../../src/server/model/prompts.js'
 import type { ModelAccess } from '../../src/server/model/types.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
@@ -12,9 +13,10 @@ import { ConversationEntryStore } from '../../src/server/store/index.js'
 
 /** Every value a Room's behaviour turns on, stated by the test rather than assumed here. */
 export type RoomSpec = Readonly<{
-  mode: ModeDescriptor
+  modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   charter: Charter
+  fragments: PromptFragments
   policy: HistoryPolicy
   modelAccess: ModelAccess
   now: Clock
@@ -26,8 +28,10 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     durableContextReader(dataRoot),
     authorContextStore(dataRoot),
     new ConversationEntryStore(),
-    resolveRoster(spec.mode, spec.roles),
+    resolveRoster(spec.roles),
+    spec.modes,
     spec.charter,
+    spec.fragments,
     spec.policy,
     createLogger('silent'),
     spec.now,

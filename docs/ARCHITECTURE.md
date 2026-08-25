@@ -219,15 +219,45 @@ model once is on that model for every piece; and the interface theme. With no th
 interface follows the operating system — an absent key means the author has not chosen, which is a
 different thing from a value the application supplied on their behalf.
 
-**Shipped data travels with the application**, beside its own source rather than under the data root:
-the participant charter, the role definitions, and the mode descriptors. Where exactly is the store
-boundary's, like the rest of the layout — the modules that read them state what each must contain and
-never where it is. It is kept apart from author configuration because conflating them means an upgrade
-either clobbers the author's assignments or fails to deliver a corrected role definition. It is
-validated at startup, and invalid shipped data is a startup failure, since a descriptor that parses
-partially would enable the wrong cast. The mode set shipped is one descriptor, and any other count is a
-startup failure too: everything above reads the mode as singular, so a second one arriving as data would
-be silently ignored rather than offered.
+**Shipped data travels with the application**, not under the data root: the charter, every participant,
+every mode descriptor and every prompt fragment are documents under a content root resolved once at
+startup. Where exactly that root sits is the store boundary's, like the rest of the layout — the modules
+that read it state what each document must contain and never where it is. It is kept apart from author
+configuration because conflating them means
+an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
+validated at startup, and invalid shipped data is a startup failure, since a document that parses
+partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
+and sibling description, and none names a participant.
+
+**The same startup validation gates a release, not only a running instance.** Content that could not
+start the application does not ship, so the check that decides this runs the real loaders against the
+real content before a release rather than trusting that whatever passed review also parses. It asserts
+nothing about what the content says — which participants a mode enables, how a persona is worded — only
+that the application can start on it. Source code itself names no shipped mode id, participant id or
+handle, which is what lets a participant or mode be added, renamed or removed as a content edit; a
+shipped identity returning to source is caught apart from that check, by inspecting the repository
+rather than running it.
+
+**Every heading, instruction and repeated line addressed to a model is content, never source.** A
+fragment only substitutes, so which fragments a call composes, in what order, and how many times a
+repeated line renders are decisions the context compilation seam owns and a fragment cannot make for
+itself. This is what lets editing a heading or an instruction take effect on reload: the seam that
+assembles a call changes only when which fragments it reaches for changes, never when their wording
+does.
+
+**A participant declares its own eligibility, and the count that must hold is validated where the
+participants are loaded.** Exactly one may declare itself the generalist; none or several is a startup
+failure naming the participant files involved, because nothing downstream has a second way to choose
+which one judges the piece as a whole.
+
+**A cast participant declares the mode-and-surface pairs it is available for, and whether it starts
+enabled at each.** Validating that declaration needs the loaded modes, so it happens after modes load
+and before the participants they name are trusted: an availability entry naming a mode that did not
+load, naming a participant that is not cast-eligible, or repeating a mode-and-surface pair is a startup
+failure naming the participant file. The available roster for a given mode and surface, and the
+initial cast it yields, are both derived from these declarations rather than stored anywhere — a mode
+descriptor names no specialist, so making one available in a mode is an edit to that specialist's own
+document.
 
 **The piece directory is the piece's identity.** Its name derives from the title, slugified, with
 collisions disambiguated at creation, and it is what the application addresses a piece by. A renamed
@@ -351,7 +381,7 @@ mean different things to the author and to the room, so none of them is the abse
 result modelling two of them as a missing value would leave every caller inferring the difference
 from state it happens to hold. A failure carries what came back verbatim where anything did.
 
-**The prompt crosses as text rather than as messages.** A message array would import a chat topology
+**Each half crosses as text rather than as messages.** A message array would import a chat topology
 from whichever runtime was consulted first, and this conversation has five speakers with no faithful
 mapping onto user-and-assistant alternation. Flattening is the correct representation here rather
 than a concession, and context compilation already produces it.
@@ -497,15 +527,21 @@ either.
 
 **This is the seam the central bet lives in.** Everything else in the orchestration is plumbing.
 
-A participant call is assembled from the participant's role definition, the mode's criteria for that
-participant, the model configuration, and the selected context compilation policy — none of which is
+A participant call is assembled from the participant's persona, the mode's shared description of the
+form and scale, the model configuration, and the selected context compilation policy — none of which is
 an intrinsic property of the participant.
 
-**The mode's criteria are part of that because they are what make the specialists differ.** A
-compilation that dropped what a specialist attends to and the defect it is alert to would separate
-four participants by one sentence of role description each, which is not the room the bet describes.
-The Story Editor has no such criteria, being no part of the cast, and is told what it is for by its
-role definition instead.
+**The mode's description is part of that because every participant answers to the same form.** It
+states nothing about any one participant's responsibility; each interprets what the form implies
+through its own persona, so the Story Editor receives the same description as every specialist and
+applies it through a different persona rather than being exempted from it.
+
+**A call's prompt has a durable half and a per-call half, each composed from loaded fragments in a
+fixed order.** The durable half is what is true of the call site before a request — the mode
+description, the charter, a participant's persona, or a non-participant call's operation role; the
+per-call half is the task and the material a particular request carries. No heading, task instruction
+or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
+prompt language of its own.
 
 **Compilation is a pure function**, so the invariant is asserted against the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
@@ -640,10 +676,22 @@ of the addressing. A client that parsed and posted its own participant list coul
 addressing contradicted the words about to reach the model; synthesizing a sigil into the author's text
 would put words in the conversation they never wrote.
 
+**The available roster is the ceiling on who can be addressed.** A specialist the piece's mode makes
+available is addressable whether or not it is enabled; one the mode does not make available is not
+addressable at all, and its handle resolves to nothing. Both the surface that suggests a handle as the
+author types and the resolver that reads the finished message derive that set the same way, so the author
+is never offered a handle the dispatch would then ignore.
+
 **Addressing a specialist that is not enabled enables it** before the dispatch's entry is written — the
 same durable write as enabling it directly, and the same author-message entry that carries the resolved
 audience also names which of them were newly brought in. The alternative is participation with an
 expiry, which is new domain machinery for something the author reverses in one action.
+
+**Naming an addressed-only participant calls it and writes nothing.** It belongs to no cast, so there is
+no membership for the dispatch to bring it into — it joins this dispatch's eligible set exactly as a
+named specialist does, and the piece's enabled cast is untouched. Because something was addressed, the
+generalist is excluded from that same dispatch unless it too was named, the same rule that already keeps
+it out of a dispatch addressed to one specialist alone.
 
 **The Story Editor is not a member of the eligible set.** Keeping it out is what stops the ambiguity
 from becoming a double call. An addressed dispatch does not call it unless it was addressed; a dispatch
@@ -764,7 +812,7 @@ a frame around one.
 
 **An event names a participant by its identity and never by its display name.** A name is roster data, it
 is the same for every dispatch, and putting it on every frame would make the stream a second place a
-participant's name is stated — one that would go stale the moment a role definition was edited and
+participant's name is stated — one that would go stale the moment a participant was edited and
 reloaded. The client resolves names through the roster, and the surface a conversation is drawn on does
 not render until the roster has landed, so there is no window in which a conversation could be drawn in
 identities.
@@ -823,8 +871,9 @@ cast and is not togglable, so it is reported as its own thing rather than as a c
 and it is reported rather than left to the client to infer as *the participant that is not in the cast*,
 which is a rule about the room's composition and belongs to the server that resolves the roster.
 
-**Creating a piece makes no model call.** It writes the piece directory and enables the mode's default
-cast, so a piece is creatable and writable with the runtime not even running.
+**Creating a piece makes no model call.** It writes the piece directory and enables the roster
+specialists that declare themselves on by default for the chosen mode, so a piece is creatable and
+writable with the runtime not even running.
 
 **Every model operation receives the manuscript as it currently stands**, carried in the request that
 starts it. The draft file remains the sole durable representation of the manuscript, and the room never
@@ -878,7 +927,7 @@ rebuilt, and the roster changing is the only thing that causes one.
 
 **Everything else is picked up without a restart, and code changes without a rebuild.** The client is
 served by the Vite process the server runs inside, so a client edit hot-reloads and a server edit reloads
-the module graph. Shipped data travels in the repository bind, so correcting a role definition is an edit
+the module graph. Shipped data travels in the repository bind, so correcting a participant is an edit
 and a reload rather than a release; it is validated at startup, so it is a reload and not merely a save.
 Change notification over a bind mount is not dependable, so the watcher polls. Nothing about that reaches
 author data, which is still watched by nothing at all.

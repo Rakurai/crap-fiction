@@ -13,11 +13,27 @@ import { buildTestApp } from '../../support/harness.js'
  * two answers a runtime the author cannot reach arrives as.
  */
 
-const MODE: ModeDescriptor = { id: 'flash', name: 'Flash', cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }] }
+const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
 
 const ROLES: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'attends to the turn' },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'the generalist' },
+  {
+    id: 'shape',
+    handle: 'shape',
+    displayName: 'Shape',
+    description: 'attends to the turn',
+    persona: 'reasons about attends to the turn',
+    eligibility: 'cast',
+    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
+  },
+  {
+    id: 'story-editor',
+    handle: 'editor',
+    displayName: 'Story Editor',
+    description: 'the generalist',
+    persona: 'reasons about the generalist',
+    eligibility: 'generalist',
+    availability: [],
+  },
 ]
 
 describe('the call-site and model routes', () => {
@@ -32,7 +48,7 @@ describe('the call-site and model routes', () => {
   })
 
   function studio(runtimeStatus?: RuntimeStatus) {
-    return buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus }).app
+    return buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus }).app
   }
 
   it('carries every call site the roles compose to, in the order the studio names them', async () => {

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
-import { Conversation } from './Conversation.js'
+import { Conversation, type HandleEntry } from './Conversation.js'
 import { ContextReview } from './ContextReview.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
 import { useLoaded } from './load.js'
@@ -83,6 +83,11 @@ function Surfaces({
   const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
   const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
 
+  const addressable: readonly HandleEntry[] = [
+    ...room.cast.map(({ handle, displayName }) => ({ handle, displayName })),
+    { handle: room.storyEditor.handle, displayName: room.storyEditor.displayName },
+  ]
+
   function switchTo(conversationId: string | null): void {
     setActiveConversationId(conversationId)
     setSession((current) => current + 1)
@@ -135,7 +140,7 @@ function Surfaces({
           room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
           displayName={roster.displayName}
           handle={roster.handle}
-          handles={roster.handles}
+          handles={addressable}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
           clock={Date.now}
           onApplied={manuscript.applyRecommendation}

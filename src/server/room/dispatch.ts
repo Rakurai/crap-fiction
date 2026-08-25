@@ -5,7 +5,7 @@ import type {
   ParticipantResponseEntry,
 } from '../../shared/conversationEntries.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { ModelAccess } from '../model/types.js'
+import type { CallPrompt, ModelAccess } from '../model/types.js'
 import { normalizeResponse, responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
@@ -13,18 +13,18 @@ export type ParticipantOutcome =
   | Readonly<{ kind: 'entry'; entry: ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry }>
   | Readonly<{ kind: 'abandoned' }>
 
-export function evidenceFrom(outcome: ParticipantOutcome, participantId: string): ParticipantEvidence | undefined {
+export function evidenceFrom(outcome: ParticipantOutcome, participant: string): ParticipantEvidence | undefined {
   if (outcome.kind !== 'entry') return undefined
   if (outcome.entry.kind === 'participantResponse') {
-    return { kind: 'substantive', participantId, claim: outcome.entry.claim, note: outcome.entry.note }
+    return { kind: 'substantive', participant, claim: outcome.entry.claim, note: outcome.entry.note }
   }
-  if (outcome.entry.kind === 'participantNoComment') return { kind: 'noComment', participantId }
+  if (outcome.entry.kind === 'participantNoComment') return { kind: 'noComment', participant }
   return undefined
 }
 
 export async function callParticipant(
   role: RoleDefinition,
-  prompt: string,
+  prompt: CallPrompt,
   causeId: string,
   owesAnswer: boolean,
   modelAccess: ModelAccess,

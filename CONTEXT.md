@@ -46,8 +46,12 @@ story context, and conversations.
 
 ## Mode
 
-The form and scale of a piece, expressed as data rather than code. A mode supplies the
-default cast for a new piece and the criteria each specialist applies at that scale.
+The form and scale of a piece, expressed as data rather than code. A mode supplies a shared
+description of that form and scale, which every participant interprets through its own
+persona.
+
+Several modes may exist side by side. A piece is created against exactly one and keeps it for
+its whole life.
 
 ## Draft
 
@@ -65,33 +69,68 @@ durable notes.
 Story context may change considerably as a piece develops, but never without the author
 saying so. Ordinary discussion and ordinary editing do not rewrite it.
 
+## Surface
+
+The closed set of places written material can be edited: the draft, the story context, or the
+author context.
+
 ## Room
 
-The participants engaged on a piece: its specialists and the Story Editor.
+The participants engaged on a piece: its roster and the Story Editor.
 
-**Cast** means the specialists. The Story Editor is always present and is not one of them.
+### Roster
 
-A specialist is **enabled** or it is not. There is no joining or leaving lifecycle and no
-temporary presence: a specialist disabled for a time and re-enabled later simply becomes
-eligible again.
+The specialists available to a piece, given its mode. A mode names no specialist; each
+specialist declares for itself the modes it is available in. The roster is everything that
+declaration yields for the piece's mode, whether currently enabled or not.
+
+**Cast** means the roster's enabled subset. The Story Editor is always present and belongs to
+neither the roster nor the cast.
+
+**Initial cast** — the cast a newly created piece begins with, drawn from the default each
+roster specialist declares for the piece's mode.
+
+A specialist is **enabled** or it is not, within the roster. There is no joining or leaving
+lifecycle and no temporary presence: a specialist disabled for a time and re-enabled later
+simply becomes answerable again.
 
 ## Participant
 
-A collaborator that can be addressed and can respond: a specialist, or the Story Editor.
+A collaborator that can be addressed and can respond: a specialist, the Story Editor, or an
+addressed-only collaborator.
 
-Each participant has a static role description explaining what it contributes.
+Each participant is one authored document holding two distinct texts: a short **description**,
+read by the author when assigning it a model, and a **persona**, briefing the model with the
+participant's responsibility. Neither stands in for the other.
+
+### Eligibility
+
+Whether a participant answers an unaddressed message: a property of the participant itself, one
+of three closed kinds — cast, generalist, or addressed-only.
 
 ### Specialist
 
-A participant holding one craft responsibility, reasoning narrowly and deliberately within
-it.
+A cast participant holding one craft responsibility, reasoning narrowly and deliberately within
+it. It declares, for each mode and editing surface it is available on, whether it starts enabled
+there.
 
 ### Story Editor
 
-The generalist participant, always present. Its objective is its own and holistic:
+The generalist. Exactly one participant declares it. Its objective is its own and holistic:
 evaluate the current story against the author's story context and author context, using the
-specialists' readings as evidence, and recommend what best serves the piece as a whole. It
-is not a summarizer, not a consensus mechanism, and not an authority over the author.
+specialists' readings as evidence, and recommend what best serves the piece as a whole. It is not
+a summarizer, not a consensus mechanism, and not an authority over the author.
+
+### Addressed-only
+
+Available in every mode, belonging to no cast, and answering only when the author names it.
+
+## Charter
+
+The rules restated to every participant, regardless of which one it is: what each response
+outcome means, what makes a recommendation implementable, and that nothing reasons about how
+the author's question was asked rather than about the story. Correcting one of these rules is
+one edit rather than one per participant.
 
 ## Conversation
 
@@ -124,6 +163,10 @@ collaborator is an ordinary message rather than a different kind of interaction.
 An author action opened from a particular response is addressed to that participant by the
 act rather than by the words, and its message is not read for addressing at all: the author
 aimed it by pointing.
+
+A participant addressed directly answers, even where the answer is that it sees no material
+issue. Saying nothing is only for a message a participant was merely eligible for, not one it
+was asked.
 
 ## Response
 

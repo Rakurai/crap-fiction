@@ -3,6 +3,7 @@ import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
+import type { PromptFragments } from '../model/prompts.js'
 import type { CallResult, ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
 import {
@@ -44,6 +45,7 @@ import { computeAppliedChangeContent } from './appliedChange.js'
 import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
 import {
+  assertSpecialistIndependence,
   compileApplyContext,
   compileCaptureContext,
   compileSpecialistContext,
@@ -54,11 +56,12 @@ import {
   type ContextInput,
   type HistoryPolicy,
   type ParticipantEvidence,
-  type SpecialistCriteria,
 } from './context.js'
+import { WORKED_SURFACE } from '../../shared/surfaces.js'
 import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
-import type { RoomRoster } from './roster.js'
+import { specialistsFor, type RoomRoster } from './roster.js'
+import type { ModeDescriptor } from '../modes.js'
 
 export type RoomEvent =
   | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
@@ -92,6 +95,13 @@ export class ParticipantNotFoundError extends Error {
   constructor(pieceId: string, participantId: string) {
     super(`no participant "${participantId}" in the room for piece "${pieceId}"`)
     this.name = 'ParticipantNotFoundError'
+  }
+}
+
+export class ModeNotFoundError extends Error {
+  constructor(modeId: string) {
+    super(`no loaded mode "${modeId}"`)
+    this.name = 'ModeNotFoundError'
   }
 }
 
@@ -147,9 +157,11 @@ type DispatchPlan = Readonly<{
   ask: { claim: string; note: string | undefined; clarification: string | undefined } | undefined
   addressedIds: readonly string[]
   eligibleSpecialists: readonly RoleDefinition[]
+  eligibleAddressedOnly: readonly RoleDefinition[]
   storyEditorIncluded: boolean
   existingEntries: readonly ConversationEntry[]
   draft: string
+  modeDescription: string
 }>
 
 function findResponse(
@@ -168,10 +180,13 @@ export class Room {
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
+  readonly #fragments: PromptFragments
   readonly #policy: HistoryPolicy
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
-  readonly #criteria: ReadonlyMap<string, SpecialistCriteria>
+  readonly #addressedOnly: readonly RoleDefinition[]
+  readonly #modeDescriptions: ReadonlyMap<string, string>
+  readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
@@ -182,7 +197,9 @@ export class Room {
     authorContextStore: AuthorContextStore,
     entries: ConversationEntryStore,
     roster: RoomRoster,
+    modes: readonly ModeDescriptor[],
     charter: Charter,
+    fragments: PromptFragments,
     policy: HistoryPolicy,
     logger: Logger,
     now: Clock,
@@ -194,10 +211,13 @@ export class Room {
     this.#logger = logger
     this.#now = now
     this.#charter = charter
+    this.#fragments = fragments
     this.#policy = policy
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
-    this.#criteria = roster.criteria
+    this.#addressedOnly = roster.addressedOnly
+    this.#modeDescriptions = new Map(modes.map((mode) => [mode.id, mode.description]))
+    this.#displayNames = new Map([...roster.specialists, roster.storyEditor, ...roster.addressedOnly].map((role) => [role.id, role.displayName]))
   }
 
   specialists(): readonly RoleDefinition[] {
@@ -206,6 +226,12 @@ export class Room {
 
   storyEditor(): RoleDefinition {
     return this.#storyEditor
+  }
+
+  #modeDescriptionFor(modeId: string): string {
+    const description = this.#modeDescriptions.get(modeId)
+    if (description === undefined) throw new ModeNotFoundError(modeId)
+    return description
   }
 
   subscribe(pieceId: string, listener: Listener): () => void {
@@ -277,7 +303,9 @@ export class Room {
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
     const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
-    const roster = [...this.#specialists, this.#storyEditor]
+    const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, WORKED_SURFACE)
+    const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
     let causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
@@ -312,14 +340,19 @@ export class Room {
 
     const eligibleSpecialists =
       addressedIds.length === 0
-        ? this.#specialists.filter((role) => piece.metadata.cast.includes(role.id))
-        : this.#specialists.filter((role) => addressedIds.includes(role.id))
+        ? modeSpecialists.filter((role) => piece.metadata.cast.includes(role.id))
+        : modeSpecialists.filter((role) => addressedIds.includes(role.id))
+    const eligibleAddressedOnly = this.#addressedOnly.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
     if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
-    const audience = [...eligibleSpecialists.map((role) => role.id), ...(storyEditorIncluded ? [this.#storyEditor.id] : [])]
+    const audience = [
+      ...eligibleSpecialists.map((role) => role.id),
+      ...eligibleAddressedOnly.map((role) => role.id),
+      ...(storyEditorIncluded ? [this.#storyEditor.id] : []),
+    ]
 
     const actionId = nanoid()
     const startedAt = this.#now()
@@ -342,9 +375,11 @@ export class Room {
       ask,
       addressedIds,
       eligibleSpecialists,
+      eligibleAddressedOnly,
       storyEditorIncluded,
       existingEntries,
       draft,
+      modeDescription,
     }
     const cause = causeEntry
 
@@ -389,7 +424,8 @@ export class Room {
     plan: DispatchPlan,
     operation: ActiveDispatch,
   ): Promise<void> {
-    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, storyEditorIncluded, existingEntries, draft } = plan
+    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft, modeDescription } =
+      plan
     const { actionId, controller } = operation
     const signal = controller.signal
 
@@ -410,13 +446,15 @@ export class Room {
       authorContext: durableContext.authorContext,
       storyContext: durableContext.storyContext,
       draft,
+      surface: WORKED_SURFACE,
       entries: existingEntries,
       policy: this.#policy,
+      modeDescription,
+      participants: this.#displayNames,
     }
     const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
       ...shared,
       role,
-      criteria: this.#criteria.get(role.id),
       owesAnswer,
     })
 
@@ -425,10 +463,12 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
     }
 
-    const calls = eligibleSpecialists.map((role) => {
+    const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
-      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
+      return { role, owesAnswer, context: compileSpecialistContext(contextFor(role, owesAnswer)) }
     })
+    assertSpecialistIndependence(compiled.map(({ context }) => context))
+    const calls = compiled.map(({ role, owesAnswer, context }) => ({ role, owesAnswer, prompt: renderPrompt(context, this.#fragments, this.#charter) }))
 
     const evidence: ParticipantEvidence[] = []
     let abandoned = false
@@ -460,7 +500,7 @@ export class Room {
       }
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
 
-      const gathered = evidenceFrom(outcome, call.role.id)
+      const gathered = evidenceFrom(outcome, call.role.displayName)
       if (gathered !== undefined) evidence.push(gathered)
     }
 
@@ -471,7 +511,7 @@ export class Room {
         abandoned = true
       } else {
         const owesAnswer = addressedIds.includes(this.#storyEditor.id) || evidence.length === 0
-        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#charter)
+        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#fragments, this.#charter)
         const outcome = await callParticipant(this.#storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
           onState(this.#storyEditor.id, state),
         )
@@ -525,15 +565,18 @@ export class Room {
 
     try {
       const context = compileApplyContext({
+        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
         recommendationClaim: response.claim,
         recommendationNote: response.note,
         constraint,
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
+        surface: WORKED_SURFACE,
         entries,
+        participants: this.#displayNames,
       })
-      const prompt = renderApplyPrompt(context, this.#charter)
+      const prompt = renderApplyPrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
       if (result.outcome !== 'value') {
         this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: result.outcome === 'abandoned' ? 'abandoned' : 'failed' } })
@@ -578,12 +621,15 @@ export class Room {
 
     try {
       const context = compileCaptureContext({
+        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
+        surface: WORKED_SURFACE,
         entries,
+        participants: this.#displayNames,
       })
-      const prompt = renderCapturePrompt(context)
+      const prompt = renderCapturePrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
       if (result.outcome !== 'value') return result
 
