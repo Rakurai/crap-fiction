@@ -26,8 +26,10 @@ import {
   RoomBusyError,
   type RoomEvent,
 } from '../../../src/server/room/room.js'
+import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
+import { CHARTER_FIXTURE } from '../../support/roomFixtures.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
@@ -44,10 +46,21 @@ const fixtureRoles = [
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'z' },
 ]
 
+/** Everything a room turns on except the seam under test, which each caller supplies. */
+function roomSpecWith(modelAccess: ModelAccess) {
+  return {
+    mode: fixtureMode,
+    roles: fixtureRoles,
+    charter: CHARTER_FIXTURE,
+    policy: SHIPPED_HISTORY_POLICY,
+    modelAccess,
+    now: () => 1_700_000_000_000,
+  }
+}
+
 function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureBehavior>>): { room: Room; adapter: FixtureModelAdapter } {
   const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
-  const modelAccess = adapter
-  const room = buildTestRoom(dataRoot, { mode: fixtureMode, roles: fixtureRoles, modelAccess })
+  const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
   return { room, adapter }
 }
 
@@ -86,51 +99,6 @@ describe('Room.dispatch', () => {
 
   afterEach(() => {
     rmSync(dataRoot, { recursive: true, force: true })
-  })
-
-  it('refuses a second dispatch while one is in flight for the same piece, including one issued in the same tick', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
-    })
-
-    const [first, second] = await Promise.allSettled([
-      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text'),
-      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'second' }, 'draft text'),
-    ])
-
-    expect(first?.status).toBe('fulfilled')
-    expect(second?.status).toBe('rejected')
-    expect(second?.status === 'rejected' && second.reason).toBeInstanceOf(RoomBusyError)
-
-    expect(entries(workspaceDir, piece.id, 'c1')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
-
-    adapter.release('shape')
-    adapter.release('compression')
-    adapter.release('story-editor')
-  })
-
-  it('SPEC "Model access": refuses a dispatch for a second piece while one is in flight, since no runtime holds more than one call', async () => {
-    const cups = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
-    })
-
-    await room.dispatch(workspaceDir, cups.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
-
-    await expect(room.dispatch(workspaceDir, other.id, 'c2', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
-      new RoomBusyError(cups.id),
-    )
-    expect(room.activitySnapshot(other.id)).toBeUndefined()
-
-    adapter.release('shape')
-    adapter.release('compression')
-    adapter.release('story-editor')
   })
 
   it('CONTEXT "Room": an unaddressed dispatch reads nothing for addressing and calls the enabled cast', async () => {
@@ -193,7 +161,7 @@ describe('Room.dispatch', () => {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
     }
-    const room = buildTestRoom(dataRoot, { mode: fixtureMode, roles: fixtureRoles, modelAccess: broken })
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
 
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
@@ -212,30 +180,7 @@ describe('Room.dispatch', () => {
     expect(room.activitySnapshot(piece.id)).toBeUndefined()
   })
 
-  it('writes the author entry immediately, with its resolved audience, before any participant is called', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } }, held: true },
-    })
-
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
-    const settled = settlementOf(room, piece.id)
-    expect(entries(workspaceDir, piece.id, conversationId)).toMatchObject([{ kind: 'authorMessage', text: 'a message' }])
-
-    adapter.release('shape')
-    adapter.release('compression')
-    adapter.release('story-editor')
-    await settled
-
-    const landed = entries(workspaceDir, piece.id, conversationId)
-    expect(landed).toHaveLength(4)
-    expect(landed.filter((entry) => entry.kind === 'participantNoComment')).toHaveLength(2)
-    expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(1)
-  })
-
-  it('calls the enabled cast, then the Story Editor, appending each response as it lands', async () => {
+  it('writes the author entry before any participant is called, then appends each response as it lands, reporting each as working first', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } }, held: true, states: ['working'] },
@@ -252,9 +197,10 @@ describe('Room.dispatch', () => {
       if (event.type === 'action.finished') events.push(`finished:${event.data.outcome}`)
     })
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
     expect(events[0]).toBe('started:shape,compression,story-editor')
+    expect(entries(workspaceDir, piece.id, conversationId)).toMatchObject([{ kind: 'authorMessage', text: 'a message' }])
 
     adapter.release('shape')
     adapter.release('compression')
@@ -265,6 +211,11 @@ describe('Room.dispatch', () => {
     for (const participantId of ['shape', 'compression', 'story-editor']) {
       expect(events.indexOf(`state:${participantId}:working`)).toBeLessThan(events.indexOf(`settled:${participantId}`))
     }
+
+    const landed = entries(workspaceDir, piece.id, conversationId)
+    expect(landed).toHaveLength(4)
+    expect(landed.filter((entry) => entry.kind === 'participantNoComment')).toHaveLength(1)
+    expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
   it('SPEC "Dispatch": submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
@@ -321,39 +272,26 @@ describe('Room.dispatch', () => {
     await capturing
   })
 
-  it('durably enables a specialist that was addressed but not part of the enabled cast', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    await writePieceCast(workspaceDir, piece.id, ['compression'])
+  it('durably enables a specialist addressed from outside the enabled cast, naming it as brought — and brings nobody where addressing names only the cast', async () => {
+    const brought = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    await writePieceCast(workspaceDir, brought.id, ['compression'])
+    const alreadyIn = await createPiece(workspaceDir, 'Kettle', fixtureMode)
 
     const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } } },
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
-    const settled = settlementOf(room, piece.id)
-    adapter.release('shape')
-    await settled
+    await room.dispatch(workspaceDir, brought.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
+    await settlementOf(room, brought.id)
 
-    const updated = readPiece(workspaceDir, piece.id)
-    expect(updated?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+    expect(readPiece(workspaceDir, brought.id)?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+    expect(entries(workspaceDir, brought.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: ['shape'] })
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
-    expect(landed[0]).toMatchObject({ kind: 'authorMessage', brought: ['shape'] })
-  })
+    await room.dispatch(workspaceDir, alreadyIn.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
+    await settlementOf(room, alreadyIn.id)
 
-  it('leaves `brought` empty when addressing names only specialists already in the cast', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } }, held: true },
-    })
-
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
-    const settled = settlementOf(room, piece.id)
-    adapter.release('shape')
-    await settled
-
-    const landed = entries(workspaceDir, piece.id, conversationId)
-    expect(landed[0]).toMatchObject({ kind: 'authorMessage', brought: [] })
+    expect(entries(workspaceDir, alreadyIn.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: [] })
+    expect(adapter.promptFor('shape')).toBeDefined()
   })
 
   it('UX_DESIGN "Every specialist call failed... that call fails too": settles with nothing in it at all, without ever emitting an error event', async () => {
@@ -397,38 +335,7 @@ describe('Room.dispatch', () => {
     expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
   })
 
-  it('ABANDON-UNTRACK: lets a new dispatch start immediately, without waiting for the abandoned one to finish unwinding', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
-    })
-
-    const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
-    room.abandon(piece.id, firstActionId)
-
-    const { conversationId, actionId: secondActionId } = await room.dispatch(
-      workspaceDir,
-      piece.id,
-      'c1',
-      { kind: 'message', text: 'second' },
-      'draft text',
-    )
-    expect(secondActionId).not.toBe(firstActionId)
-
-    adapter.release('shape')
-    adapter.release('compression')
-    adapter.release('story-editor')
-    await settlementOf(room, piece.id)
-
-    const landed = entries(workspaceDir, piece.id, conversationId).filter(
-      (entry) => entry.kind === 'participantResponse' || entry.kind === 'participantNoComment',
-    )
-    expect(landed).toHaveLength(3)
-  })
-
-  it('a stale actionId — naming an action already abandoned — is a silent no-op, never touching whatever runs next', async () => {
+  it('ABANDON-UNTRACK: lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -513,20 +420,7 @@ describe('Room.apply', () => {
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
   })
 
-  it("carries the recommendation and the author's constraint, verbatim, into the call", async () => {
-    const { pieceId } = await pieceWithRecommendation()
-    const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
-    })
-
-    await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), 'keep the last line', 'draft text')
-
-    expect(adapter.promptFor('apply')).toContain('cut the second paragraph')
-    expect(adapter.promptFor('apply')).toContain('keep the last line')
-    expect(adapter.promptFor('apply')).toContain('draft text')
-  })
-
-  it('SPEC "Applying a recommendation": carries the full current conversation, including discussion after the recommendation', async () => {
+  it("SPEC \"Applying a recommendation\": carries the recommendation, the author's constraint and the draft verbatim, beside the full current conversation including discussion after the recommendation", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room: laterRoom } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -540,8 +434,11 @@ describe('Room.apply', () => {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
     })
 
-    await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), 'keep the last line', 'draft text')
 
+    expect(adapter.promptFor('apply')).toContain('cut the second paragraph')
+    expect(adapter.promptFor('apply')).toContain('keep the last line')
+    expect(adapter.promptFor('apply')).toContain('draft text')
     expect(adapter.promptFor('apply')).toContain('a later, unrelated question')
   })
 
@@ -555,45 +452,65 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(pieceId)).toBeUndefined()
   })
 
-  it('refuses to apply while a dispatch is in flight for the same piece', async () => {
+  /**
+   * SPEC "Model access": one lock, held across the studio rather than per piece, because
+   * no runtime holds more than one dispatch-or-apply call at a time. One property, so it
+   * is stated once over every pair that can contend for it rather than once per pair.
+   */
+  it('admits one dispatch or application at a time, whichever piece asks, and names the piece holding it', async () => {
     const { pieceId } = await pieceWithRecommendation()
+    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    await room.dispatch(workspaceDir, pieceId, 'c2', { kind: 'message', text: 'a message' }, 'draft text')
+    // Two dispatches issued in the same tick: only the first ever opens.
+    const [first, second] = await Promise.allSettled([
+      room.dispatch(workspaceDir, pieceId, 'c2', { kind: 'message', text: 'first' }, 'draft text'),
+      room.dispatch(workspaceDir, pieceId, 'c2', { kind: 'message', text: 'second' }, 'draft text'),
+    ])
+    expect(first?.status).toBe('fulfilled')
+    expect(second?.status === 'rejected' && second.reason).toBeInstanceOf(RoomBusyError)
+    expect(entries(workspaceDir, pieceId, 'c2')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
+    const settled = settlementOf(room, pieceId)
 
+    // A second piece contends for the same runtime, and is told which piece holds it.
+    await expect(room.dispatch(workspaceDir, other.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
+      new RoomBusyError(pieceId),
+    )
+    expect(room.activitySnapshot(other.id)).toBeUndefined()
+
+    // So does an application.
     await expect(room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft')).rejects.toThrowError(RoomBusyError)
 
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
-  })
+    await settled
 
-  it('refuses to dispatch while an application is in flight', async () => {
-    const { pieceId } = await pieceWithRecommendation()
-    const { room, adapter } = buildRoom(dataRoot, {
+    // And the other way round: an application in flight holds the lock against a dispatch.
+    const { room: applyRoom, adapter: applyAdapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
     })
+    const applying = applyRoom.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft')
 
-    const applying = room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft')
-
-    await expect(room.dispatch(workspaceDir, pieceId, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
+    await expect(applyRoom.dispatch(workspaceDir, pieceId, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
       RoomBusyError,
     )
 
-    adapter.release('apply')
+    applyAdapter.release('apply')
     await applying
   })
 
-  it('resolves as abandoned, and leaves the recommendation applicable, when abandoned mid-call', async () => {
+  it('leaves the recommendation applicable, and the draft as it was, where the application did not settle', async () => {
     const { pieceId } = await pieceWithRecommendation()
+
+    // Abandoned mid-call.
     const { room, adapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
     })
-
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
 
@@ -602,24 +519,20 @@ describe('Room.apply', () => {
     if (started === undefined) throw new Error('expected action.started to have fired synchronously')
     room.abandon(pieceId, started.data.actionId)
     await expect(applying).resolves.toMatchObject({ result: { outcome: 'abandoned' } })
-
     expect(room.activitySnapshot(pieceId)).toBeUndefined()
-    adapter.release('apply')
-    const second = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
-    if (second.result.outcome !== 'value') throw new Error('expected the second application to settle')
-    expect(second.result.value.manuscript).toBe('revised')
-  })
 
-  it('changes nothing on a failed call, and leaves the recommendation applicable', async () => {
-    const { pieceId } = await pieceWithRecommendation()
-    const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'failed', reason: 'unconfigured' } },
-    })
-
-    const { result } = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    // Failed outright.
+    const { room: failing } = buildRoom(dataRoot, { apply: { result: { outcome: 'failed', reason: 'unconfigured' } } })
+    const { result } = await failing.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
     expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
-    expect(room.activitySnapshot(pieceId)).toBeUndefined()
+    expect(failing.activitySnapshot(pieceId)).toBeUndefined()
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+
+    // The recommendation still stands at its identity, so a later application settles.
+    adapter.release('apply')
+    const retried = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    if (retried.result.outcome !== 'value') throw new Error('expected the retried application to settle')
+    expect(retried.result.value.manuscript).toBe('revised')
   })
 
   it('persists the change a settled call actually made, naming the response it came from', async () => {
@@ -710,8 +623,9 @@ describe('Room.capture', () => {
     await room.capture(workspaceDir, piece.id, 'c2', 'text')
   })
 
-  it('CONTEXT "Capture context": proceeds while a dispatch is in flight for the same piece, sharing the model seam but not the room\'s dispatch-and-apply lock', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+  it('CONTEXT "Capture context": runs beside a dispatch on the same piece in either order, sharing the model seam but not the room\'s dispatch-and-apply lock', async () => {
+    const first = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -719,31 +633,27 @@ describe('Room.capture', () => {
       capture: { result: { outcome: 'value', value: { proposals: [] } } },
     })
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
-
-    const result = await room.capture(workspaceDir, piece.id, 'c1', 'draft text')
-    expect(result).toEqual({ outcome: 'value', value: { proposals: [] } })
-
+    // A capture opened behind a dispatch that holds the lock.
+    await room.dispatch(workspaceDir, first.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    expect(await room.capture(workspaceDir, first.id, 'c1', 'draft text')).toEqual({ outcome: 'value', value: { proposals: [] } })
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
-  })
+    await settlementOf(room, first.id)
 
-  it('does not block a dispatch from opening for the same piece while it runs', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room, adapter } = buildRoom(dataRoot, {
+    // And a dispatch opened behind a capture that is still running.
+    const { room: heldCapture, adapter: captureAdapter } = buildRoom(dataRoot, {
       capture: { result: { outcome: 'value', value: { proposals: [] } }, held: true },
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
+    const capturing = heldCapture.capture(workspaceDir, second.id, 'c1', 'draft text')
 
-    const capturing = room.capture(workspaceDir, piece.id, 'c1', 'draft text')
+    await heldCapture.dispatch(workspaceDir, second.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    await settlementOf(heldCapture, second.id)
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
-    await settlementOf(room, piece.id)
-
-    adapter.release('capture')
+    captureAdapter.release('capture')
     await capturing
   })
 
@@ -822,30 +732,24 @@ describe('Room.approveCapture', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('writes an approved proposal to the destination it names, and nothing to the other', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
+  it('writes exactly the destinations the approved proposals name, and nothing to one no proposal named', async () => {
+    const first = await createPiece(workspaceDir, 'Cups', fixtureMode)
+    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode)
     const { room } = buildRoom(dataRoot, {})
 
-    const outcome = await room.approveCapture(workspaceDir, piece.id, [
+    const one = await room.approveCapture(workspaceDir, first.id, [
       { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
     ])
-
-    expect(outcome).toEqual({ written: ['storyContext'], failures: [] })
-    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(one).toEqual({ written: ['storyContext'], failures: [] })
+    expect(readStoryContext(workspaceDir, first.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
     expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
-  })
 
-  it('writes both destinations in one call when proposals approve both', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room } = buildRoom(dataRoot, {})
-
-    const outcome = await room.approveCapture(workspaceDir, piece.id, [
-      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'two cups, one left behind' },
+    const both = await room.approveCapture(workspaceDir, second.id, [
+      { id: 'p1', destination: 'storyContext', section: 'Premise', operation: 'add', text: 'a kettle, still warm' },
       { id: 'p2', destination: 'authorContext', section: 'Voice', operation: 'add', text: 'wry and close' },
     ])
-
-    expect(outcome.written.sort()).toEqual(['authorContext', 'storyContext'])
-    expect(readStoryContext(workspaceDir, piece.id, durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
+    expect(both.written.slice().sort()).toEqual(['authorContext', 'storyContext'])
+    expect(readStoryContext(workspaceDir, second.id, durableContextSchema)).toEqual({ Premise: ['a kettle, still warm'] })
     expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
   })
 
@@ -922,13 +826,22 @@ describe('Room.dispatch — an action the author opened from a particular respon
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', audience: ['shape'], text: 'say more about that, @compression' })
   })
 
-  it('replying to an unknown participant is refused, not opened against nobody', async () => {
+  /**
+   * One claim over both acts: an act naming something the conversation does not hold is
+   * refused before an action opens, rather than opened against nobody.
+   */
+  it('refuses an act naming a participant or a response that is not there, opening no action either way', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
     const { room } = buildRoom(dataRoot, {})
 
     await expect(
       room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'targeted', target: 'no-such-participant', text: 'a reply' }, 'draft text'),
     ).rejects.toThrowError(ParticipantNotFoundError)
+    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+
+    await expect(
+      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'ask', respondingTo: 'no-such-response', clarification: undefined }, 'draft text'),
+    ).rejects.toThrowError(CommentaryNotFoundError)
     expect(room.activitySnapshot(piece.id)).toBeUndefined()
   })
 
@@ -964,15 +877,5 @@ describe('Room.dispatch — an action the author opened from a particular respon
     const landed = entries(workspaceDir, piece.id, 'c1')
     const request = landed.find((entry) => entry.kind === 'concreteChangeRequest')
     expect(request).toMatchObject({ target: 'shape', respondingTo: firstResponse.id, clarification: 'what would you cut' })
-  })
-
-  it('refuses where no commentary stands at the named response', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode)
-    const { room } = buildRoom(dataRoot, {})
-
-    await expect(
-      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'ask', respondingTo: 'no-such-response', clarification: undefined }, 'draft text'),
-    ).rejects.toThrowError(CommentaryNotFoundError)
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
   })
 })

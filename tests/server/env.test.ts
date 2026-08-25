@@ -8,10 +8,17 @@ const validEnv = {
   STUDIO_LOG_LEVEL: 'info',
 }
 
+/** One wrong value per variable, each wrong in the way that variable can be wrong. */
+const WRONG = {
+  STUDIO_DATA_ROOT: 'relative/path',
+  STUDIO_PORT: 'not-a-number',
+  STUDIO_MODEL_RUNTIME_URL: 'not a url',
+  STUDIO_LOG_LEVEL: 'verbose',
+}
+
 describe('loadEnv', () => {
   it('returns a typed value when every variable is present and valid', () => {
-    const env = loadEnv(validEnv)
-    expect(env).toEqual({
+    expect(loadEnv(validEnv)).toEqual({
       dataRoot: '/data',
       port: 4000,
       modelRuntimeUrl: 'http://localhost:1234',
@@ -19,36 +26,19 @@ describe('loadEnv', () => {
     })
   })
 
-  it.each(Object.keys(validEnv))('crashes naming %s when it is absent', (missingKey) => {
-    const withoutOne = { ...validEnv, [missingKey]: undefined }
-    expect(() => loadEnv(withoutOne)).toThrowError(new RegExp(missingKey))
-  })
-
-  it('crashes naming the variable when STUDIO_PORT is not a valid port', () => {
-    expect(() => loadEnv({ ...validEnv, STUDIO_PORT: 'not-a-number' })).toThrowError(/STUDIO_PORT/)
-  })
-
-  it('crashes naming the variable when STUDIO_DATA_ROOT is not absolute', () => {
-    expect(() => loadEnv({ ...validEnv, STUDIO_DATA_ROOT: 'relative/path' })).toThrowError(
-      /STUDIO_DATA_ROOT/,
-    )
-  })
-
-  it('crashes naming the variable when STUDIO_MODEL_RUNTIME_URL is not a URL', () => {
-    expect(() => loadEnv({ ...validEnv, STUDIO_MODEL_RUNTIME_URL: 'not a url' })).toThrowError(
-      /STUDIO_MODEL_RUNTIME_URL/,
-    )
-  })
-
-  it('crashes naming the variable when STUDIO_LOG_LEVEL is not a known level', () => {
-    expect(() => loadEnv({ ...validEnv, STUDIO_LOG_LEVEL: 'verbose' })).toThrowError(
-      /STUDIO_LOG_LEVEL/,
-    )
-  })
-
-  it('supplies no default for any variable', () => {
+  /**
+   * Supplying no default and naming what is missing are one claim: an empty environment
+   * crashes naming every variable at once, rather than starting on values nobody chose.
+   */
+  it('supplies no default for any variable, naming every one of them when the environment is empty', () => {
     expect(() => loadEnv({})).toThrowError(
       /STUDIO_DATA_ROOT.*STUDIO_PORT.*STUDIO_MODEL_RUNTIME_URL.*STUDIO_LOG_LEVEL/s,
     )
+  })
+
+  it('crashes naming the variable whose value it cannot read, whichever one that is', () => {
+    for (const [key, value] of Object.entries(WRONG)) {
+      expect(() => loadEnv({ ...validEnv, [key]: value })).toThrowError(new RegExp(key))
+    }
   })
 })

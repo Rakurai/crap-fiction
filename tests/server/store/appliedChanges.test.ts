@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -9,6 +9,8 @@ const cutSentence: AppliedChange = {
   id: 'change1',
   content: { kind: 'passages', passages: [{ before: 'Ruth stood looking at them.', after: '' }] },
 }
+
+const REWRITE: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
 
 describe('applied changes', () => {
   let workspaceDir: string
@@ -22,37 +24,28 @@ describe('applied changes', () => {
     rmSync(workspaceDir, { recursive: true, force: true })
   })
 
-  it('reports none where nothing has ever been applied', () => {
+  it('reports none before anything is applied, and afterwards every change the piece holds, whatever each of them changed', async () => {
     expect(readAppliedChanges(workspaceDir, 'cups', appliedChangeSchema)).toEqual([])
-  })
 
-  it('writes a change and reads it back among the piece\'s changes', async () => {
     await writeAppliedChange(workspaceDir, 'cups', cutSentence)
-    expect(readAppliedChanges(workspaceDir, 'cups', appliedChangeSchema)).toEqual([cutSentence])
-  })
-
-  it('reads every change a piece holds, one file each', async () => {
-    const rewrite: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
-    await writeAppliedChange(workspaceDir, 'cups', cutSentence)
-    await writeAppliedChange(workspaceDir, 'cups', rewrite)
+    await writeAppliedChange(workspaceDir, 'cups', REWRITE)
 
     const changes = readAppliedChanges(workspaceDir, 'cups', appliedChangeSchema)
     expect(changes).toHaveLength(2)
-    expect(changes).toEqual(expect.arrayContaining([cutSentence, rewrite]))
+    expect(changes).toEqual(expect.arrayContaining([cutSentence, REWRITE]))
   })
 
-  it('deletes one change\'s file, by its own id', async () => {
+  /**
+   * A change is held on its own, so a deletion reaches exactly the one named — and a name
+   * nothing is held under is nothing to report, not a failure.
+   */
+  it('deletes the one change its id names and no other, and reports nothing wrong for a change not there', async () => {
     await writeAppliedChange(workspaceDir, 'cups', cutSentence)
-    const file = path.join(workspaceDir, 'cups', 'changes', 'change1.json')
-    expect(existsSync(file)).toBe(true)
+    await writeAppliedChange(workspaceDir, 'cups', REWRITE)
 
     await deleteAppliedChange(workspaceDir, 'cups', 'change1')
 
-    expect(existsSync(file)).toBe(false)
-    expect(readAppliedChanges(workspaceDir, 'cups', appliedChangeSchema)).toEqual([])
-  })
-
-  it('deletes nothing and reports nothing wrong for a change not on disk', async () => {
+    expect(readAppliedChanges(workspaceDir, 'cups', appliedChangeSchema)).toEqual([REWRITE])
     await expect(deleteAppliedChange(workspaceDir, 'cups', 'never-written')).resolves.toBeUndefined()
   })
 })

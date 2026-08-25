@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { applyProposals, toCaptureProposals } from '../../../src/server/room/capture.js'
 import type { CaptureProposal, CaptureProposalValue } from '../../../src/shared/captureProposal.js'
+import type { DurableContext } from '../../../src/shared/durableContext.js'
 
 describe('toCaptureProposals', () => {
-  it('gives each of the model\'s bare proposals its own identity', () => {
+  it("gives each of the model's bare proposals its own identity", () => {
     const values: readonly CaptureProposalValue[] = [
       { destination: 'storyContext', section: 'Voice', operation: 'add', text: 'wry and close' },
       { destination: 'authorContext', section: 'Patterns disliked', operation: 'add', text: 'rhetorical questions' },
@@ -24,39 +25,34 @@ function proposal(value: Unaddressed<CaptureProposalValue>): CaptureProposal {
   return { ...value, destination: 'storyContext', id: 'p1' }
 }
 
+/**
+ * What each operation does to the section it names, with a second entry present throughout so
+ * that leaving the rest of the section alone is part of every row rather than its own test.
+ * `replace` and `revise` are one behaviour here, not two: both overwrite in place.
+ */
+const OPERATIONS: readonly { readonly proposal: Unaddressed<CaptureProposalValue>; readonly expected: readonly string[] }[] = [
+  { proposal: { section: 'Voice', operation: 'add', text: 'wry and close' }, expected: ['present tense', 'wry and close'] },
+  {
+    proposal: { section: 'Voice', operation: 'revise', entry: 'present tense', text: 'wry and understated' },
+    expected: ['wry and understated'],
+  },
+  { proposal: { section: 'Voice', operation: 'replace', entry: 'present tense', text: 'blunt and plain' }, expected: ['blunt and plain'] },
+  { proposal: { section: 'Voice', operation: 'remove', entry: 'present tense' }, expected: [] },
+]
+
 describe('applyProposals', () => {
-  it('appends an added entry to the section it names, creating the section if it did not exist', () => {
-    const next = applyProposals({}, [proposal({ section: 'Voice', operation: 'add', text: 'wry and close' })])
-
-    expect(next).toEqual({ Voice: ['wry and close'] })
+  it('does what each operation names to the section it names, leaving the rest of that section as it was', () => {
+    for (const { proposal: value, expected } of OPERATIONS) {
+      expect(applyProposals({ Voice: ['present tense'] }, [proposal(value)])).toEqual({ Voice: expected })
+    }
   })
 
-  it('overwrites the named entry in place on revise, leaving the rest of the section untouched', () => {
-    const context = { Voice: ['wry and close', 'present tense'] }
-
-    const next = applyProposals(context, [proposal({ section: 'Voice', operation: 'revise', entry: 'wry and close', text: 'wry and understated' })])
-
-    expect(next).toEqual({ Voice: ['wry and understated', 'present tense'] })
+  it('creates a section an added entry names where the context had none', () => {
+    expect(applyProposals({}, [proposal({ section: 'Voice', operation: 'add', text: 'wry and close' })])).toEqual({ Voice: ['wry and close'] })
   })
 
-  it('overwrites the named entry in place on replace, the same way revise does', () => {
-    const context = { Voice: ['wry and close'] }
-
-    const next = applyProposals(context, [proposal({ section: 'Voice', operation: 'replace', entry: 'wry and close', text: 'blunt and plain' })])
-
-    expect(next).toEqual({ Voice: ['blunt and plain'] })
-  })
-
-  it('drops the named entry on remove, leaving the rest of the section untouched', () => {
-    const context = { Voice: ['wry and close', 'present tense'] }
-
-    const next = applyProposals(context, [proposal({ section: 'Voice', operation: 'remove', entry: 'wry and close' })])
-
-    expect(next).toEqual({ Voice: ['present tense'] })
-  })
-
-  it('applies several proposals across different sections in one pass', () => {
-    const context = { Voice: ['wry and close'], 'Patterns disliked': ['adverbs'] }
+  it('applies several proposals across different sections in one pass, never mutating the context it was given', () => {
+    const context: DurableContext = { Voice: ['wry and close'], 'Patterns disliked': ['adverbs'] }
 
     const next = applyProposals(context, [
       proposal({ section: 'Voice', operation: 'remove', entry: 'wry and close' }),
@@ -64,29 +60,22 @@ describe('applyProposals', () => {
     ])
 
     expect(next).toEqual({ Voice: [], 'Patterns disliked': ['adverbs', 'rhetorical questions'] })
+    expect(context).toEqual({ Voice: ['wry and close'], 'Patterns disliked': ['adverbs'] })
   })
 
-  it('leaves the section untouched when a remove names an entry no longer there', () => {
-    const context = { Voice: ['present tense'] }
-
-    const next = applyProposals(context, [proposal({ section: 'Voice', operation: 'remove', entry: 'wry and close' })])
-
-    expect(next).toEqual({ Voice: ['present tense'] })
-  })
-
-  it('falls back to adding the proposed text when a revise names an entry no longer there', () => {
-    const context = { Voice: ['present tense'] }
-
-    const next = applyProposals(context, [proposal({ section: 'Voice', operation: 'revise', entry: 'wry and close', text: 'blunt and plain' })])
-
-    expect(next).toEqual({ Voice: ['present tense', 'blunt and plain'] })
-  })
-
-  it('never mutates the context it was given', () => {
-    const context = { Voice: ['wry and close'] }
-
-    applyProposals(context, [proposal({ section: 'Voice', operation: 'add', text: 'present tense' })])
-
-    expect(context).toEqual({ Voice: ['wry and close'] })
+  /**
+   * The context can have moved since the model read it, so an operation naming an entry that
+   * is gone is ordinary rather than an error: a removal has nothing left to do, and a revision
+   * still has text worth keeping.
+   */
+  it('treats an entry no longer there as no work for a remove, and as an addition for a revise', () => {
+    expect(applyProposals({ Voice: ['present tense'] }, [proposal({ section: 'Voice', operation: 'remove', entry: 'wry and close' })])).toEqual({
+      Voice: ['present tense'],
+    })
+    expect(
+      applyProposals({ Voice: ['present tense'] }, [
+        proposal({ section: 'Voice', operation: 'revise', entry: 'wry and close', text: 'blunt and plain' }),
+      ]),
+    ).toEqual({ Voice: ['present tense', 'blunt and plain'] })
   })
 })

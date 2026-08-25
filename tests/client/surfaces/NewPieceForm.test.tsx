@@ -5,7 +5,7 @@ import { NewPieceForm } from '../../../src/client/NewPieceForm.js'
 describe('creating a piece', () => {
   afterEach(cleanup)
 
-  it('is a control until the author reaches for it, and then a labelled field', () => {
+  it('is a control until the author reaches for it, then a labelled field, and a control again on the keystroke that leaves everything else', () => {
     render(<NewPieceForm submitting={false} error={undefined} onSubmit={vi.fn()} />)
 
     expect(screen.queryByRole('textbox')).toBeNull()
@@ -13,12 +13,7 @@ describe('creating a piece', () => {
     fireEvent.click(screen.getByRole('button', { name: 'new piece' }))
 
     expect(screen.getByLabelText('title')).toBe(screen.getByRole('textbox'))
-  })
 
-  it('withdraws the field on the keystroke that leaves everything else', () => {
-    render(<NewPieceForm submitting={false} error={undefined} onSubmit={vi.fn()} />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'new piece' }))
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
 
     expect(screen.queryByRole('textbox')).toBeNull()

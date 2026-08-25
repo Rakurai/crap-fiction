@@ -27,6 +27,8 @@ import {
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import { durableContextSchema } from '../../../src/shared/durableContext.js'
 
+const CUPS = { title: 'Cups', mode: 'flash', status: 'drafting' as const, cast: ['shape'] }
+
 describe('the settings file', () => {
   let dataRoot: string
 
@@ -62,13 +64,6 @@ describe('the settings file', () => {
     expect(readSettingsSection(dataRoot, 'interfacePreferences', schema)).toEqual({})
   })
 
-  it('trims surrounding whitespace from a hand-edited string value', async () => {
-    mkdirSync(path.dirname(settingsPath()), { recursive: true })
-    writeFileSync(settingsPath(), 'workspace: "  my-writing  "\n', 'utf8')
-
-    expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
-  })
-
   it('sets one section and leaves the others as they stood', async () => {
     await writeSettingsSection(dataRoot, 'workspace', 'my-writing')
     await writeSettingsSection(dataRoot, 'modelAssignments', { shape: 'a-model' })
@@ -77,113 +72,91 @@ describe('the settings file', () => {
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readSettingsSection(dataRoot, 'modelAssignments', z.record(z.string(), z.string()))).toEqual({ shape: 'a-model' })
   })
-
-  it('refuses a workspace directory outside the data root', () => {
-    expect(() => resolveWorkspaceDirectory(dataRoot, '/etc/passwd')).toThrow(PathEscapesRootError)
-  })
 })
 
-describe("a piece's metadata", () => {
+/**
+ * The reader is tolerant of what a hand editing an author does, and intolerant of what
+ * would leave the studio guessing. Each claim below is the reader's, not any one file's,
+ * so it is stated once over the readers that share it rather than once per file.
+ */
+describe('the tolerant reader', () => {
+  let dataRoot: string
   let workspaceDir: string
 
-  beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+  beforeEach(async () => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
+    await writePieceMetadata(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function pieceYamlPath(id: string): string {
-    return path.join(workspaceDir, id, 'piece.yaml')
+  function handWrite(file: string, text: string): void {
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, text, 'utf8')
   }
 
-  it('reads a hand-edited scalar cast as a one-item list', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(pieceYamlPath('cups'), 'title: Cups\nmode: flash\nstatus: drafting\ncast: shape\n', 'utf8')
+  const settingsFile = (): string => path.join(dataRoot, 'config', 'settings.yaml')
+  const authorContextFile = (): string => path.join(dataRoot, 'config', 'author-context.yaml')
+  const pieceFile = (): string => path.join(workspaceDir, 'cups', 'piece.yaml')
+
+  it('trims the whitespace an author leaves around a value, wherever a string is read', () => {
+    handWrite(settingsFile(), 'workspace: "  my-writing  "\n')
+    handWrite(pieceFile(), 'title: "  Cups  "\nmode: flash\nstatus: drafting\ncast:\n  - shape\n')
+    handWrite(authorContextFile(), 'Voice:\n  - "  wry and close  "\n')
+
+    expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
+    expect(readPiece(workspaceDir, 'cups')?.metadata.title).toBe('Cups')
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
+  })
+
+  it('reads a lone value written where a list belongs as a list of that one value', () => {
+    handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\ncast: shape\n')
+    handWrite(authorContextFile(), 'Prose tendencies:\n  - overwrites dialogue tags\nPatterns disliked: rhetorical questions\n')
 
     expect(readPiece(workspaceDir, 'cups')?.metadata.cast).toEqual(['shape'])
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
+      'Prose tendencies': ['overwrites dialogue tags'],
+      'Patterns disliked': ['rhetorical questions'],
+    })
   })
 
-  it('trims surrounding whitespace from a hand-edited title', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(pieceYamlPath('cups'), 'title: "  Cups  "\nmode: flash\nstatus: drafting\ncast:\n  - shape\n', 'utf8')
-
-    expect(readPiece(workspaceDir, 'cups')?.metadata.title).toBe('Cups')
-  })
-
-  it('states a failure naming the entry when a value is the wrong kind', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(pieceYamlPath('cups'), 'title: 42\nmode: flash\nstatus: drafting\ncast:\n  - shape\n', 'utf8')
-
-    expect(() => readPiece(workspaceDir, 'cups')).toThrowError(TolerantReadError)
+  it('states a failure naming the entry it could not make sense of, rather than guessing at it', () => {
+    handWrite(pieceFile(), 'title: 42\nmode: flash\nstatus: drafting\ncast:\n  - shape\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(/title/)
-  })
 
-  it('states a failure naming the entry when a required entry is missing', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(pieceYamlPath('cups'), 'title: Cups\nmode: flash\nstatus: drafting\n', 'utf8')
-
-    expect(() => readPiece(workspaceDir, 'cups')).toThrowError(TolerantReadError)
+    handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(/cast/)
+
+    handWrite(authorContextFile(), 'Voice:\n  - nested:\n      - not prose\n')
+    expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(/Voice/)
   })
 
-  it('states a failure, rather than throwing an unrelated error, when the YAML does not parse', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(pieceYamlPath('cups'), ':\n  - this is not: [valid\n', 'utf8')
-
+  it('states a failure, rather than an error from whatever it handed the text to, where the file does not parse', async () => {
+    handWrite(pieceFile(), ':\n  - this is not: [valid\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(TolerantReadError)
-  })
 
-  it('reads an id that would escape the workspace as a declared absence rather than outside it', () => {
-    expect(readPiece(workspaceDir, '../../etc')).toBeUndefined()
-  })
-
-  it('refuses to write metadata for an id that would escape the workspace', async () => {
-    await expect(
-      writePieceMetadata(workspaceDir, '../../etc', { title: 'Cups', mode: 'flash', status: 'drafting', cast: [] }),
-    ).rejects.toThrowError(PathEscapesRootError)
-  })
-
-  it('reads a piece behind a symlink that resolves outside the workspace as a declared absence', () => {
-    const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-'))
-    writeFileSync(path.join(outside, 'piece.yaml'), 'title: Escaped\nmode: flash\nstatus: drafting\ncast: []\n', 'utf8')
-    symlinkSync(outside, path.join(workspaceDir, 'escaped'))
-
-    expect(readPiece(workspaceDir, 'escaped')).toBeUndefined()
-
-    rmSync(outside, { recursive: true, force: true })
-  })
-
-  it('sets only the cast, leaving title, mode and status untouched', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-
-    await writePieceCast(workspaceDir, 'cups', ['shape', 'compression'])
-
-    const metadata = readPiece(workspaceDir, 'cups')?.metadata
-    expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape', 'compression'] })
-  })
-
-  it('sets only the title, leaving mode, status and cast untouched', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-
-    await writePieceDetails(workspaceDir, 'cups', { title: 'The Cups' })
-
-    const metadata = readPiece(workspaceDir, 'cups')?.metadata
-    expect(metadata).toEqual({ title: 'The Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-  })
-
-  it('sets only the status, leaving title, mode and cast untouched', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-
-    await writePieceDetails(workspaceDir, 'cups', { status: 'finished' })
-
-    const metadata = readPiece(workspaceDir, 'cups')?.metadata
-    expect(metadata).toEqual({ title: 'Cups', mode: 'flash', status: 'finished', cast: ['shape'] })
+    await new ConversationEntryStore().append(workspaceDir, 'cups', 'c1', {
+      id: 'e1',
+      kind: 'authorMessage',
+      text: 'x',
+      audience: [],
+      brought: [],
+    })
+    handWrite(path.join(workspaceDir, 'cups', 'conversations', 'c1.json'), '{ not valid json')
+    expect(() => readConversationEntries(workspaceDir, 'cups', 'c1')).toThrowError(TolerantReadError)
   })
 })
 
-describe('the durable contexts', () => {
+/**
+ * One claim, held at every path the store resolves: nothing is read from or written to a
+ * location outside the root it was given. A read answers with a declared absence and a
+ * write refuses, because a read has an absence to report and a write does not.
+ */
+describe('path containment', () => {
   let dataRoot: string
   let workspaceDir: string
 
@@ -197,77 +170,96 @@ describe('the durable contexts', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function handWriteAuthorContext(text: string): void {
-    mkdirSync(path.join(dataRoot, 'config'), { recursive: true })
-    writeFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), text, 'utf8')
-  }
+  it('reports an escaping id as an absence to every reader and refuses it at every writer', async () => {
+    expect(() => resolveWorkspaceDirectory(dataRoot, '/etc/passwd')).toThrow(PathEscapesRootError)
 
-  it('reads an author context nothing has been written to as a declared absence', () => {
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
+    expect(readPiece(workspaceDir, '../../etc')).toBeUndefined()
+    expect(readStoryContext(workspaceDir, '../../etc', durableContextSchema)).toBeUndefined()
+
+    await expect(writePieceMetadata(workspaceDir, '../../etc', { ...CUPS, cast: [] })).rejects.toThrowError(PathEscapesRootError)
+    await expect(writeStoryContext(workspaceDir, '../../etc', { Premise: ['x'] })).rejects.toThrowError(PathEscapesRootError)
+    await expect(new DraftStore().write(workspaceDir, '../../escaped', 'text')).rejects.toThrowError(PathEscapesRootError)
   })
 
-  it('reads a piece with no story context as a declared absence rather than as an empty one', async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+  it('resolves the link rather than the name, so a piece symlinked outside the workspace is an absence too', () => {
+    const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-'))
+    writeFileSync(path.join(outside, 'piece.yaml'), 'title: Escaped\nmode: flash\nstatus: drafting\ncast: []\n', 'utf8')
+    symlinkSync(outside, path.join(workspaceDir, 'escaped'))
 
+    expect(readPiece(workspaceDir, 'escaped')).toBeUndefined()
+
+    rmSync(outside, { recursive: true, force: true })
+  })
+})
+
+describe("a piece's metadata", () => {
+  let workspaceDir: string
+
+  beforeEach(async () => {
+    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+  })
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true })
+  })
+
+  it('sets only the entry a write names, leaving the piece as it otherwise stood', async () => {
+    await writePieceCast(workspaceDir, 'cups', ['shape', 'compression'])
+    expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({ ...CUPS, cast: ['shape', 'compression'] })
+
+    await writePieceDetails(workspaceDir, 'cups', { title: 'The Cups' })
+    expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({ ...CUPS, title: 'The Cups', cast: ['shape', 'compression'] })
+
+    await writePieceDetails(workspaceDir, 'cups', { status: 'finished' })
+    expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({
+      ...CUPS,
+      title: 'The Cups',
+      status: 'finished',
+      cast: ['shape', 'compression'],
+    })
+  })
+})
+
+describe('the durable contexts', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(async () => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
+    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('reads a context nothing has written to as a declared absence rather than as an empty one', () => {
+    expect(readAuthorContext(dataRoot, durableContextSchema)).toBeUndefined()
     expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toBeUndefined()
   })
 
-  it('reads the sections the author named, with a hand-written scalar entry as a one-item list', () => {
-    handWriteAuthorContext('Prose tendencies:\n  - overwrites dialogue tags\nPatterns disliked: rhetorical questions\n')
-
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
-      'Prose tendencies': ['overwrites dialogue tags'],
-      'Patterns disliked': ['rhetorical questions'],
-    })
-  })
-
-  it('trims surrounding whitespace from a hand-edited entry', () => {
-    handWriteAuthorContext('Voice:\n  - "  wry and close  "\n')
-
-    expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({ Voice: ['wry and close'] })
-  })
-
-  it('states a failure naming the section when an entry is the wrong kind', () => {
-    handWriteAuthorContext('Voice:\n  - nested:\n      - not prose\n')
-
-    expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(TolerantReadError)
-    expect(() => readAuthorContext(dataRoot, durableContextSchema)).toThrowError(/Voice/)
-  })
-
-  it('reads a piece id that would escape the workspace as a declared absence', () => {
-    expect(readStoryContext(workspaceDir, '../../etc', durableContextSchema)).toBeUndefined()
-  })
-
-  it("keeps a story context's sections through the piece's own writes", async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-    writeFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), '# what this is about\nPremise:\n  - two cups, one left behind\n', 'utf8')
-
-    expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
-  })
-
-  it("writes the author context whole, keeping a hand-written comment beside a section a write did not touch", async () => {
-    handWriteAuthorContext('# author notes\nVoice:\n  - wry and close\n')
+  /**
+   * Both contexts are files the author may have written in by hand, so a whole-file write must
+   * leave a comment standing — which is only observable in the text itself, not through a read.
+   */
+  it('writes either context whole, keeping a hand-written comment the write did not touch', async () => {
+    mkdirSync(path.join(dataRoot, 'config'), { recursive: true })
+    writeFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), '# author notes\nVoice:\n  - wry and close\n', 'utf8')
+    writeFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), '# what this is about\n', 'utf8')
 
     await writeAuthorContext(dataRoot, { Voice: ['wry and close'], 'Patterns disliked': ['rhetorical questions'] })
+    await writeStoryContext(workspaceDir, 'cups', { Premise: ['two cups, one left behind'] })
 
-    const text = readFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), 'utf8')
-    expect(text).toContain('# author notes')
+    expect(readFileSync(path.join(dataRoot, 'config', 'author-context.yaml'), 'utf8')).toContain('# author notes')
     expect(readAuthorContext(dataRoot, durableContextSchema)).toEqual({
       Voice: ['wry and close'],
       'Patterns disliked': ['rhetorical questions'],
     })
-  })
-
-  it("writes a piece's story context the same way", async () => {
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
-
-    await writeStoryContext(workspaceDir, 'cups', { Premise: ['two cups, one left behind'] })
-
+    expect(readFileSync(path.join(workspaceDir, 'cups', 'story-context.yaml'), 'utf8')).toContain('# what this is about')
     expect(readStoryContext(workspaceDir, 'cups', durableContextSchema)).toEqual({ Premise: ['two cups, one left behind'] })
-  })
-
-  it('refuses to write a story context for an id that would escape the workspace', async () => {
-    await expect(writeStoryContext(workspaceDir, '../../etc', { Premise: ['x'] })).rejects.toThrowError(PathEscapesRootError)
   })
 })
 
@@ -286,7 +278,7 @@ describe('a conversation', () => {
 
   beforeEach(async () => {
     workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+    await writePieceMetadata(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -295,19 +287,17 @@ describe('a conversation', () => {
 
   it('reports a conversation nothing has appended to yet as a declared absence', () => {
     expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toBeUndefined()
+    expect(mostRecentConversationId(workspaceDir, 'cups')).toBeUndefined()
+    expect(conversationActivity(workspaceDir, 'cups')).toEqual([])
   })
 
-  it('appends the first entry to a conversation that does not exist on disk yet', async () => {
-    await new ConversationEntryStore().append(workspaceDir, 'cups', 'c1', authorMessage)
-
-    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage] })
-  })
-
-  it('appends behind what is already there rather than replacing it', async () => {
+  it('appends the first entry to a conversation not on disk yet, and behind what is there after', async () => {
     const store = new ConversationEntryStore()
-    await store.append(workspaceDir, 'cups', 'c1', authorMessage)
-    await store.append(workspaceDir, 'cups', 'c1', response)
 
+    await store.append(workspaceDir, 'cups', 'c1', authorMessage)
+    expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage] })
+
+    await store.append(workspaceDir, 'cups', 'c1', response)
     expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage, response] })
   })
 
@@ -319,54 +309,27 @@ describe('a conversation', () => {
     expect(readConversationEntries(workspaceDir, 'cups', 'c1')).toEqual({ id: 'c1', entries: [authorMessage, response] })
   })
 
-  it('states a failure, rather than tolerating anything, when the JSON does not parse', async () => {
-    await new ConversationEntryStore().append(workspaceDir, 'cups', 'c1', authorMessage)
-    writeFileSync(path.join(workspaceDir, 'cups', 'conversations', 'c1.json'), '{ not valid json', 'utf8')
-
-    expect(() => readConversationEntries(workspaceDir, 'cups', 'c1')).toThrowError(TolerantReadError)
-  })
-
-  it('reports no most-recent conversation when none has ever been written', () => {
-    expect(mostRecentConversationId(workspaceDir, 'cups')).toBeUndefined()
-  })
-
-  it('reports the most recently written conversation as the most recent one', async () => {
+  it('reports every conversation a piece holds with its last activity, and the most recently written one as the most recent', async () => {
     const store = new ConversationEntryStore()
     await store.append(workspaceDir, 'cups', 'older', authorMessage)
     // Aged explicitly: writing the two in order would rest on the filesystem's timestamp resolution.
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, 'cups', 'conversations', 'older.json'), past, past)
-
     await store.append(workspaceDir, 'cups', 'newer', authorMessage)
 
     expect(mostRecentConversationId(workspaceDir, 'cups')).toBe('newer')
-  })
-
-  it('reports every conversation a piece holds with its last activity, unordered', async () => {
-    const store = new ConversationEntryStore()
-    await store.append(workspaceDir, 'cups', 'c1', authorMessage)
-    await store.append(workspaceDir, 'cups', 'c2', authorMessage)
-
     const activity = conversationActivity(workspaceDir, 'cups')
-    expect(activity.map((entry) => entry.id)).toEqual(expect.arrayContaining(['c1', 'c2']))
+    expect(activity.map((entry) => entry.id)).toEqual(expect.arrayContaining(['older', 'newer']))
     expect(activity.every((entry) => typeof entry.modifiedMs === 'number')).toBe(true)
   })
 
-  it('reports no conversation activity for a piece that holds none', () => {
-    expect(conversationActivity(workspaceDir, 'cups')).toEqual([])
-  })
-
-  it("deletes a conversation's one file", async () => {
+  it("deletes a conversation's one file, and reports nothing wrong for one that was never written", async () => {
     await new ConversationEntryStore().append(workspaceDir, 'cups', 'c1', authorMessage)
     const file = path.join(workspaceDir, 'cups', 'conversations', 'c1.json')
-    expect(existsSync(file)).toBe(true)
 
     await deleteConversation(workspaceDir, 'cups', 'c1')
-
     expect(existsSync(file)).toBe(false)
-  })
 
-  it('deletes nothing and reports nothing wrong for a conversation not on disk', async () => {
     await expect(deleteConversation(workspaceDir, 'cups', 'never-written')).resolves.toBeUndefined()
   })
 })
@@ -376,7 +339,7 @@ describe("a piece's draft", () => {
 
   beforeEach(async () => {
     workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
-    await writePieceMetadata(workspaceDir, 'cups', { title: 'Cups', mode: 'flash', status: 'drafting', cast: ['shape'] })
+    await writePieceMetadata(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -395,9 +358,5 @@ describe("a piece's draft", () => {
     await Promise.all([drafts.write(workspaceDir, 'cups', 'first'), drafts.write(workspaceDir, 'cups', 'second')])
 
     expect(readFileSync(path.join(workspaceDir, 'cups', 'draft.md'), 'utf8')).toBe('second')
-  })
-
-  it('refuses an id that would land outside the workspace rather than writing there', async () => {
-    await expect(new DraftStore().write(workspaceDir, '../../escaped', 'text')).rejects.toThrowError(PathEscapesRootError)
   })
 })

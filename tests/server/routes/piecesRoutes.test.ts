@@ -2,10 +2,32 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildTestApp } from '../../support/harness.js'
+import type { RoleDefinition } from '../../../src/server/model/roles.js'
+import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
+import { buildTestApp } from '../../support/harness.js'
 
-describe('/pieces', () => {
+/**
+ * What a piece is and how it changes belongs to `pieces.test.ts`, which states it in
+ * the studio's own vocabulary. These tests own only what the adapter adds: the paths,
+ * the request grammar, the view the routes serialize, and the envelope each stated
+ * failure arrives in.
+ */
+
+const MODE: ModeDescriptor = {
+  id: 'flash',
+  name: 'Flash',
+  cast: [{ id: 'shape', attendsTo: 'the shape of the piece', defect: 'a shapeless middle' }],
+}
+
+const ROLES: readonly RoleDefinition[] = [
+  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'reads for the shape of the whole' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'weighs what the room said' },
+]
+
+const JSON_HEADERS = { 'content-type': 'application/json' }
+
+describe('the piece routes', () => {
   let dataRoot: string
 
   beforeEach(() => {
@@ -16,271 +38,25 @@ describe('/pieces', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  async function withWorkspace() {
-    const { app, workspace } = buildTestApp(dataRoot)
-    await workspace.set('my-writing')
-    return app
+  function studio() {
+    return buildTestApp(dataRoot, { mode: MODE, roles: ROLES, runtimeStatus: undefined })
   }
 
-  it('refuses to list pieces with no workspace configured', async () => {
-    const { app } = buildTestApp(dataRoot)
-    const res = await app.request('/pieces')
-    expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
-  })
-
-  it('creates a piece from a title alone and lists it afterwards', async () => {
-    const app = await withWorkspace()
-
-    const postRes = await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'The Cups' }),
-    })
-    expect(postRes.status).toBe(200)
-    const postBody = await postRes.json()
-    expect(postBody).toMatchObject({ success: true, data: { id: 'the-cups', title: 'The Cups', mode: 'flash', status: 'drafting' } })
-
-    const listRes = await app.request('/pieces')
-    const listBody = await listRes.json()
-    expect(listBody).toMatchObject({ success: true, data: [{ id: 'the-cups', title: 'The Cups' }] })
-  })
-
-  it('refuses a piece with no title', async () => {
-    const app = await withWorkspace()
-    const res = await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'INVALID_REQUEST' } })
-  })
-
-  it('opens a created piece by id', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const res = await app.request('/pieces/cups')
-    expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ success: true, data: { id: 'cups', title: 'Cups' } })
-  })
-
-  it('reports a piece that does not exist as PIECE_NOT_FOUND', async () => {
-    const app = await withWorkspace()
-    const res = await app.request('/pieces/nothing-here')
-    expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
-  })
-
-  it('reports a hand-corrupted piece.yaml as a stated ARTIFACT_INVALID failure, in the envelope', async () => {
-    const { app, workspace } = buildTestApp(dataRoot)
+  async function withWorkspace() {
+    const { app, workspace } = studio()
     const dir = await workspace.set('my-writing')
-    mkdirSync(path.join(dir, 'broken'), { recursive: true })
-    writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\nstatus: not-a-status\n', 'utf8')
-
-    const res = await app.request('/pieces/broken')
-    expect(res.status).toBe(500)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'ARTIFACT_INVALID' } })
-  })
-
-  it('saves a draft as Markdown and reports it back on the next open', async () => {
-    const { app, workspace } = buildTestApp(dataRoot)
-    const dir = await workspace.set('my-writing')
-    mkdirSync(path.join(dir, 'cups'), { recursive: true })
-    writeFileSync(
-      path.join(dir, 'cups', 'piece.yaml'),
-      'title: Cups\nmode: flash\nstatus: drafting\ncast:\n  - shape\n',
-      'utf8',
-    )
-
-    const putRes = await app.request('/pieces/cups/draft', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ draft: 'Two small words.' }),
-    })
-    expect(putRes.status).toBe(200)
-    expect(await putRes.json()).toEqual({ success: true, data: null })
-
-    const getRes = await app.request('/pieces/cups')
-    expect(await getRes.json()).toMatchObject({ success: true, data: { draft: 'Two small words.' } })
-  })
-
-  it('reports saving a draft for a piece that does not exist as PIECE_NOT_FOUND', async () => {
-    const app = await withWorkspace()
-    const res = await app.request('/pieces/nothing-here/draft', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ draft: 'text' }),
-    })
-    expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
-  })
-
-  it('refuses to save a draft with no workspace configured', async () => {
-    const { app } = buildTestApp(dataRoot)
-    const res = await app.request('/pieces/cups/draft', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ draft: 'text' }),
-    })
-    expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
-  })
-
-  it('opens a piece listing its specialists with their role descriptions, all enabled by default', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const res = await app.request('/pieces/cups')
-    const body = await res.json()
-    expect(body).toMatchObject({
-      success: true,
-      data: { cast: [{ id: 'shape', displayName: 'Shape', roleDescription: 'x', enabled: true }] },
-    })
-  })
-
-  it('disables a specialist, and the next open reports it disabled', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const patchRes = await app.request('/pieces/cups', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cast: [] }),
-    })
-    expect(patchRes.status).toBe(200)
-    expect(await patchRes.json()).toMatchObject({
-      success: true,
-      data: { cast: [{ id: 'shape', enabled: false }] },
-    })
-
-    const getRes = await app.request('/pieces/cups')
-    expect(await getRes.json()).toMatchObject({ success: true, data: { cast: [{ id: 'shape', enabled: false }] } })
-  })
-
-  it('retitles a piece without renaming its directory', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const patchRes = await app.request('/pieces/cups', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'The Cups' }),
-    })
-    expect(patchRes.status).toBe(200)
-    expect(await patchRes.json()).toMatchObject({ success: true, data: { id: 'cups', title: 'The Cups' } })
-
-    const getRes = await app.request('/pieces/cups')
-    expect(await getRes.json()).toMatchObject({ success: true, data: { id: 'cups', title: 'The Cups' } })
-  })
-
-  it('marks a piece finished, and nothing gates opening or writing its draft afterwards', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const patchRes = await app.request('/pieces/cups', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ status: 'finished' }),
-    })
-    expect(await patchRes.json()).toMatchObject({ success: true, data: { status: 'finished' } })
-
-    const putRes = await app.request('/pieces/cups/draft', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ draft: 'The last word.' }),
-    })
-    expect(putRes.status).toBe(200)
-
-    const getRes = await app.request('/pieces/cups')
-    expect(await getRes.json()).toMatchObject({ success: true, data: { status: 'finished', draft: 'The last word.' } })
-  })
-
-  it('reports retitling a piece that does not exist as PIECE_NOT_FOUND', async () => {
-    const app = await withWorkspace()
-    const res = await app.request('/pieces/nothing-here', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Anything' }),
-    })
-    expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
-  })
-
-  it('refuses to widen a piece past its mode\'s cast', async () => {
-    const app = await withWorkspace()
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
-
-    const res = await app.request('/pieces/cups', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cast: ['story-editor'] }),
-    })
-    expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
-  })
-
-  it('reports enabling a specialist for a piece that does not exist as PIECE_NOT_FOUND', async () => {
-    const app = await withWorkspace()
-    const res = await app.request('/pieces/nothing-here', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cast: [] }),
-    })
-    expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
-  })
-})
-
-describe('/pieces/:id/conversations/:cid', () => {
-  let dataRoot: string
-
-  beforeEach(() => {
-    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
-  })
-
-  afterEach(() => {
-    rmSync(dataRoot, { recursive: true, force: true })
-  })
-
-  async function withPiece() {
-    const { app, workspace } = buildTestApp(dataRoot)
-    const dir = await workspace.set('my-writing')
-    await app.request('/pieces', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Cups' }),
-    })
     return { app, dir }
   }
 
-  it('reports the piece\'s conversations, in the listing GET /pieces/:id already carries', async () => {
+  async function withPiece() {
+    const { app, dir } = await withWorkspace()
+    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups' }) })
+    return { app, dir }
+  }
+
+  it('carries an opened piece whole: its details, its draft, its cast with the roles named, and its conversations', async () => {
     const { app, dir } = await withPiece()
+    await app.request('/pieces/cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'Two small words.' }) })
     await new ConversationEntryStore().append(dir, 'cups', 'c1', {
       id: 'e1',
       kind: 'authorMessage',
@@ -290,37 +66,98 @@ describe('/pieces/:id/conversations/:cid', () => {
     })
 
     const res = await app.request('/pieces/cups')
-    const body = await res.json()
-    expect(body.data.conversations).toEqual([{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }])
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        id: 'cups',
+        title: 'Cups',
+        mode: 'flash',
+        status: 'drafting',
+        draft: 'Two small words.',
+        cast: [{ id: 'shape', displayName: 'Shape', roleDescription: ROLES[0]?.roleDescription, enabled: true }],
+        conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
+      },
+    })
   })
 
-  it('deletes a conversation and the change files its applications name', async () => {
+  it('carries a conversation the author asks for by id, with the entries it holds', async () => {
+    const { app, dir } = await withPiece()
+    await new ConversationEntryStore().append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+
+    const res = await app.request('/pieces/cups/conversations/c1')
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ success: true, data: { id: 'c1', entries: [{ id: 'e1', kind: 'authorMessage' }] } })
+  })
+
+  it('reaches the studio on every write it offers, answering each in the envelope', async () => {
+    const { app } = await withWorkspace()
+
+    const created = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'The Cups' }) })
+    expect(await created.json()).toMatchObject({ success: true, data: { id: 'the-cups' } })
+
+    const listed = await app.request('/pieces')
+    expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
+
+    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: [] }) })
+    expect(await patched.json()).toMatchObject({ success: true, data: { title: 'Cups', status: 'finished', cast: [{ id: 'shape', enabled: false }] } })
+
+    const saved = await app.request('/pieces/the-cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'text' }) })
+    expect(await saved.json()).toEqual({ success: true, data: null })
+
+    const opened = await app.request('/pieces/the-cups/conversations', { method: 'POST' })
+    expect(await opened.json()).toMatchObject({ success: true, data: { id: expect.any(String) } })
+  })
+
+  it('deletes a conversation, and the piece stops reporting it', async () => {
     const { app, dir } = await withPiece()
     const store = new ConversationEntryStore()
     await store.append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
     await store.append(dir, 'cups', 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
-    await writeAppliedChange(dir, 'cups', {
-      id: 'change1',
-      content: { kind: 'passages', passages: [{ before: 'it', after: '' }] },
-    })
+    await writeAppliedChange(dir, 'cups', { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
 
-    const delRes = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
-    expect(delRes.status).toBe(200)
-    expect(await delRes.json()).toEqual({ success: true, data: null })
+    const res = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
 
-    const getRes = await app.request('/pieces/cups/conversations/c1')
-    expect(getRes.status).toBe(404)
-    expect(await getRes.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
-
-    const pieceRes = await app.request('/pieces/cups')
-    expect((await pieceRes.json()).data.conversations).toEqual([])
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true, data: null })
+    expect((await (await app.request('/pieces/cups')).json()).data.conversations).toEqual([])
   })
 
-  it('reports deleting a conversation nothing has written yet as CONVERSATION_NOT_FOUND', async () => {
-    const { app } = await withPiece()
+  /**
+   * Which refusals the studio states at all belongs to `pieces.test.ts` and
+   * `store/index.test.ts`. What the adapter owns is the translation: each stated refusal
+   * reaching the author as a named code at the status that refusal warrants, never as an
+   * unhandled collapse.
+   */
+  it('translates every refusal the studio states into a named code at its own status', async () => {
+    const unconfigured = await studio().app.request('/pieces')
+    expect(unconfigured.status).toBe(400)
+    expect(await unconfigured.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
 
-    const res = await app.request('/pieces/cups/conversations/never-written', { method: 'DELETE' })
-    expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
+    const { app, dir } = await withPiece()
+
+    const ungrammatical = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({}) })
+    expect(ungrammatical.status).toBe(400)
+    expect(await ungrammatical.json()).toMatchObject({ success: false, error: { code: 'INVALID_REQUEST' } })
+
+    const absentPiece = await app.request('/pieces/nothing-here')
+    expect(absentPiece.status).toBe(404)
+    expect(await absentPiece.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
+
+    const absentConversation = await app.request('/pieces/cups/conversations/never-written', { method: 'DELETE' })
+    expect(absentConversation.status).toBe(404)
+    expect(await absentConversation.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
+
+    const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: ['story-editor'] }) })
+    expect(outsideCast.status).toBe(400)
+    expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
+
+    mkdirSync(path.join(dir, 'broken'), { recursive: true })
+    writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\nstatus: not-a-status\n', 'utf8')
+    const corrupted = await app.request('/pieces/broken')
+    expect(corrupted.status).toBe(500)
+    expect(await corrupted.json()).toMatchObject({ success: false, error: { code: 'ARTIFACT_INVALID' } })
   })
 })

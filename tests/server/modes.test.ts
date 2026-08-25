@@ -9,16 +9,12 @@ const flash: ModeDescriptor = {
 }
 
 describe('selectSingleMode', () => {
-  it('resolves the one shipped mode descriptor', () => {
+  it('resolves the one shipped mode descriptor, and fails startup on any other number of them', () => {
     expect(selectSingleMode([flash])).toEqual(flash)
-  })
 
-  it('fails startup when more than one mode is shipped', () => {
-    expect(() => selectSingleMode([flash, { ...flash, id: 'epic', name: 'Epic' }])).toThrowError(ShippedDataError)
-    expect(() => selectSingleMode([flash, { ...flash, id: 'epic', name: 'Epic' }])).toThrowError(/found 2/)
-  })
-
-  it('fails startup when no mode descriptors are shipped at all', () => {
+    const two = [flash, { ...flash, id: 'epic', name: 'Epic' }]
+    expect(() => selectSingleMode(two)).toThrowError(ShippedDataError)
+    expect(() => selectSingleMode(two)).toThrowError(/found 2/)
     expect(() => selectSingleMode([])).toThrowError(ShippedDataError)
   })
 })

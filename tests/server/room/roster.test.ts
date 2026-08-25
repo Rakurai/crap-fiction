@@ -11,16 +11,15 @@ function mode(cast: ModeDescriptor['cast']): ModeDescriptor {
 }
 
 describe('resolving who is in the room', () => {
-  it('takes the cast from the mode and the Story Editor from whoever the cast does not name', () => {
+  /**
+   * The mode names the cast and what each of them attends to; the Story Editor is whoever it
+   * does not name, and so has no criteria of its own to carry.
+   */
+  it("takes the cast and its criteria from the mode, and the Story Editor, with no criteria, from whoever the cast does not name", () => {
     const roster = resolveRoster(mode([{ id: 'shape', attendsTo: 'the arc', defect: 'a late entry' }]), [SHAPE, EDITOR])
 
     expect(roster.specialists.map((role) => role.id)).toEqual(['shape'])
     expect(roster.storyEditor.id).toBe('story-editor')
-  })
-
-  it('carries the mode\'s criteria for each specialist, and none for the Story Editor', () => {
-    const roster = resolveRoster(mode([{ id: 'shape', attendsTo: 'the arc', defect: 'a late entry' }]), [SHAPE, EDITOR])
-
     expect(roster.criteria.get('shape')).toEqual({ attendsTo: 'the arc', defect: 'a late entry' })
     expect(roster.criteria.get('story-editor')).toBeUndefined()
   })
@@ -29,12 +28,14 @@ describe('resolving who is in the room', () => {
     expect(() => resolveRoster(mode([{ id: 'interiority', attendsTo: 'x', defect: 'y' }]), [SHAPE, EDITOR])).toThrowError(CastMemberWithoutRoleError)
   })
 
-  it('refuses a roster with nobody outside the cast: there would be no Story Editor', () => {
-    expect(() => resolveRoster(mode([{ id: 'shape', attendsTo: 'x', defect: 'y' }]), [SHAPE])).toThrowError(StoryEditorNotResolvedError)
-  })
-
-  it('refuses a roster with more than one outside the cast: which of them judges is not stated anywhere', () => {
+  /**
+   * Exactly one role outside the cast, either way it fails: with nobody there is no Story
+   * Editor, and with two, which of them judges is stated nowhere.
+   */
+  it('refuses a roster that does not leave exactly one role outside the cast', () => {
     const other: RoleDefinition = { id: 'interiority', handle: 'inter', displayName: 'Interiority', roleDescription: 'the inner life' }
+
+    expect(() => resolveRoster(mode([{ id: 'shape', attendsTo: 'x', defect: 'y' }]), [SHAPE])).toThrowError(StoryEditorNotResolvedError)
     expect(() => resolveRoster(mode([{ id: 'shape', attendsTo: 'x', defect: 'y' }]), [SHAPE, EDITOR, other])).toThrowError(StoryEditorNotResolvedError)
   })
 })

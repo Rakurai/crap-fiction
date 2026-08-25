@@ -11,7 +11,7 @@ const PROPOSALS: readonly CaptureProposal[] = [
 describe('the context capture review', () => {
   afterEach(cleanup)
 
-  it('groups proposals under the destination they belong to, with none approved by default', () => {
+  it('groups proposals under the destination they belong to, checked where approved and unchecked where not', () => {
     render(<ContextReview proposals={PROPOSALS} approved={new Set()} closing={false} error={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('Story context')).toBeTruthy()
@@ -20,12 +20,9 @@ describe('the context capture review', () => {
     for (const checkbox of screen.getAllByRole('checkbox')) {
       expect((checkbox as HTMLInputElement).checked).toBe(false)
     }
-  })
 
-  it('shows a proposal already approved as checked', () => {
-    render(
-      <ContextReview proposals={PROPOSALS} approved={new Set(['p1'])} closing={false} error={undefined} onToggle={vi.fn()} onClose={vi.fn()} />,
-    )
+    cleanup()
+    render(<ContextReview proposals={PROPOSALS} approved={new Set(['p1'])} closing={false} error={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect((screen.getByText('two cups, one left behind').closest('label')?.querySelector('input') as HTMLInputElement).checked).toBe(true)
   })
@@ -49,13 +46,12 @@ describe('the context capture review', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('states nothing was proposed when the analysis returned nothing', () => {
+  it('states what came back where there is nothing to review — nothing proposed, or a failure that left the review open', () => {
     render(<ContextReview proposals={[]} approved={new Set()} closing={false} error={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('Nothing proposed.')).toBeTruthy()
-  })
 
-  it('states a failure that left the review open', () => {
+    cleanup()
     render(
       <ContextReview proposals={PROPOSALS} approved={new Set()} closing={false} error="storyContext: disk is full" onToggle={vi.fn()} onClose={vi.fn()} />,
     )

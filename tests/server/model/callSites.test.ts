@@ -8,20 +8,17 @@ const roles: readonly RoleDefinition[] = [
 ]
 
 describe('callSites', () => {
-  it('lists every participant, followed by the two operation call sites', () => {
-    expect(callSites(roles).map((site) => site.site)).toEqual(['shape', 'story-editor', 'apply', 'capture'])
-  })
-
-  it('carries a role description for a participant and none for an operation', () => {
+  /**
+   * The list holds two kinds of site, and what tells them apart is that a participant is
+   * somebody in the room — it has a handle and a role — while an operation is only a place a
+   * model is called from.
+   */
+  it('lists every participant with its handle and role, followed by the two operation call sites with neither', () => {
     const sites = callSites(roles)
-    expect(sites.find((site) => site.site === 'shape')?.roleDescription).toBe('x')
-    expect(sites.find((site) => site.site === 'apply')?.roleDescription).toBeNull()
-  })
 
-  it('carries a handle for a participant and none for an operation', () => {
-    const sites = callSites(roles)
-    expect(sites.find((site) => site.site === 'shape')?.handle).toBe('shape')
-    expect(sites.find((site) => site.site === 'apply')?.handle).toBeNull()
+    expect(sites.map((site) => site.site)).toEqual(['shape', 'story-editor', 'apply', 'capture'])
+    expect(sites.find((site) => site.site === 'shape')).toMatchObject({ handle: 'shape', roleDescription: 'x' })
+    expect(sites.find((site) => site.site === 'apply')).toMatchObject({ handle: null, roleDescription: null })
   })
 
   it('fails when a participant id collides with an operation call site', () => {

@@ -1,4 +1,17 @@
 import type { Charter } from '../../src/server/model/charter.js'
+import type { RoleDefinition } from '../../src/server/model/roles.js'
+import type { ModeDescriptor } from '../../src/server/modes.js'
+
+export const MODE_FIXTURE: ModeDescriptor = {
+  id: 'flash',
+  name: 'Flash',
+  cast: [{ id: 'shape', attendsTo: 'x', defect: 'y' }],
+}
+
+export const ROLES_FIXTURE: readonly RoleDefinition[] = [
+  { id: 'shape', handle: 'shape', displayName: 'Shape', roleDescription: 'x' },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', roleDescription: 'y' },
+]
 
 export const CHARTER_FIXTURE: Charter = {
   outcomes: {

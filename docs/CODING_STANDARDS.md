@@ -332,6 +332,14 @@ would become a durable record nobody decided to keep.
 directory, its index file is that interface and a sibling file behind it is internal — a test imports
 the index and never a sibling, on the same terms as product code.
 
+**A test directory names what is protected, never the runtime that happens to be needed.** A reader
+knows from a path alone what a file is for, because the path groups tests by the capability or module
+they guard — the client's surfaces, the client's state, a server module, the HTTP routes, the whole
+application stood up for real. Where a group needs a particular environment the runner selects it by
+matching those paths, so the environment follows the grouping and is never its reason. A directory named
+for a runtime tells a contributor nothing about where a new test belongs, and a layout that says nothing
+is re-guessed by everyone who adds to it.
+
 **Each property is asserted at exactly one boundary, and nowhere twice.** A rule asserted at two
 levels is a rule that will be changed at one. Where a property could be stated at more than one
 boundary, it is asserted at the deepest one able to state it in the product's own vocabulary — the
