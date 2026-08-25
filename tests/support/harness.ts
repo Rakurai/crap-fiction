@@ -32,16 +32,7 @@ export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
  * harness data. The roster comes from the mode and roles the test itself stated,
  * because the routes report it.
  */
-const UNREACHED_CHARTER: Charter = {
-  outcomes: {
-    noComment: 'unreached: no prompt is rendered in this scenario',
-    commentary: 'unreached: no prompt is rendered in this scenario',
-    applicableSuggestion: 'unreached: no prompt is rendered in this scenario',
-  },
-  recommendationIsOneChange: 'unreached: no prompt is rendered in this scenario',
-  directQuestionOwedAnswer: 'unreached: no prompt is rendered in this scenario',
-  noReasoningAboutTheAuthorsQuestion: 'unreached: no prompt is rendered in this scenario',
-}
+const UNREACHED_CHARTER: Charter = 'unreached: no prompt is rendered in this scenario'
 
 function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {

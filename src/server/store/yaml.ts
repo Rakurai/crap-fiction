@@ -146,7 +146,10 @@ export function readShippedTextFile(filePath: string): string {
 
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 
-function parseContentDocument<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { id: string; persona: string }> {
+export function readContentFragmentFile<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { body: string }> {
+  if (!existsSync(filePath)) {
+    throw new ShippedDataError(filePath, '(file)', 'not found')
+  }
   const match = FRONTMATTER_PATTERN.exec(readFileSync(filePath, 'utf8'))
   if (match === null) {
     throw new ShippedDataError(filePath, '(frontmatter)', 'missing or malformed frontmatter block')
@@ -159,12 +162,16 @@ function parseContentDocument<T>(filePath: string, schema: z.ZodType<T>): Readon
     throw new ShippedDataError(filePath, entry, message)
   }
 
-  const persona = (body ?? '').trim()
+  return { ...result.data, body: (body ?? '').trim() }
+}
+
+function parseContentDocument<T>(filePath: string, schema: z.ZodType<T>): Readonly<T & { id: string; persona: string }> {
+  const { body: persona, ...rest } = readContentFragmentFile(filePath, schema)
   if (persona.length === 0) {
     throw new ShippedDataError(filePath, 'persona', 'must not be empty')
   }
 
-  return { ...result.data, id: path.basename(filePath, '.md'), persona }
+  return { ...(rest as T), id: path.basename(filePath, '.md'), persona }
 }
 
 export function readContentDocuments<T>(dir: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {

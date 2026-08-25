@@ -13,6 +13,7 @@ import {
   fileModifiedMs,
   fileNames,
   readContentDocuments,
+  readContentFragmentFile,
   readJsonArtifact,
   readShippedTextFile,
   readTextArtifact,
@@ -261,10 +262,14 @@ export function readShippedModes<T>(schema: z.ZodType<T>): readonly Readonly<T &
   })
 }
 
-export function readShippedCharter<T>(schema: z.ZodType<T>): T {
-  return readYamlFile(path.join(SHIPPED_ROOT, 'model', 'charter.yaml'), schema)
+export function readShippedCharter(contentRoot: string): string {
+  return readShippedTextFile(path.join(contentRoot, 'charter.md'))
 }
 
 export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {
   return readContentDocuments(path.join(contentRoot, 'participants'), schema)
+}
+
+export function readShippedFragment<T>(contentRoot: string, kind: string, name: string, schema: z.ZodType<T>): Readonly<T & { body: string }> {
+  return readContentFragmentFile(path.join(contentRoot, 'prompts', kind, `${name}.md`), schema)
 }

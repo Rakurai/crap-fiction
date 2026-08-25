@@ -219,8 +219,8 @@ model once is on that model for every piece; and the interface theme. With no th
 interface follows the operating system — an absent key means the author has not chosen, which is a
 different thing from a value the application supplied on their behalf.
 
-**Shipped data travels with the application**, not under the data root: the participant charter and
-the mode descriptors sit beside their own source, and every participant is one document under a
+**Shipped data travels with the application**, not under the data root: the mode descriptors sit beside
+their own source, and the charter, every participant and every prompt fragment are documents under a
 content root resolved once at startup. Where exactly the content root and the source-adjacent files sit
 is the store boundary's, like the rest of the layout — the modules that read them state what each must
 contain and never where it is. It is kept apart from author configuration because conflating them means
@@ -228,6 +228,13 @@ an upgrade either clobbers the author's assignments or fails to deliver a correc
 validated at startup, and invalid shipped data is a startup failure, since a document that parses
 partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
 and sibling description, and none names a participant.
+
+**Every heading, instruction and repeated line addressed to a model is content, never source.** A
+fragment only substitutes, so which fragments a call composes, in what order, and how many times a
+repeated line renders are decisions the context compilation seam owns and a fragment cannot make for
+itself. This is what lets editing a heading or an instruction take effect on reload: the seam that
+assembles a call changes only when which fragments it reaches for changes, never when their wording
+does.
 
 **A participant declares its own eligibility, and the count that must hold is validated where the
 participants are loaded.** Exactly one may declare itself the generalist; none or several is a startup
@@ -519,6 +526,13 @@ an intrinsic property of the participant.
 states nothing about any one participant's responsibility; each interprets what the form implies
 through its own persona, so the Story Editor receives the same description as every specialist and
 applies it through a different persona rather than being exempted from it.
+
+**A call's prompt has a durable half and a per-call half, each composed from loaded fragments in a
+fixed order.** The durable half is what is true of the call site before a request — the mode
+description, the charter, a participant's persona, or a non-participant call's operation role; the
+per-call half is the task and the material a particular request carries. No heading, task instruction
+or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
+prompt language of its own.
 
 **Compilation is a pure function**, so the invariant is asserted against the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind

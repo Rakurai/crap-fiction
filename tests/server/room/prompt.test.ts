@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { loadCharter } from '../../../src/server/model/charter.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import { compileSpecialistContext, renderPrompt } from '../../../src/server/room/context.js'
+import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 const shape: RoleDefinition = {
   id: 'shape',
@@ -14,8 +14,7 @@ const shape: RoleDefinition = {
 }
 
 describe('the prompt a specialist is called with', () => {
-  it('carries every clause of the shipped charter, each in its own section', () => {
-    const charter = loadCharter()
+  it('carries the whole charter, composed as one section, and the addressed obligation only when it was owed one', () => {
     const context = compileSpecialistContext({
       role: shape,
       modeDescription: 'A short piece read in one sitting.',
@@ -27,15 +26,12 @@ describe('the prompt a specialist is called with', () => {
       draft: 'text',
       entries: undefined,
       policy: 'shared',
+      participants: new Map(),
     })
 
-    const prompt = renderPrompt(context, charter)
+    const prompt = renderPrompt(context, PROMPT_FRAGMENTS_FIXTURE, CHARTER_FIXTURE)
 
-    expect(prompt).toContain(charter.outcomes.noComment)
-    expect(prompt).toContain(charter.outcomes.commentary)
-    expect(prompt).toContain(charter.outcomes.applicableSuggestion)
-    expect(prompt).toContain(charter.recommendationIsOneChange)
-    expect(prompt).toContain(charter.directQuestionOwedAnswer)
-    expect(prompt).toContain(charter.noReasoningAboutTheAuthorsQuestion)
+    expect(prompt).toContain(CHARTER_FIXTURE)
+    expect(prompt).toContain('FIXTURE_ADDRESSED_HEADING')
   })
 })

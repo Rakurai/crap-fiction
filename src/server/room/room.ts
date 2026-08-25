@@ -3,6 +3,7 @@ import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
+import type { PromptFragments } from '../model/prompts.js'
 import type { CallResult, ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
 import {
@@ -177,11 +178,13 @@ export class Room {
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
+  readonly #fragments: PromptFragments
   readonly #policy: HistoryPolicy
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
   readonly #modeDescriptions: ReadonlyMap<string, string>
+  readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #captures = new Map<string, ActiveCapture>()
   #operation: ActiveOperation | undefined = undefined
@@ -194,6 +197,7 @@ export class Room {
     roster: RoomRoster,
     modes: readonly ModeDescriptor[],
     charter: Charter,
+    fragments: PromptFragments,
     policy: HistoryPolicy,
     logger: Logger,
     now: Clock,
@@ -205,11 +209,13 @@ export class Room {
     this.#logger = logger
     this.#now = now
     this.#charter = charter
+    this.#fragments = fragments
     this.#policy = policy
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
     this.#modeDescriptions = new Map(modes.map((mode) => [mode.id, mode.description]))
+    this.#displayNames = new Map([...roster.specialists, roster.storyEditor, ...roster.addressedOnly].map((role) => [role.id, role.displayName]))
   }
 
   specialists(): readonly RoleDefinition[] {
@@ -441,6 +447,7 @@ export class Room {
       entries: existingEntries,
       policy: this.#policy,
       modeDescription,
+      participants: this.#displayNames,
     }
     const contextFor = (role: RoleDefinition, owesAnswer: boolean): ContextInput => ({
       ...shared,
@@ -455,7 +462,7 @@ export class Room {
 
     const calls = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
       const owesAnswer = addressedIds.includes(role.id)
-      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#charter) }
+      return { role, owesAnswer, prompt: renderPrompt(compileSpecialistContext(contextFor(role, owesAnswer)), this.#fragments, this.#charter) }
     })
 
     const evidence: ParticipantEvidence[] = []
@@ -488,7 +495,7 @@ export class Room {
       }
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
 
-      const gathered = evidenceFrom(outcome, call.role.id)
+      const gathered = evidenceFrom(outcome, call.role.displayName)
       if (gathered !== undefined) evidence.push(gathered)
     }
 
@@ -499,7 +506,7 @@ export class Room {
         abandoned = true
       } else {
         const owesAnswer = addressedIds.includes(this.#storyEditor.id) || evidence.length === 0
-        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#charter)
+        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#fragments, this.#charter)
         const outcome = await callParticipant(this.#storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
           onState(this.#storyEditor.id, state),
         )
@@ -553,6 +560,7 @@ export class Room {
 
     try {
       const context = compileApplyContext({
+        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
         recommendationClaim: response.claim,
         recommendationNote: response.note,
         constraint,
@@ -560,8 +568,9 @@ export class Room {
         storyContext: durableContext.storyContext,
         draft,
         entries,
+        participants: this.#displayNames,
       })
-      const prompt = renderApplyPrompt(context, this.#charter)
+      const prompt = renderApplyPrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
       if (result.outcome !== 'value') {
         this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: result.outcome === 'abandoned' ? 'abandoned' : 'failed' } })
@@ -606,12 +615,14 @@ export class Room {
 
     try {
       const context = compileCaptureContext({
+        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
         entries,
+        participants: this.#displayNames,
       })
-      const prompt = renderCapturePrompt(context)
+      const prompt = renderCapturePrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
       if (result.outcome !== 'value') return result
 

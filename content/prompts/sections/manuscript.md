@@ -1,0 +1,7 @@
+---
+variables:
+  - manuscript
+---
+## Manuscript
+
+{{manuscript}}

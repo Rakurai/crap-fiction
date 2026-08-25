@@ -163,16 +163,15 @@ as absent would invite something to read them.
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them.
 
-Shipped data — the participant charter, every participant, and the mode descriptors — travels with the
-application and not under the data root. The charter and the mode descriptors sit beside the
-application's own source, each mode paired with a sibling document describing its form and scale;
-every participant is one Markdown document under a content root resolved once at startup, and its
-filename is its id.
+Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
+travels with the application and not under the data root. The charter and every participant are one
+Markdown document each, under a content root resolved once at startup; a participant's filename is its
+id. The mode descriptors sit beside the application's own source, each mode paired with a sibling
+document describing its form and scale.
 
-The **charter** is what every participant is told whichever one it is: what the three outcomes mean and
-what makes a recommendation applicable rather than commentary, that a direct question is owed an answer,
-and that nothing reasons about the author's question instead of about the story. It is its own kind so
-that a correction to it is one edit rather than one per participant.
+The **charter** is one Markdown document under the content root, composed whole into a specialist or
+generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
+rather than intrinsic to the charter and is composed only where a call addresses a participant directly.
 
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
@@ -185,6 +184,14 @@ A **mode** carries its `id` and its `displayName`, and names no participant. Its
 carries the shared **description** of its form and scale that every participant call receives. Any
 number of modes may load; the roster and initial cast for a given mode and surface are derived from
 every cast participant's declared availability, never listed by the mode.
+
+A **prompt fragment** is one Markdown document under the content root, holding a heading or an
+instruction addressed to a model together with frontmatter declaring the names it interpolates as
+`{{name}}` placeholders. It performs substitution only: no branching, looping or expression evaluation.
+The inventory is closed — a section, a repeated line, a per-call task, an operation role, or a
+surface's framing — and every entry in it is a startup-required file; an absent one fails naming it. A
+rendered prompt names a participant by its display name, never by its internal id, and is never written
+to a log.
 
 ## Process environment
 

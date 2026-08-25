@@ -5,6 +5,7 @@ import { loadEnv, type StudioEnv } from './env.js'
 import { createLogger, type Logger } from './logger.js'
 import { callSites } from './model/callSites.js'
 import { loadCharter, type Charter } from './model/charter.js'
+import { loadPromptFragments } from './model/prompts.js'
 import type { ModelAccess } from './model/types.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
@@ -29,7 +30,8 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
   const modes = loadModes()
   const roles = loadRoles(CONTENT_ROOT, new Set(modes.map((mode) => mode.id)))
-  const charter = loadCharter()
+  const charter = loadCharter(CONTENT_ROOT)
+  const fragments = loadPromptFragments(CONTENT_ROOT)
   const sites = callSites(roles)
   const draftWriter = new DraftWriter(new DraftStore())
   const modelAccess = makeModelAccess(env, logger)
@@ -42,6 +44,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     roster,
     modes,
     charter,
+    fragments,
     SHIPPED_HISTORY_POLICY,
     logger,
     Date.now,

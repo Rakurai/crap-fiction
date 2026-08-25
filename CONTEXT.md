@@ -125,6 +125,13 @@ a summarizer, not a consensus mechanism, and not an authority over the author.
 
 Available in every mode, belonging to no cast, and answering only when the author names it.
 
+## Charter
+
+The rules restated to every participant, regardless of which one it is: what each response
+outcome means, what makes a recommendation implementable, and that nothing reasons about how
+the author's question was asked rather than about the story. Correcting one of these rules is
+one edit rather than one per participant.
+
 ## Conversation
 
 A durable, resumable, multi-turn discussion about a piece. A piece may have several.
@@ -156,6 +163,10 @@ collaborator is an ordinary message rather than a different kind of interaction.
 An author action opened from a particular response is addressed to that participant by the
 act rather than by the words, and its message is not read for addressing at all: the author
 aimed it by pointing.
+
+A participant addressed directly answers, even where the answer is that it sees no material
+issue. Saying nothing is only for a message a participant was merely eligible for, not one it
+was asked.
 
 ## Response
 
