@@ -13,13 +13,14 @@ export type ParticipantOutcome =
   | Readonly<{ kind: 'entry'; entry: ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry }>
   | Readonly<{ kind: 'abandoned' }>
 
+/**
+ * Only a substantive reading is evidence. A declined or failed call is recorded in the conversation
+ * and stops there: what it would tell the Story Editor is who spoke, not anything about the story.
+ */
 export function evidenceFrom(outcome: ParticipantOutcome, participant: string): ParticipantEvidence | undefined {
   if (outcome.kind !== 'entry') return undefined
-  if (outcome.entry.kind === 'participantResponse') {
-    return { kind: 'substantive', participant, claim: outcome.entry.claim, note: outcome.entry.note }
-  }
-  if (outcome.entry.kind === 'participantNoComment') return { kind: 'noComment', participant }
-  return undefined
+  if (outcome.entry.kind !== 'participantResponse') return undefined
+  return { kind: 'substantive', participant, claim: outcome.entry.claim, note: outcome.entry.note }
 }
 
 export async function callParticipant(

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApplicationEntryView, ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
@@ -117,7 +117,7 @@ describe('a landed response in the conversation', () => {
     expect(block).toContain('Reader Experience')
   })
 
-  it('draws nothing at all for a no-comment outcome — not a row, not a name, not a placeholder', async () => {
+  it('states a no-comment outcome as one line under the participant that read, carrying nothing to act on', async () => {
     renderConversation([
       { id: 'e1', kind: 'participantNoComment', participantId: 'shape', causeId: 'e0' },
       { id: 'e2', kind: 'participantResponse', participantId: 'editor', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' },
@@ -125,8 +125,12 @@ describe('a landed response in the conversation', () => {
 
     await screen.findByText('It holds.')
 
-    expect(screen.queryByText('Shape')).toBeNull()
-    expect(screen.getByText('Story Editor')).toBeTruthy()
+    const declined = blockContaining('has no comment.')
+    expect(declined.textContent).toContain('@shape')
+    expect(declined.textContent).toContain('Shape')
+    // Nothing to act on, so none of the actions a response carries appear against it.
+    expect(within(declined).queryByRole('button')).toBeNull()
+    expect(within(declined).queryByRole('textbox')).toBeNull()
   })
 
   it("states a failed call in the machine's register under the participant that did not answer, with whatever came back where anything did", async () => {

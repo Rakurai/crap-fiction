@@ -59,6 +59,24 @@
   border-top: 1px solid var(--rule);
 }
 
+/*
+ * A reading with nothing to add is a line, not a response: the same identity in the same order,
+ * carrying no claim and no actions. It reads as a participant who read, not one who was absent.
+ */
+.noComment {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 11px 0 2px;
+  border-top: 1px solid var(--rule);
+}
+
+.noCommentWords {
+  font: 400 11.5px/1 var(--font-ui);
+  color: var(--ink3);
+  margin: 0;
+}
+
 /* Identity is the handle the author addresses, which is also how the addressing gets learned. */
 .identity {
   display: flex;

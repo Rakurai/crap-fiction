@@ -343,6 +343,25 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
+  it('owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('story-editor')).toContain('FIXTURE_ADDRESSED_HEADING')
+
+    // Declining was never on offer, so the attempt comes back as a call that did not answer.
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
+    expect(landed.filter((entry) => entry.kind === 'participantNoComment').map((entry) => entry.participantId)).toEqual(['shape', 'compression'])
+    expect(landed.filter((entry) => entry.kind === 'participantFailure').map((entry) => entry.participantId)).toEqual(['story-editor'])
+  })
+
   it('calls a named addressed-only participant alone, enrolling it in nothing and trailing it with no generalist call', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
@@ -566,6 +585,32 @@ describe('Room.apply', () => {
     expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
     expect(room.activitySnapshot(scope(pieceId))).toMatchObject({ kind: 'apply' })
+  })
+
+  it('pends the manuscript in the prose surface\'s own spelling, so a model that wrote equivalent Markdown still reaches a document that surface can save', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { replacement: 'She left them *there*.\n\nBoth cups.\n' } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('Two cups.'))
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+
+    expect(outcome.replacement).toBe('She left them _there_.\n\nBoth cups.')
+    await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
+    await expect(room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)).resolves.toMatchObject({ entryId: outcome.applicationId })
+  })
+
+  it('answers that nothing changed where the model rewrote the manuscript in another spelling of the same prose', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { replacement: 'She left them *there*.\n' } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('She left them _there_.'))
+
+    expect(outcome).toMatchObject({ outcome: 'noChange' })
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
   it("the activity snapshot names the pending application's own identity once the model has answered, and carries no document", async () => {

@@ -302,7 +302,7 @@ describe('rendering a prompt', () => {
     expect(wholeOf(renderPrompt(withoutReference, fragments, charter))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
-  it("gives the story editor the dispatch's readings as their own section, a no-comment among them as an attributed craft finding rather than a tally, naming the participant by display name", () => {
+  it("gives the story editor the dispatch's readings as their own section, naming the participant by display name, and no section at all where nothing substantive landed", () => {
     const withReading = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
       { kind: 'substantive', participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
     ])
@@ -310,10 +310,10 @@ describe('rendering a prompt', () => {
     expect(prompt).toContain('FIXTURE_READINGS_HEADING')
     expect(prompt).toContain('the third line carries nothing')
 
-    const withNoComment = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
-      { kind: 'noComment', participant: 'Compression' },
-    ])
-    expect(wholeOf(renderPrompt(withNoComment, fragments, charter))).toContain('Compression found nothing material in its discipline.')
+    // A dispatch every specialist declined reaches here as no evidence at all, so the generalist
+    // reads the story with no account of who spoke — not an empty heading standing for the silence.
+    const withNothing = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [])
+    expect(wholeOf(renderPrompt(withNothing, fragments, charter))).not.toContain('FIXTURE_READINGS_HEADING')
   })
 
   it("states the mode's shared description of form and scale alongside the role's own persona in the durable half, and selects the generalist task for the generalist in the per-call half", () => {

@@ -137,9 +137,10 @@ subordinates the specialists to the Story Editor, or presents the Story Editor a
 over them. The Story Editor's response is distinguishable as its own contribution and carries
 the same actions as any other.
 
-**A no-comment response occupies no space.** It is not a row, not a line, not a dimmed
-placeholder. What the author sees is that the action settled, not a census of who declined to
-speak.
+**A no-comment response is one line, in the participant's name.** It says that the participant
+read and had nothing to add, and it carries no claim, no note and no actions, because there is
+nothing to act on. The author can see who was in the room and who spoke without inferring either
+from an absence.
 
 **A response that was directly addressed always appears**, including when its substance is
 that the participant sees no material issue.

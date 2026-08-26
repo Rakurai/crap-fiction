@@ -84,7 +84,6 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     historyMessage: variableFragment('lines/historyMessage', ['text'], 'Author: {{text}}'),
     historyResponse: variableFragment('lines/historyResponse', ['participant', 'reading'], '{{participant}}: {{reading}}'),
     readingSubstantive: variableFragment('lines/readingSubstantive', ['participant', 'reading'], '{{participant}}: {{reading}}'),
-    readingNoComment: variableFragment('lines/readingNoComment', ['participant'], '{{participant}} found nothing material in its discipline.'),
   },
   tasks: {
     specialist: variableFragment('tasks/specialist', ['targetDocument'], 'FIXTURE_SPECIALIST_TASK {{targetDocument}}'),
