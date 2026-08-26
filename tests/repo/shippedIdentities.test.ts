@@ -1,17 +1,8 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CONTENT_ROOT, loadShippedContent } from '../../src/server/bootstrap.js'
-
-const repoRoot = path.join(import.meta.dirname, '..', '..')
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return sourceFiles(full)
-    return entry.name.endsWith('.ts') || entry.name.endsWith('.tsx') ? [full] : []
-  })
-}
+import { REPO_ROOT, sourcesUnder } from '../support/sourceTree.js'
 
 function escapeForRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -26,7 +17,7 @@ function filesNamingAny(files: readonly string[], identities: readonly string[])
   return files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     const named = identities.find((identity) => quotedLiteralPattern(identity).test(source))
-    return named === undefined ? [] : [{ file: path.relative(repoRoot, file), identity: named }]
+    return named === undefined ? [] : [{ file: path.relative(REPO_ROOT, file), identity: named }]
   })
 }
 
@@ -49,6 +40,6 @@ describe('application code names no shipped identity', () => {
       ...shipped.modes.map((mode) => mode.id),
     ]
 
-    expect(filesNamingAny(sourceFiles(path.join(repoRoot, 'src')), identities)).toEqual([])
+    expect(filesNamingAny(sourcesUnder('src'), identities)).toEqual([])
   })
 })

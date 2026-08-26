@@ -512,7 +512,12 @@ describe('conversation activity, truthfully', () => {
     expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
   })
 
-  it('ABANDON-KEEP-LANDED: an entry accepted before abandonment stays, and a late progress callback for the same action cannot resurrect its activity', async () => {
+  /**
+   * What an abandoned dispatch leaves on the page. Which events can still move the projection
+   * afterwards is `entryProjection.test.ts`'s claim; what this owns is that the author is left
+   * reading the response rather than a room still apparently at work.
+   */
+  it('leaves the response an abandoned dispatch landed on the page, with nothing still shown as in flight', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -530,10 +535,7 @@ describe('conversation activity, truthfully', () => {
     fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull())
 
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working', surface: 'draft' } })
-
     expect(screen.getByText('It holds.')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
     expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 

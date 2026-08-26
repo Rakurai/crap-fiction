@@ -406,7 +406,7 @@ describe('getConversation', () => {
     return { kind: 'piece', workspaceDir, pieceId, surface: 'draft' }
   }
 
-  it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
+  it('refuses to read a conversation nothing has written yet, as a stated ConversationNotFoundError', async () => {
     await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     expect(() => getConversation(dataRoot, workspaceDir, 'cups', 'draft', 'c1')).toThrowError(ConversationNotFoundError)
   })
@@ -517,7 +517,7 @@ describe('deleteConversation', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
+  it('refuses to delete a conversation nothing has written yet, as a stated ConversationNotFoundError', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     await expect(deleteConversation(dataRoot, workspaceDir, piece.id, 'draft', 'never-written')).rejects.toThrowError(ConversationNotFoundError)
   })

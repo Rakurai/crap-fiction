@@ -69,10 +69,6 @@ async function settle() {
   })
 }
 
-function leaveControl(): HTMLButtonElement {
-  return screen.getByRole('button', { name: '‹ pieces' })
-}
-
 describe('the piece header', () => {
   afterEach(cleanup)
 
@@ -207,11 +203,14 @@ describe('the manuscript while a save is failing', () => {
     vi.useRealTimers()
   })
 
-  it('refuses to leave, says what the machine said, and lets go once a write succeeds', async () => {
+  /**
+   * That a standing failure is what blocks leaving is `closePiece.test.ts`'s claim, and that it
+   * blocks from any surface is `OpenedPiece.test.tsx`'s. What the manuscript owns is the register
+   * the failure is stated in, and that it is gone the moment a write succeeds.
+   */
+  it('says what the machine said, as a statement asking nothing, and takes it back once a write succeeds', async () => {
     saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
     renderManuscript({ draft: 'First light.' })
-
-    expect(leaveControl().disabled).toBe(false)
 
     type('First light. Then none.')
     await settle()
@@ -224,13 +223,12 @@ describe('the manuscript while a save is failing', () => {
     expect(screen.getByRole('status').textContent).toContain('The Lighthouse')
     expect(screen.getByText(/^NOT SAVED · \d\d:\d\d$/)).toBeTruthy()
     expect(screen.getByText('EACCES: PERMISSION DENIED')).toBeTruthy()
-    expect(leaveControl().disabled).toBe(true)
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(false)
 
     type('First light. Then none. Then light again.')
 
     await settle()
     expect(screen.queryByRole('status')).toBeNull()
-    expect(leaveControl().disabled).toBe(false)
+    expect(screen.queryByText(/NOT SAVED/)).toBeNull()
   })
 })

@@ -97,4 +97,23 @@ describe('projectEvent', () => {
     projection = projectEvent(projection, finished('stale-action', 'abandoned'))
     expect(projection.activity?.actionId).toBe('a1')
   })
+
+  /**
+   * What an abandoned dispatch leaves behind: whatever landed before it stands, and nothing
+   * arriving late for it can put the room back to work — a finish is the end of that action,
+   * not a pause in it.
+   */
+  it('keeps the entries an abandoned dispatch accepted, and lets no late activity of its own reopen it', () => {
+    let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
+    projection = projectEvent(projection, appended(response('e1', 'shape', 'e0')))
+    projection = projectEvent(projection, finished('a1', 'abandoned'))
+
+    expect(projection.entries.map((entry) => entry.id)).toEqual(['e1'])
+    expect(projection.activity).toBeUndefined()
+
+    projection = projectEvent(projection, activity('reader', 'working'))
+
+    expect(projection.activity).toBeUndefined()
+    expect(projection.entries.map((entry) => entry.id)).toEqual(['e1'])
+  })
 })

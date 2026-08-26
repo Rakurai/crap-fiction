@@ -1,23 +1,13 @@
-import { readFileSync, readdirSync } from 'node:fs'
-import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-
-const repoRoot = path.join(import.meta.dirname, '..', '..')
+import { sourcesUnder } from '../support/sourceTree.js'
 
 function reachesInto(source: string, area: string): boolean {
   return new RegExp(`import\\s+(?:[^'"]*from\\s+)?['"](?:\\.\\./)+${area}/`).test(source)
 }
 
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return sourceFiles(full)
-    return entry.name.endsWith('.ts') || entry.name.endsWith('.tsx') ? [full] : []
-  })
-}
-
 function reaching(from: string, area: string): string[] {
-  return sourceFiles(path.join(repoRoot, ...from.split('/'))).filter((file) => reachesInto(readFileSync(file, 'utf8'), area))
+  return sourcesUnder(...from.split('/')).filter((file) => reachesInto(readFileSync(file, 'utf8'), area))
 }
 
 describe('the scanner', () => {
