@@ -240,21 +240,15 @@ interface follows the operating system — an absent key means the author has no
 different thing from a value the application supplied on their behalf.
 
 **Shipped data travels with the application**, not under the data root: the charter, every participant,
-every mode descriptor and every prompt fragment are documents under a content root resolved once at
-startup. Where exactly that root sits is the store boundary's, like the rest of the layout — the modules
-that read it state what each document must contain and never where it is. It is kept apart from author
-configuration because conflating them means
+every mode descriptor, every prompt fragment and every reference schema are documents under a content
+root resolved once at startup. Where exactly that root sits is the store boundary's, like the rest of
+the layout — the modules that read it state what each document must contain and never where it is. It
+is kept apart from author configuration because conflating them means
 an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
-validated at startup, and invalid shipped data is a startup failure, since a document that parses
-partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
-and sibling description, and none names a participant.
-
-**A reference schema is guidance, never a contract.** Each mode ships one story-context reference
-beside its descriptor and description, and the studio ships one author-context reference at the
-content root; both are startup-required text, missing exactly as fatally as a mode's description
-would be missing. A reference travels to a context Apply and to the client that shows it, and
-nothing parses it, validates a context document against it, or compares it with an Apply result —
-a document that satisfies no schema is not invalid, since none is enforced.
+validated at startup, and invalid shipped data is a startup failure — a reference schema is required
+text and is missing exactly as fatally as a mode's description would be missing, while a document that
+parses partially would enable the wrong cast. Any number of modes may be shipped; each is its own
+descriptor and sibling description, and none names a participant.
 
 **The same startup validation gates a release, not only a running instance.** Content that could not
 start the application does not ship, so the check that decides this runs the real loaders against the
@@ -318,9 +312,8 @@ counters the application maintains.
 
 **Piece metadata is YAML; conversations are JSON; author context and story context are text.** The
 author hand-edits piece metadata and both contexts; a conversation is machinery the author does not
-edit. Author context and story context keep a `.yaml` name for the author's sake, but the application
-never parses either one: a read hands back the bytes on disk and a save replaces them with exactly
-what it was given. Piece metadata is the only one of the three that is validated.
+edit. Author context and story context keep a `.yaml` name for the author's sake. Piece metadata is
+the only one of the three that is validated.
 
 **A conversation is an ordered, append-only sequence of entries the conversation surface is rebuilt
 from.** Every entry after the first carries the identity of the entry that caused it rather than a

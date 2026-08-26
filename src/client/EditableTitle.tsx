@@ -7,7 +7,6 @@ type EditableTitleProps = {
   readonly onRetitle: (title: string) => void
 }
 
-/** The piece's title, reached and left in one action each way, shared by every editing surface. */
 export function EditableTitle({ title, saving, onRetitle }: EditableTitleProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)

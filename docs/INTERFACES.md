@@ -168,11 +168,10 @@ One compilation per kind of call, each returning the whole of what its prompt is
 | an application | the recommendation, the author's constraint, and the reference schema for the surface it targets, where that surface has one |
 
 Every kind receives both context documents, the current draft whole, the surface it is compiling for, and
-the conversation's entries. Author context and story context arrive as opaque text — exactly the bytes on
-disk — and no compilation parses, validates or reorders either one. A participant compilation also
-receives the history policy, which selects between shared history and stricter independence and is the
-whole of the difference between them; the application compilation reads the conversation whole and has no
-policy.
+the conversation's entries, with author context and story context reaching every compilation unchanged.
+A participant compilation also receives the history policy, which selects between shared history and
+stricter independence and is the whole of the difference between them; the application compilation reads
+the conversation whole and has no policy.
 
 The two participant compilations return one type. The application compilation returns its own, because a
 call that is not a participant has no role, no mode description and no owed answer, and a shape carrying
@@ -211,9 +210,8 @@ The author hand-edits everything under `config/` and every YAML file in a piece.
 change file are machinery, and nothing invites an edit to them. The draft and the story context each
 keep their own conversations and changes, nested under the piece by surface; the author context's live
 once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
-validated on read;
-`author-context.yaml` and `story-context.yaml` keep the name by convention but are opaque text — nothing
-parses them, and a save replaces one with exactly the bytes it was given.
+validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention and are
+not.
 
 Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
 reference schema — travels with the application and not under the data root, under a content root
@@ -222,8 +220,8 @@ participant's filename is its id. Each mode is a descriptor paired with a siblin
 its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
-generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
-rather than intrinsic to the charter and is composed only where a call addresses a participant directly.
+generalist call. The obligation to answer a direct question is call-specific rather than intrinsic to
+the charter, and is composed only where a call addresses a participant directly.
 
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short

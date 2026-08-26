@@ -129,7 +129,6 @@ export function useApply(
         return
       }
 
-      // outcome.outcome === 'pending'
       await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement)
     }
 
