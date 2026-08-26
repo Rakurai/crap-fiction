@@ -700,6 +700,26 @@ describe('Room.apply', () => {
     expect(retried.outcome.manuscript).toBe('revised')
   })
 
+  it("states the application's own collapse: a seam that throws closes the action at its scope rather than leaving it open", async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const broken: ModelAccess = {
+      call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
+      status: () => Promise.resolve({ reachable: true, models: [] }),
+    }
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
+
+    const events: RoomEvent[] = []
+    room.subscribe(pieceId, (event) => events.push(event))
+
+    await expect(room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('draft text'))).rejects.toThrowError(
+      'the seam broke in a way nothing named',
+    )
+
+    expect(events.map((event) => event.type)).toEqual(['action.started', 'action.finished'])
+    expect(events.find((event) => event.type === 'action.finished')?.data).toMatchObject({ outcome: 'failed' })
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+  })
+
   it('confirmed against the document as saved, persists the change and the entry that names the response it came from, and frees the scope', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {

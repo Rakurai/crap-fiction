@@ -24,7 +24,7 @@ import {
   type ParticipantActivityEvent,
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
-import { SURFACE_IDS, type DocumentSnapshot, type SurfaceId } from '../../shared/surfaces.js'
+import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
@@ -274,8 +274,8 @@ export class Room {
     if (this.#currentPieceId !== undefined && this.#currentPieceId !== pieceId) this.#abandonPiece(this.#currentPieceId)
     this.#currentPieceId = pieceId
 
-    const [draft, storyContext, authorContext] = SURFACE_IDS.map((surface) => this.activitySnapshot({ pieceId, surface }) ?? null)
-    const snapshot: RoomActivitySnapshot = { draft: draft ?? null, storyContext: storyContext ?? null, authorContext: authorContext ?? null }
+    const at = (surface: SurfaceId): ConversationActivitySnapshot | null => this.activitySnapshot({ pieceId, surface }) ?? null
+    const snapshot: RoomActivitySnapshot = { draft: at('draft'), storyContext: at('storyContext'), authorContext: at('authorContext') }
     const unsubscribe = this.subscribe(pieceId, listener)
     return { snapshot, unsubscribe }
   }
@@ -672,7 +672,7 @@ export class Room {
       if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
       return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, manuscript } }
     } catch (err) {
-      if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
+      closeOut('failed')
       throw err
     }
   }

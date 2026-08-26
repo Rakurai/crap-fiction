@@ -32,8 +32,13 @@ export function manuscript(page: Page): Locator {
   return page.getByRole('textbox', { name: 'Manuscript' })
 }
 
+/** The composer of whichever surface is showing: a role query passes over the ones held hidden. */
+export function composer(page: Page): Locator {
+  return page.getByRole('combobox', { name: 'Message the room' })
+}
+
 export async function sendToRoom(page: Page, message: string): Promise<Locator> {
-  await page.getByLabel('Message the room').fill(message)
+  await composer(page).fill(message)
   await control(page, 'send').click()
   const abandon = control(page, 'abandon')
   await expect(abandon).toBeVisible()

@@ -1,8 +1,18 @@
 import type { PieceStatus } from '../shared/pieceViews.js'
+import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
+import styles from './ContextSurface.module.css'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, timeOfDay } from './facts.js'
-import styles from './StoryContext.module.css'
+import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
+
+/** The surfaces this component draws: a plain text document beside a reference schema. */
+export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
+
+const DOCUMENT: Readonly<Record<ContextSurfaceId, { readonly label: string; readonly file: string }>> = {
+  storyContext: { label: 'Story context', file: 'story-context.yaml' },
+  authorContext: { label: 'Author context', file: 'author-context.yaml' },
+}
 
 type LifecycleProps = {
   readonly status: PieceStatus
@@ -14,7 +24,8 @@ type LifecycleProps = {
   readonly onSetStatus: (status: PieceStatus) => void
 }
 
-type StoryContextProps = {
+type ContextSurfaceProps = {
+  readonly surface: ContextSurfaceId
   readonly title: string
   readonly onClose: () => void
   readonly text: string
@@ -25,13 +36,13 @@ type StoryContextProps = {
   readonly leaveBlocked: boolean
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
-  readonly onSwitchToDraft: () => void
-  readonly onSwitchToAuthorContext: () => void
+  readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName: string } | undefined
 }
 
-export function StoryContext({
+export function ContextSurface({
+  surface,
   title,
   onClose,
   text,
@@ -41,11 +52,12 @@ export function StoryContext({
   leaveBlocked,
   onOpenRoom,
   onOpenConversations,
-  onSwitchToDraft,
-  onSwitchToAuthorContext,
+  onSwitchTo,
   lifecycle,
   applying,
-}: StoryContextProps) {
+}: ContextSurfaceProps) {
+  const { label, file } = DOCUMENT[surface]
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.topBar}>
@@ -66,12 +78,11 @@ export function StoryContext({
         </select>
         <span className={styles.spacer} />
         <div className={styles.controls}>
-          <button type="button" className={styles.control} onClick={onSwitchToDraft}>
-            draft
-          </button>
-          <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
-            author context
-          </button>
+          {SURFACE_IDS.filter((candidate) => candidate !== surface).map((candidate) => (
+            <button key={candidate} type="button" className={styles.control} onClick={() => onSwitchTo(candidate)}>
+              {SURFACE_CONTROL_LABEL[candidate]}
+            </button>
+          ))}
           <span className={styles.controlsRule} />
           <button type="button" className={styles.control} onClick={onOpenConversations}>
             conversations
@@ -98,7 +109,7 @@ export function StoryContext({
       <div className={styles.scroll}>
         <div className={styles.measure}>
           <textarea
-            aria-label="Story context"
+            aria-label={label}
             className={styles.text}
             value={text}
             disabled={applying !== undefined}
@@ -118,8 +129,8 @@ export function StoryContext({
         <div className={styles.saveFailed}>
           <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            The last write to story-context.yaml failed. Nothing has been discarded — keep writing. Leaving for
-            another piece is unavailable while “{title}” is unsaved.
+            The last write to {file} failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            unavailable while “{title}” is unsaved.
           </p>
           <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>
         </div>

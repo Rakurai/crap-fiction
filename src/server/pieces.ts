@@ -153,8 +153,10 @@ function surfaceText(workspaceDir: string, dataRoot: string, id: string, piece: 
 
 function surfaceReferenceSchema(piece: StoredPiece, surface: SurfaceId, modes: readonly ModeDescriptor[], authorContextReference: string): string | null {
   if (surface === 'draft') return null
-  if (surface === 'storyContext') return modes.find((mode) => mode.id === piece.metadata.mode)?.storyContextReference ?? ''
-  return authorContextReference
+  if (surface === 'authorContext') return authorContextReference
+  const mode = modes.find((candidate) => candidate.id === piece.metadata.mode)
+  if (mode === undefined) throw new UnknownModeError(piece.metadata.mode)
+  return mode.storyContextReference
 }
 
 function surfaceDetail(

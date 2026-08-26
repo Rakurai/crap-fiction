@@ -4,6 +4,7 @@ import type { PieceStatus } from '../shared/pieceViews.js'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
+import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
 
@@ -112,10 +113,10 @@ export function Manuscript({
             </button>
             <span className={styles.controlsRule} />
             <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
-              story context
+              {SURFACE_CONTROL_LABEL.storyContext}
             </button>
             <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
-              author context
+              {SURFACE_CONTROL_LABEL.authorContext}
             </button>
             <button type="button" className={styles.control} onClick={onOpenConversations}>
               conversations

@@ -1,5 +1,7 @@
+import { render } from '@testing-library/react'
+import { createElement, StrictMode, useEffect } from 'react'
 import { describe, expect, it } from 'vitest'
-import { applyRoomEvent, createPieceStream } from '../../../src/client/pieceStream.js'
+import { applyRoomEvent, createPieceStream, usePieceStream } from '../../../src/client/pieceStream.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import { EMPTY_ROOM_ACTIVITY as EMPTY, type subscribeToRoom as subscribeToRoomFn } from '../../../src/client/roomClient.js'
 
@@ -83,5 +85,40 @@ describe('createPieceStream', () => {
 
     expect(seenByFirst).toEqual([])
     expect(seenBySecond).toEqual([STARTED])
+  })
+})
+
+describe('usePieceStream', () => {
+  it('holds an open stream for a surface that subscribes after the piece was mounted, torn down and mounted again', () => {
+    const sources: { closed: boolean; onEvent: (event: RoomEvent) => void }[] = []
+    const subscribeToRoom: typeof subscribeToRoomFn = (_pieceId, onEvent) => {
+      const source = { closed: false, onEvent }
+      sources.push(source)
+      return {
+        snapshot: Promise.resolve(EMPTY),
+        unsubscribe: () => {
+          source.closed = true
+        },
+      }
+    }
+
+    const seen: RoomEvent[] = []
+
+    function Surface({ subscribe }: { readonly subscribe: typeof subscribeToRoomFn }) {
+      useEffect(() => subscribe('the-lighthouse', (event) => seen.push(event), () => {}).unsubscribe, [subscribe])
+      return null
+    }
+
+    function Piece() {
+      return createElement(Surface, { subscribe: usePieceStream('the-lighthouse', subscribeToRoom) })
+    }
+
+    // StrictMode: the mount React discards is the one that would leave a closed event source behind.
+    render(createElement(StrictMode, null, createElement(Piece, null)))
+
+    const live = sources.filter((source) => !source.closed)
+    expect(live).toHaveLength(1)
+    live[0]?.onEvent(STARTED)
+    expect(seen).toEqual([STARTED])
   })
 })

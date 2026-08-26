@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { RoomActivitySnapshot } from '../shared/conversationEvents.js'
 import { isParticipantOutcome, type RoomEvent } from './entryProjection.js'
 import { EMPTY_ROOM_ACTIVITY, type subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
@@ -120,9 +120,26 @@ export function createPieceStream(pieceId: string, subscribeToRoom: typeof subsc
  * Owns the one event source for the opened piece, for as long as the piece stays open: every
  * surface's conversation subscribes through the returned adapter instead of opening its own, so
  * switching which conversation a surface is showing never reconnects the underlying stream.
+ *
+ * The stream is opened on first subscription and dropped when the piece closes, never held across a
+ * close: a closed event source stays closed, so a stream created once and torn down on a remount
+ * would leave every later subscriber listening to nothing.
  */
 export function usePieceStream(pieceId: string, subscribeToRoom: typeof subscribeToRoomFn): typeof subscribeToRoomFn {
-  const [stream] = useState(() => createPieceStream(pieceId, subscribeToRoom))
-  useEffect(() => () => stream.close(), [stream])
-  return stream.subscribeToRoom
+  const held = useRef<PieceStream | undefined>(undefined)
+
+  const open = useCallback((): PieceStream => {
+    held.current ??= createPieceStream(pieceId, subscribeToRoom)
+    return held.current
+  }, [pieceId, subscribeToRoom])
+
+  useEffect(() => {
+    open()
+    return () => {
+      held.current?.close()
+      held.current = undefined
+    }
+  }, [open])
+
+  return useCallback((id, onEvent, onMalformedFrame) => open().subscribeToRoom(id, onEvent, onMalformedFrame), [open])
 }

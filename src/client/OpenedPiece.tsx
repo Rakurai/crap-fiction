@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
 import type { SurfaceId } from '../shared/surfaces.js'
-import { AuthorContext } from './AuthorContext.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import { ContextSurface } from './ContextSurface.js'
 import { Conversation, type HandleEntry } from './Conversation.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
 import { documentSnapshotFrom } from './documentSnapshot.js'
@@ -22,7 +22,6 @@ import {
   fetchConversation,
   subscribeToRoom,
 } from './roomClient.js'
-import { StoryContext } from './StoryContext.js'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
@@ -224,7 +223,8 @@ function Surfaces({
       </div>
 
       <div className={styles.surfacePane} hidden={activeSurface !== 'storyContext'} inert={activeSurface !== 'storyContext'}>
-        <StoryContext
+        <ContextSurface
+          surface="storyContext"
           title={piece.title}
           onClose={closeAndAbandon}
           text={storyContextText}
@@ -237,8 +237,7 @@ function Surfaces({
             conversations.onRefresh('storyContext')
             setPanel('conversations')
           }}
-          onSwitchToDraft={() => setActiveSurface('draft')}
-          onSwitchToAuthorContext={() => setActiveSurface('authorContext')}
+          onSwitchTo={setActiveSurface}
           lifecycle={lifecycle}
           applying={storyContextUi.applying}
         />
@@ -265,7 +264,8 @@ function Surfaces({
       </div>
 
       <div className={styles.surfacePane} hidden={activeSurface !== 'authorContext'} inert={activeSurface !== 'authorContext'}>
-        <AuthorContext
+        <ContextSurface
+          surface="authorContext"
           title={piece.title}
           onClose={closeAndAbandon}
           text={authorContextText}
@@ -278,8 +278,7 @@ function Surfaces({
             conversations.onRefresh('authorContext')
             setPanel('conversations')
           }}
-          onSwitchToDraft={() => setActiveSurface('draft')}
-          onSwitchToStoryContext={() => setActiveSurface('storyContext')}
+          onSwitchTo={setActiveSurface}
           lifecycle={lifecycle}
           applying={authorContextUi.applying}
         />

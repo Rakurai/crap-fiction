@@ -196,6 +196,11 @@ describe('pieces', () => {
     expect(opened.surfaces.draft.referenceSchema).toBeNull()
   })
 
+  it('refuses to open a piece whose mode is not loaded, rather than reporting a story context with no reference schema', async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
+    expect(() => getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [], AUTHOR_CONTEXT_REFERENCE)).toThrowError(UnknownModeError)
+  })
+
   it('finds the same author-context document and conversations from two pieces in different workspaces, while their casts stay distinct', async () => {
     const archivist: RoleDefinition = {
       id: 'archivist',
