@@ -152,19 +152,33 @@ those as absent would invite something to read them.
   config/
     settings.yaml              model assignments, workspace path, the interface theme
     author-context.yaml
+  author-context/              the global namespace, reached identically from every piece
+    conversations/
+      <conversation-id>.json
+    changes/
+      <change-id>.json         the passages one application changed, before and after
   <workspace>/                 chosen by the author, inside the data root
     the-cups/
       draft.md                 the manuscript — clean prose, no tool artifacts
-      piece.yaml               title, mode, status, enabled cast
+      piece.yaml               title, mode, status, enabled cast per editing surface
       story-context.yaml
       conversations/
-        <conversation-id>.json
+        draft/
+          <conversation-id>.json
+        storyContext/
+          <conversation-id>.json
       changes/
-        <change-id>.json       the passages one application changed, before and after
+        draft/
+          <change-id>.json     the passages one application changed, before and after
+        storyContext/
+          <change-id>.json
 ```
 
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
-change file are machinery, and nothing invites an edit to them. `piece.yaml` is validated on read;
+change file are machinery, and nothing invites an edit to them. The draft and the story context each
+keep their own conversations and changes, nested under the piece by surface; the author context's live
+once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
+validated on read;
 `author-context.yaml` and `story-context.yaml` keep the name by convention but are opaque text — nothing
 parses them, and a save replaces one with exactly the bytes it was given.
 

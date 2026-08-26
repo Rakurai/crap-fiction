@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
+import type { ConversationScope } from '../../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
 import { buildTestApp } from '../../support/harness.js'
 
@@ -51,6 +52,10 @@ const ROLES: readonly RoleDefinition[] = [
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
 
+function draftScope(workspaceDir: string, pieceId: string): ConversationScope {
+  return { kind: 'piece', workspaceDir, pieceId, surface: 'draft' }
+}
+
 describe('the piece routes', () => {
   let dataRoot: string
 
@@ -81,7 +86,7 @@ describe('the piece routes', () => {
   it('carries an opened piece whole: its details, its draft, its cast with the roles named, and its conversations', async () => {
     const { app, dir } = await withPiece()
     await app.request('/pieces/cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'Two small words.' }) })
-    await new ConversationEntryStore().append(dir, 'cups', 'c1', {
+    await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', {
       id: 'e1',
       kind: 'authorMessage',
       text: 'does the opening earn its length',
@@ -108,7 +113,7 @@ describe('the piece routes', () => {
 
   it('carries a conversation the author asks for by id, with the entries it holds', async () => {
     const { app, dir } = await withPiece()
-    await new ConversationEntryStore().append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
 
     const res = await app.request('/pieces/cups/conversations/c1')
 
@@ -137,10 +142,11 @@ describe('the piece routes', () => {
 
   it('deletes a conversation, and the piece stops reporting it', async () => {
     const { app, dir } = await withPiece()
+    const scope = draftScope(dir, 'cups')
     const store = new ConversationEntryStore()
-    await store.append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
-    await store.append(dir, 'cups', 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
-    await writeAppliedChange(dir, 'cups', { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
+    await store.append(dataRoot, scope, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
+    await writeAppliedChange(dataRoot, scope, { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
 
     const res = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
 

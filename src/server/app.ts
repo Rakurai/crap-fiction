@@ -30,10 +30,14 @@ import {
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
 import { applyOutcome } from './room/outcomes.js'
 import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
+import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
+
+/** The one surface the HTTP interface reaches today; the other two are addressable behind it already. */
+const OPENED_SURFACE = 'draft'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
@@ -93,16 +97,18 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    const scope: RoomScope = { pieceId: id, surface: OPENED_SURFACE }
+    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.activitySnapshot(scope) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
     const id = c.req.param('id')
     const workspaceDir = workspace.require()
+    const scope: RoomScope = { pieceId: id, surface: OPENED_SURFACE }
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.activitySnapshot(scope) ?? null, room.specialists(), room.storyEditor())))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
@@ -116,29 +122,32 @@ export function createApp(
   })
 
   app.get('/pieces/:id/conversations/:cid', (c) => {
-    return c.json(ok(getConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))))
+    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.param('cid'))))
   })
 
   app.delete('/pieces/:id/conversations/:cid', async (c) => {
-    await deleteConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))
+    await deleteConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.param('cid'))
     return c.json(ok(null))
   })
 
   app.post('/pieces/:id/conversations/:cid/dispatch', body(dispatchRequestSchema), async (c) => {
     const request = c.req.valid('json')
-    const result = await room.dispatch(workspace.require(), c.req.param('id'), c.req.param('cid'), dispatchOpening(request), request.draft)
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const result = await room.dispatch(workspace.require(), scope, c.req.param('cid'), dispatchOpening(request), request.draft)
     return c.json(ok(result))
   })
 
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
     const { responseId, constraint, draft } = c.req.valid('json')
-    const { actionId, result } = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), responseId, constraint, draft)
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const { actionId, result } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, draft)
     return c.json(ok(applyOutcome(actionId, result)))
   })
 
   app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
     workspace.require()
-    room.abandon(c.req.param('id'), c.req.param('actionId'))
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    room.abandon(scope, c.req.param('actionId'))
     return c.json(ok(null))
   })
 

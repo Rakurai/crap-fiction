@@ -6,6 +6,7 @@ import type { ModelAccess } from '../../../src/server/model/types.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
+import type { ConversationScope, RoomScope } from '../../../src/server/scope.js'
 import { readAppliedChanges, readConversationEntries, readPiece, TolerantReadError, writePieceCast } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
@@ -98,13 +99,25 @@ function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureB
   return { room, adapter }
 }
 
-function entries(workspaceDir: string, pieceId: string, conversationId: string): readonly ConversationEntry[] {
-  return readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+function scope(pieceId: string): RoomScope {
+  return { pieceId, surface: 'draft' }
+}
+
+function draftScope(workspaceDir: string, pieceId: string): ConversationScope {
+  return { kind: 'piece', workspaceDir, pieceId, surface: 'draft' }
+}
+
+function entries(dataRoot: string, workspaceDir: string, pieceId: string, conversationId: string): readonly ConversationEntry[] {
+  return readConversationEntries(dataRoot, draftScope(workspaceDir, pieceId), conversationId)?.entries ?? []
 }
 
 function settlementOf(room: Room, pieceId: string): Promise<void> {
-  const settlement = room.settlement(pieceId)
-  if (settlement === undefined) throw new Error(`no dispatch in flight for "${pieceId}"`)
+  return settlementOfScope(room, scope(pieceId))
+}
+
+function settlementOfScope(room: Room, roomScope: RoomScope): Promise<void> {
+  const settlement = room.settlement(roomScope)
+  if (settlement === undefined) throw new Error(`no dispatch in flight for "${roomScope.pieceId}" on its "${roomScope.surface}" surface`)
   return settlement
 }
 
@@ -138,17 +151,17 @@ describe('Room.dispatch', () => {
   it("an unaddressed dispatch reads nothing for addressing and calls the enabled cast, never a specialist the piece's mode does not offer", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
     // Only a hand-edited piece.yaml can name an unavailable specialist; the pieces module refuses to.
-    await writePieceCast(workspaceDir, piece.id, ['shape', 'compression', 'interiority'])
+    await writePieceCast(workspaceDir, piece.id, 'draft', ['shape', 'compression', 'interiority'])
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     await settlementOf(room, piece.id)
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', text: 'a message', audience: [] })
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
     expect(adapter.promptFor('shape')).toContain('a message')
@@ -157,14 +170,14 @@ describe('Room.dispatch', () => {
 
   it('states a failure synchronously, rather than opening an action, when the conversation on disk cannot be read', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
-    mkdirSync(path.join(workspaceDir, piece.id, 'conversations'), { recursive: true })
-    writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'c1.json'), '{ not valid json', 'utf8')
+    mkdirSync(path.join(workspaceDir, piece.id, 'conversations', 'draft'), { recursive: true })
+    writeFileSync(path.join(workspaceDir, piece.id, 'conversations', 'draft', 'c1.json'), '{ not valid json', 'utf8')
     const { room } = buildRoom(dataRoot, {})
 
-    await expect(room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
+    await expect(room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
       TolerantReadError,
     )
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+    expect(room.activitySnapshot(scope(piece.id))).toBeUndefined()
   })
 
   it('reaches a compiled prompt exactly as written, comments and malformed YAML alike, since story context is opaque text', async () => {
@@ -176,7 +189,7 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     await settlementOf(room, piece.id)
 
     expect(adapter.promptFor('shape')).toContain('# notes\nPremise: not valid: [yaml')
@@ -193,7 +206,7 @@ describe('Room.dispatch', () => {
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
 
     await expect(settlementOf(room, piece.id)).resolves.toBeUndefined()
 
@@ -204,7 +217,7 @@ describe('Room.dispatch', () => {
     })
     expect(events.find((event) => event.type === 'action.finished')?.data).toMatchObject({ outcome: 'failed' })
 
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+    expect(room.activitySnapshot(scope(piece.id))).toBeUndefined()
   })
 
   it('writes the author entry before any participant is called, then appends each response as it lands, reporting each as working first', async () => {
@@ -224,10 +237,10 @@ describe('Room.dispatch', () => {
       if (event.type === 'action.finished') events.push(`finished:${event.data.outcome}`)
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
     expect(events[0]).toBe('started:shape,compression,story-editor')
-    expect(entries(workspaceDir, piece.id, conversationId)).toMatchObject([{ kind: 'authorMessage', text: 'a message' }])
+    expect(entries(dataRoot, workspaceDir, piece.id, conversationId)).toMatchObject([{ kind: 'authorMessage', text: 'a message' }])
 
     adapter.release('shape')
     adapter.release('compression')
@@ -239,7 +252,7 @@ describe('Room.dispatch', () => {
       expect(events.indexOf(`state:${participantId}:working`)).toBeLessThan(events.indexOf(`settled:${participantId}`))
     }
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed).toHaveLength(4)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment')).toHaveLength(1)
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
@@ -253,7 +266,7 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
 
     expect(adapter.promptFor('shape')).toBeDefined()
@@ -272,29 +285,29 @@ describe('Room.dispatch', () => {
     adapter.release('story-editor')
     await settled
 
-    const landed = entries(workspaceDir, piece.id, conversationId).filter((entry) => entry.kind === 'participantResponse')
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId).filter((entry) => entry.kind === 'participantResponse')
     expect(landed.map((entry) => entry.participantId)).toEqual(['compression', 'shape', 'story-editor'])
   })
 
   it('durably enables a specialist addressed from outside the enabled cast, naming it as brought — and brings nobody where addressing names only the cast', async () => {
     const brought = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
-    await writePieceCast(workspaceDir, brought.id, ['compression'])
+    await writePieceCast(workspaceDir, brought.id, 'draft', ['compression'])
     const alreadyIn = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, [fixtureMode], fixtureSpecialists)
 
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } } },
     })
 
-    await room.dispatch(workspaceDir, brought.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(brought.id), 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
     await settlementOf(room, brought.id)
 
-    expect(readPiece(workspaceDir, brought.id)?.metadata.cast.sort()).toEqual(['compression', 'shape'])
-    expect(entries(workspaceDir, brought.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: ['shape'] })
+    expect(readPiece(workspaceDir, brought.id)?.metadata.cast.draft.sort()).toEqual(['compression', 'shape'])
+    expect(entries(dataRoot, workspaceDir, brought.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: ['shape'] })
 
-    await room.dispatch(workspaceDir, alreadyIn.id, 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(alreadyIn.id), 'c1', { kind: 'message', text: '@shape a direct question' }, 'draft text')
     await settlementOf(room, alreadyIn.id)
 
-    expect(entries(workspaceDir, alreadyIn.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: [] })
+    expect(entries(dataRoot, workspaceDir, alreadyIn.id, 'c1')[0]).toMatchObject({ kind: 'authorMessage', brought: [] })
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
@@ -304,14 +317,14 @@ describe('Room.dispatch', () => {
       toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a tool reading' } } },
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: '@toolsmith sharpen this' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: '@toolsmith sharpen this' }, 'draft text')
     await settlementOf(room, piece.id)
 
     expect(adapter.promptFor('toolsmith')).toBeDefined()
     expect(adapter.promptFor('story-editor')).toBeUndefined()
-    expect(readPiece(workspaceDir, piece.id)?.metadata.cast.sort()).toEqual(['compression', 'shape'])
+    expect(readPiece(workspaceDir, piece.id)?.metadata.cast.draft.sort()).toEqual(['compression', 'shape'])
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', audience: ['toolsmith'], brought: [] })
     expect(landed.filter((entry) => entry.kind === 'participantResponse').map((entry) => entry.participantId)).toEqual(['toolsmith'])
   })
@@ -329,13 +342,13 @@ describe('Room.dispatch', () => {
       events.push(event.type)
     })
 
-    const { conversationId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     await settlementOf(room, piece.id)
 
     expect(events).not.toContain('error')
     expect(events[events.length - 1]).toBe('action.finished')
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed.filter((entry) => entry.kind === 'participantFailure')).toHaveLength(3)
   })
 
@@ -347,13 +360,13 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
     })
 
-    const { conversationId, actionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const { conversationId, actionId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
     const settled = settlementOf(room, piece.id)
-    room.abandon(piece.id, actionId)
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+    room.abandon(scope(piece.id), actionId)
+    expect(room.activitySnapshot(scope(piece.id))).toBeUndefined()
     await settled
 
-    const landed = entries(workspaceDir, piece.id, conversationId)
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
   })
 
@@ -365,12 +378,12 @@ describe('Room.dispatch', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    const { actionId: firstActionId } = await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'message', text: 'first' }, 'draft text')
-    room.abandon(piece.id, firstActionId)
+    const { actionId: firstActionId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'first' }, 'draft text')
+    room.abandon(scope(piece.id), firstActionId)
 
     const { conversationId, actionId: secondActionId } = await room.dispatch(
       workspaceDir,
-      piece.id,
+      scope(piece.id),
       'c1',
       { kind: 'message', text: 'second' },
       'draft text',
@@ -378,18 +391,34 @@ describe('Room.dispatch', () => {
     expect(secondActionId).not.toBe(firstActionId)
     const settled = settlementOf(room, piece.id)
 
-    room.abandon(piece.id, firstActionId)
-    expect(room.activitySnapshot(piece.id)).toMatchObject({ actionId: secondActionId })
+    room.abandon(scope(piece.id), firstActionId)
+    expect(room.activitySnapshot(scope(piece.id))).toMatchObject({ actionId: secondActionId })
 
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
     await settled
 
-    const landed = entries(workspaceDir, piece.id, conversationId).filter(
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId).filter(
       (entry) => entry.kind === 'participantResponse' || entry.kind === 'participantNoComment',
     )
     expect(landed).toHaveLength(3)
+  })
+
+  it("resolves an author-context room scope's conversation in the data root's global namespace, not under the piece", async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room } = buildRoom(dataRoot, {
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a durable note' } } },
+    })
+
+    const authorContextScope: RoomScope = { pieceId: piece.id, surface: 'authorContext' }
+    await room.dispatch(workspaceDir, authorContextScope, 'c1', { kind: 'message', text: 'a durable preference' }, 'draft text')
+    await settlementOfScope(room, authorContextScope)
+
+    expect(readConversationEntries(dataRoot, { kind: 'global' }, 'c1')).toMatchObject({
+      entries: [{ kind: 'authorMessage', text: 'a durable preference' }, { kind: 'participantResponse' }],
+    })
+    expect(readConversationEntries(dataRoot, draftScope(workspaceDir, piece.id), 'c1')).toBeUndefined()
   })
 })
 
@@ -414,14 +443,14 @@ describe('Room.apply', () => {
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
     })
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'targeted', target: 'shape', text: 'a direct question' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'targeted', target: 'shape', text: 'a direct question' }, 'draft text')
     await settlementOf(room, piece.id)
     adapter.release('shape')
     return { pieceId: piece.id }
   }
 
   function responseId(pieceId: string): string {
-    const [response] = entries(workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'participantResponse')
+    const [response] = entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'participantResponse')
     if (response === undefined) throw new Error('expected a landed response')
     return response.id
   }
@@ -432,7 +461,7 @@ describe('Room.apply', () => {
       apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
     })
 
-    const { result } = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'The cups sat where she left them, twice.')
+    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'The cups sat where she left them, twice.')
 
     if (result.outcome !== 'value') throw new Error('expected the application to settle')
     expect(result.value.manuscript).toBe('The cups sat where she left them.')
@@ -449,14 +478,14 @@ describe('Room.apply', () => {
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the room has nothing urgent to add' } } },
     })
-    await laterRoom.dispatch(workspaceDir, pieceId, 'c1', { kind: 'message', text: 'a later, unrelated question' }, 'draft text')
+    await laterRoom.dispatch(workspaceDir, scope(pieceId), 'c1', { kind: 'message', text: 'a later, unrelated question' }, 'draft text')
     await settlementOf(laterRoom, pieceId)
 
     const { room, adapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
     })
 
-    await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), 'keep the last line', 'draft text')
+    await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), 'keep the last line', 'draft text')
 
     expect(adapter.promptFor('apply')).toContain('cut the second paragraph')
     expect(adapter.promptFor('apply')).toContain('keep the last line')
@@ -468,62 +497,104 @@ describe('Room.apply', () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {})
 
-    await expect(room.apply(workspaceDir, pieceId, 'c1', 'no-such-response', undefined, 'draft')).rejects.toThrowError(
+    await expect(room.apply(workspaceDir, scope(pieceId), 'c1', 'no-such-response', undefined, 'draft')).rejects.toThrowError(
       RecommendationNotFoundError,
     )
-    expect(room.activitySnapshot(pieceId)).toBeUndefined()
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
   /**
-   * One conversation-action state, held across the studio rather than per piece, because no runtime
-   * holds more than one dispatch-or-apply call at a time. One property, so it is stated once over
-   * every pair that can contend for it rather than once per pair.
+   * One conversation-action state per room scope: a piece's surface stays busy until its
+   * dispatch or application settles, and neither act starts a second one at that same scope.
    */
-  it('admits one dispatch or application at a time, whichever piece asks, and names the piece holding it', async () => {
+  it('admits one dispatch or application at a time per room scope, and names the piece and surface holding it', async () => {
     const { pieceId } = await pieceWithRecommendation()
-    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, [fixtureMode], fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    // Two dispatches issued in the same tick: only the first ever opens.
+    // Two dispatches issued in the same tick for the same scope: only the first ever opens.
     const [first, second] = await Promise.allSettled([
-      room.dispatch(workspaceDir, pieceId, 'c2', { kind: 'message', text: 'first' }, 'draft text'),
-      room.dispatch(workspaceDir, pieceId, 'c2', { kind: 'message', text: 'second' }, 'draft text'),
+      room.dispatch(workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'first' }, 'draft text'),
+      room.dispatch(workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'second' }, 'draft text'),
     ])
     expect(first?.status).toBe('fulfilled')
     expect(second?.status === 'rejected' && second.reason).toBeInstanceOf(RoomBusyError)
-    expect(entries(workspaceDir, pieceId, 'c2')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
+    expect(second?.status === 'rejected' && (second.reason as Error).message).toContain('draft')
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c2')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
     const settled = settlementOf(room, pieceId)
 
-    // A second piece contends for the same runtime, and is told which piece holds it.
-    await expect(room.dispatch(workspaceDir, other.id, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
-      new RoomBusyError(pieceId),
-    )
-    expect(room.activitySnapshot(other.id)).toBeUndefined()
-
-    // So does an application.
-    await expect(room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft')).rejects.toThrowError(RoomBusyError)
+    // The same scope also refuses an application while its dispatch is in flight.
+    await expect(room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft')).rejects.toThrowError(RoomBusyError)
 
     adapter.release('shape')
     adapter.release('compression')
     adapter.release('story-editor')
     await settled
 
-    // And the other way round: an application in flight holds the lock against a dispatch.
+    // And the other way round: an application in flight refuses a second dispatch at its own scope.
     const { room: applyRoom, adapter: applyAdapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
     })
-    const applying = applyRoom.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft')
+    const applying = applyRoom.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft')
 
-    await expect(applyRoom.dispatch(workspaceDir, pieceId, 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
+    await expect(applyRoom.dispatch(workspaceDir, scope(pieceId), 'c1', { kind: 'message', text: 'a message' }, 'draft text')).rejects.toThrowError(
       RoomBusyError,
     )
 
     applyAdapter.release('apply')
     await applying
+  })
+
+  it("gates only its own room scope: the same piece's other surface, and a different piece's draft, each accept a dispatch while one scope is busy", async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const other = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    // Addressed at a distinct, addressed-only participant so its held call cannot collide with the
+    // busy scope's own held calls to `shape` and `compression` at the fixture adapter's one gate per site.
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+      toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a tool reading' } }, held: true },
+    })
+
+    await room.dispatch(workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'busy on draft' }, 'draft text')
+    const draftSettled = settlementOf(room, pieceId)
+
+    // The same piece's story-context surface is a different room scope, and accepts a dispatch of its
+    // own rather than being refused as busy. Nothing is available there, so this calls only the Story
+    // Editor — not yet submitted for the busy draft scope, so its held call cannot collide either.
+    const storyContextScope: RoomScope = { pieceId, surface: 'storyContext' }
+    const { actionId: storyContextActionId } = await room.dispatch(
+      workspaceDir,
+      storyContextScope,
+      'c1',
+      { kind: 'message', text: 'a story-context note' },
+      'draft text',
+    )
+    expect(room.activitySnapshot(storyContextScope)).toBeDefined()
+
+    // And a different piece's draft surface, a different scope again, accepts one too.
+    const { actionId: otherActionId } = await room.dispatch(
+      workspaceDir,
+      scope(other.id),
+      'c1',
+      { kind: 'targeted', target: 'toolsmith', text: 'a direct question' },
+      'draft text',
+    )
+    expect(room.activitySnapshot(scope(other.id))).toBeDefined()
+
+    // Neither newly accepted scope waited on the busy one, which is the property under test; abandon
+    // them rather than releasing their held call twice over.
+    room.abandon(storyContextScope, storyContextActionId)
+    room.abandon(scope(other.id), otherActionId)
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await draftSettled
   })
 
   it('leaves the recommendation applicable, and the draft as it was, where the application did not settle', async () => {
@@ -536,23 +607,23 @@ describe('Room.apply', () => {
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
 
-    const applying = room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    const applying = room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
     const started = events.find((event) => event.type === 'action.started')
     if (started === undefined) throw new Error('expected action.started to have fired synchronously')
-    room.abandon(pieceId, started.data.actionId)
+    room.abandon(scope(pieceId), started.data.actionId)
     await expect(applying).resolves.toMatchObject({ result: { outcome: 'abandoned' } })
-    expect(room.activitySnapshot(pieceId)).toBeUndefined()
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
 
     // Failed outright.
     const { room: failing } = buildRoom(dataRoot, { apply: { result: { outcome: 'failed', reason: 'unconfigured' } } })
-    const { result } = await failing.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    const { result } = await failing.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
     expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
-    expect(failing.activitySnapshot(pieceId)).toBeUndefined()
+    expect(failing.activitySnapshot(scope(pieceId))).toBeUndefined()
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
 
     // The recommendation still stands at its identity, so a later application settles.
     adapter.release('apply')
-    const retried = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'draft text')
+    const retried = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
     if (retried.result.outcome !== 'value') throw new Error('expected the retried application to settle')
     expect(retried.result.value.manuscript).toBe('revised')
   })
@@ -564,13 +635,13 @@ describe('Room.apply', () => {
     })
     const source = responseId(pieceId)
 
-    const { result } = await room.apply(workspaceDir, pieceId, 'c1', source, undefined, 'The cups sat where she left them, twice.')
+    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', source, undefined, 'The cups sat where she left them, twice.')
 
     if (result.outcome !== 'value') throw new Error('expected the application to settle')
-    const [onDisk] = readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema)
+    const [onDisk] = readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)
     expect(onDisk).toEqual(result.value.change)
 
-    const [application] = entries(workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')
+    const [application] = entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')
     expect(application).toMatchObject({ responseId: source, changeId: result.value.change?.id })
   })
 
@@ -580,11 +651,11 @@ describe('Room.apply', () => {
       apply: { result: { outcome: 'value', value: { manuscript: 'unchanged text' } } },
     })
 
-    const { result } = await room.apply(workspaceDir, pieceId, 'c1', responseId(pieceId), undefined, 'unchanged text')
+    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'unchanged text')
 
     if (result.outcome !== 'value') throw new Error('expected the application to settle')
     expect(result.value.change).toBeUndefined()
-    expect(readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema)).toEqual([])
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
   })
 })
 
@@ -610,13 +681,13 @@ describe('Room.dispatch — an action the author opened from a particular respon
       'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
     })
 
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'targeted', target: 'shape', text: 'say more about that, @compression' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'targeted', target: 'shape', text: 'say more about that, @compression' }, 'draft text')
     await settlementOf(room, piece.id)
 
     expect(adapter.promptFor('compression')).toBeUndefined()
     expect(adapter.promptFor('shape')).toContain('say more about that, @compression')
 
-    const landed = entries(workspaceDir, piece.id, 'c1')
+    const landed = entries(dataRoot, workspaceDir, piece.id, 'c1')
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', audience: ['shape'], text: 'say more about that, @compression' })
   })
 
@@ -629,14 +700,14 @@ describe('Room.dispatch — an action the author opened from a particular respon
     const { room } = buildRoom(dataRoot, {})
 
     await expect(
-      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'targeted', target: 'no-such-participant', text: 'a reply' }, 'draft text'),
+      room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'targeted', target: 'no-such-participant', text: 'a reply' }, 'draft text'),
     ).rejects.toThrowError(ParticipantNotFoundError)
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+    expect(room.activitySnapshot(scope(piece.id))).toBeUndefined()
 
     await expect(
-      room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'ask', respondingTo: 'no-such-response', clarification: undefined }, 'draft text'),
+      room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'ask', respondingTo: 'no-such-response', clarification: undefined }, 'draft text'),
     ).rejects.toThrowError(CommentaryNotFoundError)
-    expect(room.activitySnapshot(piece.id)).toBeUndefined()
+    expect(room.activitySnapshot(scope(piece.id))).toBeUndefined()
   })
 
   it("asking for a concrete change opens a dispatch with no message, calling only the response's own participant", async () => {
@@ -644,9 +715,9 @@ describe('Room.dispatch — an action the author opened from a particular respon
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'The entry is late.', note: 'By a paragraph.' } } },
     })
-    await room.dispatch(workspaceDir, piece.id, 'c1', { kind: 'targeted', target: 'shape', text: 'does the opening earn its length' }, 'draft text')
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'targeted', target: 'shape', text: 'does the opening earn its length' }, 'draft text')
     await settlementOf(room, piece.id)
-    const [firstResponse] = entries(workspaceDir, piece.id, 'c1').filter((entry) => entry.kind === 'participantResponse')
+    const [firstResponse] = entries(dataRoot, workspaceDir, piece.id, 'c1').filter((entry) => entry.kind === 'participantResponse')
     if (firstResponse === undefined) throw new Error('expected a landed response')
 
     const { room: askRoom, adapter: askAdapter } = buildRoom(dataRoot, {
@@ -656,7 +727,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
     const events: RoomEvent[] = []
     askRoom.subscribe(piece.id, (event) => events.push(event))
 
-    await askRoom.dispatch(workspaceDir, piece.id, 'c1', { kind: 'ask', respondingTo: firstResponse.id, clarification: 'what would you cut' }, 'draft text')
+    await askRoom.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'ask', respondingTo: firstResponse.id, clarification: 'what would you cut' }, 'draft text')
     await settlementOf(askRoom, piece.id)
 
     const started = events.find((event) => event.type === 'action.started')
@@ -667,7 +738,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
     expect(askAdapter.promptFor('compression')).toBeUndefined()
     expect(askAdapter.promptFor('story-editor')).toBeUndefined()
 
-    const landed = entries(workspaceDir, piece.id, 'c1')
+    const landed = entries(dataRoot, workspaceDir, piece.id, 'c1')
     const request = landed.find((entry) => entry.kind === 'concreteChangeRequest')
     expect(request).toMatchObject({ target: 'shape', respondingTo: firstResponse.id, clarification: 'what would you cut' })
   })

@@ -266,6 +266,20 @@ initial cast it yields, are both derived from these declarations rather than sto
 descriptor names no specialist, so making one available in a mode is an edit to that specialist's own
 document.
 
+**A piece's enabled cast is one record holding an independent list per editing surface**, all three
+written together at creation from the initial cast each surface derives, and read and written
+thereafter one surface at a time — enabling a specialist on one surface is a write that never touches
+another's list. A record missing one of the three surfaces is invalid data, never a gap the reader
+fills in.
+
+**Every conversation and its applied changes are addressed by a piece and an editing surface together,
+never by a piece alone, and the room is the sole place that maps what it gates onto that address.** The
+draft and the story context each hold their own conversations and applied changes, one collection per
+surface; the author context's hold no piece at all, and live once in the data root's global namespace,
+reached identically from every piece. Nothing outside the room derives this mapping, and nothing above
+the room's own gate — the busy-or-idle state a dispatch or an Apply holds — is shared across two
+surfaces of the same piece, or across two pieces: each is its own address and its own gate.
+
 **The piece directory is the piece's identity.** Its name derives from the title, slugified, with
 collisions disambiguated at creation, and it is what the application addresses a piece by. A renamed
 or copied directory is simply a piece at a new path, which is what plain files are for. The display
@@ -276,10 +290,11 @@ different matter and are real: a piece has several conversations, and each needs
 independently of its file's position on disk.
 
 **A directory is a piece when it holds piece metadata**, and nothing else about it is required: a
-piece with no draft, no story context and no conversations is a piece the author has only named. A
-piece with no conversations is opened by starting one, which is also what deleting the last one
-leaves behind. A piece's modified time is its draft's, and a conversation's last activity is its last
-entry's, so both are facts about the files rather than counters the application maintains.
+piece with no draft, no story context and no conversation on either of its own surfaces is a piece the
+author has only named. A surface with no conversations is opened by starting one, which is also what
+deleting the last one on that surface leaves behind. A piece's modified time is its draft's, and a
+conversation's last activity is its last entry's, so both are facts about the files rather than
+counters the application maintains.
 
 **Piece metadata is YAML; conversations are JSON; author context and story context are text.** The
 author hand-edits piece metadata and both contexts; a conversation is machinery the author does not
@@ -598,8 +613,11 @@ inferring consensus from silence, or reporting the room's own behaviour back to 
 
 ## Operation state
 
-One conversation action runs at a time — a dispatch or an Apply — so that part of the application's
-interaction state is small enough to name exhaustively and is what the client's controls observe.
+One conversation action runs at a time per room scope — a dispatch or an Apply, on one piece's one
+editing surface — so that part of the application's interaction state is small enough to name
+exhaustively and is what the client's controls observe. A busy scope's controls are the only ones a
+client need disable: another surface of the same piece, or another piece entirely, is a different
+scope and is never held busy by this one.
 
 ```
 idle
@@ -609,22 +627,25 @@ idle
 
 Abandonment applies to `dispatching` and `applying`, returning to `idle` with whatever landed kept.
 
-**The room holds the conversation-action state and refuses to start one unless it is idle.** The client
-disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
-because the guard on the manuscript has to be where the state is, not in the surface that draws the
-buttons. A refused start is a failure and is never a question put to the author — nothing asks which of
-two operations to keep.
+**The room holds the conversation-action state per room scope and refuses to start one at a scope
+unless that scope is idle.** The client disables the controls that would start one, so the refusal is
+unreachable in ordinary use; it exists because the guard on the manuscript has to be where the state is,
+not in the surface that draws the buttons. A refused start is a failure and is never a question put to
+the author — nothing asks which of two operations to keep.
 
 **Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the one
-that replaced it. Abandoning targets this identifier directly rather than whichever operation the piece
+that replaced it. Abandoning targets this identifier directly rather than whichever operation the scope
 is running: a request naming an action that has already finished, ordinary or abandoned, is a silent
 no-op. Untracking is synchronous with the abandon request itself rather than with the cancelled call's
-eventual settlement, which is what lets the room accept the next operation immediately.
+eventual settlement, which is what lets the scope accept the next operation immediately.
 
-**Serialization is a simplification, not a principle.** Overlapping conversation actions would buy
-little wall-clock against capacity bounded by the loaded model while multiplying the states the
-interface has to compose, and nothing is built to make that concurrency impossible.
+**Serialization is a simplification scoped to one room scope, not a principle held over the whole
+studio.** Overlapping conversation actions at the same scope would buy little wall-clock against
+capacity bounded by the loaded model while multiplying the states the interface has to compose, and
+nothing is built to make that concurrency impossible within a scope. Two different scopes contending for
+the same runtime is the model layer's own queuing to absorb, never a reason for one scope to refuse
+another's work.
 
 ## Dispatch
 
@@ -1014,7 +1035,7 @@ boundary's assertions cover:
 | Boundary | Its assertion territory |
 |---|---|
 | **context** | independence, the history policies, and the Story Editor's asymmetric input |
-| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment, and that no operation writes the manuscript |
+| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, and that no operation writes the manuscript |
 | **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
 | **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, no reasoning above the seam, and the adapter's serialization of independent submissions |
 | **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |

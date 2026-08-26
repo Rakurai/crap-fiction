@@ -23,6 +23,7 @@ import {
 } from '../../shared/conversationEvents.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
+import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
 import { ConversationEntryStore, readConversationEntries, readPiece, writeAppliedChange, writePieceCast } from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
@@ -37,7 +38,6 @@ import {
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
-import { WORKED_SURFACE } from '../../shared/surfaces.js'
 import type { ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
@@ -51,8 +51,8 @@ export type RoomEvent =
   | { readonly type: 'error'; readonly data: ConversationErrorEvent }
 
 export class RoomBusyError extends Error {
-  constructor(pieceId: string) {
-    super(`an operation is already in flight for "${pieceId}"`)
+  constructor(pieceId: string, surface: string) {
+    super(`an operation is already in flight for "${pieceId}" on its "${surface}" surface`)
     this.name = 'RoomBusyError'
   }
 }
@@ -98,7 +98,7 @@ export type DispatchOpening =
 
 type ActiveDispatch = {
   readonly kind: 'dispatch'
-  readonly pieceId: string
+  readonly roomScope: RoomScope
   readonly conversationId: string
   readonly actionId: string
   readonly sourceEntryId: string
@@ -114,7 +114,7 @@ type RunningDispatch = ActiveDispatch & {
 
 type ActiveApply = {
   readonly kind: 'apply'
-  readonly pieceId: string
+  readonly roomScope: RoomScope
   readonly conversationId: string
   readonly actionId: string
   readonly sourceEntryId: string
@@ -149,6 +149,7 @@ export class Room {
   readonly #modelAccess: ModelAccess
   readonly #readDurableContext: ReadDurableContext
   readonly #entries: ConversationEntryStore
+  readonly #dataRoot: string
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
@@ -160,12 +161,13 @@ export class Room {
   readonly #modeDescriptions: ReadonlyMap<string, string>
   readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
-  #operation: ActiveOperation | undefined = undefined
+  readonly #operations = new Map<string, ActiveOperation>()
 
   constructor(
     modelAccess: ModelAccess,
     readDurableContext: ReadDurableContext,
     entries: ConversationEntryStore,
+    dataRoot: string,
     roster: RoomRoster,
     modes: readonly ModeDescriptor[],
     charter: Charter,
@@ -177,6 +179,7 @@ export class Room {
     this.#modelAccess = modelAccess
     this.#readDurableContext = readDurableContext
     this.#entries = entries
+    this.#dataRoot = dataRoot
     this.#logger = logger
     this.#now = now
     this.#charter = charter
@@ -214,12 +217,12 @@ export class Room {
     for (const listener of this.#listeners.get(pieceId) ?? []) listener(event)
   }
 
-  #operationFor(pieceId: string): ActiveOperation | undefined {
-    return this.#operation?.pieceId === pieceId ? this.#operation : undefined
+  #operationFor(scope: RoomScope): ActiveOperation | undefined {
+    return this.#operations.get(roomScopeKey(scope))
   }
 
-  activitySnapshot(pieceId: string): ConversationActivitySnapshot | undefined {
-    const operation = this.#operationFor(pieceId)
+  activitySnapshot(scope: RoomScope): ConversationActivitySnapshot | undefined {
+    const operation = this.#operationFor(scope)
     if (operation === undefined) return undefined
     if (operation.kind === 'apply') {
       return {
@@ -241,34 +244,36 @@ export class Room {
     }
   }
 
-  settlement(pieceId: string): Promise<void> | undefined {
-    const operation = this.#operationFor(pieceId)
+  settlement(scope: RoomScope): Promise<void> | undefined {
+    const operation = this.#operationFor(scope)
     return operation?.kind === 'dispatch' ? operation.settlement : undefined
   }
 
-  abandon(pieceId: string, actionId: string): void {
-    const operation = this.#operationFor(pieceId)
+  abandon(scope: RoomScope, actionId: string): void {
+    const operation = this.#operationFor(scope)
     if (operation === undefined || operation.actionId !== actionId) return
     operation.controller.abort()
-    this.#operation = undefined
+    this.#operations.delete(roomScopeKey(scope))
   }
 
   async dispatch(
     workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
     conversationId: string,
     opening: DispatchOpening,
     draft: string,
   ): Promise<{ conversationId: string; actionId: string }> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    const pieceId = roomScope.pieceId
+    const holder = this.#operationFor(roomScope)
+    if (holder !== undefined) throw new RoomBusyError(pieceId, roomScope.surface)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+    const existingEntries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
     const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
-    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, WORKED_SURFACE)
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, roomScope.surface)
     const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
@@ -302,13 +307,14 @@ export class Room {
       }
     }
 
+    const enabledCast = piece.metadata.cast[roomScope.surface]
     const eligibleSpecialists =
       addressedIds.length === 0
-        ? modeSpecialists.filter((role) => piece.metadata.cast.includes(role.id))
+        ? modeSpecialists.filter((role) => enabledCast.includes(role.id))
         : modeSpecialists.filter((role) => addressedIds.includes(role.id))
     const eligibleAddressedOnly = this.#addressedOnly.filter((role) => addressedIds.includes(role.id))
 
-    const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
+    const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !enabledCast.includes(id))
     if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
@@ -323,7 +329,7 @@ export class Room {
 
     const dispatchState: ActiveDispatch = {
       kind: 'dispatch',
-      pieceId,
+      roomScope,
       conversationId,
       actionId,
       sourceEntryId: causeEntry.id,
@@ -346,10 +352,11 @@ export class Room {
       modeDescription,
     }
     const cause = causeEntry
+    const key = roomScopeKey(roomScope)
 
     const written = (async () => {
-      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
-      await this.#entries.append(workspaceDir, pieceId, conversationId, cause)
+      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, roomScope.surface, [...enabledCast, ...brought])
+      await this.#entries.append(this.#dataRoot, conversationScope, conversationId, cause)
     })()
 
     const settlement = written
@@ -360,16 +367,16 @@ export class Room {
             data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience },
           })
           this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause } })
-          return this.#run(workspaceDir, pieceId, conversationId, plan, dispatchState).catch((err: unknown) => {
+          return this.#run(workspaceDir, roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
             this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
           })
         },
         () => {},
       )
       .finally(() => {
-        if (this.#operation?.actionId === actionId) this.#operation = undefined
+        if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
       })
-    this.#operation = { ...dispatchState, settlement }
+    this.#operations.set(key, { ...dispatchState, settlement })
 
     await written
     return { conversationId, actionId }
@@ -383,11 +390,13 @@ export class Room {
 
   async #run(
     workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
+    conversationScope: ConversationScope,
     conversationId: string,
     plan: DispatchPlan,
     operation: ActiveDispatch,
   ): Promise<void> {
+    const pieceId = roomScope.pieceId
     const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft, modeDescription } =
       plan
     const { actionId, controller } = operation
@@ -401,7 +410,7 @@ export class Room {
       authorContext: durableContext.authorContext,
       storyContext: durableContext.storyContext,
       draft,
-      surface: WORKED_SURFACE,
+      surface: roomScope.surface,
       entries: existingEntries,
       policy: this.#policy,
       modeDescription,
@@ -448,7 +457,7 @@ export class Room {
       if (failed) return
 
       try {
-        await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+        await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
       } catch (err) {
         reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
         return
@@ -475,7 +484,7 @@ export class Room {
           abandoned = true
         } else {
           try {
-            await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+            await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
           } catch (err) {
             reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
           }
@@ -492,19 +501,21 @@ export class Room {
 
   async apply(
     workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
     conversationId: string,
     responseId: string,
     constraint: string | undefined,
     draft: string,
   ): Promise<{ actionId: string; result: CallResult<{ manuscript: string; change: AppliedChange | undefined; entryId: string | undefined }> }> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    const pieceId = roomScope.pieceId
+    const holder = this.#operationFor(roomScope)
+    if (holder !== undefined) throw new RoomBusyError(pieceId, roomScope.surface)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+    const entries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
     const response = findResponse(entries, responseId)
     if (response === undefined || response.outcome !== 'applicableSuggestion') throw new RecommendationNotFoundError(pieceId, responseId)
 
@@ -512,10 +523,12 @@ export class Room {
 
     const actionId = nanoid()
     const controller = new AbortController()
-    this.#operation = { kind: 'apply', pieceId, conversationId, actionId, sourceEntryId: responseId, controller, startedAt: this.#now() }
+    const startedAt = this.#now()
+    const key = roomScopeKey(roomScope)
+    this.#operations.set(key, { kind: 'apply', roomScope, conversationId, actionId, sourceEntryId: responseId, controller, startedAt })
     this.#emit(pieceId, {
       type: 'action.started',
-      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt: this.#operation.startedAt },
+      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt },
     })
 
     try {
@@ -527,7 +540,7 @@ export class Room {
         authorContext: durableContext.authorContext,
         storyContext: durableContext.storyContext,
         draft,
-        surface: WORKED_SURFACE,
+        surface: roomScope.surface,
         referenceSchema: undefined,
         entries,
         participants: this.#displayNames,
@@ -547,14 +560,14 @@ export class Room {
 
       const changeId = nanoid()
       const change: AppliedChange = { id: changeId, content: computeAppliedChangeContent(draft, manuscript) }
-      await writeAppliedChange(workspaceDir, pieceId, change)
+      await writeAppliedChange(this.#dataRoot, conversationScope, change)
       const application: ApplicationEntry = { id: nanoid(), kind: 'application', responseId, changeId, constraint }
-      await this.#entries.append(workspaceDir, pieceId, conversationId, application)
+      await this.#entries.append(this.#dataRoot, conversationScope, conversationId, application)
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: change.content } } })
       this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
       return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
     } finally {
-      if (this.#operation?.actionId === actionId) this.#operation = undefined
+      if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
     }
   }
 }

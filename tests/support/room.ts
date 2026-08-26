@@ -27,6 +27,7 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     spec.modelAccess,
     durableContextReader(dataRoot),
     new ConversationEntryStore(),
+    dataRoot,
     resolveRoster(spec.roles),
     spec.modes,
     spec.charter,

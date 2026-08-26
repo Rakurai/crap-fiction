@@ -82,23 +82,27 @@ author context.
 
 ## Room
 
-The participants engaged on a piece: its roster and the Story Editor.
+The participants engaged on a piece: its roster and the Story Editor. A piece has one room, but
+the room's roster, cast and engagement are independent per editing surface: enabling a specialist,
+or engaging the room in work, on one surface says nothing about any other.
 
 ### Roster
 
-The specialists available to a piece, given its mode. A mode names no specialist; each
-specialist declares for itself the modes it is available in. The roster is everything that
-declaration yields for the piece's mode, whether currently enabled or not.
+The specialists available to a piece on one editing surface, given its mode. A mode names no
+specialist; each specialist declares for itself the mode-and-surface pairs it is available for.
+The roster for a mode and surface is everything that declaration yields, whether currently
+enabled or not.
 
-**Cast** means the roster's enabled subset. The Story Editor is always present and belongs to
-neither the roster nor the cast.
+**Cast** means the roster's enabled subset, for one editing surface. The Story Editor is always
+present and belongs to neither the roster nor the cast, on any surface.
 
-**Initial cast** — the cast a newly created piece begins with, drawn from the default each
-roster specialist declares for the piece's mode.
+**Initial cast** — the cast a newly created piece begins with on one editing surface, drawn from
+the default each roster specialist declares for the piece's mode and that surface.
 
-A specialist is **enabled** or it is not, within the roster. There is no joining or leaving
-lifecycle and no temporary presence: a specialist disabled for a time and re-enabled later
-simply becomes answerable again.
+A specialist is **enabled** or it is not, within the roster of one editing surface. There is no
+joining or leaving lifecycle and no temporary presence: a specialist disabled for a time and
+re-enabled later simply becomes answerable again. Enabling it on one surface has no bearing on
+its standing on another.
 
 ## Participant
 
@@ -140,7 +144,10 @@ one edit rather than one per participant.
 
 ## Conversation
 
-A durable, resumable, multi-turn discussion about a piece. A piece may have several.
+A durable, resumable, multi-turn discussion about a piece's draft, about its story context, or
+about the author context that generalizes across every piece. A piece may have several
+conversations on each of its own two surfaces; the author context has one shared collection,
+reached the same way from any piece.
 
 A conversation exists once its first author action opens. Until then, starting one is an
 intention rather than a thing: nothing empty is kept, and nothing accumulates to be pruned.
@@ -231,5 +238,6 @@ made. A convenience for something the author could type; not a distinct mode of 
 
 ## Durable state
 
-Everything the application keeps: author context, and per piece its metadata, draft, story
-context, and conversations.
+Everything the application keeps: author context and its conversations, generalizing across
+every piece; and per piece its metadata, draft, story context, and the draft's and the story
+context's own conversations.

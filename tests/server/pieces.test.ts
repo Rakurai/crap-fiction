@@ -20,6 +20,7 @@ import {
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { ConversationEntryStore, DraftStore, readAppliedChanges, writeAppliedChange } from '../../src/server/store/index.js'
+import type { ConversationScope } from '../../src/server/scope.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 
@@ -69,14 +70,17 @@ const storyEditor: RoleDefinition = {
 }
 
 describe('pieces', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it('creates a piece from a title alone, with the mode default cast enabled and no draft written', async () => {
@@ -89,10 +93,20 @@ describe('pieces', () => {
     expect(piece.length).toBe(0)
   })
 
+  it("writes all three surfaces' derived casts in one metadata write", async () => {
+    const piece = await createPiece(workspaceDir, 'The Cups', flash.id, [flash], specialists)
+    const opened = getPiece(dataRoot, workspaceDir, piece.id, null, specialists, storyEditor)
+
+    expect(opened.cast.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
+    // Neither specialist declares availability for the other two surfaces, so both are empty — but present.
+    await setPieceCast(workspaceDir, piece.id, specialists, 'storyContext', [])
+    await setPieceCast(workspaceDir, piece.id, specialists, 'authorContext', [])
+  })
+
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
     const piece = await createPiece(workspaceDir, 'A Long Way', epic.id, [flash, epic], specialists)
     expect(piece.mode).toBe('epic')
-    expect(getPiece(workspaceDir, piece.id, null, specialists, storyEditor).mode).toBe('epic')
+    expect(getPiece(dataRoot, workspaceDir, piece.id, null, specialists, storyEditor).mode).toBe('epic')
 
     await expect(createPiece(workspaceDir, 'Nope', 'novella', [flash, epic], specialists)).rejects.toThrowError(UnknownModeError)
   })
@@ -137,7 +151,7 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    const opened = getPiece(workspaceDir, created.id, null, specialists, storyEditor)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
     expect(opened).toEqual({
       ...created,
       draft: '',
@@ -159,7 +173,7 @@ describe('pieces', () => {
     const storyContextText = '# notes\nPremise: two cups, one left behind\nPoint of view: close third, past tense\n'
     writeFileSync(path.join(workspaceDir, created.id, 'story-context.yaml'), storyContextText, 'utf8')
 
-    const opened = getPiece(workspaceDir, created.id, null, specialists, storyEditor)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
     expect(opened.draft).toBe('Two small words.')
     expect(opened.storyContext).toBe(storyContextText)
   })
@@ -171,8 +185,8 @@ describe('pieces', () => {
    */
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
-      expect(() => getPiece(workspaceDir, id, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
-      await expect(setPieceCast(workspaceDir, id, specialists, ['shape'])).rejects.toThrowError(PieceNotFoundError)
+      expect(() => getPiece(dataRoot, workspaceDir, id, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
+      await expect(setPieceCast(workspaceDir, id, specialists, 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
       await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
     }
@@ -180,49 +194,65 @@ describe('pieces', () => {
 })
 
 describe('setPieceCast', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it('disables a specialist, reports the cast as it now stands, and makes it eligible again when named once more', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
-    const disabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape'])
+    const disabled = await setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape'])
 
     expect(disabled).toEqual([
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(workspaceDir, created.id, null, specialists, storyEditor).cast).toEqual(disabled)
+    expect(getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor).cast).toEqual(disabled)
 
-    const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, ['shape', 'compression'])
+    const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
   })
 
   it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
-    await expect(setPieceCast(workspaceDir, created.id, specialists, ['shape', 'story-editor'])).rejects.toThrowError(
+    await expect(setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape', 'story-editor'])).rejects.toThrowError(
       UnknownCastMemberError,
     )
+  })
+
+  it("stores each surface's cast independently of the others", async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
+
+    await setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape'])
+    await setPieceCast(workspaceDir, created.id, specialists, 'storyContext', [])
+
+    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
+    expect(opened.cast.find((member) => member.id === 'shape')?.enabled).toBe(true)
   })
 })
 
 describe('updatePieceDetails', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it('retitles a piece, leaving its mode, status and directory untouched', async () => {
@@ -231,7 +261,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(workspaceDir, 'cups', null, specialists, storyEditor).title).toBe('The Cups')
+    expect(getPiece(dataRoot, workspaceDir, 'cups', null, specialists, storyEditor).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {
@@ -273,19 +303,26 @@ describe('DraftWriter', () => {
 })
 
 describe('getConversation', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
+
+  function scopeFor(pieceId: string): ConversationScope {
+    return { kind: 'piece', workspaceDir, pieceId, surface: 'draft' }
+  }
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
     await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    expect(() => getConversation(workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
+    expect(() => getConversation(dataRoot, workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
   })
 
   it('joins an application onto the change it produced, by identity, and leaves an unapplied response with none', async () => {
@@ -309,12 +346,13 @@ describe('getConversation', () => {
       claim: 'it holds',
     }
     const application: ConversationEntry = { id: 'e4', kind: 'application', responseId: 'e2', changeId: 'change1' }
-    for (const entry of [authorMessage, response, otherResponse, application]) await store.append(workspaceDir, piece.id, 'c1', entry)
+    const scope = scopeFor(piece.id)
+    for (const entry of [authorMessage, response, otherResponse, application]) await store.append(dataRoot, scope, 'c1', entry)
 
     const change: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] } }
-    await writeAppliedChange(workspaceDir, piece.id, change)
+    await writeAppliedChange(dataRoot, scope, change)
 
-    const conversation = getConversation(workspaceDir, piece.id, 'c1')
+    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'c1')
 
     const applicationView = conversation.entries.find((entry) => entry.kind === 'application')
     expect(applicationView).toMatchObject({ responseId: 'e2', changeId: 'change1', change: change.content })
@@ -324,33 +362,36 @@ describe('getConversation', () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
     const application: ConversationEntry = { id: 'e1', kind: 'application', responseId: 'no-such-response', changeId: 'never-written' }
-    await store.append(workspaceDir, piece.id, 'c1', application)
+    await store.append(dataRoot, scopeFor(piece.id), 'c1', application)
 
-    const conversation = getConversation(workspaceDir, piece.id, 'c1')
+    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'c1')
     expect(conversation.entries[0]).toMatchObject({ kind: 'application', change: undefined })
   })
 })
 
 describe('listConversations', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it('reports none for a piece with no conversations', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    expect(listConversations(workspaceDir, piece.id)).toEqual([])
+    expect(listConversations(dataRoot, workspaceDir, piece.id)).toEqual([])
   })
 
   // Which entry the opening words come from belongs to `shared/conversationEntries.test.ts`.
   it("carries the conversation's opening words onto the summary", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    await new ConversationEntryStore().append(workspaceDir, piece.id, 'c1', {
+    await new ConversationEntryStore().append(dataRoot, { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }, 'c1', {
       id: 'e1',
       kind: 'authorMessage',
       text: 'does the opening earn its length',
@@ -358,55 +399,60 @@ describe('listConversations', () => {
       brought: [],
     })
 
-    const [summary] = listConversations(workspaceDir, piece.id)
+    const [summary] = listConversations(dataRoot, workspaceDir, piece.id)
     expect(summary).toMatchObject({ id: 'c1', opening: 'does the opening earn its length' })
   })
 
   it('orders the listing by last activity, most recent first', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
+    const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }
     const anyEntry: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] }
-    await store.append(workspaceDir, piece.id, 'older', anyEntry)
+    await store.append(dataRoot, scope, 'older', anyEntry)
     const past = new Date(Date.now() - 10_000)
-    utimesSync(path.join(workspaceDir, piece.id, 'conversations', 'older.json'), past, past)
-    await store.append(workspaceDir, piece.id, 'newer', anyEntry)
+    utimesSync(path.join(workspaceDir, piece.id, 'conversations', 'draft', 'older.json'), past, past)
+    await store.append(dataRoot, scope, 'newer', anyEntry)
 
-    expect(listConversations(workspaceDir, piece.id).map((c) => c.id)).toEqual(['newer', 'older'])
+    expect(listConversations(dataRoot, workspaceDir, piece.id).map((c) => c.id)).toEqual(['newer', 'older'])
   })
 })
 
 describe('deleteConversation', () => {
+  let dataRoot: string
   let workspaceDir: string
 
   beforeEach(() => {
-    workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
   })
 
   afterEach(() => {
-    rmSync(workspaceDir, { recursive: true, force: true })
+    rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    await expect(deleteConversation(workspaceDir, piece.id, 'never-written')).rejects.toThrowError(ConversationNotFoundError)
+    await expect(deleteConversation(dataRoot, workspaceDir, piece.id, 'never-written')).rejects.toThrowError(ConversationNotFoundError)
   })
 
   it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
     const store = new ConversationEntryStore()
-    await store.append(workspaceDir, piece.id, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
-    await store.append(workspaceDir, piece.id, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
-    await store.append(workspaceDir, piece.id, 'c2', { id: 'e1', kind: 'authorMessage', text: 'y', audience: [], brought: [] })
+    const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }
+    await store.append(dataRoot, scope, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
+    await store.append(dataRoot, scope, 'c2', { id: 'e1', kind: 'authorMessage', text: 'y', audience: [], brought: [] })
 
     const ownChange: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } }
     const unrelatedChange: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
-    await writeAppliedChange(workspaceDir, piece.id, ownChange)
-    await writeAppliedChange(workspaceDir, piece.id, unrelatedChange)
+    await writeAppliedChange(dataRoot, scope, ownChange)
+    await writeAppliedChange(dataRoot, scope, unrelatedChange)
 
-    await deleteConversation(workspaceDir, piece.id, 'c1')
+    await deleteConversation(dataRoot, workspaceDir, piece.id, 'c1')
 
-    expect(() => getConversation(workspaceDir, piece.id, 'c1')).toThrowError(ConversationNotFoundError)
-    expect(listConversations(workspaceDir, piece.id).map((c) => c.id)).toEqual(['c2'])
-    expect(readAppliedChanges(workspaceDir, piece.id, appliedChangeSchema)).toEqual([unrelatedChange])
+    expect(() => getConversation(dataRoot, workspaceDir, piece.id, 'c1')).toThrowError(ConversationNotFoundError)
+    expect(listConversations(dataRoot, workspaceDir, piece.id).map((c) => c.id)).toEqual(['c2'])
+    expect(readAppliedChanges(dataRoot, scope, appliedChangeSchema)).toEqual([unrelatedChange])
   })
 })

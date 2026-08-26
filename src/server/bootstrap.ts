@@ -56,6 +56,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     modelAccess,
     durableContextReader(env.dataRoot),
     new ConversationEntryStore(),
+    env.dataRoot,
     roster,
     modes,
     charter,
