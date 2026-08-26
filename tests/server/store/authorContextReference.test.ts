@@ -16,13 +16,13 @@ describe('readShippedAuthorContextReference', () => {
   })
 
   it('loads the global author-context reference as exact text', () => {
-    writeFileSync(path.join(contentRoot, 'author-context-reference.md'), 'An author context is sections of entries.', 'utf8')
+    writeFileSync(path.join(contentRoot, 'author-context.yaml'), 'An author context is sections of entries.', 'utf8')
 
     expect(readShippedAuthorContextReference(contentRoot)).toBe('An author context is sections of entries.')
   })
 
   it('fails startup naming the file when the studio ships no author-context reference', () => {
     expect(() => readShippedAuthorContextReference(contentRoot)).toThrowError(ShippedDataError)
-    expect(() => readShippedAuthorContextReference(contentRoot)).toThrowError(/author-context-reference\.md/)
+    expect(() => readShippedAuthorContextReference(contentRoot)).toThrowError(/author-context\.yaml/)
   })
 })

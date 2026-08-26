@@ -177,6 +177,17 @@ function fixedSection(fragment: Fragment): string {
   return renderFragment(fragment, {})
 }
 
+/** What a task instruction calls the document it targets, so an Apply or a reading task names the surface it was actually issued for. */
+const TARGET_DOCUMENT: Readonly<Record<SurfaceId, string>> = {
+  draft: 'manuscript',
+  storyContext: 'story context',
+  authorContext: 'author context',
+}
+
+function taskSection(fragment: Fragment, surface: SurfaceId): string {
+  return renderFragment(fragment, { targetDocument: TARGET_DOCUMENT[surface] })
+}
+
 function section(fragments: PromptFragments, name: SectionName, variable: string, value: string | undefined): string {
   if (value === undefined || value.trim().length === 0) return ''
   return renderFragment(fragments.sections[name], { [variable]: value.trim() })
@@ -207,7 +218,7 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
 export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallPrompt {
   const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.apply)])
   const perCall = compose([
-    fixedSection(fragments.tasks.apply),
+    taskSection(fragments.tasks.apply, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
     section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
@@ -231,7 +242,7 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
   ])
 
   const perCall = compose([
-    fixedSection(task),
+    taskSection(task, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
     context.owesAnswer ? fixedSection(fragments.sections.addressed) : '',
     section(fragments, 'authorContext', 'authorContext', context.authorContext),

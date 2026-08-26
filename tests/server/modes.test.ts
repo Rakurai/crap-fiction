@@ -21,7 +21,7 @@ describe('loadModes', () => {
     mkdirSync(dir, { recursive: true })
     writeFileSync(path.join(dir, 'mode.yaml'), descriptor, 'utf8')
     if (description !== undefined) writeFileSync(path.join(dir, 'description.md'), description, 'utf8')
-    if (storyContextReference !== undefined) writeFileSync(path.join(dir, 'story-context-reference.md'), storyContextReference, 'utf8')
+    if (storyContextReference !== undefined) writeFileSync(path.join(dir, 'story-context.yaml'), storyContextReference, 'utf8')
   }
 
   it('loads every mode a content root ships, each with the shared description its sibling document carries and its sibling story-context reference', () => {
@@ -45,6 +45,6 @@ describe('loadModes', () => {
     writeMode('flash', 'id: flash\ndisplayName: Flash\n', 'A short piece read in one sitting.', undefined)
 
     expect(() => loadModes(contentRoot)).toThrowError(ShippedDataError)
-    expect(() => loadModes(contentRoot)).toThrowError(/story-context-reference\.md/)
+    expect(() => loadModes(contentRoot)).toThrowError(/story-context\.yaml/)
   })
 })

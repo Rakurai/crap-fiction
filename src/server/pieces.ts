@@ -5,7 +5,7 @@ import { openingWords, type ConversationSummary } from '../shared/conversationEn
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
-import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
+import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import { defaultCastFor, specialistsFor } from './room/roster.js'
@@ -189,9 +189,13 @@ export function getPiece(
   authorContextReference: string,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  const surfaces = Object.fromEntries(
-    SURFACE_IDS.map((surface) => [surface, surfaceDetail(dataRoot, workspaceDir, id, piece, specialists, modes, authorContextReference, surface)]),
-  ) as PieceDetail['surfaces']
+  const detailFor = (surface: SurfaceId): SurfaceDetail =>
+    surfaceDetail(dataRoot, workspaceDir, id, piece, specialists, modes, authorContextReference, surface)
+  const surfaces: PieceDetail['surfaces'] = {
+    draft: detailFor('draft'),
+    storyContext: detailFor('storyContext'),
+    authorContext: detailFor('authorContext'),
+  }
   return {
     ...summarize(id, piece),
     surfaces,

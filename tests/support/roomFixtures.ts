@@ -67,10 +67,10 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     readingNoComment: variableFragment('lines/readingNoComment', ['participant'], '{{participant}} found nothing material in its discipline.'),
   },
   tasks: {
-    specialist: fixedFragment('tasks/specialist', 'FIXTURE_SPECIALIST_TASK'),
-    generalist: fixedFragment('tasks/generalist', 'FIXTURE_GENERALIST_TASK'),
-    concreteChange: fixedFragment('tasks/concreteChange', 'FIXTURE_CONCRETE_CHANGE_TASK'),
-    apply: fixedFragment('tasks/apply', 'FIXTURE_APPLY_TASK'),
+    specialist: variableFragment('tasks/specialist', ['targetDocument'], 'FIXTURE_SPECIALIST_TASK {{targetDocument}}'),
+    generalist: variableFragment('tasks/generalist', ['targetDocument'], 'FIXTURE_GENERALIST_TASK {{targetDocument}}'),
+    concreteChange: variableFragment('tasks/concreteChange', ['targetDocument'], 'FIXTURE_CONCRETE_CHANGE_TASK {{targetDocument}}'),
+    apply: variableFragment('tasks/apply', ['targetDocument'], 'FIXTURE_APPLY_TASK {{targetDocument}}'),
   },
   roles: {
     apply: fixedFragment('roles/apply', 'FIXTURE_APPLY_ROLE'),

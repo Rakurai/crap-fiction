@@ -321,7 +321,7 @@ export function readShippedModes<T>(
     const modeDir = path.join(dir, id)
     const descriptor = readYamlFile(path.join(modeDir, 'mode.yaml'), schema)
     const description = readShippedTextFile(path.join(modeDir, 'description.md'))
-    const storyContextReference = readShippedTextFile(path.join(modeDir, 'story-context-reference.md'))
+    const storyContextReference = readShippedTextFile(path.join(modeDir, 'story-context.yaml'))
     return { ...descriptor, description, storyContextReference }
   })
 }
@@ -331,7 +331,7 @@ export function readShippedCharter(contentRoot: string): string {
 }
 
 export function readShippedAuthorContextReference(contentRoot: string): string {
-  return readShippedTextFile(path.join(contentRoot, 'author-context-reference.md'))
+  return readShippedTextFile(path.join(contentRoot, 'author-context.yaml'))
 }
 
 export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {

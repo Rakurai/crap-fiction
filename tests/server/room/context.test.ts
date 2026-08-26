@@ -347,6 +347,52 @@ describe('rendering a prompt', () => {
   })
 })
 
+describe('the task instruction names the surface it was compiled for', () => {
+  const TARGET_DOCUMENT_LABEL = { draft: 'manuscript', storyContext: 'story context', authorContext: 'author context' } as const
+  const SURFACES = ['draft', 'storyContext', 'authorContext'] as const
+
+  const TASK_CASES = [
+    {
+      kind: 'specialist',
+      marker: 'FIXTURE_SPECIALIST_TASK',
+      render: (surface: (typeof SURFACES)[number]) => renderPrompt(compileSpecialistContext(contextInput({ role: shape, surface })), fragments, charter),
+    },
+    {
+      kind: 'generalist',
+      marker: 'FIXTURE_GENERALIST_TASK',
+      render: (surface: (typeof SURFACES)[number]) =>
+        renderPrompt(compileSpecialistContext(contextInput({ role: { ...shape, eligibility: 'generalist' }, surface })), fragments, charter),
+    },
+    {
+      kind: 'concreteChange',
+      marker: 'FIXTURE_CONCRETE_CHANGE_TASK',
+      render: (surface: (typeof SURFACES)[number]) =>
+        renderPrompt(
+          compileSpecialistContext(contextInput({ role: shape, surface, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } })),
+          fragments,
+          charter,
+        ),
+    },
+    {
+      kind: 'apply',
+      marker: 'FIXTURE_APPLY_TASK',
+      render: (surface: (typeof SURFACES)[number]) => renderApplyPrompt(compileApplyContext(applyContextInput({ surface, entries: [] })), fragments),
+    },
+  ]
+
+  describe.each(TASK_CASES)('the $kind task', ({ marker, render }) => {
+    it.each(SURFACES)("names %s's own target document, and no other surface's", (surface) => {
+      const prompt = wholeOf(render(surface))
+      expect(prompt).toContain(`${marker} ${TARGET_DOCUMENT_LABEL[surface]}`)
+      for (const other of SURFACES) {
+        if (other !== surface) expect(prompt).not.toContain(`${marker} ${TARGET_DOCUMENT_LABEL[other]}`)
+      }
+      // A context surface's task never carries the draft-only "manuscript" action directive.
+      if (surface !== 'draft') expect(prompt).not.toContain('manuscript')
+    })
+  })
+})
+
 describe('the order the two halves compose in', () => {
   it('orders a participant call widest-frame to narrowest-responsibility, and its per-call half task through the current material', () => {
     const context = compileSpecialistContext(

@@ -206,9 +206,9 @@ parses them, and a save replaces one with exactly the bytes it was given.
 
 Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
 reference schema — travels with the application and not under the data root, under a content root
-resolved once at startup. The charter, the author-context reference and every participant are one
-Markdown document each; a participant's filename is its id. Each mode is a descriptor paired with a
-sibling document describing its form and scale and a sibling story-context reference.
+resolved once at startup. The charter and every participant are one Markdown document each; a
+participant's filename is its id. Each mode is a descriptor paired with a sibling document describing
+its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
 generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
@@ -226,10 +226,11 @@ carries the shared **description** of its form and scale that every participant 
 number of modes may load; the roster and initial cast for a given mode and surface are derived from
 every cast participant's declared availability, never listed by the mode.
 
-A **reference schema** is one Markdown document under the content root, shown to the author and
-given whole to a context Apply for the surface it belongs to: one per mode, for that mode's story
-context, and one for the studio's author context. It is guidance, not a contract — nothing parses
-it, and it is never compared with a context document or an Apply result.
+A **reference schema** is one YAML document under the content root, shown to the author and given
+whole to a context Apply for the surface it belongs to: one per mode, at
+`content/modes/<mode>/story-context.yaml`, for that mode's story context, and one at
+`content/author-context.yaml` for the studio's author context. It is guidance, not a contract —
+nothing parses it, and it is never compared with a context document or an Apply result.
 
 A **prompt fragment** is one Markdown document under the content root, holding a heading or an
 instruction addressed to a model together with frontmatter declaring the names it interpolates as
