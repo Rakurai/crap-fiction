@@ -193,6 +193,23 @@ single transaction so that it participates in undo and redo as one action.
 **Nothing application-specific enters the document.** No node attributes carrying application state,
 no marks for recommendations, no decorations tracking responses.
 
+## The editing surface
+
+**One client module is mounted once per surface.** It owns that surface's document session, its
+conversation selection and session, its cast controls, its Apply and abandonment, and the body that
+composes its document with its conversation panel. What differs between draft, story context and
+author context — the prose body against the plain-text body and its reference schema, a piece-scoped
+conversation selection against author context's global one, the label a control carries — is supplied
+to that one module as configuration. It is never a branch inside the piece that opens onto it, and it
+is never a second copy of the module for a second surface.
+
+**The piece a surface opens onto holds none of that surface's own state.** What it holds is piece-wide
+chrome and close, and a registry of every surface's current client text compiled for whatever needs a
+snapshot of all three. A surface reports its own text, whether its own write is failing, and what it
+has in flight upward into that piece only so those three things can be computed once from every
+surface's report; nothing reads a sibling surface's state back out of it, and a surface's own
+read-only state is derived from nothing but its own report.
+
 ## Persistence
 
 **A workspace directory the author chooses, one directory per piece.** Listing pieces is a directory

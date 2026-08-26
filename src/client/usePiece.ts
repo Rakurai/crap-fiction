@@ -2,13 +2,11 @@ import { useCallback, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import type { SurfaceId } from '../shared/surfaces.js'
+import { type BySurface, withSurface } from './bySurface.js'
 import { useLoaded } from './load.js'
 import { fetchPiece, updatePiece } from './piecesClient.js'
 import { failureMessage } from './request.js'
 import { deleteConversation as deleteConversationRequest } from './roomClient.js'
-
-/** A value held per editing surface, so one surface's state never bleeds into another's. */
-type BySurface<T> = Readonly<Partial<Record<SurfaceId, T>>>
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
@@ -30,10 +28,6 @@ export type PieceViewModel =
       readonly deleteConversation: (surface: SurfaceId, conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
     }
   | { readonly status: 'error'; readonly message: string }
-
-function withSurface<T>(surface: SurfaceId, value: T | undefined): (current: BySurface<T>) => BySurface<T> {
-  return (current) => ({ ...current, [surface]: value })
-}
 
 export function usePiece(id: string): PieceViewModel {
   const load = useCallback((signal: AbortSignal) => fetchPiece(id, signal), [id])

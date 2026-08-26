@@ -125,6 +125,10 @@ function switchToDraft(): void {
   fireEvent.click(screen.getByRole('button', { name: 'draft' }))
 }
 
+function switchToAuthorContext(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'author context' }))
+}
+
 /** The composer belonging to whichever surface is currently visible — role queries alone exclude the hidden one. */
 function activeComposer(): HTMLTextAreaElement {
   const send = screen.getByRole('button', { name: 'send' })
@@ -200,7 +204,7 @@ describe('a failed save on one document', () => {
 })
 
 describe('activity on one surface', () => {
-  it('leaves the other free to start its own work', async () => {
+  it('leaves the other two free to start their own work', async () => {
     await renderOpened()
 
     fireEvent.change(activeComposer(), { target: { value: 'a message for the draft room' } })
@@ -209,7 +213,10 @@ describe('activity on one surface', () => {
 
     switchToStoryContext()
     fireEvent.change(activeComposer(), { target: { value: 'a message for the story context room' } })
+    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
 
+    switchToAuthorContext()
+    fireEvent.change(activeComposer(), { target: { value: 'a message for the author context room' } })
     expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })

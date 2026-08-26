@@ -3,25 +3,20 @@ import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import styles from './ContextSurface.module.css'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, timeOfDay } from './facts.js'
+import type { LifecycleProps } from './pieceLifecycle.js'
 import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 
 /** The surfaces this component draws: a plain text document beside a reference schema. */
 export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
 
+export function isContextSurfaceId(surface: SurfaceId): surface is ContextSurfaceId {
+  return surface !== 'draft'
+}
+
 const DOCUMENT: Readonly<Record<ContextSurfaceId, { readonly label: string; readonly file: string }>> = {
   storyContext: { label: 'Story context', file: 'story-context.yaml' },
   authorContext: { label: 'Author context', file: 'author-context.yaml' },
-}
-
-type LifecycleProps = {
-  readonly status: PieceStatus
-  readonly retitling: boolean
-  readonly retitleError: string | undefined
-  readonly onRetitle: (title: string) => void
-  readonly settingStatus: boolean
-  readonly statusError: string | undefined
-  readonly onSetStatus: (status: PieceStatus) => void
 }
 
 type ContextSurfaceProps = {

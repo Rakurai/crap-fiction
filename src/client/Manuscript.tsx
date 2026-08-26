@@ -4,19 +4,10 @@ import type { PieceStatus } from '../shared/pieceViews.js'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
+import type { LifecycleProps } from './pieceLifecycle.js'
 import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
-
-type LifecycleProps = {
-  readonly status: PieceStatus
-  readonly retitling: boolean
-  readonly retitleError: string | undefined
-  readonly onRetitle: (title: string) => void
-  readonly settingStatus: boolean
-  readonly statusError: string | undefined
-  readonly onSetStatus: (status: PieceStatus) => void
-}
 
 type ManuscriptProps = {
   readonly title: string
