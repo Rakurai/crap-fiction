@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
-import type { DocumentSnapshot } from '../shared/surfaces.js'
+import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
 import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -13,7 +13,7 @@ import type {
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
-import type { saveDraft as saveDraftFn } from './piecesClient.js'
+import type { saveSurfaceDocument as saveSurfaceDocumentFn } from './piecesClient.js'
 
 const UNSENT = 'the message was not sent'
 
@@ -39,13 +39,14 @@ export type RoomAdapters = Readonly<{
   abandonOperation: typeof abandonOperationFn
   applyRecommendation: typeof applyRecommendationFn
   confirmApplication: typeof confirmApplicationFn
-  saveDraft: typeof saveDraftFn
+  saveDocument: typeof saveSurfaceDocumentFn
 }>
 
 export function useConversation(
   pieceId: string,
+  surface: PieceSurfaceId,
   initialConversationId: string | null,
-  flushDraft: () => void,
+  flushDocument: () => void,
   getDocuments: () => DocumentSnapshot,
   room: RoomAdapters,
 ): ConversationViewModel {
@@ -66,7 +67,7 @@ export function useConversation(
     let active = true
 
     if (openedWithConversationId !== null) {
-      void fetchConversation(pieceId, openedWithConversationId).then((result) => {
+      void fetchConversation(pieceId, surface, openedWithConversationId).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
           setProjection((prev) =>
@@ -82,7 +83,7 @@ export function useConversation(
     const { snapshot, unsubscribe } = subscribeToRoom(
       pieceId,
       (event) => {
-        if (!active) return
+        if (!active || event.data.surface !== surface) return
         if (event.type === 'error') {
           setError(event.data.message)
           return
@@ -108,19 +109,19 @@ export function useConversation(
     )
 
     // The action in flight for this surface, if any, only belongs to this conversation when its
-    // identity matches: the draft surface admits one operation at a time, but it may belong to a
+    // identity matches: this surface admits one operation at a time, but it may belong to a
     // conversation other than the one this hook opened.
     void snapshot.then((activity) => {
       if (!active) return
-      const draftActivity = activity.draft
-      if (draftActivity === null || draftActivity.conversationId !== openedWithConversationId) return
-      actionIdRef.current = draftActivity.actionId
-      setActionId(draftActivity.actionId)
+      const surfaceActivity = activity[surface]
+      if (surfaceActivity === null || surfaceActivity.conversationId !== openedWithConversationId) return
+      actionIdRef.current = surfaceActivity.actionId
+      setActionId(surfaceActivity.actionId)
       setBusy(true)
-      if (draftActivity.kind === 'dispatch') {
-        setProjection((prev) => ({ ...prev, activity: draftActivity }))
+      if (surfaceActivity.kind === 'dispatch') {
+        setProjection((prev) => ({ ...prev, activity: surfaceActivity }))
       } else {
-        setResumedApplying({ responseId: draftActivity.sourceEntryId })
+        setResumedApplying({ responseId: surfaceActivity.sourceEntryId })
       }
     })
 
@@ -128,11 +129,11 @@ export function useConversation(
       active = false
       unsubscribe()
     }
-  }, [pieceId, openedWithConversationId])
+  }, [pieceId, surface, openedWithConversationId])
 
   function openDispatch(opening: DispatchOpening): void {
     if (busy) return
-    flushDraft()
+    flushDocument()
     setError(undefined)
     setBusy(true)
 
@@ -144,7 +145,7 @@ export function useConversation(
     async function run(): Promise<void> {
       let conversationId = conversationIdRef.current
       if (conversationId === null) {
-        const created = await createConversation(pieceId)
+        const created = await createConversation(pieceId, surface)
         if (created.outcome !== 'value') {
           stop(failureMessage(created))
           return
@@ -153,7 +154,7 @@ export function useConversation(
         conversationIdRef.current = created.value.id
       }
 
-      const result = await dispatch(pieceId, conversationId, opening, getDocuments())
+      const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments())
       if (result.outcome !== 'value') stop(failureMessage(result))
     }
 
@@ -182,7 +183,7 @@ export function useConversation(
     setActionId(undefined)
     setBusy(false)
     setProjection((prev) => (prev.activity?.actionId === target ? { ...prev, activity: undefined } : prev))
-    void abandonOperation(pieceId, conversationId, target).then((result) => {
+    void abandonOperation(pieceId, surface, conversationId, target).then((result) => {
       const message = failureMessage(result)
       if (message !== undefined) setError(message)
     })

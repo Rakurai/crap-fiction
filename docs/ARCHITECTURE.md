@@ -62,11 +62,12 @@ may carry the call site, the outcome, the elapsed time, the model identity and t
 the piece and conversation, but never a prompt, a participant's response, manuscript text or the
 contents of either durable context. The author's story is not diagnostic data.
 
-**One piece is open at a time, and the application state is singular** — one draft, one current
-conversation, one operation. Switching pieces replaces that state rather than accumulating alongside
-it, and abandons whatever operation is in flight, keeping whatever landed. Nothing is ordinarily
-held unsaved. A switch is refused only while a draft write remains unwritten after a failure, having
-first retried it: prose the author typed is the one thing a piece switch may never discard.
+**One piece is open at a time, and the application state is singular** — each editing surface's own
+document, conversation and operation. Switching pieces replaces that state rather than accumulating
+alongside it, and abandons whatever operation is in flight on every surface, keeping whatever landed.
+Nothing is ordinarily held unsaved. A switch is refused only while a document's write remains
+unwritten after a failure, having first retried it: prose the author typed is the one thing a piece
+switch may never discard.
 
 ## Dependency roster
 
@@ -371,34 +372,38 @@ filesystem and is a copy across one, and the data root is a bind mount whose fil
 holding the process's temp directory — so staging a write anywhere but beside its target would quietly
 stop being atomic.
 
-**Autosave of the manuscript is debounced and is a local write only.** No model call is on the save
-path.
+**Autosave of the manuscript and of the story context is debounced and is a local write only, each
+independently of the other.** No model call is on either save path, and a debounce or a failure on
+one never holds up or masks the other's.
 
-**The client is the only writer of the manuscript.** No model operation writes it: an operation
-receives the current text in the request that starts it, and an application returns prose the client
-applies to the editor and then saves by the ordinary autosave path. This is what makes a failed or
-abandoned application change nothing — the room has no path to the manuscript to leave half-written —
-and it means the one artifact where two writers would silently lose prose has one.
+**The client is the only writer of the manuscript and of the story context.** No model operation
+writes either: an operation receives the current text of both in the request that starts it, and an
+application returns prose the client applies to the surface it targeted and then saves by that
+surface's own autosave path. This is what makes a failed or abandoned application change nothing —
+the room has no path to either document to leave half-written — and it means each of the two
+artifacts where two writers would silently lose prose has one.
 
-**One draft write is in flight at a time.** Text the author produces while a write is in flight
-accumulates and goes out with the next one. An atomic rename makes a write indivisible, not ordered:
-two in flight can complete oldest-last and restore prose the author has already replaced, and nothing
-about a single logical writer prevents that on its own. Serializing at that writer is what removes the
-whole class, and is why no write generation or stale-write rejection appears anywhere.
+**One write is in flight at a time for the manuscript, and likewise for the story context.** Text
+the author produces while a write is in flight accumulates and goes out with the next one. An atomic
+rename makes a write indivisible, not ordered: two in flight can complete oldest-last and restore
+prose the author has already replaced, and nothing about a single logical writer prevents that on
+its own. Serializing at that writer is what removes the whole class, and is why no write generation
+or stale-write rejection appears anywhere.
 
-**Starting an operation flushes any pending draft write and does not wait on it.** The current text
-travels in the request either way, so the model never works from prose the author has already changed
-and no operation depends on a write having succeeded.
+**Starting an operation flushes whichever of the two its own surface holds pending, and does not
+wait on it.** The current text of both travels in the request either way, so the model never works
+from prose the author has already changed and no operation depends on a write having succeeded.
 
-**A write that fails is never reported as a write that succeeded.** The editor stays usable, the
-unwritten state stays in memory, the failure is stated where the author can see it and stays stated
-until it clears, the next ordinary write retries it, and nothing resolves it optimistically. No retry
-is scheduled and nothing claims one: the retry rides the next ordinary write, so a promise of one
-would describe behaviour the client does not have, and an author who read it and stopped typing is
-never written.
+**A write that fails is never reported as a write that succeeded.** The surface it belongs to stays
+usable, the unwritten state stays in memory, the failure is stated where the author can see it and
+stays stated until it clears, the next ordinary write to that document retries it, and nothing
+resolves it optimistically. No retry is scheduled and nothing claims one: the retry rides the next
+ordinary write, so a promise of one would describe behaviour the client does not have, and an author
+who read it and stopped typing is never written.
 
-**Leaving the piece is refused while a draft write is failing**, and refused rather than confirmed.
-Nothing asks the author to confirm discarding anything, and the manuscript stays editable throughout.
+**Leaving the piece is refused while either the manuscript's or the story context's write is
+failing**, and refused rather than confirmed. Nothing asks the author to confirm discarding anything,
+and both surfaces stay editable throughout.
 
 ## Model access
 
@@ -764,27 +769,27 @@ for a dispatch would break the premise that the author writes while the room thi
 ## Applying a recommendation
 
 **One call.** Its input is the current draft, the full current conversation, the recommendation itself,
-both durable contexts, and the author's constraint where they supplied one. Its output is the manuscript
-embodying it.
+both durable contexts, the author's constraint where they supplied one, and the surface the
+recommendation names. Its output is that surface's document embodying it.
 
 **Apply resolves its source by response-entry identity and reads the conversation as it stands at
 invocation, not as it stood when the recommendation was made.** Intervening discussion may qualify or
 contradict an old recommendation, and the write process weighs that rather than replaying the
 recommendation against stale history. Apply creates no participant follow-up of its own.
 
-**The application's input is stable because the manuscript travels in the request, not because anything
-is locked.** An application reads the draft it was handed and returns the next state of it; an edit
-landing in between would leave a rewrite to be merged against prose it never saw, and no merge rule for
-semantic prose surgery is worth having. The text in the request cannot change under the call, so the
-room needs no lock and holds none — a draft write arriving mid-application is written, and changes
-nothing about what the model was given.
+**The application's input is stable because the target document travels in the request, not because
+anything is locked.** An application reads the document it was handed and returns the next state of
+it; an edit landing in between would leave a rewrite to be merged against prose it never saw, and no
+merge rule for semantic prose surgery is worth having. The text in the request cannot change under the
+call, so the room needs no lock and holds none — a write to that document arriving mid-application is
+written, and changes nothing about what the model was given.
 
-**The result is prose the client applies**, not a write the room performs. The room reads the draft from
-the request and returns the applied manuscript; nothing reaches disk until the author's own editor holds
-it.
+**The result is prose the client applies**, not a write the room performs. The room reads the target
+document from the request and returns it embodying the recommendation; nothing reaches disk until the
+author's own surface holds it.
 
 **A replacement is provisional until the client confirms it was saved.** The room retains it — the
-manuscript, the change computed from it, and a provisional identity — as the one pending application its
+document, the change computed from it, and a provisional identity — as the one pending application its
 room scope may hold, rather than writing anything durable yet. Confirming reads the target document as
 persisted and requires it to equal the replacement exactly before the change record and the entry naming
 it are written, the change first; a mismatch, an absent document, or an identity that is neither pending
@@ -798,33 +803,35 @@ punctuation, reflow paragraphs and revise prose nobody asked about.
 
 **The representation the model returns is an implementation choice** — revised Markdown, replacement
 ranges, or structured operations — and the author experience does not depend on it. What bounds it: the
-result is applied to the editor as a single transaction, and the application computes the
-before-and-after presented to the author from the manuscript states rather than trusting the model to
-describe its own edit. That before-and-after is the changed passages with a little prose around them and
+result reaches its target surface as one atomic replacement — a single transaction where that surface is
+the manuscript's editor, so it participates in the editor's own undo as one action — and the application
+computes the before-and-after presented to the author from the two states of that document rather than
+trusting the model to describe its own edit. That before-and-after is the changed passages with a little
+prose around them and
 no positions of any kind — enough to show what happened, not enough to reapply it anywhere — and where
 the change is unbounded it is the statement that the piece was rewritten whole. That last case is a rule
 about what the file may hold, not about how much the surface may show: what it prevents is storing the
 prose either side of a whole-manuscript rewrite, which is a complete prior state of the story sitting on
 disk for as long as the conversation lives.
 
-**An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, manuscript
-untouched, recommendation still applicable. With the timeout in the model layer, a model that never
-answers returns the piece to `idle` without the author acting.
+**An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, the target
+document untouched, recommendation still applicable. With the timeout in the model layer, a model that
+never answers returns the piece to `idle` without the author acting.
 
 **Abandoning a pending replacement is different only in what there is to undo.** No call is left to
 cancel — the model already answered — so abandoning simply clears the pending state and frees the scope.
-Whatever the client already installed or saved stays exactly as it is: Apply does not roll back an
-editor's own text, and the recommendation is still applicable because nothing was ever recorded against
+Whatever the client already installed or saved stays exactly as it is: Apply does not roll back the
+surface's own text, and the recommendation is still applicable because nothing was ever recorded against
 it.
 
-**An application that returned the manuscript unchanged is recorded as nothing.** No change file, no
-conversation entry, and the operation settles as ordinarily as any other: what the author would read
+**An application that returned its target document unchanged is recorded as nothing.** No change file,
+no conversation entry, and the operation settles as ordinarily as any other: what the author would read
 from an entry is that a recommendation was applied, and nothing was.
 
 **Nothing is stored that would let an application be replayed.** A recommendation is interpreted afresh
-against whatever the manuscript is at the moment it is applied, which is what makes an old
+against whatever that document is at the moment it is applied, which is what makes an old
 recommendation applicable at all. **A failed application changes nothing** — no partial write, no
-half-applied manuscript, and the recommendation stays applicable. A replacement whose confirmation is
+half-applied document, and the recommendation stays applicable. A replacement whose confirmation is
 refused changes nothing by the same rule: the change record and the entry naming it are written together
 or not at all.
 

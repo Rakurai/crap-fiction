@@ -33,7 +33,7 @@ import {
 import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
-import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
@@ -102,6 +102,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
     policy: SHIPPED_HISTORY_POLICY,
     modelAccess,
     now: () => 1_700_000_000_000,
+    authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
   }
 }
 
@@ -752,6 +753,59 @@ describe('Room.apply', () => {
 
     expect(second).toEqual(first)
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toHaveLength(1)
+  })
+
+  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema and the preserve-instruction, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const storyContextScope: RoomScope = { pieceId: piece.id, surface: 'storyContext' }
+    const storyContextConversationScope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'storyContext' }
+
+    const { room: settingUp } = buildRoom(dataRoot, {
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'name the second cup' } } },
+    })
+    await settingUp.dispatch(
+      workspaceDir,
+      storyContextScope,
+      'c1',
+      { kind: 'targeted', target: 'story-editor', text: 'what should the story context say' },
+      documents('the draft, untouched', { storyContext: 'Premise: two cups.' }),
+    )
+    await settlementOfScope(settingUp, storyContextScope)
+
+    const [response] = (readConversationEntries(dataRoot, storyContextConversationScope, 'c1')?.entries ?? []).filter(
+      (entry) => entry.kind === 'participantResponse',
+    )
+    if (response === undefined) throw new Error('expected a landed response')
+
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'Premise: two cups, one chipped.' } } },
+    })
+
+    const { outcome } = await room.apply(
+      workspaceDir,
+      storyContextScope,
+      'c1',
+      response.id,
+      undefined,
+      documents('the draft, untouched', { storyContext: 'Premise: two cups.' }),
+    )
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+    expect(outcome.manuscript).toBe('Premise: two cups, one chipped.')
+
+    // The document verbatim, its own reference schema, the story-context framing, and the
+    // generic preserve-instruction — never the draft as what is being rewritten.
+    expect(adapter.promptFor('apply')).toContain('Premise: two cups.')
+    expect(adapter.promptFor('apply')).toContain(fixtureMode.storyContextReference)
+    expect(adapter.promptFor('apply')).toContain('FIXTURE_STORY_CONTEXT_SURFACE')
+    expect(adapter.promptFor('apply')).toContain('FIXTURE_APPLY_TASK')
+
+    await writeStoryContext(workspaceDir, piece.id, outcome.manuscript)
+    const confirmed = await room.confirmApply(workspaceDir, storyContextScope, 'c1', outcome.applicationId)
+
+    const [onDisk] = readAppliedChanges(dataRoot, storyContextConversationScope, appliedChangeSchema)
+    expect(onDisk?.content).toEqual(confirmed.change)
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, piece.id), appliedChangeSchema)).toEqual([])
+    expect(readPiece(workspaceDir, piece.id)?.draft).toBeUndefined()
   })
 })
 

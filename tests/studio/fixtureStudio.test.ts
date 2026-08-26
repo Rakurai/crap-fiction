@@ -51,7 +51,7 @@ describe('the fixture studio', () => {
       body: JSON.stringify({ title: 'Cups', mode: 'flash' }),
     })
 
-    const res = await app.request('/pieces/cups/conversations/c1/dispatch', {
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

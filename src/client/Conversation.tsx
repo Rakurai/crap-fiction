@@ -4,7 +4,7 @@ import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
-import type { DocumentSnapshot } from '../shared/surfaces.js'
+import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
@@ -21,9 +21,10 @@ export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
 type ConversationProps = {
   readonly pieceId: string
+  readonly surface: PieceSurfaceId
   readonly currentConversationId: string | null
   readonly documents: DocumentSnapshot
-  readonly flushDraft: () => void
+  readonly flushDocument: () => void
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
@@ -361,9 +362,10 @@ function DispatchFlight({
 
 export function Conversation({
   pieceId,
+  surface,
   currentConversationId,
   documents,
-  flushDraft,
+  flushDocument,
   room,
   displayName,
   handle,
@@ -396,9 +398,9 @@ export function Conversation({
     textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
   }, [caretOffset])
 
-  const conversation = useConversation(pieceId, currentConversationId, flushDraft, () => documents, room)
+  const conversation = useConversation(pieceId, surface, currentConversationId, flushDocument, () => documents, room)
 
-  const apply = useApply(pieceId, conversation.conversationId, () => documents, onApplied, room, conversation.resumedApplying)
+  const apply = useApply(pieceId, surface, conversation.conversationId, () => documents, onApplied, room, conversation.resumedApplying)
 
   useEffect(() => {
     onApplyingChange(
@@ -527,13 +529,13 @@ export function Conversation({
           submit()
         }}
       >
-        <label className={styles.visuallyHidden} htmlFor="conversation-message">
+        <label className={styles.visuallyHidden} htmlFor={`conversation-message-${surface}`}>
           Message the room
         </label>
         <div className={styles.field}>
           {/* `value` carries the whole message; the store's own `inputValue` holds only the live `@token`. */}
           <Ariakit.Combobox
-            id="conversation-message"
+            id={`conversation-message-${surface}`}
             store={combobox}
             className={styles.input}
             value={message}

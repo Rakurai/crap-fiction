@@ -11,7 +11,7 @@ import {
   type ConversationErrorEvent,
   type RoomActivitySnapshot,
 } from '../shared/conversationEvents.js'
-import type { DocumentSnapshot } from '../shared/surfaces.js'
+import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
 import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
 
@@ -23,8 +23,12 @@ function readJson(text: string): unknown {
   }
 }
 
-export function createConversation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations`, z.object({ id: z.string() }), {
+function surfacePath(pieceId: string, surface: PieceSurfaceId): string {
+  return `/pieces/${encodeURIComponent(pieceId)}/surfaces/${surface}`
+}
+
+export function createConversation(pieceId: string, surface: PieceSurfaceId, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations`, z.object({ id: z.string() }), {
     method: 'POST',
     signal: signal ?? null,
   })
@@ -32,16 +36,22 @@ export function createConversation(pieceId: string, signal?: AbortSignal): Promi
 
 export function fetchConversation(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<EntryConversationView>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, entryConversationViewSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}`, entryConversationViewSchema, {
     signal: signal ?? null,
   })
 }
 
-export function deleteConversation(pieceId: string, conversationId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, z.null(), {
+export function deleteConversation(
+  pieceId: string,
+  surface: PieceSurfaceId,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<null>> {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}`, z.null(), {
     method: 'DELETE',
     signal: signal ?? null,
   })
@@ -56,12 +66,13 @@ export type DispatchOpening =
 
 export function dispatch(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string,
   opening: DispatchOpening,
   documents: DocumentSnapshot,
   signal?: AbortSignal,
 ): Promise<RequestResult<{ conversationId: string; actionId: string }>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ ...opening, documents }),
@@ -71,13 +82,14 @@ export function dispatch(
 
 export function applyRecommendation(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string,
   responseId: string,
   documents: DocumentSnapshot,
   constraint: string | undefined,
   signal?: AbortSignal,
 ): Promise<RequestResult<ApplyOutcome>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ responseId, documents, constraint }),
@@ -87,12 +99,13 @@ export function applyRecommendation(
 
 export function confirmApplication(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string,
   applicationId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<ApplyConfirmation>> {
   return requestJson(
-    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}/confirm`,
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}/confirm`,
     applyConfirmationSchema,
     { method: 'POST', signal: signal ?? null },
   )
@@ -100,12 +113,13 @@ export function confirmApplication(
 
 export function abandonOperation(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string,
   actionId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<null>> {
   return requestJson(
-    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
     z.null(),
     { method: 'POST', signal: signal ?? null },
   )

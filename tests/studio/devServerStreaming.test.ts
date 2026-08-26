@@ -65,14 +65,14 @@ describe('a dispatch\'s events through the dev server', () => {
       body: JSON.stringify({ workspace: 'my-writing' }),
     })
     const piece = (await post('/pieces', { title: 'Cups', mode: 'flash' })) as { id: string }
-    const conversation = (await post(`/pieces/${piece.id}/conversations`)) as { id: string }
+    const conversation = (await post(`/pieces/${piece.id}/surfaces/draft/conversations`)) as { id: string }
 
     const stream = await fetch(`${baseUrl}/pieces/${piece.id}/events`)
     expect(stream.status).toBe(200)
     if (stream.body === null) throw new Error('the events response carried no body')
     const reader = stream.body.getReader()
 
-    await post(`/pieces/${piece.id}/conversations/${conversation.id}/dispatch`, {
+    await post(`/pieces/${piece.id}/surfaces/draft/conversations/${conversation.id}/dispatch`, {
       message: 'What do you make of this?',
       documents: { draft: 'The cups sat where she left them.', storyContext: '', authorContext: '' },
     })

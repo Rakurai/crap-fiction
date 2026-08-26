@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAutosaveController, type SaveDraft } from '../../../src/client/autosave.js'
+import { createAutosaveController, type SaveDocument } from '../../../src/client/autosave.js'
 import type { RequestResult } from '../../../src/client/request.js'
 
 const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
@@ -10,7 +10,7 @@ const WROTE: RequestResult<null> = { outcome: 'value', value: null }
 const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: 'ARTIFACT_INVALID', message })
 
 function saver() {
-  return vi.fn<SaveDraft>()
+  return vi.fn<SaveDocument>()
 }
 
 describe('createAutosaveController', () => {

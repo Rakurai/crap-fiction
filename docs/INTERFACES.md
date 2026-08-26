@@ -46,23 +46,26 @@ GET    /pieces/:id                                 metadata and the Story Editor
                                                    three surfaces' text, its reference schema where it
                                                    has one, conversation index, current conversation,
                                                    and roster with enabled state
-PATCH  /pieces/:id                                 title, status, enabled cast
-PUT    /pieces/:id/draft
-GET    /pieces/:id/conversations/:cid              the durable entries, each application joined to
+PATCH  /pieces/:id                                 title, status, one surface's enabled cast
+PUT    /pieces/:id/surfaces/:surface/document      the draft's or the story context's whole text
+GET    /pieces/:id/surfaces/:surface/conversations/:cid
+                                                   the durable entries, each application joined to
                                                    the change it names
-POST   /pieces/:id/conversations                   returns the new conversation
-DELETE /pieces/:id/conversations/:cid
-POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
+POST   /pieces/:id/surfaces/:surface/conversations returns the new conversation
+DELETE /pieces/:id/surfaces/:surface/conversations/:cid
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/dispatch
+                                                   the author's message, a target and a message, or
                                                    the response answered and any clarification, and
                                                    the current text of all three documents
-POST   /pieces/:id/conversations/:cid/apply        the response applied, any constraint, and the
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply
+                                                   the response applied, any constraint, and the
                                                    current text of all three documents; settles a
                                                    no-change result on the spot, or answers with a
                                                    pending replacement and its provisional identity
-POST   /pieces/:id/conversations/:cid/apply/:applicationId/confirm
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm
                                                    the provisional identity a pending replacement was
                                                    given, confirmed once the client has saved it
-POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/actions/:actionId/abandon
                                                    targets that action by identity, so a request
                                                    naming one already finished touches nothing
 GET    /pieces/:id/events                          the event stream
@@ -80,6 +83,10 @@ GET    /models                                     what the runtime holds, and w
 `GET /call-sites` is what the room-editing surface and the assignment surface both read. `GET /models`
 reports whether the runtime can be reached at all, which is the state where the manuscript still opens
 and only the room is unavailable.
+
+Every `:surface` above names `draft` or `storyContext` — the two surfaces a piece's own routes
+address. Author context generalizes across every piece rather than belonging to one, so `GET
+/pieces/:id` is the whole of how a piece's routes reach it.
 
 ## The event stream
 

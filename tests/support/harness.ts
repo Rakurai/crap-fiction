@@ -7,10 +7,10 @@ import type { Fragment, PromptFragments } from '../../src/server/model/prompts.j
 import { callSites } from '../../src/server/model/callSites.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
+import { PieceDocumentWriter } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
-import { DraftStore } from '../../src/server/store/index.js'
+import { DraftStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -66,6 +66,7 @@ function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: rea
     now: () => {
       throw new Error('this scenario opened no operation, so nothing should have read the clock')
     },
+    authorContextReference: UNREACHED,
   })
 }
 
@@ -85,7 +86,7 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     env,
     workspace,
     spec.modes,
-    new DraftWriter(new DraftStore()),
+    new PieceDocumentWriter(new DraftStore(), new StoryContextStore()),
     callSites(spec.roles),
     modelAccess,
     room,

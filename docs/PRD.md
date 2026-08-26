@@ -267,6 +267,15 @@ may add, revise, replace or remove, and nothing is written that the author did n
 *Done when:* both contexts are human-readable and hand-editable on disk, and edits made
 outside the application are simply what the application reads next.
 
+**Work on the story context the way they work on the draft** — *per session*
+The author revises premise, intent, voice and established facts in a surface of its own, with
+the room's help, rather than only by hand-editing the file.
+*Done when:* story context has its own editing surface, conversations, cast and activity;
+switching between it and the draft changes nothing about either surface's own text, editor
+history, conversation, composer state or in-flight work; and a failed save on one surface's
+document is stated there and blocks leaving the piece without hiding or overriding whatever the
+other surface's own save state is.
+
 ### Conversations
 
 **Pick up where they left off** — *per session*
@@ -365,8 +374,8 @@ software has no need for and therefore does not have.
 **Story visualization.** Reader-knowledge-against-character-knowledge timelines and similar
 readings of structure, if actual use earns them.
 
-**Richer context management.** A dedicated editing surface for author and story context, if
-hand-editing proves insufficient.
+**Richer context management.** A dedicated editing surface for author context, if hand-editing
+proves insufficient.
 
 **Locating an applied change in the prose.** A transient jump-to or highlight affordance for
 finding what an application changed in a longer manuscript, if the before-and-after shown with

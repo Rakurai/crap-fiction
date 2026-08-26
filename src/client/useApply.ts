@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
-import type { DocumentSnapshot } from '../shared/surfaces.js'
+import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
   confirmApplication as confirmApplicationFn,
 } from './roomClient.js'
-import type { saveDraft as saveDraftFn } from './piecesClient.js'
+import type { saveSurfaceDocument as saveSurfaceDocumentFn } from './piecesClient.js'
 import { failureMessage } from './request.js'
 
 export type ApplyAdapters = Readonly<{
   applyRecommendation: typeof applyRecommendationFn
   confirmApplication: typeof confirmApplicationFn
-  saveDraft: typeof saveDraftFn
+  saveDocument: typeof saveSurfaceDocumentFn
   abandonOperation: typeof abandonOperationFn
 }>
 
@@ -26,13 +26,14 @@ export type ApplyViewModel = Readonly<{
 
 export function useApply(
   pieceId: string,
+  surface: PieceSurfaceId,
   conversationId: string | null,
   getDocuments: () => DocumentSnapshot,
   onApplied: (markdown: string) => void,
   adapters: ApplyAdapters,
   initialApplying?: ApplyingResponse,
 ): ApplyViewModel {
-  const { applyRecommendation, confirmApplication, saveDraft, abandonOperation } = adapters
+  const { applyRecommendation, confirmApplication, saveDocument, abandonOperation } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(initialApplying)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -58,11 +59,11 @@ export function useApply(
     // author doing so by hand.
     function stopAndAbandon(actionId: string, message: string | undefined): void {
       stop(message)
-      void abandonOperation(pieceId, cid, actionId)
+      void abandonOperation(pieceId, surface, cid, actionId)
     }
 
     async function run(): Promise<void> {
-      const result = await applyRecommendation(pieceId, cid, responseId, getDocuments(), constraint)
+      const result = await applyRecommendation(pieceId, surface, cid, responseId, getDocuments(), constraint)
       if (result.outcome !== 'value') {
         stop(failureMessage(result))
         return
@@ -81,13 +82,13 @@ export function useApply(
       // outcome.outcome === 'pending': install the replacement, save it exactly, then confirm.
       onApplied(outcome.manuscript)
 
-      const saved = await saveDraft(pieceId, outcome.manuscript)
+      const saved = await saveDocument(pieceId, surface, outcome.manuscript)
       if (saved.outcome !== 'value') {
         stopAndAbandon(outcome.actionId, failureMessage(saved) ?? 'the applied text could not be saved')
         return
       }
 
-      const confirmed = await confirmApplication(pieceId, cid, outcome.applicationId)
+      const confirmed = await confirmApplication(pieceId, surface, cid, outcome.applicationId)
       if (confirmed.outcome !== 'value') {
         stopAndAbandon(outcome.actionId, failureMessage(confirmed))
         return

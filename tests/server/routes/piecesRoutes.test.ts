@@ -85,7 +85,7 @@ describe('the piece routes', () => {
 
   it('carries an opened piece whole, keyed by all three surfaces: its details, each surface\'s text, cast and conversations', async () => {
     const { app, dir } = await withPiece()
-    await app.request('/pieces/cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'Two small words.' }) })
+    await app.request('/pieces/cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'Two small words.' }) })
     await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', {
       id: 'e1',
       kind: 'authorMessage',
@@ -122,7 +122,7 @@ describe('the piece routes', () => {
     const { app, dir } = await withPiece()
     await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
 
-    const res = await app.request('/pieces/cups/conversations/c1')
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1')
 
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ success: true, data: { id: 'c1', entries: [{ id: 'e1', kind: 'authorMessage' }] } })
@@ -137,16 +137,16 @@ describe('the piece routes', () => {
     const listed = await app.request('/pieces')
     expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
 
-    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: [] }) })
+    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: { surface: 'draft', ids: [] } }) })
     expect(await patched.json()).toMatchObject({
       success: true,
       data: { title: 'Cups', status: 'finished', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
     })
 
-    const saved = await app.request('/pieces/the-cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'text' }) })
+    const saved = await app.request('/pieces/the-cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'text' }) })
     expect(await saved.json()).toEqual({ success: true, data: null })
 
-    const opened = await app.request('/pieces/the-cups/conversations', { method: 'POST' })
+    const opened = await app.request('/pieces/the-cups/surfaces/draft/conversations', { method: 'POST' })
     expect(await opened.json()).toMatchObject({ success: true, data: { id: expect.any(String) } })
   })
 
@@ -158,7 +158,7 @@ describe('the piece routes', () => {
     await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
     await writeAppliedChange(dataRoot, scope, { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
 
-    const res = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1', { method: 'DELETE' })
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true, data: null })
@@ -186,11 +186,11 @@ describe('the piece routes', () => {
     expect(absentPiece.status).toBe(404)
     expect(await absentPiece.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
 
-    const absentConversation = await app.request('/pieces/cups/conversations/never-written', { method: 'DELETE' })
+    const absentConversation = await app.request('/pieces/cups/surfaces/draft/conversations/never-written', { method: 'DELETE' })
     expect(absentConversation.status).toBe(404)
     expect(await absentConversation.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
 
-    const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: ['story-editor'] }) })
+    const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: { surface: 'draft', ids: ['story-editor'] } }) })
     expect(outsideCast.status).toBe(400)
     expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
 

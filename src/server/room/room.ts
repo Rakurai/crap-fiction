@@ -24,7 +24,7 @@ import {
   type ParticipantActivityEvent,
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
-import { SURFACE_IDS, type DocumentSnapshot } from '../../shared/surfaces.js'
+import { SURFACE_IDS, type DocumentSnapshot, type SurfaceId } from '../../shared/surfaces.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
@@ -53,6 +53,11 @@ import {
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
+
+function referenceSchemaFor(mode: ModeDescriptor, authorContextReference: string, surface: SurfaceId): string | undefined {
+  if (surface === 'draft') return undefined
+  return surface === 'storyContext' ? mode.storyContextReference : authorContextReference
+}
 
 export type RoomEvent =
   | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
@@ -196,7 +201,8 @@ export class Room {
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
-  readonly #modeDescriptions: ReadonlyMap<string, string>
+  readonly #modes: ReadonlyMap<string, ModeDescriptor>
+  readonly #authorContextReference: string
   readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
@@ -213,6 +219,7 @@ export class Room {
     policy: HistoryPolicy,
     logger: Logger,
     now: Clock,
+    authorContextReference: string,
   ) {
     this.#modelAccess = modelAccess
     this.#entries = entries
@@ -225,7 +232,8 @@ export class Room {
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
-    this.#modeDescriptions = new Map(modes.map((mode) => [mode.id, mode.description]))
+    this.#modes = new Map(modes.map((mode) => [mode.id, mode]))
+    this.#authorContextReference = authorContextReference
     this.#displayNames = new Map([...roster.specialists, roster.storyEditor, ...roster.addressedOnly].map((role) => [role.id, role.displayName]))
   }
 
@@ -237,10 +245,14 @@ export class Room {
     return this.#storyEditor
   }
 
+  #modeFor(modeId: string): ModeDescriptor {
+    const mode = this.#modes.get(modeId)
+    if (mode === undefined) throw new ModeNotFoundError(modeId)
+    return mode
+  }
+
   #modeDescriptionFor(modeId: string): string {
-    const description = this.#modeDescriptions.get(modeId)
-    if (description === undefined) throw new ModeNotFoundError(modeId)
-    return description
+    return this.#modeFor(modeId).description
   }
 
   subscribe(pieceId: string, listener: Listener): () => void {
@@ -598,7 +610,7 @@ export class Room {
     const response = findResponse(entries, responseId)
     if (response === undefined || response.outcome !== 'applicableSuggestion') throw new RecommendationNotFoundError(pieceId, responseId)
 
-    const draft = documents.draft
+    const target = documents[roomScope.surface]
     const actionId = nanoid()
     const controller = new AbortController()
     const startedAt = this.#now()
@@ -615,16 +627,17 @@ export class Room {
     }
 
     try {
+      const mode = this.#modeFor(piece.metadata.mode)
       const context = compileApplyContext({
-        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
+        modeDescription: mode.description,
         recommendationClaim: response.claim,
         recommendationNote: response.note,
         constraint,
         authorContext: documents.authorContext,
         storyContext: documents.storyContext,
-        draft,
+        draft: documents.draft,
         surface: roomScope.surface,
-        referenceSchema: undefined,
+        referenceSchema: referenceSchemaFor(mode, this.#authorContextReference, roomScope.surface),
         entries,
         participants: this.#displayNames,
       })
@@ -642,7 +655,7 @@ export class Room {
       }
 
       const { manuscript } = result.value
-      if (manuscript === draft) {
+      if (manuscript === target) {
         closeOut('settled')
         return { actionId, outcome: { outcome: 'noChange', actionId } }
       }
@@ -652,7 +665,7 @@ export class Room {
         responseId,
         constraint,
         replacement: manuscript,
-        change: { id: nanoid(), content: computeAppliedChangeContent(draft, manuscript) },
+        change: { id: nanoid(), content: computeAppliedChangeContent(target, manuscript) },
       }
       const current = this.#operations.get(key)
       if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })

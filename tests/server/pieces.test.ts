@@ -6,11 +6,11 @@ import {
   ConversationNotFoundError,
   createPiece,
   deleteConversation,
-  DraftWriter,
   getConversation,
   getPiece,
   listConversations,
   listPieces,
+  PieceDocumentWriter,
   PieceNotFoundError,
   setPieceCast,
   UnknownCastMemberError,
@@ -19,7 +19,7 @@ import {
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { ConversationEntryStore, DraftStore, readAppliedChanges, writeAppliedChange } from '../../src/server/store/index.js'
+import { ConversationEntryStore, DraftStore, readAppliedChanges, StoryContextStore, writeAppliedChange } from '../../src/server/store/index.js'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
@@ -198,7 +198,9 @@ describe('pieces', () => {
       expect(() => getPiece(dataRoot, workspaceDir, id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)).toThrowError(PieceNotFoundError)
       await expect(setPieceCast(workspaceDir, id, specialists, 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
-      await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
+      await expect(new PieceDocumentWriter(new DraftStore(), new StoryContextStore()).save(workspaceDir, id, 'draft', 'text')).rejects.toThrowError(
+        PieceNotFoundError,
+      )
     }
   })
 })
@@ -288,7 +290,7 @@ describe('updatePieceDetails', () => {
   })
 })
 
-describe('DraftWriter', () => {
+describe('PieceDocumentWriter', () => {
   let workspaceDir: string
 
   beforeEach(() => {
@@ -299,16 +301,24 @@ describe('DraftWriter', () => {
     rmSync(workspaceDir, { recursive: true, force: true })
   })
 
-  function draftWriter(): DraftWriter {
-    return new DraftWriter(new DraftStore())
+  function documentWriter(): PieceDocumentWriter {
+    return new PieceDocumentWriter(new DraftStore(), new StoryContextStore())
   }
 
   it("writes an existing piece's draft through to the store", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
-    await draftWriter().save(workspaceDir, piece.id, 'Two small words.')
+    await documentWriter().save(workspaceDir, piece.id, 'draft', 'Two small words.')
 
     expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('Two small words.')
+  })
+
+  it("writes an existing piece's story context through to the store, independently of the draft", async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
+
+    await documentWriter().save(workspaceDir, piece.id, 'storyContext', 'Premise: two cups, one left behind\n')
+
+    expect(readFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), 'utf8')).toBe('Premise: two cups, one left behind\n')
   })
 })
 
@@ -332,7 +342,7 @@ describe('getConversation', () => {
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
     await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    expect(() => getConversation(dataRoot, workspaceDir, 'cups', 'c1')).toThrowError(ConversationNotFoundError)
+    expect(() => getConversation(dataRoot, workspaceDir, 'cups', 'draft', 'c1')).toThrowError(ConversationNotFoundError)
   })
 
   it('joins an application onto the change it produced, by identity, and leaves an unapplied response with none', async () => {
@@ -362,7 +372,7 @@ describe('getConversation', () => {
     const change: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] } }
     await writeAppliedChange(dataRoot, scope, change)
 
-    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'c1')
+    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'draft', 'c1')
 
     const applicationView = conversation.entries.find((entry) => entry.kind === 'application')
     expect(applicationView).toMatchObject({ responseId: 'e2', changeId: 'change1', change: change.content })
@@ -374,7 +384,7 @@ describe('getConversation', () => {
     const application: ConversationEntry = { id: 'e1', kind: 'application', responseId: 'no-such-response', changeId: 'never-written' }
     await store.append(dataRoot, scopeFor(piece.id), 'c1', application)
 
-    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'c1')
+    const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'draft', 'c1')
     expect(conversation.entries[0]).toMatchObject({ kind: 'application', change: undefined })
   })
 })
@@ -395,7 +405,7 @@ describe('listConversations', () => {
 
   it('reports none for a piece with no conversations', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    expect(listConversations(dataRoot, workspaceDir, piece.id)).toEqual([])
+    expect(listConversations(dataRoot, workspaceDir, piece.id, 'draft')).toEqual([])
   })
 
   // Which entry the opening words come from belongs to `shared/conversationEntries.test.ts`.
@@ -409,7 +419,7 @@ describe('listConversations', () => {
       brought: [],
     })
 
-    const [summary] = listConversations(dataRoot, workspaceDir, piece.id)
+    const [summary] = listConversations(dataRoot, workspaceDir, piece.id, 'draft')
     expect(summary).toMatchObject({ id: 'c1', opening: 'does the opening earn its length' })
   })
 
@@ -423,7 +433,7 @@ describe('listConversations', () => {
     utimesSync(path.join(workspaceDir, piece.id, 'conversations', 'draft', 'older.json'), past, past)
     await store.append(dataRoot, scope, 'newer', anyEntry)
 
-    expect(listConversations(dataRoot, workspaceDir, piece.id).map((c) => c.id)).toEqual(['newer', 'older'])
+    expect(listConversations(dataRoot, workspaceDir, piece.id, 'draft').map((c) => c.id)).toEqual(['newer', 'older'])
   })
 })
 
@@ -443,7 +453,7 @@ describe('deleteConversation', () => {
 
   it('reports a conversation nothing has written yet as a stated ConversationNotFoundError', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    await expect(deleteConversation(dataRoot, workspaceDir, piece.id, 'never-written')).rejects.toThrowError(ConversationNotFoundError)
+    await expect(deleteConversation(dataRoot, workspaceDir, piece.id, 'draft', 'never-written')).rejects.toThrowError(ConversationNotFoundError)
   })
 
   it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
@@ -459,10 +469,10 @@ describe('deleteConversation', () => {
     await writeAppliedChange(dataRoot, scope, ownChange)
     await writeAppliedChange(dataRoot, scope, unrelatedChange)
 
-    await deleteConversation(dataRoot, workspaceDir, piece.id, 'c1')
+    await deleteConversation(dataRoot, workspaceDir, piece.id, 'draft', 'c1')
 
-    expect(() => getConversation(dataRoot, workspaceDir, piece.id, 'c1')).toThrowError(ConversationNotFoundError)
-    expect(listConversations(dataRoot, workspaceDir, piece.id).map((c) => c.id)).toEqual(['c2'])
+    expect(() => getConversation(dataRoot, workspaceDir, piece.id, 'draft', 'c1')).toThrowError(ConversationNotFoundError)
+    expect(listConversations(dataRoot, workspaceDir, piece.id, 'draft').map((c) => c.id)).toEqual(['c2'])
     expect(readAppliedChanges(dataRoot, scope, appliedChangeSchema)).toEqual([unrelatedChange])
   })
 })

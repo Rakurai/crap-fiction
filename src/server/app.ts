@@ -5,7 +5,7 @@ import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
-import { documentSnapshotSchema } from '../shared/surfaces.js'
+import { documentSnapshotSchema, pieceSurfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
@@ -18,10 +18,10 @@ import {
   ConversationNotFoundError,
   createPiece,
   deleteConversation,
-  type DraftWriter,
   getConversation,
   getPiece,
   listPieces,
+  type PieceDocumentWriter,
   PieceNotFoundError,
   startConversation,
   UnknownCastMemberError,
@@ -41,16 +41,13 @@ import {
 import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
-import { validateJson } from './validate.js'
+import { validateJson, validateParam } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
-
-/** The surface a dispatch, an Apply and a cast change reach; the other two hold their own room scope already. */
-const OPENED_SURFACE = 'draft'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
-const putDraftSchema = z.object({ draft: z.string() })
+const putSurfaceDocumentSchema = z.object({ text: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postApplySchema = z.object({
   responseId: z.string().min(1),
@@ -60,14 +57,15 @@ const postApplySchema = z.object({
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
-  cast: z.array(z.string().min(1)).optional(),
+  cast: z.object({ surface: pieceSurfaceIdSchema, ids: z.array(z.string().min(1)) }).optional(),
 })
+const surfaceParamSchema = z.object({ surface: pieceSurfaceIdSchema })
 
 export function createApp(
   env: StudioEnv,
   workspace: WorkspaceRegistry,
   modes: readonly ModeDescriptor[],
-  draftWriter: DraftWriter,
+  documentWriter: PieceDocumentWriter,
   sites: readonly CallSiteDescriptor[],
   modelAccess: ModelAccess,
   room: Room,
@@ -118,48 +116,50 @@ export function createApp(
     return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
   })
 
-  app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
-    const { draft } = c.req.valid('json')
-    await draftWriter.save(workspace.require(), c.req.param('id'), draft)
+  const param = validateParam(surfaceParamSchema, logger)
+
+  app.put('/pieces/:id/surfaces/:surface/document', param, body(putSurfaceDocumentSchema), async (c) => {
+    const { text } = c.req.valid('json')
+    await documentWriter.save(workspace.require(), c.req.param('id'), c.req.valid('param').surface, text)
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations', (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations', param, (c) => {
     return c.json(ok(startConversation(workspace.require(), c.req.param('id'))))
   })
 
-  app.get('/pieces/:id/conversations/:cid', (c) => {
-    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.param('cid'))))
+  app.get('/pieces/:id/surfaces/:surface/conversations/:cid', param, (c) => {
+    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
   })
 
-  app.delete('/pieces/:id/conversations/:cid', async (c) => {
-    await deleteConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.param('cid'))
+  app.delete('/pieces/:id/surfaces/:surface/conversations/:cid', param, async (c) => {
+    await deleteConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations/:cid/dispatch', body(dispatchRequestSchema), async (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/dispatch', param, body(dispatchRequestSchema), async (c) => {
     const request = c.req.valid('json')
-    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
     const result = await room.dispatch(workspace.require(), scope, c.req.param('cid'), dispatchOpening(request), request.documents)
     return c.json(ok(result))
   })
 
-  app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/apply', param, body(postApplySchema), async (c) => {
     const { responseId, constraint, documents } = c.req.valid('json')
-    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
     const { outcome } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, documents)
     return c.json(ok(outcome))
   })
 
-  app.post('/pieces/:id/conversations/:cid/apply/:applicationId/confirm', async (c) => {
-    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm', param, async (c) => {
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
     const confirmation = await room.confirmApply(workspace.require(), scope, c.req.param('cid'), c.req.param('applicationId'))
     return c.json(ok(confirmation))
   })
 
-  app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/actions/:actionId/abandon', param, (c) => {
     workspace.require()
-    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
     room.abandon(scope, c.req.param('actionId'))
     return c.json(ok(null))
   })

@@ -11,7 +11,7 @@ import type { Room } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestApp } from '../../support/harness.js'
 import { buildTestRoom } from '../../support/room.js'
-import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
  * What the room does with a dispatch or an application belongs to
@@ -78,6 +78,7 @@ describe('the room over HTTP', () => {
       policy: SHIPPED_HISTORY_POLICY,
       modelAccess,
       now: () => 1_700_000_000_000,
+      authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
     })
     const { app, workspace } = buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus: undefined, room })
 
@@ -87,7 +88,7 @@ describe('the room over HTTP', () => {
   }
 
   async function dispatch(app: Hono, conversationId: string, body: Record<string, unknown>): Promise<Response> {
-    return await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
+    return await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}/dispatch`, {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ documents: DOCUMENTS, ...body }),
@@ -99,7 +100,7 @@ describe('the room over HTTP', () => {
   }
 
   async function conversation(app: Hono, conversationId: string) {
-    return await (await app.request(`/pieces/cups/conversations/${conversationId}`)).json()
+    return await (await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}`)).json()
   }
 
   /** Watched at the scope the author's studio watches through the event stream's snapshot. */
@@ -124,11 +125,11 @@ describe('the room over HTTP', () => {
   it('mints a conversation id that writes nothing until the first dispatch opens', async () => {
     const { app } = await withPiece({})
 
-    const res = await app.request('/pieces/cups/conversations', { method: 'POST' })
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations', { method: 'POST' })
     const { id } = (await res.json()).data
 
     expect(res.status).toBe(200)
-    const unopened = await app.request(`/pieces/cups/conversations/${id}`)
+    const unopened = await app.request(`/pieces/cups/surfaces/draft/conversations/${id}`)
     expect(unopened.status).toBe(404)
     expect(await unopened.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
   })
@@ -177,7 +178,7 @@ describe('the room over HTTP', () => {
     })
     const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
-    const applying = app.request('/pieces/cups/conversations/c1/apply', {
+    const applying = app.request('/pieces/cups/surfaces/draft/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ responseId, documents: DOCUMENTS }),
@@ -193,12 +194,12 @@ describe('the room over HTTP', () => {
     // Still busy: pending, not settled, until the client installs, saves and confirms it.
     expect(room.activitySnapshot(draftScope)).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
 
-    await app.request('/pieces/cups/draft', {
+    await app.request('/pieces/cups/surfaces/draft/document', {
       method: 'PUT',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ draft: applied.manuscript }),
+      body: JSON.stringify({ text: applied.manuscript }),
     })
-    const confirming = await app.request(`/pieces/cups/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
+    const confirming = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
     expect(confirming.status).toBe(200)
     const { data: confirmed } = await confirming.json()
 
@@ -218,7 +219,7 @@ describe('the room over HTTP', () => {
     })
     const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
-    const applying = app.request('/pieces/cups/conversations/c1/apply', {
+    const applying = app.request('/pieces/cups/surfaces/draft/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ responseId, documents: DOCUMENTS }),
@@ -226,11 +227,11 @@ describe('the room over HTTP', () => {
     modelAccess.release('apply')
     const { data: applied } = await (await applying).json()
 
-    const unknown = await app.request('/pieces/cups/conversations/c1/apply/no-such-application/confirm', { method: 'POST' })
+    const unknown = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application/confirm', { method: 'POST' })
     expect(unknown.status).toBe(404)
     expect(await unknown.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
 
-    const unsaved = await app.request(`/pieces/cups/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
+    const unsaved = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
     expect(unsaved.status).toBe(409)
     expect(await unsaved.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_DOCUMENT_NOT_SAVED' } })
   })
@@ -239,7 +240,7 @@ describe('the room over HTTP', () => {
   it('accepts abandoning an action nothing is running without complaint', async () => {
     const { app, room } = await withPiece({})
 
-    const abandoned = await app.request('/pieces/cups/conversations/c1/actions/no-such-action/abandon', { method: 'POST' })
+    const abandoned = await app.request('/pieces/cups/surfaces/draft/conversations/c1/actions/no-such-action/abandon', { method: 'POST' })
 
     expect(abandoned.status).toBe(200)
     expect(room.activitySnapshot(draftScope)).toBeUndefined()
@@ -264,7 +265,7 @@ describe('the room over HTTP', () => {
     expect(unknownCommentary.status).toBe(404)
     expect(await unknownCommentary.json()).toMatchObject({ success: false, error: { code: 'COMMENTARY_NOT_FOUND' } })
 
-    const unknownRecommendation = await app.request('/pieces/cups/conversations/c1/apply', {
+    const unknownRecommendation = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ responseId: 'no-such-response', documents: { draft: 'text', storyContext: '', authorContext: '' } }),

@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { createAutosaveController, type AutosaveState } from './autosave.js'
-import type { saveDraft as saveDraftFn } from './piecesClient.js'
+import { createAutosaveController, type AutosaveState, type SaveDocument } from './autosave.js'
 
 export type AutosaveViewModel = Readonly<{
   state: AutosaveState
   flush: () => void
 }>
 
-export function useAutosave(pieceId: string, markdown: string, saveDraft: typeof saveDraftFn): AutosaveViewModel {
+export function useAutosave(markdown: string, save: SaveDocument): AutosaveViewModel {
   const [state, setState] = useState<AutosaveState>({ failed: false })
   const controllerRef = useRef<ReturnType<typeof createAutosaveController> | undefined>(undefined)
 
-  controllerRef.current ??= createAutosaveController(markdown, (text) => saveDraft(pieceId, text), setState, () => Date.now())
+  controllerRef.current ??= createAutosaveController(markdown, save, setState, () => Date.now())
   const controller = controllerRef.current
 
   useEffect(() => {

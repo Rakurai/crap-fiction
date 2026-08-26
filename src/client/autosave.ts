@@ -5,7 +5,7 @@ export type AutosaveState =
   | { readonly failed: false }
   | { readonly failed: true; readonly message: string; readonly atMs: number }
 
-export type SaveDraft = (text: string) => Promise<RequestResult<null>>
+export type SaveDocument = (text: string) => Promise<RequestResult<null>>
 
 export type AutosaveController = {
   readonly update: (text: string) => void
@@ -14,7 +14,7 @@ export type AutosaveController = {
 
 const DEBOUNCE_MS = 1000
 
-export function createAutosaveController(initialText: string, save: SaveDraft, onStateChange: (state: AutosaveState) => void, now: Clock, debounceMs: number = DEBOUNCE_MS): AutosaveController {
+export function createAutosaveController(initialText: string, save: SaveDocument, onStateChange: (state: AutosaveState) => void, now: Clock, debounceMs: number = DEBOUNCE_MS): AutosaveController {
   let latest = initialText
   let dirty = false
   let inFlight = false

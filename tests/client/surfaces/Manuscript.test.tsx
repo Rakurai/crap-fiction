@@ -16,6 +16,7 @@ const DEFAULT_PROPS = {
   onClose: vi.fn(),
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
+  onSwitchToStoryContext: vi.fn(),
   lifecycle: {
     status: 'drafting' as const,
     retitling: false,
@@ -30,7 +31,7 @@ const DEFAULT_PROPS = {
 
 function Harness(props: typeof DEFAULT_PROPS) {
   const manuscript = useManuscript(props.draft)
-  const autosave = useAutosave(props.pieceId, manuscript.markdown, (text) => saveDraft(props.pieceId, text))
+  const autosave = useAutosave(manuscript.markdown, (text) => saveDraft(props.pieceId, text))
 
   return (
     <Manuscript
@@ -39,8 +40,10 @@ function Harness(props: typeof DEFAULT_PROPS) {
       onClose={props.onClose}
       manuscript={manuscript}
       autosave={autosave}
+      leaveBlocked={autosave.state.failed}
       onOpenRoom={props.onOpenRoom}
       onOpenConversations={props.onOpenConversations}
+      onSwitchToStoryContext={props.onSwitchToStoryContext}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />

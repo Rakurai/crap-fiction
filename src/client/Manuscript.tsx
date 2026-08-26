@@ -1,6 +1,7 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import type { PieceStatus } from '../shared/pieceViews.js'
+import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
 import type { AutosaveViewModel } from './useAutosave.js'
@@ -22,56 +23,31 @@ type ManuscriptProps = {
   readonly onClose: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
+  /** Whether leaving the piece is refused — this document's own failed save, or another's. */
+  readonly leaveBlocked: boolean
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
+  readonly onSwitchToStoryContext: () => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName: string } | undefined
-}
-
-function EditableTitle({ title, saving, onRetitle }: { readonly title: string; readonly saving: boolean; readonly onRetitle: (title: string) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(title)
-
-  if (!editing) {
-    return (
-      <button type="button" className={styles.title} onClick={() => { setDraft(title); setEditing(true) }}>
-        {title}
-      </button>
-    )
-  }
-
-  return (
-    <form
-      className={styles.retitleForm}
-      onSubmit={(event) => {
-        event.preventDefault()
-        const next = draft.trim()
-        setEditing(false)
-        if (next.length > 0 && next !== title) onRetitle(next)
-      }}
-    >
-      <input
-        aria-label="Piece title"
-        className={styles.retitleInput}
-        value={draft}
-        autoFocus
-        disabled={saving}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setEditing(false)
-        }}
-      />
-      <button type="submit" className={styles.retitleSave} disabled={saving}>
-        save
-      </button>
-    </form>
-  )
 }
 
 /** How long the way out of the reading view stands after the author last moved the pointer. */
 const WAY_BACK_HOLDS_MS = 2400
 
-export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenRoom, onOpenConversations, lifecycle, applying }: ManuscriptProps) {
+export function Manuscript({
+  title,
+  mode,
+  onClose,
+  manuscript,
+  autosave,
+  leaveBlocked,
+  onOpenRoom,
+  onOpenConversations,
+  onSwitchToStoryContext,
+  lifecycle,
+  applying,
+}: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
   const [wayBackRevealed, setWayBackRevealed] = useState(false)
   const wayBackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -108,7 +84,7 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
     <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
       {!reading && (
         <div className={styles.topBar}>
-          <button type="button" className={styles.leave} onClick={onClose} disabled={autosave.state.failed}>
+          <button type="button" className={styles.leave} onClick={onClose} disabled={leaveBlocked}>
             ‹ pieces
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
@@ -133,6 +109,9 @@ export function Manuscript({ title, mode, onClose, manuscript, autosave, onOpenR
               reading
             </button>
             <span className={styles.controlsRule} />
+            <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
+              story context
+            </button>
             <button type="button" className={styles.control} onClick={onOpenConversations}>
               conversations
             </button>

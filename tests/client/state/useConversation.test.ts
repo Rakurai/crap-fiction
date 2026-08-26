@@ -39,7 +39,7 @@ function roomWithHeldConversation(entries: readonly ConversationEntryView[], dra
     abandonOperation: vi.fn(),
     applyRecommendation: vi.fn(),
     confirmApplication: vi.fn(),
-    saveDraft: vi.fn(),
+    saveDocument: vi.fn(),
     subscribeToRoom: vi.fn((_pieceId, onEvent) => {
       deliver = onEvent
       return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
@@ -62,7 +62,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it('keeps an entry that landed while the file was still being read, behind the entries that preceded it', async () => {
     const { room, stream, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1'), authorMessage('e2', 'what about e2')])
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     stream({
       type: 'action.started',
@@ -83,7 +83,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it("resumes the dispatch the room reports in flight once the stream's snapshot resolves, behind the file's entries too", async () => {
     const { room, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1')], activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => {
       expect(result.current.busy).toBe(true)
@@ -100,7 +100,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it('ignores the snapshot when its action belongs to a different conversation than the one this hook opened', async () => {
     const { room } = roomWithHeldConversation([], { ...activitySnapshot('a1'), conversationId: 'some-other-conversation' })
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await act(async () => {
       await Promise.resolve()
@@ -123,7 +123,7 @@ describe('releasing the controls an action holds', () => {
       abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
       applyRecommendation: vi.fn(),
       confirmApplication: vi.fn(),
-      saveDraft: vi.fn(),
+      saveDocument: vi.fn(),
       subscribeToRoom: vi.fn((_pieceId, onEvent) => {
         deliver = onEvent
         return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
@@ -136,7 +136,7 @@ describe('releasing the controls an action holds', () => {
   it('holds them for the newer action when the one it replaced settles behind it', async () => {
     const { room, stream } = streamingRoom(activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 
@@ -156,7 +156,7 @@ describe('releasing the controls an action holds', () => {
   it('releases them for an action started and finished in the same batch of frames', () => {
     const { room, stream } = streamingRoom()
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', null, () => {}, () => DOCUMENTS, room))
 
     stream(
       {
@@ -183,7 +183,7 @@ describe('abandoning an operation', () => {
       abandonOperation,
       applyRecommendation: vi.fn(),
       confirmApplication: vi.fn(),
-      saveDraft: vi.fn(),
+      saveDocument: vi.fn(),
       subscribeToRoom: vi.fn(() => ({ snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} })),
     }
   }
@@ -191,7 +191,7 @@ describe('abandoning an operation', () => {
   it('asks the room to abandon the operation in flight, and asks nothing where there is none', async () => {
     const room = idleRoom(undefined, activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 
@@ -199,10 +199,10 @@ describe('abandoning an operation', () => {
       result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
 
     const idle = idleRoom()
-    const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => DOCUMENTS, idle))
+    const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', 'draft', null, () => {}, () => DOCUMENTS, idle))
 
     nothingInFlight.current.abandon()
 
@@ -212,7 +212,7 @@ describe('abandoning an operation', () => {
   it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', async () => {
     const room = idleRoom(vi.fn(() => new Promise<RequestResult<null>>(() => {})), activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.busy).toBe(true))
 
@@ -230,7 +230,7 @@ describe('abandoning an operation', () => {
       activitySnapshot('a1'),
     )
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 

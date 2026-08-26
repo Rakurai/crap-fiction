@@ -27,14 +27,8 @@ import {
   writePieceMetadata,
   type DraftStore,
   type StoredPiece,
+  type StoryContextStore,
 } from './store/index.js'
-
-/** The surface every act that changes a piece's own cast reaches; the other two hold their own. */
-const OPENED_SURFACE: PieceSurfaceId = 'draft'
-
-function draftScope(workspaceDir: string, pieceId: string): ConversationScope {
-  return { kind: 'piece', workspaceDir, pieceId, surface: OPENED_SURFACE }
-}
 
 function surfaceScope(workspaceDir: string, pieceId: string, surface: SurfaceId): ConversationScope {
   return conversationScopeFor(workspaceDir, { pieceId, surface })
@@ -100,7 +94,7 @@ export function listConversations(
   dataRoot: string,
   workspaceDir: string,
   pieceId: string,
-  surface: SurfaceId = OPENED_SURFACE,
+  surface: SurfaceId,
 ): readonly ConversationSummary[] {
   const scope = surfaceScope(workspaceDir, pieceId, surface)
   return conversationActivity(dataRoot, scope)
@@ -237,7 +231,7 @@ export async function updatePieceDetails(
 export type PieceChanges = Readonly<{
   title?: string | undefined
   status?: PieceStatus | undefined
-  cast?: readonly string[] | undefined
+  cast?: Readonly<{ surface: PieceSurfaceId; ids: readonly string[] }> | undefined
 }>
 
 export async function updatePiece(
@@ -252,7 +246,7 @@ export async function updatePiece(
     await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
   }
   if (cast !== undefined) {
-    await setPieceCast(workspaceDir, id, specialists, OPENED_SURFACE, cast)
+    await setPieceCast(workspaceDir, id, specialists, cast.surface, cast.ids)
   }
 }
 
@@ -261,8 +255,14 @@ export function startConversation(workspaceDir: string, pieceId: string): { read
   return { id: nanoid() }
 }
 
-export function getConversation(dataRoot: string, workspaceDir: string, pieceId: string, conversationId: string): EntryConversationView {
-  const scope = draftScope(workspaceDir, pieceId)
+export function getConversation(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: PieceSurfaceId,
+  conversationId: string,
+): EntryConversationView {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
   const conversation = readConversationEntries(dataRoot, scope, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
@@ -275,8 +275,14 @@ export function getConversation(dataRoot: string, workspaceDir: string, pieceId:
   return { id: conversation.id, entries }
 }
 
-export async function deleteConversation(dataRoot: string, workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
-  const scope = draftScope(workspaceDir, pieceId)
+export async function deleteConversation(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: PieceSurfaceId,
+  conversationId: string,
+): Promise<void> {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
   const conversation = readConversationEntries(dataRoot, scope, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
@@ -289,15 +295,19 @@ export async function deleteConversation(dataRoot: string, workspaceDir: string,
   await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
-export class DraftWriter {
-  readonly #drafts: DraftStore
+/** The draft's and the story context's own writer, each document serialized independently of the other. */
+export class PieceDocumentWriter {
+  readonly #draft: DraftStore
+  readonly #storyContext: StoryContextStore
 
-  constructor(drafts: DraftStore) {
-    this.#drafts = drafts
+  constructor(draft: DraftStore, storyContext: StoryContextStore) {
+    this.#draft = draft
+    this.#storyContext = storyContext
   }
 
-  async save(workspaceDir: string, id: string, draft: string): Promise<void> {
+  async save(workspaceDir: string, id: string, surface: PieceSurfaceId, text: string): Promise<void> {
     if (!pieceExists(workspaceDir, id)) throw new PieceNotFoundError(id)
-    await this.#drafts.write(workspaceDir, id, draft)
+    if (surface === 'draft') await this.#draft.write(workspaceDir, id, text)
+    else await this.#storyContext.write(workspaceDir, id, text)
   }
 }

@@ -161,6 +161,15 @@ export class DraftStore {
   }
 }
 
+/** Story context's own writer, serialized independently of the draft's so neither write waits on the other. */
+export class StoryContextStore {
+  readonly #lock = new Mutex()
+
+  async write(workspaceDir: string, id: string, text: string): Promise<void> {
+    await this.#lock.runExclusive(() => writeStoryContext(workspaceDir, id, text))
+  }
+}
+
 export async function writePieceCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
 }

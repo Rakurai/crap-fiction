@@ -19,6 +19,7 @@ export type RoomSpec = Readonly<{
   policy: HistoryPolicy
   modelAccess: ModelAccess
   now: Clock
+  authorContextReference: string
 }>
 
 export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
@@ -33,5 +34,6 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     spec.policy,
     createLogger('silent'),
     spec.now,
+    spec.authorContextReference,
   )
 }

@@ -33,6 +33,8 @@ export const ROLES_FIXTURE: readonly RoleDefinition[] = [
 
 export const CHARTER_FIXTURE: Charter = 'nothing material to contribute; a reading without a concrete action; a recommendation concrete enough to apply'
 
+export const AUTHOR_CONTEXT_REFERENCE_FIXTURE = 'Recurring stylistic preferences and collaboration notes, generalizing across every piece.'
+
 function fixedFragment(name: string, template: string): Fragment {
   return { name, variables: [], template }
 }

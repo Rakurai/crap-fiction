@@ -54,6 +54,20 @@ view is entered and left in one action each way with reading position preserved 
 that the author does it on impulse, mid-paragraph, without deciding to. It reads as the same
 manuscript with the application gone, not as a separate place.
 
+## The story context surface
+
+**A short switcher, beside the manuscript's other one-action controls, moves between the draft
+and story context.** Switching changes the document on screen, its conversations, its cast and
+its activity together, and nothing else: the surface left behind keeps its text, its editor
+history, its conversation and composer state, its scroll position, and whatever save or room
+activity it was already holding, exactly as it was left. Activity on one is never a reason the
+other cannot start its own.
+
+**Story context is set as plain text, not as prose.** It carries no rendered view, no Markdown
+source toggle and no reading view — one surface, one way of seeing it, because it is notes
+rather than the story itself. Its reference schema sits beside it, offered as guidance the
+author can consult and dismiss rather than a form asking to be filled in.
+
 ## The conversation
 
 ### Where the author speaks
@@ -281,7 +295,7 @@ Derived from how often the author does each thing.
 **Permanently present** — the manuscript; the conversation; the input; the actions on a
 response.
 
-**One action away** — the reading view; the Markdown view; choosing or starting a
+**One action away** — the reading view; the Markdown view; story context; choosing or starting a
 conversation; editing the room.
 
 **A place the author goes** — model assignment, the workspace, other pieces, the interface theme.
@@ -355,11 +369,13 @@ half-applied, and the recommendation remains applicable.
 editable again, and the recommendation is still there to apply.
 
 **A failed save.** The failure is stated quietly and persistently where the writing surface can be
-seen, clears itself when a later write succeeds, and never resolves optimistically: silence has to
-mean saved, or it means nothing. Not a modal, because interrupting the author to say the disk is
-unhappy costs them more than the failure does. Leaving for another piece is the one thing unavailable
-in this state, and it is unavailable rather than confirmed: an author asked whether to discard their
-own prose has been asked the wrong question.
+seen, named as that document's own where the piece holds more than one, clears itself when a
+later write to that document succeeds, and never resolves optimistically: silence has to mean
+saved, or it means nothing. Not a modal, because interrupting the author to say the disk is
+unhappy costs them more than the failure does. Leaving for another piece is the one thing
+unavailable while any of the piece's documents is in this state, and it is unavailable rather
+than confirmed: an author asked whether to discard their own prose has been asked the wrong
+question.
 
 **Models unreachable.** The manuscript opens, is writable, and stays writable. Only the room
 is unavailable, and it says so where the author would otherwise address it. The ordinary cause is a

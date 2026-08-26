@@ -9,11 +9,11 @@ import { loadPromptFragments, type PromptFragments } from './model/prompts.js'
 import type { ModelAccess } from './model/types.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
-import { DraftWriter } from './pieces.js'
+import { PieceDocumentWriter } from './pieces.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { Room } from './room/room.js'
 import { resolveRoster, type RoomRoster } from './room/roster.js'
-import { ConversationEntryStore, DraftStore, readShippedAuthorContextReference } from './store/index.js'
+import { ConversationEntryStore, DraftStore, readShippedAuthorContextReference, StoryContextStore } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -49,7 +49,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
   const { modes, charter, fragments, sites, roster, authorContextReference } = loadShippedContent(CONTENT_ROOT)
-  const draftWriter = new DraftWriter(new DraftStore())
+  const documentWriter = new PieceDocumentWriter(new DraftStore(), new StoryContextStore())
   const modelAccess = makeModelAccess(env, logger)
   const room = new Room(
     modelAccess,
@@ -62,6 +62,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     SHIPPED_HISTORY_POLICY,
     logger,
     Date.now,
+    authorContextReference,
   )
-  return { app: createApp(env, workspace, modes, draftWriter, sites, modelAccess, room, logger, authorContextReference) }
+  return { app: createApp(env, workspace, modes, documentWriter, sites, modelAccess, room, logger, authorContextReference) }
 }
