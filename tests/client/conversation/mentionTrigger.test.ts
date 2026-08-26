@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { completeMention, mentionQuery } from '../../src/client/mentionTrigger.js'
+import { completeMention, mentionQuery } from '../../../src/client/mentionTrigger.js'
 
 // Where a sigil counts as opening a mention at all is the shared `@handle` grammar's claim, held
 // at `shared/handle.test.ts`; the one mid-word case below is this module's seam onto it.
