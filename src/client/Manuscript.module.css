@@ -1,11 +1,11 @@
 /*
- * The prose keeps a measure and stops pooling the rest of the window on one side: past its own
- * width the pane holds its place beside the conversation rather than sliding away from it.
+ * The pane takes the window's whole width beside the conversation; the prose keeps its measure
+ * inside it rather than by capping the pane, so a wide display widens the margins around the
+ * text and never leaves the application itself sitting in a box.
  */
 .wrapper {
   position: relative;
   flex: 1 1 760px;
-  max-width: 760px;
   min-width: 440px;
   min-height: 0;
   display: flex;
@@ -68,17 +68,6 @@
   composes: commit from './controls.module.css';
 }
 
-.status {
-  font: 500 10px/1 var(--font-facts);
-  color: var(--facts-ink);
-  letter-spacing: .06em;
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 4px 5px;
-  flex: none;
-}
-
 .lifecycleError {
   flex: none;
   font: 400 11.5px/1.45 var(--font-ui);
@@ -88,13 +77,16 @@
   border-top: 1px solid var(--rule2);
 }
 
+/*
+ * Stated whole or not at all: it is the only thing in the bar that could give way under pressure,
+ * and truncating it leaves an ellipsis standing where a fact was, which says less than nothing.
+ */
 .length {
+  flex: none;
   font: 400 10px/1 var(--font-facts);
   color: var(--facts-ink);
   letter-spacing: .07em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .applyingBanner {

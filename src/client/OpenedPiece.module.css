@@ -1,14 +1,13 @@
 /*
- * The two surfaces sit together in the middle of the window rather than at its two edges: the
- * slack a wide display leaves goes outside the pair, where it reads as margin, and not between
- * them, where it read as two applications open at once.
+ * The pair fills the window edge to edge. What a wide display leaves goes to the document,
+ * which is the one thing that can use it: the conversation holds its width, so thinking never
+ * takes space from the prose and the prose never has to give any back.
  */
 .row {
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
-  justify-content: center;
   background: var(--bg);
 }
 

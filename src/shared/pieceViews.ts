@@ -1,15 +1,10 @@
 import { z } from 'zod'
 import { conversationSummarySchema } from './conversationEntries.js'
 
-export const pieceStatusSchema = z.enum(['drafting', 'finished', 'abandoned'])
-
-export type PieceStatus = z.infer<typeof pieceStatusSchema>
-
 const pieceSummaryShape = z.object({
   id: z.string(),
   title: z.string(),
   mode: z.string(),
-  status: pieceStatusSchema,
   length: z.number(),
   modified: z.number(),
 })

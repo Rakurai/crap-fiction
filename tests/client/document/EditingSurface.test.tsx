@@ -43,13 +43,9 @@ const BASE_PROPS = {
   roster: ROSTER,
   runtime: { reachable: true },
   lifecycle: {
-    status: 'drafting' as const,
     retitling: false,
     retitleError: undefined,
     onRetitle: vi.fn(),
-    settingStatus: false,
-    statusError: undefined,
-    onSetStatus: vi.fn(),
   },
   active: true,
   onSwitchToSurface: vi.fn(),

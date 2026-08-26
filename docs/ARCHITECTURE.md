@@ -565,7 +565,7 @@ standing alone conforms and nothing has to be invented to fill a field. Shrinkin
 always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
-one, and so does the Story Editor on a dispatch where nothing substantive landed. Declaring it is then
+one, and so does the Story Editor on every dispatch that calls it at all. Declaring it is then
 a response that does not conform, which the module re-issues under its own policy before it becomes a
 failure. This is what makes an owed answer enforceable without inspecting what a response says —
 judging the content would take a second model call to do badly, and a model willing to declare silence
@@ -822,6 +822,12 @@ mid-application is written, and changes nothing about what the model was given.
 **The result is text the client applies**, not a write the room performs. The room reads the target
 document from the request and returns it embodying the recommendation; nothing reaches disk until the
 author's own surface holds it.
+
+**A replacement is read into its target document's own spelling before it is anything.** A surface saves
+the document its own editor writes, so a replacement in some other equivalent spelling of the same prose
+is text that surface can never save and a confirmation that can never match. Reading it in once, where the
+replacement is formed, is also what makes the before-and-after and the answer that nothing changed describe
+the text that will land rather than the text the model happened to type.
 
 **A replacement is provisional until the client confirms it was saved.** The room retains it — the
 document, the change computed from it, and a provisional identity — as the one pending application its

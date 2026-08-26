@@ -55,7 +55,7 @@ export type SectionName =
   | 'constraint'
   | 'referenceSchema'
 
-export type LineName = 'historyMessage' | 'historyResponse' | 'readingSubstantive' | 'readingNoComment'
+export type LineName = 'historyMessage' | 'historyResponse' | 'readingSubstantive'
 export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
 export type OperationRoleName = 'apply'
 
@@ -75,7 +75,7 @@ const SECTION_NAMES: readonly SectionName[] = [
   'constraint',
   'referenceSchema',
 ]
-const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'readingSubstantive', 'readingNoComment']
+const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'readingSubstantive']
 const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply']
 const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply']
 

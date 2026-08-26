@@ -103,7 +103,6 @@ describe('pieces', () => {
     expect(piece.id).toBe('the-cups')
     expect(piece.title).toBe('The Cups')
     expect(piece.mode).toBe('flash')
-    expect(piece.status).toBe('drafting')
     expect(piece.length).toBe(0)
   })
 
@@ -331,26 +330,13 @@ describe('updatePieceDetails', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('retitles a piece, leaving its mode, status and directory untouched', async () => {
+  it('retitles a piece, leaving its mode and directory untouched', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
 
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
-    expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
+    expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash' })
     expect(getPiece(dataRoot, workspaceDir, 'cups', specialists, storyEditor, interviewer, [flash], AUTHOR_CONTEXT_REFERENCE_FIXTURE).title).toBe('The Cups')
-  })
-
-  it('marks a piece finished or abandoned, with no transition it refuses', async () => {
-    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-
-    const finished = await updatePieceDetails(workspaceDir, created.id, { status: 'finished' })
-    expect(finished.status).toBe('finished')
-
-    const abandoned = await updatePieceDetails(workspaceDir, created.id, { status: 'abandoned' })
-    expect(abandoned.status).toBe('abandoned')
-
-    const backToDrafting = await updatePieceDetails(workspaceDir, created.id, { status: 'drafting' })
-    expect(backToDrafting.status).toBe('drafting')
   })
 })
 

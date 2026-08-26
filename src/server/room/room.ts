@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import { canonicalMarkdown } from '../../document/markdown.js'
 import type { AppliedChange, AppliedChangeContent } from '../../shared/appliedChange.js'
 import { appliedChangeSchema } from '../../shared/appliedChange.js'
 import type { ApplyOutcome } from '../../shared/applyViews.js'
@@ -573,9 +574,10 @@ export class Room {
       if (signal.aborted) {
         abandoned = true
       } else {
-        const owesAnswer = addressedIds.includes(this.#storyEditor.id) || evidence.length === 0
-        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, owesAnswer), evidence), this.#fragments, this.#charter)
-        const outcome = await callParticipant(this.#storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
+        // Reaching here is itself the decision that the Story Editor speaks: an addressed dispatch
+        // has already excluded it unless it was named, so every call it does receive owes an answer.
+        const prompt = renderPrompt(compileStoryEditorContext(contextFor(this.#storyEditor, true), evidence), this.#fragments, this.#charter)
+        const outcome = await callParticipant(this.#storyEditor, prompt, causeEntry.id, true, this.#modelAccess, signal, (state) =>
           onState(this.#storyEditor.id, state),
         )
         operation.states.delete(this.#storyEditor.id)
@@ -669,7 +671,7 @@ export class Room {
         }
       }
 
-      const { replacement } = result.value
+      const replacement = roomScope.surface === 'draft' ? canonicalMarkdown(result.value.replacement) : result.value.replacement
       if (replacement === target) {
         closeOut('settled')
         return { actionId, outcome: { outcome: 'noChange', actionId } }

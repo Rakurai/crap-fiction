@@ -155,13 +155,9 @@ export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextS
         pieceAdapters={pieceAdapters}
         callSites={callSites}
         lifecycle={{
-          status: piece.piece.status,
           retitling: piece.retitling,
           retitleError: piece.retitleError,
           onRetitle: piece.retitle,
-          settingStatus: piece.settingStatus,
-          statusError: piece.statusError,
-          onSetStatus: piece.setStatus,
         }}
         authorContextSelection={authorContextSelection}
         onClose={onClose}

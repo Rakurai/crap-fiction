@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { documentToMarkdown, editorContentToMarkdown, markdownToDocument, markdownToEditorContent } from '../../src/document/markdown.js'
+import { canonicalMarkdown, documentToMarkdown, editorContentToMarkdown, markdownToDocument, markdownToEditorContent } from '../../src/document/markdown.js'
 import { documentSchema } from '../../src/document/schema.js'
 
 const { doc, paragraph, heading, horizontalRule, hardBreak } = documentSchema.nodes
@@ -187,6 +187,13 @@ describe('markdown round-trip over the constrained schema', () => {
       expect(written).not.toContain(gone)
     }
     expect(written).toBe('Read the full letter, see her, and <b>note</b> this.')
+  })
+
+  it('reads equivalent spellings of the same prose into the one spelling the serializer writes, and leaves that one alone', () => {
+    const written = canonicalMarkdown('She left them *there*.\n\nBoth cups.\n')
+
+    expect(written).toBe('She left them _there_.\n\nBoth cups.')
+    expect(canonicalMarkdown(written)).toBe(written)
   })
 
   it('round-trips through the editor-content bridge the same way as the document model', () => {

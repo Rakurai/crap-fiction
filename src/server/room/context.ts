@@ -14,9 +14,7 @@ export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'response'; participant: string; claim: string; note: string | undefined }>
 
-export type ParticipantEvidence =
-  | Readonly<{ kind: 'substantive'; participant: string; claim: string; note: string | undefined }>
-  | Readonly<{ kind: 'noComment'; participant: string }>
+export type ParticipantEvidence = Readonly<{ kind: 'substantive'; participant: string; claim: string; note: string | undefined }>
 
 export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
 
@@ -210,11 +208,7 @@ function historyLines(fragments: PromptFragments, history: readonly HistoryEntry
 function readingsLines(fragments: PromptFragments, evidence: readonly ParticipantEvidence[]): string | undefined {
   if (evidence.length === 0) return undefined
   return evidence
-    .map((entry) =>
-      entry.kind === 'noComment'
-        ? renderFragment(fragments.lines.readingNoComment, { participant: entry.participant })
-        : renderFragment(fragments.lines.readingSubstantive, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) }),
-    )
+    .map((entry) => renderFragment(fragments.lines.readingSubstantive, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) }))
     .join('\n')
 }
 

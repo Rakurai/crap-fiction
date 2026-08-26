@@ -297,8 +297,7 @@ failed to keep.
 **Move on to the next piece** — *per piece*
 *Done when:* pieces are independently listable and openable, one piece is open at a time and
 opening another costs no saving or confirmation step, no piece switch can discard prose the author
-typed, a piece can be marked finished or abandoned at any time with nothing blocking it, and nothing
-in the durable artifacts assumes a single piece.
+typed, and nothing in the durable artifacts assumes a single piece.
 
 **Open their work without the app** — *rare, non-negotiable*
 *Done when:* every durable artifact is human-readable on disk and the manuscript is diffable

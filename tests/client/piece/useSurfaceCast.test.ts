@@ -33,7 +33,6 @@ function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail>
       id: 'the-lighthouse',
       title: 'The Lighthouse',
       mode: 'flash',
-      status: 'drafting',
       length: 0,
       modified: 1_700_000_000_000,
       surfaces: { draft: surface(cast), storyContext: surface([]), authorContext: surface([]) },
