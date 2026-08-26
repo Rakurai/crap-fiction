@@ -26,7 +26,6 @@ describe('applied changes', () => {
     await writePieceMetadata(workspaceDir, 'cups', {
       title: 'Cups',
       mode: 'flash',
-      status: 'drafting',
       cast: { draft: ['shape'], storyContext: [], authorContext: [] },
     })
   })

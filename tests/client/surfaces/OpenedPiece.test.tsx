@@ -51,7 +51,6 @@ const PIECE: PieceDetail = {
   id: 'cups',
   title: 'The Cups',
   mode: 'flash',
-  status: 'drafting',
   length: 5,
   modified: 1_700_000_000_000,
   surfaces: {

@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
@@ -69,7 +69,6 @@ function summarize(id: string, piece: StoredPiece): PieceSummary {
     id,
     title: metadata.title,
     mode: metadata.mode,
-    status: metadata.status,
     length: draft === undefined ? 0 : countWords(draft.text),
     modified: draft === undefined ? piece.metadataModifiedMs : draft.modifiedMs,
   }
@@ -129,7 +128,6 @@ export async function createPiece(
   await writePieceMetadata(workspaceDir, id, {
     title,
     mode: modeId,
-    status: 'drafting',
     cast: {
       draft: [...defaultCastFor(specialists, modeId, 'draft')],
       storyContext: [...defaultCastFor(specialists, modeId, 'storyContext')],
@@ -230,7 +228,7 @@ export async function setPieceCast(
 export async function updatePieceDetails(
   workspaceDir: string,
   id: string,
-  patch: Readonly<{ title?: string; status?: PieceStatus }>,
+  patch: Readonly<{ title?: string }>,
 ): Promise<PieceSummary> {
   requirePiece(workspaceDir, id)
   await writePieceDetails(workspaceDir, id, patch)
@@ -238,13 +236,12 @@ export async function updatePieceDetails(
 }
 
 /**
- * What an author may change about a piece in one act. Which of the three arrived, and so which
+ * What an author may change about a piece in one act. Which of them arrived, and so which
  * writes it takes, is this module's decision rather than the route's: a change naming nothing is
  * a change, and it writes nothing.
  */
 export type PieceChanges = Readonly<{
   title?: string | undefined
-  status?: PieceStatus | undefined
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
@@ -254,10 +251,10 @@ export async function updatePiece(
   specialists: readonly RoleDefinition[],
   changes: PieceChanges,
 ): Promise<void> {
-  const { title, status, cast } = changes
+  const { title, cast } = changes
 
-  if (title !== undefined || status !== undefined) {
-    await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
+  if (title !== undefined) {
+    await updatePieceDetails(workspaceDir, id, { title })
   }
   if (cast !== undefined) {
     await setPieceCast(workspaceDir, id, specialists, cast.surface, cast.ids)

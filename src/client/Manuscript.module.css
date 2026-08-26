@@ -68,17 +68,6 @@
   composes: commit from './controls.module.css';
 }
 
-.status {
-  font: 500 10px/1 var(--font-facts);
-  color: var(--facts-ink);
-  letter-spacing: .06em;
-  background: none;
-  border: 1px solid var(--rule2);
-  border-radius: 3px;
-  padding: 4px 5px;
-  flex: none;
-}
-
 .lifecycleError {
   flex: none;
   font: 400 11.5px/1.45 var(--font-ui);

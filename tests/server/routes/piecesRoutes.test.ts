@@ -107,7 +107,6 @@ describe('the piece routes', () => {
         id: 'cups',
         title: 'Cups',
         mode: 'flash',
-        status: 'drafting',
         surfaces: {
           draft: {
             text: 'Two small words.',
@@ -141,10 +140,10 @@ describe('the piece routes', () => {
     const listed = await app.request('/pieces')
     expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
 
-    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: { surface: 'draft', ids: [] } }) })
+    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', cast: { surface: 'draft', ids: [] } }) })
     expect(await patched.json()).toMatchObject({
       success: true,
-      data: { title: 'Cups', status: 'finished', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
+      data: { title: 'Cups', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
     })
 
     const saved = await app.request('/pieces/the-cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'text' }) })

@@ -1,4 +1,3 @@
-import type { PieceStatus } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import styles from './ContextSurface.module.css'
 import { EditableTitle } from './EditableTitle.js'
@@ -56,17 +55,6 @@ export function ContextSurface({
           ‹ pieces
         </button>
         <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
-        <select
-          aria-label="Piece status"
-          className={styles.status}
-          value={lifecycle.status}
-          disabled={lifecycle.settingStatus}
-          onChange={(event) => lifecycle.onSetStatus(event.target.value as PieceStatus)}
-        >
-          <option value="drafting">drafting</option>
-          <option value="finished">finished</option>
-          <option value="abandoned">abandoned</option>
-        </select>
         <span className={styles.spacer} />
         <div className={styles.controls}>
           {SURFACE_IDS.filter((candidate) => candidate !== surface).map((candidate) => (
@@ -84,9 +72,9 @@ export function ContextSurface({
         </div>
       </div>
 
-      {(lifecycle.retitleError ?? lifecycle.statusError) !== undefined && (
+      {lifecycle.retitleError !== undefined && (
         <p className={styles.lifecycleError} role="alert">
-          {lifecycle.retitleError ?? lifecycle.statusError}
+          {lifecycle.retitleError}
         </p>
       )}
 

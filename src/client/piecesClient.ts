@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceStatus, type PieceSummary } from '../shared/pieceViews.js'
+import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../shared/pieceViews.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import { requestJson, type RequestResult } from './request.js'
 
@@ -36,7 +36,6 @@ export function createPiece(title: string, mode: string, signal?: AbortSignal): 
 
 export type PiecePatch = Readonly<{
   title?: string
-  status?: PieceStatus
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }>
 }>
 

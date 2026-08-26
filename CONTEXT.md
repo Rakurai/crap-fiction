@@ -42,10 +42,8 @@ hand-written comment or an idiosyncratic layout survives exactly as the author l
 
 ## Piece
 
-One story. The unit of work. A piece has a title, a mode, a status, a room, a draft, a
-story context, and conversations.
-
-**Status** is `drafting`, `finished`, or `abandoned`, and is the whole of the lifecycle.
+One story. The unit of work. A piece has a title, a mode, a room, a draft, a story context,
+and conversations.
 
 ## Mode
 

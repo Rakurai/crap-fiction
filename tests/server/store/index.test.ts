@@ -27,7 +27,7 @@ import {
 } from '../../../src/server/store/index.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 
-const CUPS = { title: 'Cups', mode: 'flash', status: 'drafting' as const, cast: { draft: ['shape'], storyContext: [], authorContext: [] } }
+const CUPS = { title: 'Cups', mode: 'flash', cast: { draft: ['shape'], storyContext: [], authorContext: [] } }
 
 describe('the settings file', () => {
   let dataRoot: string
@@ -104,23 +104,23 @@ describe('the tolerant reader', () => {
 
   it('trims the whitespace an author leaves around a value, wherever a string is read', () => {
     handWrite(settingsFile(), 'workspace: "  my-writing  "\n')
-    handWrite(pieceFile(), 'title: "  Cups  "\nmode: flash\nstatus: drafting\ncast:\n  draft:\n    - shape\n  storyContext: []\n  authorContext: []\n')
+    handWrite(pieceFile(), 'title: "  Cups  "\nmode: flash\ncast:\n  draft:\n    - shape\n  storyContext: []\n  authorContext: []\n')
 
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readPiece(workspaceDir, 'cups')?.metadata.title).toBe('Cups')
   })
 
   it('reads a lone value written where a list belongs as a list of that one value', () => {
-    handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\ncast:\n  draft: shape\n  storyContext: []\n  authorContext: []\n')
+    handWrite(pieceFile(), 'title: Cups\nmode: flash\ncast:\n  draft: shape\n  storyContext: []\n  authorContext: []\n')
 
     expect(readPiece(workspaceDir, 'cups')?.metadata.cast.draft).toEqual(['shape'])
   })
 
   it('states a failure naming the entry it could not make sense of, rather than guessing at it', () => {
-    handWrite(pieceFile(), 'title: 42\nmode: flash\nstatus: drafting\ncast:\n  draft:\n    - shape\n  storyContext: []\n  authorContext: []\n')
+    handWrite(pieceFile(), 'title: 42\nmode: flash\ncast:\n  draft:\n    - shape\n  storyContext: []\n  authorContext: []\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(/title/)
 
-    handWrite(pieceFile(), 'title: Cups\nmode: flash\nstatus: drafting\n')
+    handWrite(pieceFile(), 'title: Cups\nmode: flash\n')
     expect(() => readPiece(workspaceDir, 'cups')).toThrowError(/cast/)
   })
 
@@ -175,7 +175,7 @@ describe('path containment', () => {
     const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-'))
     writeFileSync(
       path.join(outside, 'piece.yaml'),
-      'title: Escaped\nmode: flash\nstatus: drafting\ncast:\n  draft: []\n  storyContext: []\n  authorContext: []\n',
+      'title: Escaped\nmode: flash\ncast:\n  draft: []\n  storyContext: []\n  authorContext: []\n',
       'utf8',
     )
     symlinkSync(outside, path.join(workspaceDir, 'escaped'))
@@ -204,14 +204,6 @@ describe("a piece's metadata", () => {
 
     await writePieceDetails(workspaceDir, 'cups', { title: 'The Cups' })
     expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({ ...CUPS, title: 'The Cups', cast: { ...CUPS.cast, draft: ['shape', 'compression'] } })
-
-    await writePieceDetails(workspaceDir, 'cups', { status: 'finished' })
-    expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({
-      ...CUPS,
-      title: 'The Cups',
-      status: 'finished',
-      cast: { ...CUPS.cast, draft: ['shape', 'compression'] },
-    })
   })
 
   it('holds each surface\'s cast independently, so writing one leaves the others untouched', async () => {

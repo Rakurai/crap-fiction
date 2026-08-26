@@ -1,6 +1,5 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import type { PieceStatus } from '../shared/pieceViews.js'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
@@ -83,17 +82,6 @@ export function Manuscript({
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
           <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
-          <select
-            aria-label="Piece status"
-            className={styles.status}
-            value={lifecycle.status}
-            disabled={lifecycle.settingStatus}
-            onChange={(event) => lifecycle.onSetStatus(event.target.value as PieceStatus)}
-          >
-            <option value="drafting">drafting</option>
-            <option value="finished">finished</option>
-            <option value="abandoned">abandoned</option>
-          </select>
           <span className={styles.spacer} />
           <div className={styles.controls}>
             <button type="button" className={styles.viewControl} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
@@ -119,9 +107,9 @@ export function Manuscript({
         </div>
       )}
 
-      {!reading && (lifecycle.retitleError ?? lifecycle.statusError) !== undefined && (
+      {!reading && lifecycle.retitleError !== undefined && (
         <p className={styles.lifecycleError} role="alert">
-          {lifecycle.retitleError ?? lifecycle.statusError}
+          {lifecycle.retitleError}
         </p>
       )}
 

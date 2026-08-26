@@ -19,13 +19,9 @@ const DEFAULT_PROPS = {
   onSwitchToStoryContext: vi.fn(),
   onSwitchToAuthorContext: vi.fn(),
   lifecycle: {
-    status: 'drafting' as const,
     retitling: false,
     retitleError: undefined as string | undefined,
     onRetitle: vi.fn(),
-    settingStatus: false,
-    statusError: undefined as string | undefined,
-    onSetStatus: vi.fn(),
   },
   applying: undefined as { readonly participantName: string } | undefined,
 }
@@ -118,23 +114,9 @@ describe('the piece title', () => {
 
     expect(onRetitle).not.toHaveBeenCalled()
   })
-})
 
-describe('the piece status', () => {
-  afterEach(cleanup)
-
-  it('is marked finished or abandoned with nothing more asked', () => {
-    const onSetStatus = vi.fn()
-    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, onSetStatus } })
-
-    fireEvent.change(screen.getByLabelText('Piece status'), { target: { value: 'finished' } })
-
-    expect(onSetStatus).toHaveBeenCalledWith('finished')
-    expect(screen.queryByRole('dialog')).toBeNull()
-  })
-
-  it('states a refused status change beside the header rather than silently', () => {
-    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, statusError: 'the studio did not answer' } })
+  it('states a refused retitle beside the header rather than silently', () => {
+    renderManuscript({ lifecycle: { ...DEFAULT_PROPS.lifecycle, retitleError: 'the studio did not answer' } })
 
     expect(screen.getByRole('alert').textContent).toBe('the studio did not answer')
   })

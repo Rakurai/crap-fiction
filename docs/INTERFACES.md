@@ -39,7 +39,7 @@ Every route returns the full result for its scope. There is no pagination.
 
 ```
 GET    /modes                                      every loaded mode's id and display name
-GET    /pieces                                     title, mode, status, length, modified
+GET    /pieces                                     title, mode, length, modified
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
 GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
@@ -47,7 +47,7 @@ GET    /pieces/:id                                 metadata, the Story Editor an
                                                    text, its reference schema where it has one,
                                                    conversation index, current conversation, and
                                                    roster with enabled state
-PATCH  /pieces/:id                                 title, status, one surface's enabled cast
+PATCH  /pieces/:id                                 title, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text
 GET    /pieces/:id/surfaces/:surface/conversations/:cid
@@ -196,7 +196,7 @@ those as absent would invite something to read them.
   <workspace>/                 chosen by the author, inside the data root
     the-cups/
       draft.md                 the manuscript — clean prose, no tool artifacts
-      piece.yaml               title, mode, status, enabled cast per editing surface
+      piece.yaml               title, mode, enabled cast per editing surface
       story-context.yaml
       conversations/
         draft/

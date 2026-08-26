@@ -4,7 +4,6 @@ import { z } from 'zod'
 import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
-import { pieceStatusSchema } from '../../shared/pieceViews.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import type { ConversationScope } from '../scope.js'
 import { resolveWithinRoot } from './containment.js'
@@ -76,7 +75,6 @@ export type CastBySurface = Readonly<z.infer<typeof castBySurfaceSchema>>
 const pieceMetadataSchema = z.object({
   title: z.string().min(1),
   mode: z.string().min(1),
-  status: pieceStatusSchema,
   cast: castBySurfaceSchema,
 })
 
@@ -186,12 +184,11 @@ export async function writePieceCast(workspaceDir: string, id: string, surface: 
 export async function writePieceDetails(
   workspaceDir: string,
   id: string,
-  patch: Readonly<Partial<Pick<PieceMetadata, 'title' | 'status'>>>,
+  patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>,
 ): Promise<void> {
   // An `undefined` entry is still a key `setPaths` writes, blanking a field the caller did not name.
   const values: Record<string, unknown> = {}
   if (patch.title !== undefined) values.title = patch.title
-  if (patch.status !== undefined) values.status = patch.status
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
 }
 

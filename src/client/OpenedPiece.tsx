@@ -154,13 +154,9 @@ export function OpenedPiece({ id, authorContextSelection, onClose }: OpenedPiece
       <Surfaces
         piece={piece.piece}
         lifecycle={{
-          status: piece.piece.status,
           retitling: piece.retitling,
           retitleError: piece.retitleError,
           onRetitle: piece.retitle,
-          settingStatus: piece.settingStatus,
-          statusError: piece.statusError,
-          onSetStatus: piece.setStatus,
         }}
         authorContextSelection={authorContextSelection}
         onClose={onClose}
