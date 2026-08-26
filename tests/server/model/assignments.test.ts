@@ -7,8 +7,8 @@ import { callSites, UnknownCallSiteError } from '../../../src/server/model/callS
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
 const roles: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast', availability: [] },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', availability: [] },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast', function: undefined, availability: [] },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', function: undefined, availability: [] },
 ]
 const sites = callSites(roles)
 

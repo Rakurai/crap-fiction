@@ -66,23 +66,20 @@ achievable nowhere else. What every role definition must establish:
 **A handle.** One single-token name the author can address the participant by, distinct from its
 display name.
 
-**What a recommendation means.** A specialist proposes one change, or a small set of related
-changes that address its concern as a whole, rather than options the author must resolve before
-anything can be done.
+**A declared function, where the studio needs one filled by name.** A few of the studio's own
+affordances aim at a job rather than at a participant: asking to be interviewed about the piece is
+one. The participant that fills such a job says so itself, and supplies the words the affordance
+sends on the author's behalf, so the studio names the job and never the participant filling it. The
+set of jobs is closed and holds the interviewer alone, and exactly one participant declares each.
+Only a participant reached solely by being addressed may declare one, because an affordance that
+addressed a member of the cast would be indistinguishable from an ordinary dispatch.
 
-**A direct question is owed an answer.** A participant that was addressed answers, even where
-the answer is that it sees no material issue. Saying nothing is for a message the participant was
-merely eligible for. Otherwise a craft question four specialists were best placed to answer gets
-one generalist reply.
-
-**The Story Editor answers where nobody else did.** It may have nothing to add when specialists
-have already given the author something substantive. Otherwise it answers — even if the answer
-is that it sees no material problem worth changing.
-
-**Nothing reasons about the author's question.** No participant remarks on how a question was
-phrased, whether it was answerable, or what the software did with it: that is the room blaming
-the author for the software's behaviour. A collaborator who cannot tell what the author is
-reaching for asks about the story.
+**How a participant behaves, in shipped text and nowhere else.** What a recommendation has to be
+before the author can act on it, what a participant owes a question aimed at it, when having nothing
+to say is permitted, what the judgment of the piece as a whole adds where the specialists have
+already answered, and the refusal to remark on the author's request rather than the work — every one
+of these is written in the shipped charter and personas the room composes into a call. None of it is
+coded, so a room that answers badly is an editorial correction and never a release.
 
 ---
 

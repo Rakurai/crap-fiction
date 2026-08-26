@@ -86,15 +86,23 @@ supplies.
 
 ### Where the author speaks
 
-**One input, carrying the author's own words and nothing else.** No verb selection, no mode,
-no scope control, and no buttons naming particular jobs. *Read this and tell me what you
-think*, *what isn't working about the ending*, *write the next paragraph* and *@Shape does the
-opening earn its length* are the same act of typing a message.
+**One input, carrying the author's own words and nothing else.** Nothing beside it may change
+what a message means: no verb selection, no mode, no scope control, no routing. *Read this and
+tell me what you think*, *what isn't working about the ending*, *write the next paragraph* and a
+message opening with a participant's mention are the same act of typing a message. A control
+that composes a message the author could have typed by hand, then sends and records it on
+exactly the terms that message would have carried anyway, is a shortcut through the keyboard
+rather than a second way of speaking, and is allowed.
+
+**One such shortcut sits beside send, on every surface: asking to be interviewed.** An author
+who does not know what to say next can ask for a question instead of supplying one, and the
+control mentions the interviewer and sends its invocation as an ordinary message — visible in the
+transcript in the author's own line, retypable by hand, and answered like any other mention.
 
 **Participants are addressed inside the message, by handle behind a sigil**, as in any chat
-room the author already uses — `@shape`, `@comp`. Addressing a specialist that is not in the
-room brings it in, and the room shows that it now holds one more specialist, so the change is
-never something the author discovers later.
+room the author already uses. Addressing a specialist that is not in the room brings it in, and
+the room shows that it now holds one more specialist, so the change is never something the
+author discovers later.
 
 ### While the room answers
 

@@ -10,6 +10,8 @@ export const SUGGESTION_CLAIM = 'the opening holds two beats where one would car
 
 export const EDITOR_SUGGESTION_CLAIM = 'the piece keeps returning to the harbour without ever having named it'
 
+export const INTERVIEWER_QUESTION = 'what does the harbour cost her to leave?'
+
 function commentary(claim: string, delayMs: number): FixtureBehavior {
   return { result: { outcome: 'value', value: { kind: 'response', outcome: 'commentary', claim } }, delayMs }
 }
@@ -19,12 +21,14 @@ function applicableSuggestion(claim: string, note: string, delayMs: number): Fix
 }
 
 export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
-  shape: applicableSuggestion(SUGGESTION_CLAIM, 'a suggestion from the fixture model implementation', CALL_MS),
-  'reader-experience': commentary('a reading from the fixture model implementation', CALL_MS),
-  compression: commentary('a reading from the fixture model implementation', CALL_MS),
+  change: applicableSuggestion(SUGGESTION_CLAIM, 'a suggestion from the fixture model implementation', CALL_MS),
+  character: commentary('a reading from the fixture model implementation', CALL_MS),
+  economy: commentary('a reading from the fixture model implementation', CALL_MS),
   // Slow, so a draft dispatch is still in flight while a journey acts elsewhere in the studio.
-  interiority: commentary('a reading from the fixture model implementation', SLOW_CALL_MS),
+  reader: commentary('a reading from the fixture model implementation', SLOW_CALL_MS),
   // The only participant a context surface has, so its answer is what a context Apply acts on.
   'story-editor': applicableSuggestion(EDITOR_SUGGESTION_CLAIM, 'an answer from the fixture model implementation', CALL_MS),
+  // Reached only by being addressed, whether the author typed the mention or the composer's own control did.
+  interview: commentary(INTERVIEWER_QUESTION, CALL_MS),
   apply: { result: { outcome: 'value', value: { replacement: APPLIED_TEXT } }, delayMs: 4 * CALL_MS },
 }

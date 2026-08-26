@@ -9,6 +9,7 @@ const shape: RoleDefinition = {
   description: 'x',
   persona: 'reasons about x',
   eligibility: 'cast',
+  function: undefined,
   availability: [],
 }
 const compression: RoleDefinition = {
@@ -18,6 +19,7 @@ const compression: RoleDefinition = {
   description: 'y',
   persona: 'reasons about y',
   eligibility: 'cast',
+  function: undefined,
   availability: [],
 }
 const editor: RoleDefinition = {
@@ -27,6 +29,7 @@ const editor: RoleDefinition = {
   description: 'z',
   persona: 'reasons about z',
   eligibility: 'generalist',
+  function: undefined,
   availability: [],
 }
 const participants = [shape, compression, editor]

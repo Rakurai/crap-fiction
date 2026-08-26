@@ -30,6 +30,7 @@ const BASE_PROPS = {
   initialCast: [],
   initialConversations: [],
   storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+  interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
   room: roomHolding(),
   roster: ROSTER,
   runtime: { reachable: true },

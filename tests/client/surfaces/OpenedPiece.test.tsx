@@ -81,6 +81,7 @@ const PIECE: PieceDetail = {
     },
   },
   storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+  interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
 }
 
 function conversationEntries(conversationId: string) {

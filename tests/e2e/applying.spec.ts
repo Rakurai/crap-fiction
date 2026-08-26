@@ -19,10 +19,10 @@ test('applying a recommendation rewrites the manuscript, holds it, releases it, 
   await expect(page.getByText(SUGGESTION_CLAIM)).toBeVisible()
   await expect(abandon).toBeHidden()
 
-  await answerControl(page, 'Shape', 'apply').click()
+  await answerControl(page, 'Change', 'apply').click()
 
   await expect(page.getByText('READ-ONLY')).toBeVisible()
-  await expect(page.getByText("Held while Shape's change is applied.")).toBeVisible()
+  await expect(page.getByText("Held while Change's change is applied.")).toBeVisible()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
   await editor.click()
   await page.keyboard.type(REFUSED)

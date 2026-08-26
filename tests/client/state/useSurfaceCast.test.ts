@@ -31,6 +31,7 @@ function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail>
       modified: 1_700_000_000_000,
       surfaces: { draft: surface(cast), storyContext: surface([]), authorContext: surface([]) },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+      interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
     },
   }
 }

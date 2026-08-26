@@ -141,12 +141,21 @@ author message and otherwise uses the existing conversation workflow.
   functions. Where catalog deepening lands separately, this work extends that boundary rather than
   creating parallel lookup policy.
 - Participant frontmatter gains an optional closed `function` declaration whose only current value is
-  `interviewer`. Exactly one participant must declare it, that participant must declare addressed-only
-  eligibility, and its frontmatter supplies a nonempty invocation message. Missing, duplicate,
+  `interviewer`, paired with a nonempty invocation message. Both belong to the addressed-only
+  frontmatter variant alone, so declaring a function on a cast or generalist participant is a schema
+  failure rather than a check. Exactly one participant must declare the function. Missing, duplicate,
   unknown, incomplete, or eligibility-incompatible declarations fail startup naming the responsible
   content.
 - The participant's id and handle remain data. Application source does not name the shipped
-  Interviewer identity.
+  Interviewer identity. The shipped identity is therefore chosen to differ from the function token:
+  the participant's id and handle are `interview`, its display name is Interviewer, and the token
+  remains `interviewer`. Source naming the token proves the indirection instead of merely asserting
+  it, and the identity-discipline test keeps its full reach over ids and handles.
+- Handles are content, and a handle is expected to be uniquely addressable within two characters. That
+  is a convention for whoever authors participants, recorded here and enforced by nothing. Character
+  Logic's handle is `logic` because `change` and `character` otherwise collide until the fourth
+  character, and because a handle naming a story element reads like a question about that element
+  rather than an address to a participant.
 - Addressed-only remains routing eligibility and does not imply Interviewer behavior. Other
   addressed-only participants may exist without a function.
 - The catalog exposes the declared Interviewer through a narrow meaning-based query or view used by
@@ -158,6 +167,11 @@ author message and otherwise uses the existing conversation workflow.
   combines the declared Interviewer handle with its loaded invocation message and sends the result as
   an ordinary author message. Model-facing invocation prose therefore remains shipped content rather
   than a source-code constant.
+- The composer rule that forbids controls naming particular jobs is amended narrowly to admit this
+  one. What the rule forbids becomes any control that changes what a message means — verb selection,
+  scope, routing, or mode — while a control that composes a message the author could have typed, sent
+  and recorded with no distinct semantics, is permitted. The amendment describes the composed message
+  without naming a shipped handle.
 - The generated message is stored and displayed as an ordinary author message. It uses the existing
   dispatch, addressing, conversation creation, activity, cancellation, error, and transcript paths.
   No button-origin field or machine-fact request entry is added.
@@ -202,15 +216,26 @@ author message and otherwise uses the existing conversation workflow.
   reason about the software or phrasing of the request.
 - Surface framing owns the target document's meaning. Author-context framing states that current-piece
   material is evidence rather than author-level truth.
-- Task fragments use target-document language and remain independent of participant identity. No
-  Interviewer-specific task kind is added; the Interviewer persona and explicit author request govern
-  its action.
+- Task fragments name the target document through the surface's substituted document name, so the
+  imperative sentence reads against the actual artifact, and remain independent of participant
+  identity. Target-document language means phrased against whichever document the surface supplies,
+  not the literal phrase. No Interviewer-specific task kind is added; the Interviewer persona and
+  explicit author request govern its action.
 - Apply continues to request a whole target document only as a temporary compatibility constraint.
   The instruction remains localized so later diff or bounded string-replacement work does not alter
   participant or surface design.
+- The Apply operation role necessarily restates what makes a suggestion applicable, because an Apply
+  prompt composes no charter. The two passages are the same text, and the pass that audits prompt
+  ownership makes them so.
 - Core documentation is updated with the implementation under the repository's one-home-per-fact
   discipline. Domain meaning, architecture, interfaces, and editorial shipped content are not copied
-  across documents for local convenience.
+  across documents for local convenience. Beyond the composer rule, the amendments this work owes are:
+  the addressing examples, which name retired handles and should name no shipped handle now that
+  handles are data; the participant's declared texts, which gain the client-facing invocation
+  alongside description and persona; the piece-opening surface, which gains the declared Interviewer
+  identity; the context seam, which today gives a reference only to an application and now gives an
+  optional reference to a participant compilation; and the role-definition requirements, which still
+  name what the charter owns and what the generalist's answering guarantee owns in code.
 
 ## Testing Decisions
 

@@ -1,7 +1,8 @@
 import type { Charter } from '../../src/server/model/charter.js'
 import type { Fragment, PromptFragments } from '../../src/server/model/prompts.js'
-import type { RoleDefinition } from '../../src/server/model/roles.js'
+import { INTERVIEWER_FUNCTION, type RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
+import type { Interviewer } from '../../src/server/room/roster.js'
 
 export const MODE_FIXTURE: ModeDescriptor = {
   id: 'flash',
@@ -9,6 +10,22 @@ export const MODE_FIXTURE: ModeDescriptor = {
   description: 'A short piece read in one sitting.',
   storyContextReference: 'Sections, each holding entries.',
 }
+
+export const INTERVIEWER_INVOCATION_FIXTURE = 'ask me a clarifying question'
+
+/** A role set is only loadable with the interviewer function declared exactly once, so every fixture roster carries this. */
+export const INTERVIEWER_FIXTURE: RoleDefinition = {
+  id: 'interview',
+  handle: 'interview',
+  displayName: 'Interviewer',
+  description: 'q',
+  persona: 'asks about q',
+  eligibility: 'addressed-only',
+  function: { name: INTERVIEWER_FUNCTION, invocation: INTERVIEWER_INVOCATION_FIXTURE },
+  availability: [],
+}
+
+export const INTERVIEWER_ROSTER_FIXTURE: Interviewer = { role: INTERVIEWER_FIXTURE, invocation: INTERVIEWER_INVOCATION_FIXTURE }
 
 export const ROLES_FIXTURE: readonly RoleDefinition[] = [
   {
@@ -18,6 +35,7 @@ export const ROLES_FIXTURE: readonly RoleDefinition[] = [
     description: 'x',
     persona: 'reasons about x',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: MODE_FIXTURE.id, surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -27,8 +45,10 @@ export const ROLES_FIXTURE: readonly RoleDefinition[] = [
     description: 'y',
     persona: 'reasons about y',
     eligibility: 'generalist',
+    function: undefined,
     availability: [],
   },
+  INTERVIEWER_FIXTURE,
 ]
 
 export const CHARTER_FIXTURE: Charter = 'nothing material to contribute; a reading without a concrete action; a recommendation concrete enough to apply'

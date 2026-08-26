@@ -11,7 +11,7 @@ import type { Room } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestApp } from '../../support/harness.js'
 import { buildTestRoom } from '../../support/room.js'
-import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
  * What the room does with a dispatch or an application belongs to
@@ -41,9 +41,11 @@ const ROLES: readonly RoleDefinition[] = [
     description: 'x',
     persona: 'reasons about x',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
   },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', availability: [] },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', function: undefined, availability: [] },
+  INTERVIEWER_FIXTURE,
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }

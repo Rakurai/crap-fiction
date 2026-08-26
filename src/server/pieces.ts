@@ -8,7 +8,7 @@ import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
-import { defaultCastFor, specialistsFor } from './room/roster.js'
+import { defaultCastFor, specialistsFor, type Interviewer } from './room/roster.js'
 import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
   conversationActivity,
@@ -185,6 +185,7 @@ export function getPiece(
   id: string,
   specialists: readonly RoleDefinition[],
   storyEditor: RoleDefinition,
+  interviewer: Interviewer,
   modes: readonly ModeDescriptor[],
   authorContextReference: string,
 ): PieceDetail {
@@ -200,6 +201,12 @@ export function getPiece(
     ...summarize(id, piece),
     surfaces,
     storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
+    interviewer: {
+      handle: interviewer.role.handle,
+      displayName: interviewer.role.displayName,
+      description: interviewer.role.description,
+      invocation: interviewer.invocation,
+    },
   }
 }
 

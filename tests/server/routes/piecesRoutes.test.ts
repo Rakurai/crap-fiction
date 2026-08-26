@@ -7,6 +7,7 @@ import type { ModeDescriptor } from '../../../src/server/modes.js'
 import type { ConversationScope } from '../../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
 import { buildTestApp } from '../../support/harness.js'
+import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
  * What a piece is and how it changes belongs to `pieces.test.ts`, which states it in
@@ -37,6 +38,7 @@ const ROLES: readonly RoleDefinition[] = [
     description: 'reads for the shape of the whole',
     persona: 'reasons about the shape of the whole',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -46,8 +48,10 @@ const ROLES: readonly RoleDefinition[] = [
     description: 'weighs what the room said',
     persona: 'reasons about what the room said',
     eligibility: 'generalist',
+    function: undefined,
     availability: [],
   },
+  INTERVIEWER_FIXTURE,
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }

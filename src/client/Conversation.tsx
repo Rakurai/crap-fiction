@@ -4,6 +4,7 @@ import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { InterviewerView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
@@ -30,6 +31,8 @@ type ConversationProps = {
   readonly displayName: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
   readonly handles: readonly HandleEntry[]
+  /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
+  readonly interviewer: InterviewerView
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
   /** The surface's one persistence writer: what an Apply installs its replacement through. */
@@ -375,6 +378,7 @@ export function Conversation({
   displayName,
   handle,
   handles,
+  interviewer,
   runtime,
   clock,
   onApplied,
@@ -445,6 +449,12 @@ export function Conversation({
   function askAboutChange(): void {
     if (roomBusy) return
     conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
+  }
+
+  // The message an author could have typed by hand, sent and recorded on the same terms as any other.
+  function askTheInterviewer(): void {
+    if (roomBusy) return
+    conversation.sendMessage(`@${interviewer.handle} ${interviewer.invocation}`)
   }
 
   function replyEmpty(participantId: string): void {
@@ -580,6 +590,9 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
+        <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
+          ask me
+        </button>
         <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
           send
         </button>

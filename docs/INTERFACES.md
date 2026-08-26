@@ -42,10 +42,11 @@ GET    /modes                                      every loaded mode's id and di
 GET    /pieces                                     title, mode, status, length, modified
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
-GET    /pieces/:id                                 metadata and the Story Editor, plus each of the
-                                                   three surfaces' text, its reference schema where it
-                                                   has one, conversation index, current conversation,
-                                                   and roster with enabled state
+GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
+                                                   its invocation, plus each of the three surfaces'
+                                                   text, its reference schema where it has one,
+                                                   conversation index, current conversation, and
+                                                   roster with enabled state
 PATCH  /pieces/:id                                 title, status, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text
@@ -166,7 +167,7 @@ One compilation per kind of call, each returning the whole of what its prompt is
 
 | Compilation | What it is additionally given |
 |---|---|
-| a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
+| a specialist | its role, the mode's shared description, whether it owes an answer, the dispatch's input, and a reference schema where the participant being compiled for is one the schema is meant for |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
 | an application | the recommendation, the author's constraint, and the reference schema for the surface it targets, where that surface has one |
 
@@ -230,7 +231,9 @@ display name of more than one word cannot be recovered from a message — and tw
 **description**, read by the author assigning it a model, and a **persona**, briefing the model with the
 participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
 or `addressed-only`. A `cast` participant additionally declares **availability**: the mode-and-surface
-pairs it is available for, and for each whether it starts enabled.
+pairs it is available for, and for each whether it starts enabled. An `addressed-only` participant may
+additionally declare a **function** — the named job it fills for the studio, inseparable from the
+**invocation**, the author's own words that the studio's affordance for that job sends.
 
 A **mode** carries its `id` and its `displayName`, and names no participant. Its sibling document
 carries the shared **description** of its form and scale that every participant call receives. Any
@@ -238,7 +241,8 @@ number of modes may load; the roster and initial cast for a given mode and surfa
 every cast participant's declared availability, never listed by the mode.
 
 A **reference schema** is one opaque text file under the content root, read whole and never parsed,
-shown to the author and given whole to a context Apply for the surface it belongs to: one per mode, at
+shown to the author, given whole to a context Apply for the surface it belongs to, and given whole to
+the participant declaring the interviewer function when it is called on that surface: one per mode, at
 `content/modes/<mode>/story-context.yaml`, for that mode's story context, and one at
 `content/author-context.yaml` for the studio's author context. It is guidance, not a contract: it is
 never compared with a context document or an Apply result, and its `.yaml` path names where the file

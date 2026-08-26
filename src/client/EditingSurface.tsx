@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
-import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
+import type { CastMemberView, InterviewerView, StoryEditorView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
 import { ContextSurface, type ContextSurfaceId } from './ContextSurface.js'
@@ -34,6 +34,7 @@ type EditingSurfaceProps = {
   readonly initialCast: readonly CastMemberView[]
   readonly initialConversations: readonly ConversationSummary[]
   readonly storyEditor: StoryEditorView
+  readonly interviewer: InterviewerView
   readonly room: RoomAdapters
   readonly roster: RosterViewModel
   readonly runtime: { readonly reachable: boolean } | undefined
@@ -99,6 +100,7 @@ function MountedSurface({
   initialCast,
   initialConversations,
   storyEditor,
+  interviewer,
   room,
   roster,
   runtime,
@@ -133,6 +135,7 @@ function MountedSurface({
   const handles: readonly HandleEntry[] = [
     ...cast.members.map(({ handle, displayName }) => ({ handle, displayName })),
     { handle: storyEditor.handle, displayName: storyEditor.displayName },
+    { handle: interviewer.handle, displayName: interviewer.displayName },
   ]
 
   async function deleteConversation(conversationId: string): Promise<void> {
@@ -195,6 +198,7 @@ function MountedSurface({
           displayName={roster.displayName}
           handle={roster.handle}
           handles={handles}
+          interviewer={interviewer}
           runtime={runtime}
           clock={Date.now}
           onApplied={session.install}

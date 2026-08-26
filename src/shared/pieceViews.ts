@@ -37,6 +37,17 @@ export const storyEditorViewSchema = z
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 
+/** The declared Interviewer as the client needs it: whom to name, and the words its affordance sends. */
+export const interviewerViewSchema = z
+  .object({
+    handle: z.string(),
+    displayName: z.string(),
+    description: z.string(),
+    invocation: z.string(),
+  })
+  .readonly()
+export type InterviewerView = z.infer<typeof interviewerViewSchema>
+
 export const surfaceDetailSchema = z
   .object({
     text: z.string(),
@@ -61,6 +72,7 @@ export const pieceDetailSchema = pieceSummaryShape
   .extend({
     surfaces: pieceSurfacesSchema,
     storyEditor: storyEditorViewSchema,
+    interviewer: interviewerViewSchema,
   })
   .readonly()
 export type PieceDetail = z.infer<typeof pieceDetailSchema>

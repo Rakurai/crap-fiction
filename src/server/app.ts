@@ -104,7 +104,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
+    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.specialists(), room.storyEditor(), room.interviewer(), modes, authorContextReference)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -113,7 +113,7 @@ export function createApp(
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
+    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), room.interviewer(), modes, authorContextReference)))
   })
 
   const param = validateParam(surfaceParamSchema, logger)

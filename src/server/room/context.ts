@@ -30,6 +30,7 @@ export type ContextInput = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   entries: readonly ConversationEntry[] | undefined
   policy: HistoryPolicy
   participants: ReadonlyMap<string, string>
@@ -45,6 +46,7 @@ export type Context = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   history: readonly HistoryEntry[]
   evidence: readonly ParticipantEvidence[]
 }>
@@ -84,6 +86,7 @@ function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence
     storyContext: input.storyContext,
     draft: input.draft,
     surface: input.surface,
+    referenceSchema: input.referenceSchema,
     history: deriveHistory(input.entries, input.policy, input.role.id, input.participants),
     evidence,
   }
@@ -244,6 +247,7 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
   const perCall = compose([
     taskSection(task, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
+    section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
     context.owesAnswer ? fixedSection(fragments.sections.addressed) : '',
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),

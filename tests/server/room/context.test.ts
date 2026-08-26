@@ -23,6 +23,7 @@ const shape: RoleDefinition = {
   description: 'the shape of it',
   persona: 'reasons about the turn',
   eligibility: 'cast',
+  function: undefined,
   availability: [],
 }
 const compression: RoleDefinition = {
@@ -32,6 +33,7 @@ const compression: RoleDefinition = {
   description: 'what earns its space',
   persona: 'reasons about omission',
   eligibility: 'cast',
+  function: undefined,
   availability: [],
 }
 
@@ -54,6 +56,7 @@ function contextInput(overrides: Partial<ContextInput> & { role: RoleDefinition 
     storyContext: undefined,
     draft: 'text',
     surface: 'draft',
+    referenceSchema: undefined,
     entries: undefined,
     policy: 'shared',
     participants: PARTICIPANTS,
@@ -289,6 +292,16 @@ describe('rendering a prompt', () => {
     expect(wholeOf(renderApplyPrompt(withoutReference, fragments))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
+  it('carries a reference schema to a participant under its own section, only where the compiled context was given one', () => {
+    const withReference = compileSpecialistContext(contextInput({ role: shape, referenceSchema: 'Sections, each holding entries.' }))
+    const prompt = wholeOf(renderPrompt(withReference, fragments, charter))
+    expect(prompt).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(prompt).toContain('Sections, each holding entries.')
+
+    const withoutReference = compileSpecialistContext(contextInput({ role: shape }))
+    expect(wholeOf(renderPrompt(withoutReference, fragments, charter))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+  })
+
   it("gives the story editor the dispatch's readings as their own section, a no-comment among them as an attributed craft finding rather than a tally, naming the participant by display name", () => {
     const withReading = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
       { kind: 'substantive', participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
@@ -468,6 +481,7 @@ describe('specialist independence', () => {
     storyContext: undefined,
     draft: 'text',
     surface: 'draft',
+    referenceSchema: undefined,
     history: [],
     evidence: [],
   }

@@ -10,6 +10,7 @@ import {
   openPiece,
   reopenPiece,
   sendToRoom,
+  transcriptLine,
 } from './studio.js'
 
 const FIRST = 'Working Artifact'
@@ -55,12 +56,13 @@ test('each surface holds its own work, a context change applies and persists, an
   await control(page, 'draft').click()
   await expect(control(page, 'abandon')).toBeVisible()
   await expect(editor).toHaveText(OPENING)
-  await expect(page.getByText(SUGGESTION_CLAIM)).toBeVisible()
+  await expect(transcriptLine(page, SUGGESTION_CLAIM)).toBeVisible()
   await expect(control(page, 'abandon')).toBeHidden()
 
   await control(page, 'story context').click()
   await expect(answerOf(page, 'Story Editor')).toBeVisible()
-  await expect(answerOf(page, 'Shape')).toBeHidden()
+  await expect(page.getByText(STORY_ASK)).toBeVisible()
+  await expect(page.getByText(DRAFT_ASK)).toBeHidden()
 
   await answerControl(page, 'Story Editor', 'apply').click()
   await expect(page.getByText('READ-ONLY')).toBeVisible()

@@ -20,6 +20,8 @@ const HANDLES = [
   { handle: 'editor', displayName: 'Story Editor' },
 ]
 
+const INTERVIEWER = { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' }
+
 const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
 
 function roomHolding(
@@ -51,6 +53,7 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       displayName={(id) => NAMES[id] ?? id}
       handle={(id) => HANDLE_BY_ID[id]}
       handles={HANDLES}
+      interviewer={INTERVIEWER}
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
       onApplied={() => Promise.resolve({ failed: false })}
@@ -259,6 +262,27 @@ describe('the applied change, shown on its originating response', () => {
         'draft',
         'c1',
         { message: 'Take a look at the change I just made and tell me what you think.' },
+        DOCUMENTS,
+      ),
+    )
+  })
+
+  it('asks the declared interviewer for a question by addressing it in words the author could have typed', async () => {
+    const dispatch = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding([]), dispatch }
+
+    renderConversation([], { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ask me' }))
+
+    await waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith(
+        'the-lighthouse',
+        'draft',
+        'c1',
+        { message: `@${INTERVIEWER.handle} ${INTERVIEWER.invocation}` },
         DOCUMENTS,
       ),
     )

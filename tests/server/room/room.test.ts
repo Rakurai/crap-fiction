@@ -33,7 +33,7 @@ import {
 import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestRoom } from '../../support/room.js'
-import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
 const fixtureMode: ModeDescriptor = {
   id: 'flash',
@@ -50,6 +50,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     description: 'x',
     persona: 'reasons about x',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: fixtureMode.id, surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -59,6 +60,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     description: 'y',
     persona: 'reasons about y',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: fixtureMode.id, surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -68,6 +70,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     description: 'v',
     persona: 'reasons about v',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: 'novella', surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -77,6 +80,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     description: 'z',
     persona: 'reasons about z',
     eligibility: 'generalist',
+    function: undefined,
     availability: [],
   },
   {
@@ -86,8 +90,10 @@ const fixtureRoles: readonly RoleDefinition[] = [
     description: 'w',
     persona: 'reasons about w',
     eligibility: 'addressed-only',
+    function: undefined,
     availability: [],
   },
+  INTERVIEWER_FIXTURE,
 ]
 
 const fixtureSpecialists: readonly RoleDefinition[] = fixtureRoles.filter((role) => role.eligibility === 'cast')
@@ -466,6 +472,40 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('story-editor')).toContain(fixtureMode.description)
     expect(adapter.promptFor('story-editor')).toContain('the currently open draft text')
     expect(adapter.promptFor('story-editor')).toContain('the currently open story-context text')
+  })
+
+  it("gives the declared interviewer the reference schema for whichever context surface it was called on, and gives it nobody else's call", async () => {
+    const interviewerAnswers: Readonly<Record<string, FixtureBehavior>> = {
+      [INTERVIEWER_FIXTURE.id]: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'one question' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a durable note' } } },
+    }
+    const askInterviewer = `@${INTERVIEWER_FIXTURE.handle} ${INTERVIEWER_FIXTURE.function?.invocation}`
+
+    for (const [surface, reference] of [
+      ['storyContext', fixtureMode.storyContextReference],
+      ['authorContext', AUTHOR_CONTEXT_REFERENCE_FIXTURE],
+    ] as const) {
+      const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+      const { room, adapter } = buildRoom(dataRoot, interviewerAnswers)
+      const roomScope: RoomScope = { pieceId: piece.id, surface }
+
+      await room.dispatch(workspaceDir, roomScope, 'c1', { kind: 'message', text: askInterviewer }, documents('draft text'))
+      await settlementOfScope(room, roomScope)
+      expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).toContain(reference)
+
+      await room.dispatch(workspaceDir, roomScope, 'c1', { kind: 'message', text: 'an ordinary message' }, documents('draft text'))
+      await settlementOfScope(room, roomScope)
+      expect(adapter.promptFor('story-editor')).not.toContain(reference)
+    }
+
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room, adapter } = buildRoom(dataRoot, interviewerAnswers)
+
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: askInterviewer }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(fixtureMode.storyContextReference)
+    expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(AUTHOR_CONTEXT_REFERENCE_FIXTURE)
   })
 })
 

@@ -51,6 +51,14 @@ export function answerControl(page: Page, participantName: string, name: string)
   return answerOf(page, participantName).getByRole('button', { name, exact: true })
 }
 
+/**
+ * A line of a transcript, drawn in whichever surface is showing: every surface keeps its own
+ * transcript mounted, and a role query is what passes over the panes held hidden.
+ */
+export function transcriptLine(page: Page, text: string): Locator {
+  return page.getByRole('paragraph').filter({ hasText: text })
+}
+
 export function manuscript(page: Page): Locator {
   return page.getByRole('textbox', { name: 'Manuscript' })
 }

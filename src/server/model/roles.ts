@@ -21,10 +21,31 @@ const identity = {
   description: z.string().min(1),
 }
 
+/**
+ * The closed set of product roles a participant may declare itself to fill. A function is meaning the
+ * application acts on, so its name is product vocabulary; which participant declares it is content.
+ */
+export const INTERVIEWER_FUNCTION = 'interviewer' as const
+
+export const PARTICIPANT_FUNCTIONS = [INTERVIEWER_FUNCTION] as const
+
+export type ParticipantFunction = (typeof PARTICIPANT_FUNCTIONS)[number]
+
+/**
+ * Declared as one value rather than a name beside an optional message, so a function without its
+ * invocation is a shape the content cannot express.
+ */
+const declaredFunctionSchema = z.strictObject({
+  name: z.enum(PARTICIPANT_FUNCTIONS),
+  invocation: z.string().min(1),
+})
+
+export type DeclaredFunction = Readonly<z.infer<typeof declaredFunctionSchema>>
+
 const participantFrontmatterSchema = z.discriminatedUnion('eligibility', [
   z.strictObject({ ...identity, eligibility: z.literal('cast'), availability: z.array(availabilityEntrySchema) }),
   z.strictObject({ ...identity, eligibility: z.literal('generalist') }),
-  z.strictObject({ ...identity, eligibility: z.literal('addressed-only') }),
+  z.strictObject({ ...identity, eligibility: z.literal('addressed-only'), function: declaredFunctionSchema.optional() }),
 ])
 
 export type Eligibility = z.infer<typeof participantFrontmatterSchema>['eligibility']
@@ -37,6 +58,7 @@ export type RoleDefinition = Readonly<{
   persona: string
   eligibility: Eligibility
   availability: readonly AvailabilityEntry[]
+  function: DeclaredFunction | undefined
 }>
 
 export class GeneralistCardinalityError extends Error {
@@ -47,6 +69,14 @@ export class GeneralistCardinalityError extends Error {
   }
 }
 
+export class ParticipantFunctionCardinalityError extends Error {
+  constructor(declared: ParticipantFunction, found: readonly string[]) {
+    const where = found.length > 0 ? ` (${found.join(', ')})` : ''
+    super(`expected exactly one participant declaring the function "${declared}", found ${found.length}${where}`)
+    this.name = 'ParticipantFunctionCardinalityError'
+  }
+}
+
 export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): readonly RoleDefinition[] {
   const documents = readShippedParticipants(contentRoot, participantFrontmatterSchema)
 
@@ -54,9 +84,16 @@ export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): re
     throw new ShippedDataError(participantFile(contentRoot, id), id, reason)
   }
 
-  const roles: RoleDefinition[] = documents.map((document) =>
-    document.eligibility === 'cast' ? document : { ...document, availability: [] },
-  )
+  const roles: RoleDefinition[] = documents.map((document) => ({
+    id: document.id,
+    handle: document.handle,
+    displayName: document.displayName,
+    description: document.description,
+    persona: document.persona,
+    eligibility: document.eligibility,
+    availability: document.eligibility === 'cast' ? document.availability : [],
+    function: document.eligibility === 'addressed-only' ? document.function : undefined,
+  }))
 
   const seenIds = new Set<string>()
   const seenHandles = new Set<string>()
@@ -77,6 +114,11 @@ export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): re
 
   const generalists = roles.filter((role) => role.eligibility === 'generalist')
   if (generalists.length !== 1) throw new GeneralistCardinalityError(generalists.map((role) => role.id))
+
+  for (const declared of PARTICIPANT_FUNCTIONS) {
+    const declaring = roles.filter((role) => role.function?.name === declared)
+    if (declaring.length !== 1) throw new ParticipantFunctionCardinalityError(declared, declaring.map((role) => role.id))
+  }
 
   return roles
 }

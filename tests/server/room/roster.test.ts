@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
-import { defaultCastFor, resolveRoster, specialistsFor } from '../../../src/server/room/roster.js'
+import { defaultCastFor, InterviewerNotInRosterError, resolveRoster, specialistsFor } from '../../../src/server/room/roster.js'
+import { INTERVIEWER_FIXTURE, INTERVIEWER_INVOCATION_FIXTURE } from '../../support/roomFixtures.js'
 
 const SHAPE: RoleDefinition = {
   id: 'shape',
@@ -9,6 +10,7 @@ const SHAPE: RoleDefinition = {
   description: 'the shape of it',
   persona: 'reasons about the shape of it',
   eligibility: 'cast',
+  function: undefined,
   availability: [
     { mode: 'flash', surface: 'draft', enabledByDefault: true },
     { mode: 'epic', surface: 'draft', enabledByDefault: false },
@@ -21,6 +23,7 @@ const COMPRESSION: RoleDefinition = {
   description: 'what earns its space',
   persona: 'reasons about what earns its space',
   eligibility: 'cast',
+  function: undefined,
   availability: [{ mode: 'flash', surface: 'authorContext', enabledByDefault: true }],
 }
 const EDITOR: RoleDefinition = {
@@ -30,6 +33,7 @@ const EDITOR: RoleDefinition = {
   description: 'the judgment',
   persona: 'reasons about the judgment',
   eligibility: 'generalist',
+  function: undefined,
   availability: [],
 }
 const TOOLSMITH: RoleDefinition = {
@@ -39,16 +43,28 @@ const TOOLSMITH: RoleDefinition = {
   description: 'a tool the author reaches for by name',
   persona: 'reasons about the tool the author asked for',
   eligibility: 'addressed-only',
+  function: undefined,
   availability: [],
 }
 
 describe('resolving who is in the room', () => {
   it('takes the cast from declared eligibility, the declared generalist, and every addressed-only participant apart from both', () => {
-    const roster = resolveRoster([SHAPE, EDITOR, TOOLSMITH])
+    const roster = resolveRoster([SHAPE, EDITOR, TOOLSMITH, INTERVIEWER_FIXTURE])
 
     expect(roster.specialists.map((role) => role.id)).toEqual(['shape'])
     expect(roster.storyEditor.id).toBe('story-editor')
-    expect(roster.addressedOnly.map((role) => role.id)).toEqual(['toolsmith'])
+    expect(roster.addressedOnly.map((role) => role.id)).toEqual(['toolsmith', INTERVIEWER_FIXTURE.id])
+  })
+
+  it('reads the interviewer from whichever participant declares the function, invocation and all', () => {
+    const roster = resolveRoster([SHAPE, EDITOR, TOOLSMITH, INTERVIEWER_FIXTURE])
+
+    expect(roster.interviewer.role.id).toBe(INTERVIEWER_FIXTURE.id)
+    expect(roster.interviewer.invocation).toBe(INTERVIEWER_INVOCATION_FIXTURE)
+  })
+
+  it('refuses a role set in which no participant declares the interviewer function', () => {
+    expect(() => resolveRoster([SHAPE, EDITOR, TOOLSMITH])).toThrowError(InterviewerNotInRosterError)
   })
 })
 

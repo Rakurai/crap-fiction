@@ -127,6 +127,7 @@ function Surfaces({
           initialCast={piece.surfaces[surface].cast}
           initialConversations={piece.surfaces[surface].conversations}
           storyEditor={piece.storyEditor}
+          interviewer={piece.interviewer}
           room={roomAdapters}
           roster={roster}
           runtime={probe.kind === 'ready' ? probe.value : undefined}

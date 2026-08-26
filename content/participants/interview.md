@@ -1,10 +1,11 @@
 ---
-handle: interviewer
+handle: interview
 displayName: Interviewer
 description: Asks one consequential question that clarifies what the author is trying to make.
 eligibility: addressed-only
-function: interviewer
-invocation: ask me a clarifying question
+function:
+  name: interviewer
+  invocation: ask me a clarifying question
 ---
 ## Responsibility
 

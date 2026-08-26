@@ -53,7 +53,7 @@ import {
   type ParticipantEvidence,
 } from './context.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
-import { specialistsFor, type RoomRoster } from './roster.js'
+import { specialistsFor, type Interviewer, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
 
 function referenceSchemaFor(mode: ModeDescriptor, authorContextReference: string, surface: SurfaceId): string | undefined {
@@ -182,6 +182,8 @@ type DispatchPlan = Readonly<{
   existingEntries: readonly ConversationEntry[]
   documents: DocumentSnapshot
   modeDescription: string
+  /** The reference the declared Interviewer receives on this surface, and no other participant does. */
+  interviewerReference: string | undefined
 }>
 
 function findResponse(
@@ -204,6 +206,7 @@ export class Room {
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
+  readonly #interviewer: Interviewer
   readonly #modes: ReadonlyMap<string, ModeDescriptor>
   readonly #authorContextReference: string
   readonly #displayNames: ReadonlyMap<string, string>
@@ -235,6 +238,7 @@ export class Room {
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
+    this.#interviewer = roster.interviewer
     this.#modes = new Map(modes.map((mode) => [mode.id, mode]))
     this.#authorContextReference = authorContextReference
     this.#displayNames = new Map([...roster.specialists, roster.storyEditor, ...roster.addressedOnly].map((role) => [role.id, role.displayName]))
@@ -246,6 +250,10 @@ export class Room {
 
   storyEditor(): RoleDefinition {
     return this.#storyEditor
+  }
+
+  interviewer(): Interviewer {
+    return this.#interviewer
   }
 
   #modeFor(modeId: string): ModeDescriptor {
@@ -353,7 +361,7 @@ export class Room {
 
     const conversationScope = conversationScopeFor(workspaceDir, roomScope)
     const existingEntries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
-    const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
+    const mode = this.#modeFor(piece.metadata.mode)
     const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, roomScope.surface)
     const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
@@ -430,7 +438,8 @@ export class Room {
       storyEditorIncluded,
       existingEntries,
       documents,
-      modeDescription,
+      modeDescription: mode.description,
+      interviewerReference: referenceSchemaFor(mode, this.#authorContextReference, roomScope.surface),
     }
     const cause = causeEntry
     const key = roomScopeKey(roomScope)
@@ -488,6 +497,7 @@ export class Room {
       existingEntries,
       documents,
       modeDescription,
+      interviewerReference,
     } = plan
     const { actionId, controller } = operation
     const signal = controller.signal
@@ -508,6 +518,7 @@ export class Room {
       ...shared,
       role,
       owesAnswer,
+      referenceSchema: role.id === this.#interviewer.role.id ? interviewerReference : undefined,
     })
 
     const onState = (participantId: string, state: 'preparing' | 'working'): void => {

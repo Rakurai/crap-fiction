@@ -6,6 +6,7 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import type { RuntimeStatus } from '../../../src/shared/runtimeStatus.js'
 import { buildTestApp } from '../../support/harness.js'
+import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
  * Which assignment a write reaches, and that it leaves the others alone, belongs to
@@ -28,6 +29,7 @@ const ROLES: readonly RoleDefinition[] = [
     description: 'attends to the turn',
     persona: 'reasons about attends to the turn',
     eligibility: 'cast',
+    function: undefined,
     availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
   },
   {
@@ -37,8 +39,10 @@ const ROLES: readonly RoleDefinition[] = [
     description: 'the generalist',
     persona: 'reasons about the generalist',
     eligibility: 'generalist',
+    function: undefined,
     availability: [],
   },
+  INTERVIEWER_FIXTURE,
 ]
 
 describe('the call-site and model routes', () => {
@@ -61,7 +65,7 @@ describe('the call-site and model routes', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.data.map((site: { site: string }) => site.site)).toEqual(['shape', 'story-editor', 'apply'])
+    expect(body.data.map((site: { site: string }) => site.site)).toEqual(['shape', 'story-editor', INTERVIEWER_FIXTURE.id, 'apply'])
   })
 
   it('reaches the assignment a write names, and reports it on the composed view after', async () => {

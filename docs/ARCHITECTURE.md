@@ -274,7 +274,12 @@ does.
 **A participant declares its own eligibility, and the count that must hold is validated where the
 participants are loaded.** Exactly one may declare itself the generalist; none or several is a startup
 failure naming the participant files involved, because nothing downstream has a second way to choose
-which one judges the piece as a whole.
+which one judges the piece as a whole. Each declared function is counted the same way and fails the
+same way, and the type of a participant's declaration is what keeps a function off any eligibility but
+addressed-only and keeps a declared function without its invocation unwritable — so no loader,
+compilation or client ever checks either. The resolved roster carries the participant filling each
+function, looked up once where the roster is built, and everything downstream reads it from there
+rather than searching the roster again.
 
 **A cast participant declares the mode-and-surface pairs it is available for, and whether it starts
 enabled at each.** Validating that declaration needs the loaded modes, so it happens after modes load
@@ -716,9 +721,10 @@ all of them are done from any shared model-queue state; it tracks only the speci
 dispatch's own source entry caused, and acts once exactly that set is empty.
 
 **Addressing is parsed out of the author's message by the room, and it is the only thing the message is
-parsed for.** A sigil counts where it begins the message or follows whitespace — so `mail@shape.com`
-and the second sigil of `@@shape` address nobody — and the letters following it are lowercased and
-prefix-matched against the participants' lowercased handles, so `@comp` reaches Compression. A token
+parsed for.** A sigil counts where it begins the message or follows whitespace — so a sigil inside an
+address and the second sigil of a doubled pair address nobody — and the letters following it are
+lowercased and prefix-matched against the participants' lowercased handles, so the first letters of a
+handle reach its participant where no other handle begins the same way. A token
 matching exactly one handle addresses that participant; a token matching none, or more than one, is
 ignored and stays ordinary text. Typo tolerance and fuzzy matching are not required. Offering handles
 as the author types one is the composer's own affair and never becomes a second authority on who was
@@ -748,6 +754,13 @@ no membership for the dispatch to bring it into — it joins this dispatch's eli
 named specialist does, and the piece's enabled cast is untouched. Because something was addressed, the
 generalist is excluded from that same dispatch unless it too was named, the same rule that already keeps
 it out of a dispatch addressed to one specialist alone.
+
+**The interviewer is the only participant a reference schema reaches, and only where the surface it was
+called on has one.** A schema describes what a context document is for, so it is evidence for a question
+about that document and noise in a call about the manuscript, which has no schema of its own. The
+dispatch plan resolves the schema once from the surface, and the compilation for each participant
+carries it only where that participant is the one filling the interviewer function; every other call on
+the same surface is compiled without it.
 
 **The Story Editor is not a member of the eligible set.** Keeping it out is what stops the ambiguity
 from becoming a double call. An addressed dispatch does not call it unless it was addressed; a dispatch
