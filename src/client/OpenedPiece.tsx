@@ -5,7 +5,6 @@ import type { AutosaveState } from './autosave.js'
 import type { BySurface } from './bySurface.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { closePiece } from './closePiece.js'
-import { documentSnapshotFrom } from './documentSnapshot.js'
 import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
 import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
 import { useLoaded } from './load.js'
@@ -63,9 +62,11 @@ function Surfaces({
   // One event source for the whole opened piece: every surface's conversation subscribes through
   // this rather than reconnecting the stream when the author switches which surface it shows.
   const pieceStream = usePieceStream(piece.id, subscribeToRoom)
-  const registry = useDocumentSnapshotRegistry(
-    documentSnapshotFrom(piece.surfaces.draft.text, piece.surfaces.storyContext.text, piece.surfaces.authorContext.text),
-  )
+  const registry = useDocumentSnapshotRegistry({
+    draft: piece.surfaces.draft.text,
+    storyContext: piece.surfaces.storyContext.text,
+    authorContext: piece.surfaces.authorContext.text,
+  })
 
   const [activeSurface, setActiveSurface] = useState<SurfaceId>('draft')
   const [saveFailed, setSaveFailed] = useState<BySurface<boolean>>({})

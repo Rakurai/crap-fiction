@@ -7,6 +7,7 @@ import { Conversation } from '../../../src/client/Conversation.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { AutosaveState } from '../../../src/client/autosave.js'
+import type { ApplyConfirmation } from '../../../src/shared/applyViews.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
@@ -493,44 +494,22 @@ describe('conversation activity, truthfully', () => {
     expect(send.textContent).toBe('send')
   })
 
-  it('ABANDON-UNTRACK: targets the action by identity and keeps the controls held while the studio has not answered', async () => {
+  /**
+   * That the controls stay held until the studio answers is `useConversation.test.ts`'s claim.
+   * What the conversation owns is the offer: while an action is in flight there is a control to
+   * abandon it, and clicking it names that action and no other.
+   */
+  it('offers the action in flight to be abandoned, by its own identity', async () => {
     const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
     const { room, stream } = roomStreaming([], abandonOperation)
     renderConversation([], { room })
 
-    const composer = await screen.findByLabelText('Message the room')
-    fireEvent.change(composer, { target: { value: 'a message' } })
-
+    await screen.findByLabelText('Message the room')
     stream(STARTED)
-    const abandon = await screen.findByRole('button', { name: 'abandon' })
-    fireEvent.click(abandon)
 
-    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
-    expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
-    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('keeps an Apply held when the studio cannot abandon it', async () => {
-    let answerAbandon: (result: RequestResult<null>) => void = () => {
-      throw new Error('the studio was never asked')
-    }
-    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>((resolve) => (answerAbandon = resolve)))
-    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], abandonOperation)
-    const applyRecommendation = vi.fn(() => new Promise<Awaited<ReturnType<RoomAdapters['applyRecommendation']>>>(() => {}))
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, applyRecommendation } })
-
-    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
-    stream({
-      type: 'action.started',
-      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: 1_700_000_000_000, surface: 'draft' },
-    })
     fireEvent.click(await screen.findByRole('button', { name: 'abandon' }))
 
-    expect(screen.getByText('APPLYING')).toBeTruthy()
-    await act(async () => answerAbandon({ outcome: 'unreachable', message: 'the studio did not answer' }))
-    expect(await screen.findByText('the studio did not answer')).toBeTruthy()
-    expect(screen.getByText('APPLYING')).toBeTruthy()
+    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
   })
 
   it('ABANDON-KEEP-LANDED: an entry accepted before abandonment stays, and a late progress callback for the same action cannot resurrect its activity', async () => {
@@ -571,12 +550,12 @@ describe('conversation activity, truthfully', () => {
     expect(await screen.findByText('APPLYING')).toBeTruthy()
   })
 
-  it('reconnect: a pending Apply resumes installation and confirmation from the retrieved replacement, calling no model', async () => {
-    const retrievePendingApply = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { replacement: 'resumed text' } }))
-    const confirmApplication = vi.fn(() =>
-      Promise.resolve({ outcome: 'value' as const, value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' as const } } }),
-    )
-    const onApplied = vi.fn((): Promise<AutosaveState> => Promise.resolve({ failed: false }))
+  /**
+   * That a resumed Apply retrieves its replacement, installs it and confirms it without a model
+   * is `useApply.test.ts`'s claim. What the conversation owns is the release: the surface stops
+   * showing an Apply in flight once the resumption it inherited has finished.
+   */
+  it('reconnect: releases the surface once the Apply it resumed has been confirmed', async () => {
     const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
       actionId: 'a1',
       conversationId: 'c1',
@@ -585,12 +564,27 @@ describe('conversation activity, truthfully', () => {
       startedAt: 1_700_000_000_000,
       applicationId: 'app1',
     })
+    let confirm: () => void = () => {
+      throw new Error('the studio was never asked to confirm')
+    }
+    const confirmed = new Promise<RequestResult<ApplyConfirmation>>((resolve) => {
+      confirm = () => resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } })
+    })
+    const resumable: RoomAdapters = {
+      ...room,
+      retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'resumed text' } }),
+      confirmApplication: () => confirmed,
+    }
 
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, retrievePendingApply, confirmApplication }, onApplied })
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: resumable, onApplied: () => Promise.resolve({ failed: false }) })
 
-    await waitFor(() => expect(onApplied).toHaveBeenCalledWith('resumed text'))
-    expect(retrievePendingApply).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
-    expect(confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(await screen.findByText('APPLYING')).toBeTruthy()
+
+    await act(async () => {
+      confirm()
+      await confirmed
+    })
+
     await waitFor(() => expect(screen.queryByText('APPLYING')).toBeNull())
   })
 })

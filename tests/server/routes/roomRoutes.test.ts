@@ -214,7 +214,12 @@ describe('the room over HTTP', () => {
     })
   })
 
-  it('retrieves the pending replacement by its provisional identity, so a reconnecting client resumes without a further model call, and refuses an unknown identity', async () => {
+  /**
+   * The routes a reconnecting client reads its pending replacement back from and confirms it
+   * through. Which replacements are pending, and what confirming one before the save requires,
+   * are the room's own claims at `room/room.test.ts`.
+   */
+  it('answers the pending replacement to a client asking for it by its provisional identity, and states the room\'s refusal of a confirmation the save has not caught up with', async () => {
     const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
       apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
@@ -232,30 +237,6 @@ describe('the room over HTTP', () => {
     const retrieved = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}`)
     expect(retrieved.status).toBe(200)
     expect(await retrieved.json()).toMatchObject({ success: true, data: { replacement: applied.replacement } })
-
-    const unknown = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application')
-    expect(unknown.status).toBe(404)
-    expect(await unknown.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
-  })
-
-  it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved before the client has saved the replacement', async () => {
-    const { app, modelAccess, room } = await withPiece({
-      shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
-    })
-    const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
-
-    const applying = app.request('/pieces/cups/surfaces/draft/conversations/c1/apply', {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ responseId, documents: DOCUMENTS }),
-    })
-    modelAccess.release('apply')
-    const { data: applied } = await (await applying).json()
-
-    const unknown = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application/confirm', { method: 'POST' })
-    expect(unknown.status).toBe(404)
-    expect(await unknown.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
 
     const unsaved = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
     expect(unsaved.status).toBe(409)
@@ -298,5 +279,9 @@ describe('the room over HTTP', () => {
     })
     expect(unknownRecommendation.status).toBe(404)
     expect(await unknownRecommendation.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })
+
+    const unknownApplication = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application/confirm', { method: 'POST' })
+    expect(unknownApplication.status).toBe(404)
+    expect(await unknownApplication.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
   })
 })
