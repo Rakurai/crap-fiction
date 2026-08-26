@@ -170,6 +170,15 @@ export class StoryContextStore {
   }
 }
 
+/** Author context's own writer: global, so serialized independently of any piece's own documents. */
+export class AuthorContextStore {
+  readonly #lock = new Mutex()
+
+  async write(dataRoot: string, text: string): Promise<void> {
+    await this.#lock.runExclusive(() => writeAuthorContext(dataRoot, text))
+  }
+}
+
 export async function writePieceCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
 }

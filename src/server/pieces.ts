@@ -5,7 +5,7 @@ import { openingWords, type ConversationSummary } from '../shared/conversationEn
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
 import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
-import { SURFACE_IDS, type PieceSurfaceId, type SurfaceId } from '../shared/surfaces.js'
+import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import { defaultCastFor, specialistsFor } from './room/roster.js'
@@ -25,6 +25,7 @@ import {
   writePieceCast,
   writePieceDetails,
   writePieceMetadata,
+  type AuthorContextStore,
   type DraftStore,
   type StoredPiece,
   type StoryContextStore,
@@ -231,7 +232,7 @@ export async function updatePieceDetails(
 export type PieceChanges = Readonly<{
   title?: string | undefined
   status?: PieceStatus | undefined
-  cast?: Readonly<{ surface: PieceSurfaceId; ids: readonly string[] }> | undefined
+  cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
 export async function updatePiece(
@@ -259,7 +260,7 @@ export function getConversation(
   dataRoot: string,
   workspaceDir: string,
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
 ): EntryConversationView {
   const scope = surfaceScope(workspaceDir, pieceId, surface)
@@ -279,7 +280,7 @@ export async function deleteConversation(
   dataRoot: string,
   workspaceDir: string,
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
 ): Promise<void> {
   const scope = surfaceScope(workspaceDir, pieceId, surface)
@@ -295,19 +296,24 @@ export async function deleteConversation(
   await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
-/** The draft's and the story context's own writer, each document serialized independently of the other. */
+/** Every document's own writer, each serialized independently of the others. */
 export class PieceDocumentWriter {
   readonly #draft: DraftStore
   readonly #storyContext: StoryContextStore
+  readonly #authorContext: AuthorContextStore
+  readonly #dataRoot: string
 
-  constructor(draft: DraftStore, storyContext: StoryContextStore) {
+  constructor(draft: DraftStore, storyContext: StoryContextStore, authorContext: AuthorContextStore, dataRoot: string) {
     this.#draft = draft
     this.#storyContext = storyContext
+    this.#authorContext = authorContext
+    this.#dataRoot = dataRoot
   }
 
-  async save(workspaceDir: string, id: string, surface: PieceSurfaceId, text: string): Promise<void> {
+  async save(workspaceDir: string, id: string, surface: SurfaceId, text: string): Promise<void> {
     if (!pieceExists(workspaceDir, id)) throw new PieceNotFoundError(id)
     if (surface === 'draft') await this.#draft.write(workspaceDir, id, text)
-    else await this.#storyContext.write(workspaceDir, id, text)
+    else if (surface === 'storyContext') await this.#storyContext.write(workspaceDir, id, text)
+    else await this.#authorContext.write(this.#dataRoot, text)
   }
 }

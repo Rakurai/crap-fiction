@@ -4,7 +4,7 @@ import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
-import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
@@ -21,7 +21,7 @@ export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
 type ConversationProps = {
   readonly pieceId: string
-  readonly surface: PieceSurfaceId
+  readonly surface: SurfaceId
   readonly currentConversationId: string | null
   readonly documents: DocumentSnapshot
   readonly flushDocument: () => void

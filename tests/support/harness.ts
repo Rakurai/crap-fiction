@@ -10,7 +10,7 @@ import type { ModeDescriptor } from '../../src/server/modes.js'
 import { PieceDocumentWriter } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
-import { DraftStore, StoryContextStore } from '../../src/server/store/index.js'
+import { AuthorContextStore, DraftStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -86,7 +86,7 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     env,
     workspace,
     spec.modes,
-    new PieceDocumentWriter(new DraftStore(), new StoryContextStore()),
+    new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
     callSites(spec.roles),
     modelAccess,
     room,

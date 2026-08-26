@@ -446,6 +446,27 @@ describe('Room.dispatch', () => {
     })
     expect(readConversationEntries(dataRoot, draftScope(workspaceDir, piece.id), 'c1')).toBeUndefined()
   })
+
+  it("carries the currently open piece's draft, story context and mode description, though the conversation it dispatches into is global", async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room, adapter } = buildRoom(dataRoot, {
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a durable note' } } },
+    })
+
+    const authorContextScope: RoomScope = { pieceId: piece.id, surface: 'authorContext' }
+    await room.dispatch(
+      workspaceDir,
+      authorContextScope,
+      'c1',
+      { kind: 'message', text: 'what should I remember about this author' },
+      documents('the currently open draft text', { storyContext: 'the currently open story-context text' }),
+    )
+    await settlementOfScope(room, authorContextScope)
+
+    expect(adapter.promptFor('story-editor')).toContain(fixtureMode.description)
+    expect(adapter.promptFor('story-editor')).toContain('the currently open draft text')
+    expect(adapter.promptFor('story-editor')).toContain('the currently open story-context text')
+  })
 })
 
 describe('Room.apply', () => {

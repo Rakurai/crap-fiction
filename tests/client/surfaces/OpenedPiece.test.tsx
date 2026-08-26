@@ -213,3 +213,25 @@ describe('activity on one surface', () => {
     expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })
+
+describe('the author-context conversation selection', () => {
+  it("is read from the caller rather than the piece it opens with, and a fresh choice is reported back to the caller — so a switch away and back to a different piece never loses it", async () => {
+    const onAuthorContextSelectionChange = vi.fn()
+    render(
+      <OpenedPiece
+        id="cups"
+        authorContextSelection={{ value: 'kept-across-a-piece-switch', onChange: onAuthorContextSelectionChange }}
+        onClose={() => {}}
+      />,
+    )
+    await screen.findByRole('button', { name: 'The Cups' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'author context' }))
+    await screen.findByText('opened as kept-across-a-piece-switch')
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
+    fireEvent.click(screen.getByRole('button', { name: 'new' }))
+
+    expect(onAuthorContextSelectionChange).toHaveBeenCalledWith(null)
+  })
+})

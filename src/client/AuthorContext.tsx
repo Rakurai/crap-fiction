@@ -1,7 +1,7 @@
 import type { PieceStatus } from '../shared/pieceViews.js'
+import styles from './AuthorContext.module.css'
 import { EditableTitle } from './EditableTitle.js'
 import { facts, machineWords, timeOfDay } from './facts.js'
-import styles from './StoryContext.module.css'
 import type { AutosaveViewModel } from './useAutosave.js'
 
 type LifecycleProps = {
@@ -14,7 +14,7 @@ type LifecycleProps = {
   readonly onSetStatus: (status: PieceStatus) => void
 }
 
-type StoryContextProps = {
+type AuthorContextProps = {
   readonly title: string
   readonly onClose: () => void
   readonly text: string
@@ -26,12 +26,12 @@ type StoryContextProps = {
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
   readonly onSwitchToDraft: () => void
-  readonly onSwitchToAuthorContext: () => void
+  readonly onSwitchToStoryContext: () => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName: string } | undefined
 }
 
-export function StoryContext({
+export function AuthorContext({
   title,
   onClose,
   text,
@@ -42,10 +42,10 @@ export function StoryContext({
   onOpenRoom,
   onOpenConversations,
   onSwitchToDraft,
-  onSwitchToAuthorContext,
+  onSwitchToStoryContext,
   lifecycle,
   applying,
-}: StoryContextProps) {
+}: AuthorContextProps) {
   return (
     <div className={styles.wrapper}>
       <div className={styles.topBar}>
@@ -69,8 +69,8 @@ export function StoryContext({
           <button type="button" className={styles.control} onClick={onSwitchToDraft}>
             draft
           </button>
-          <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
-            author context
+          <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
+            story context
           </button>
           <span className={styles.controlsRule} />
           <button type="button" className={styles.control} onClick={onOpenConversations}>
@@ -98,7 +98,7 @@ export function StoryContext({
       <div className={styles.scroll}>
         <div className={styles.measure}>
           <textarea
-            aria-label="Story context"
+            aria-label="Author context"
             className={styles.text}
             value={text}
             disabled={applying !== undefined}
@@ -118,7 +118,7 @@ export function StoryContext({
         <div className={styles.saveFailed}>
           <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            The last write to story-context.yaml failed. Nothing has been discarded — keep writing. Leaving for
+            The last write to author-context.yaml failed. Nothing has been discarded — keep writing. Leaving for
             another piece is unavailable while “{title}” is unsaved.
           </p>
           <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>

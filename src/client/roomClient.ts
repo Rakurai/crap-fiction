@@ -11,7 +11,7 @@ import {
   type ConversationErrorEvent,
   type RoomActivitySnapshot,
 } from '../shared/conversationEvents.js'
-import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
 
@@ -23,11 +23,11 @@ function readJson(text: string): unknown {
   }
 }
 
-function surfacePath(pieceId: string, surface: PieceSurfaceId): string {
+function surfacePath(pieceId: string, surface: SurfaceId): string {
   return `/pieces/${encodeURIComponent(pieceId)}/surfaces/${surface}`
 }
 
-export function createConversation(pieceId: string, surface: PieceSurfaceId, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
+export function createConversation(pieceId: string, surface: SurfaceId, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
   return requestJson(`${surfacePath(pieceId, surface)}/conversations`, z.object({ id: z.string() }), {
     method: 'POST',
     signal: signal ?? null,
@@ -36,7 +36,7 @@ export function createConversation(pieceId: string, surface: PieceSurfaceId, sig
 
 export function fetchConversation(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<EntryConversationView>> {
@@ -47,7 +47,7 @@ export function fetchConversation(
 
 export function deleteConversation(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<null>> {
@@ -66,7 +66,7 @@ export type DispatchOpening =
 
 export function dispatch(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   opening: DispatchOpening,
   documents: DocumentSnapshot,
@@ -82,7 +82,7 @@ export function dispatch(
 
 export function applyRecommendation(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   responseId: string,
   documents: DocumentSnapshot,
@@ -99,7 +99,7 @@ export function applyRecommendation(
 
 export function confirmApplication(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   applicationId: string,
   signal?: AbortSignal,
@@ -113,7 +113,7 @@ export function confirmApplication(
 
 export function abandonOperation(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string,
   actionId: string,
   signal?: AbortSignal,

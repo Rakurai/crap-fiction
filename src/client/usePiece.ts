@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail, PieceStatus } from '../shared/pieceViews.js'
-import type { PieceSurfaceId } from '../shared/surfaces.js'
+import type { SurfaceId } from '../shared/surfaces.js'
 import { useLoaded } from './load.js'
 import { fetchPiece, updatePiece } from './piecesClient.js'
 import { failureMessage } from './request.js'
 import { deleteConversation as deleteConversationRequest } from './roomClient.js'
 
 /** A value held per editing surface, so one surface's state never bleeds into another's. */
-type BySurface<T> = Readonly<Partial<Record<PieceSurfaceId, T>>>
+type BySurface<T> = Readonly<Partial<Record<SurfaceId, T>>>
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
@@ -17,21 +17,21 @@ export type PieceViewModel =
       readonly piece: PieceDetail
       readonly castToggling: BySurface<string>
       readonly castError: BySurface<string>
-      readonly toggleCast: (surface: PieceSurfaceId, memberId: string) => void
+      readonly toggleCast: (surface: SurfaceId, memberId: string) => void
       readonly retitling: boolean
       readonly retitleError: string | undefined
       readonly retitle: (title: string) => void
       readonly settingStatus: boolean
       readonly statusError: string | undefined
       readonly setStatus: (status: PieceStatus) => void
-      readonly refreshConversations: (surface: PieceSurfaceId) => void
+      readonly refreshConversations: (surface: SurfaceId) => void
       readonly deletingConversationId: BySurface<string>
       readonly conversationsError: BySurface<string>
-      readonly deleteConversation: (surface: PieceSurfaceId, conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
+      readonly deleteConversation: (surface: SurfaceId, conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
     }
   | { readonly status: 'error'; readonly message: string }
 
-function withSurface<T>(surface: PieceSurfaceId, value: T | undefined): (current: BySurface<T>) => BySurface<T> {
+function withSurface<T>(surface: SurfaceId, value: T | undefined): (current: BySurface<T>) => BySurface<T> {
   return (current) => ({ ...current, [surface]: value })
 }
 
@@ -48,7 +48,7 @@ export function usePiece(id: string): PieceViewModel {
   const [conversationsError, setConversationsError] = useState<BySurface<string>>({})
 
   const toggleCast = useCallback(
-    (surface: PieceSurfaceId, memberId: string) => {
+    (surface: SurfaceId, memberId: string) => {
       if (state.kind !== 'ready') return
       const piece = state.value
       const cast = piece.surfaces[surface].cast
@@ -104,7 +104,7 @@ export function usePiece(id: string): PieceViewModel {
   )
 
   const refreshConversations = useCallback(
-    (surface: PieceSurfaceId) => {
+    (surface: SurfaceId) => {
       setConversationsError(withSurface<string>(surface, undefined))
       void fetchPiece(id).then((result) => {
         if (result.outcome === 'value') {
@@ -118,7 +118,7 @@ export function usePiece(id: string): PieceViewModel {
   )
 
   const deleteConversation = useCallback(
-    (surface: PieceSurfaceId, conversationId: string): Promise<readonly ConversationSummary[] | undefined> => {
+    (surface: SurfaceId, conversationId: string): Promise<readonly ConversationSummary[] | undefined> => {
       if (state.kind !== 'ready') return Promise.resolve(undefined)
       const piece = state.value
 

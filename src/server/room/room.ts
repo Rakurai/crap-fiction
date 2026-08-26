@@ -31,6 +31,7 @@ import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomSc
 import {
   ConversationEntryStore,
   readAppliedChanges,
+  readAuthorContext,
   readConversationEntries,
   readPiece,
   readStoryContext,
@@ -733,6 +734,6 @@ export class Room {
   #readTargetText(workspaceDir: string, pieceId: string, surface: RoomScope['surface']): string {
     if (surface === 'draft') return readPiece(workspaceDir, pieceId)?.draft?.text ?? ''
     if (surface === 'storyContext') return readStoryContext(workspaceDir, pieceId) ?? ''
-    throw new Error(`Apply confirmation is not wired for the "${surface}" surface`)
+    return readAuthorContext(this.#dataRoot) ?? ''
   }
 }

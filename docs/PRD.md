@@ -276,6 +276,16 @@ history, conversation, composer state or in-flight work; and a failed save on on
 document is stated there and blocks leaving the piece without hiding or overriding whatever the
 other surface's own save state is.
 
+**Work on author context from any piece** — *per session*
+Preferences that generalize across every story belong to the author, not to whichever piece
+happens to be open, so revising them reaches the same place and the same standing conversation
+no matter which piece the author started from.
+*Done when:* author context has its own editing surface, conversations, cast and activity, reached
+identically from every piece; its active conversation stays selected across a piece switch and
+after a reload; and a call made there reads the currently open piece's draft, story context and
+mode, so leaving that piece is what ends work in progress there, the same as it ends work on the
+draft or the story context.
+
 ### Conversations
 
 **Pick up where they left off** — *per session*
@@ -373,9 +383,6 @@ software has no need for and therefore does not have.
 
 **Story visualization.** Reader-knowledge-against-character-knowledge timelines and similar
 readings of structure, if actual use earns them.
-
-**Richer context management.** A dedicated editing surface for author context, if hand-editing
-proves insufficient.
 
 **Locating an applied change in the prose.** A transient jump-to or highlight affordance for
 finding what an application changed in a longer manuscript, if the before-and-after shown with

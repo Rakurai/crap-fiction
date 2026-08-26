@@ -17,6 +17,7 @@ const DEFAULT_PROPS = {
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
   onSwitchToStoryContext: vi.fn(),
+  onSwitchToAuthorContext: vi.fn(),
   lifecycle: {
     status: 'drafting' as const,
     retitling: false,
@@ -44,6 +45,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       onOpenRoom={props.onOpenRoom}
       onOpenConversations={props.onOpenConversations}
       onSwitchToStoryContext={props.onSwitchToStoryContext}
+      onSwitchToAuthorContext={props.onSwitchToAuthorContext}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />

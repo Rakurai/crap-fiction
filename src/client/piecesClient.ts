@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceStatus, type PieceSummary } from '../shared/pieceViews.js'
-import type { PieceSurfaceId } from '../shared/surfaces.js'
+import type { SurfaceId } from '../shared/surfaces.js'
 import { requestJson, type RequestResult } from './request.js'
 
 export function fetchPieces(signal?: AbortSignal): Promise<RequestResult<readonly PieceSummary[]>> {
@@ -13,7 +13,7 @@ export function fetchPiece(id: string, signal?: AbortSignal): Promise<RequestRes
 
 export function saveSurfaceDocument(
   id: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   text: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<null>> {
@@ -37,7 +37,7 @@ export function createPiece(title: string, mode: string, signal?: AbortSignal): 
 export type PiecePatch = Readonly<{
   title?: string
   status?: PieceStatus
-  cast?: Readonly<{ surface: PieceSurfaceId; ids: readonly string[] }>
+  cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }>
 }>
 
 export function updatePiece(id: string, patch: PiecePatch, signal?: AbortSignal): Promise<RequestResult<PieceDetail>> {

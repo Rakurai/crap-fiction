@@ -56,17 +56,31 @@ manuscript with the application gone, not as a separate place.
 
 ## The story context surface
 
-**A short switcher, beside the manuscript's other one-action controls, moves between the draft
-and story context.** Switching changes the document on screen, its conversations, its cast and
-its activity together, and nothing else: the surface left behind keeps its text, its editor
-history, its conversation and composer state, its scroll position, and whatever save or room
-activity it was already holding, exactly as it was left. Activity on one is never a reason the
-other cannot start its own.
+**A short switcher, beside the manuscript's other one-action controls, moves between the draft,
+story context and author context.** Switching changes the document on screen, its conversations,
+its cast and its activity together, and nothing else: the surface left behind keeps its text,
+its editor history, its conversation and composer state, its scroll position, and whatever save
+or room activity it was already holding, exactly as it was left. Activity on one is never a
+reason the other cannot start its own.
 
 **Story context is set as plain text, not as prose.** It carries no rendered view, no Markdown
 source toggle and no reading view — one surface, one way of seeing it, because it is notes
 rather than the story itself. Its reference schema sits beside it, offered as guidance the
 author can consult and dismiss rather than a form asking to be filled in.
+
+## The author context surface
+
+**The same surface, reached identically from every piece.** Unlike the draft and story context,
+switching pieces does not replace what is on screen here: the document, its conversations and
+the conversation currently selected are the same ones a moment ago in a different piece, and stay
+selected the next time the author reaches this surface, including after a reload. It is set as
+plain text with its own reference schema, exactly as story context is.
+
+**Only its cast and its evidence are the open piece's own.** Which specialists are enabled here is
+stored per piece, and a call made here reads the currently open piece's draft, story context and
+mode. Leaving for another piece abandons work in progress here the same way leaving abandons work
+on the draft or the story context, because that work was reasoning about evidence that piece no
+longer supplies.
 
 ## The conversation
 

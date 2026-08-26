@@ -65,9 +65,11 @@ contents of either durable context. The author's story is not diagnostic data.
 **One piece is open at a time, and the application state is singular** — each editing surface's own
 document, conversation and operation. Switching pieces replaces that state rather than accumulating
 alongside it, and abandons whatever operation is in flight on every surface, keeping whatever landed.
-Nothing is ordinarily held unsaved. A switch is refused only while a document's write remains
-unwritten after a failure, having first retried it: prose the author typed is the one thing a piece
-switch may never discard.
+Author context is the one exception to "replaces": its document and conversation are not the old
+piece's to begin with, so a switch changes only the transient evidence and cast a call there reads,
+never the document or which conversation is selected. Nothing is ordinarily held unsaved. A switch
+is refused only while a document's write remains unwritten after a failure, having first retried it:
+prose the author typed is the one thing a piece switch may never discard.
 
 ## Dependency roster
 
@@ -372,27 +374,28 @@ filesystem and is a copy across one, and the data root is a bind mount whose fil
 holding the process's temp directory — so staging a write anywhere but beside its target would quietly
 stop being atomic.
 
-**Autosave of the manuscript and of the story context is debounced and is a local write only, each
-independently of the other.** No model call is on either save path, and a debounce or a failure on
-one never holds up or masks the other's.
+**Autosave of the manuscript, the story context and the author context is debounced and is a local
+write only, each independently of the other two.** No model call is on any save path, and a debounce
+or a failure on one never holds up or masks another's.
 
-**The client is the only writer of the manuscript and of the story context.** No model operation
-writes either: an operation receives the current text of both in the request that starts it, and an
-application returns prose the client applies to the surface it targeted and then saves by that
-surface's own autosave path. This is what makes a failed or abandoned application change nothing —
-the room has no path to either document to leave half-written — and it means each of the two
-artifacts where two writers would silently lose prose has one.
+**The client is the only writer of the manuscript, the story context and the author context.** No
+model operation writes any of them: an operation receives the current text of all three in the
+request that starts it, and an application returns prose the client applies to the surface it
+targeted and then saves by that surface's own autosave path. This is what makes a failed or
+abandoned application change nothing — the room has no path to any document to leave half-written —
+and it means each of the three artifacts where two writers would silently lose prose has one.
 
-**One write is in flight at a time for the manuscript, and likewise for the story context.** Text
-the author produces while a write is in flight accumulates and goes out with the next one. An atomic
-rename makes a write indivisible, not ordered: two in flight can complete oldest-last and restore
-prose the author has already replaced, and nothing about a single logical writer prevents that on
-its own. Serializing at that writer is what removes the whole class, and is why no write generation
-or stale-write rejection appears anywhere.
+**One write is in flight at a time for the manuscript, and likewise for the story context and for
+the author context.** Text the author produces while a write is in flight accumulates and goes out
+with the next one. An atomic rename makes a write indivisible, not ordered: two in flight can
+complete oldest-last and restore prose the author has already replaced, and nothing about a single
+logical writer prevents that on its own. Serializing at that writer is what removes the whole class,
+and is why no write generation or stale-write rejection appears anywhere.
 
-**Starting an operation flushes whichever of the two its own surface holds pending, and does not
-wait on it.** The current text of both travels in the request either way, so the model never works
-from prose the author has already changed and no operation depends on a write having succeeded.
+**Starting an operation flushes whichever of the three its own surface holds pending, and does not
+wait on it.** The current text of all three travels in the request either way, so the model never
+works from prose the author has already changed and no operation depends on a write having
+succeeded.
 
 **A write that fails is never reported as a write that succeeded.** The surface it belongs to stays
 usable, the unwritten state stays in memory, the failure is stated where the author can see it and
@@ -401,9 +404,9 @@ resolves it optimistically. No retry is scheduled and nothing claims one: the re
 ordinary write, so a promise of one would describe behaviour the client does not have, and an author
 who read it and stopped typing is never written.
 
-**Leaving the piece is refused while either the manuscript's or the story context's write is
-failing**, and refused rather than confirmed. Nothing asks the author to confirm discarding anything,
-and both surfaces stay editable throughout.
+**Leaving the piece is refused while any of the three documents' write is failing**, and refused
+rather than confirmed. Nothing asks the author to confirm discarding anything, and every surface
+stays editable throughout.
 
 ## Model access
 

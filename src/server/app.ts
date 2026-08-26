@@ -5,7 +5,7 @@ import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
-import { documentSnapshotSchema, pieceSurfaceIdSchema } from '../shared/surfaces.js'
+import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
@@ -57,9 +57,9 @@ const postApplySchema = z.object({
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
-  cast: z.object({ surface: pieceSurfaceIdSchema, ids: z.array(z.string().min(1)) }).optional(),
+  cast: z.object({ surface: surfaceIdSchema, ids: z.array(z.string().min(1)) }).optional(),
 })
-const surfaceParamSchema = z.object({ surface: pieceSurfaceIdSchema })
+const surfaceParamSchema = z.object({ surface: surfaceIdSchema })
 
 export function createApp(
   env: StudioEnv,

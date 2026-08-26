@@ -13,7 +13,7 @@ import { PieceDocumentWriter } from './pieces.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
 import { Room } from './room/room.js'
 import { resolveRoster, type RoomRoster } from './room/roster.js'
-import { ConversationEntryStore, DraftStore, readShippedAuthorContextReference, StoryContextStore } from './store/index.js'
+import { AuthorContextStore, ConversationEntryStore, DraftStore, readShippedAuthorContextReference, StoryContextStore } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
 export type Studio = {
@@ -49,7 +49,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
   const { modes, charter, fragments, sites, roster, authorContextReference } = loadShippedContent(CONTENT_ROOT)
-  const documentWriter = new PieceDocumentWriter(new DraftStore(), new StoryContextStore())
+  const documentWriter = new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), env.dataRoot)
   const modelAccess = makeModelAccess(env, logger)
   const room = new Room(
     modelAccess,

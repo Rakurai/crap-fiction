@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
-import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -44,7 +44,7 @@ export type RoomAdapters = Readonly<{
 
 export function useConversation(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   initialConversationId: string | null,
   flushDocument: () => void,
   getDocuments: () => DocumentSnapshot,

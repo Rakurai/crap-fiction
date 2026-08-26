@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DocumentSnapshot, PieceSurfaceId } from '../shared/surfaces.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -26,7 +26,7 @@ export type ApplyViewModel = Readonly<{
 
 export function useApply(
   pieceId: string,
-  surface: PieceSurfaceId,
+  surface: SurfaceId,
   conversationId: string | null,
   getDocuments: () => DocumentSnapshot,
   onApplied: (markdown: string) => void,

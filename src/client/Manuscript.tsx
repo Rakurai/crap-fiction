@@ -28,6 +28,7 @@ type ManuscriptProps = {
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
   readonly onSwitchToStoryContext: () => void
+  readonly onSwitchToAuthorContext: () => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName: string } | undefined
 }
@@ -45,6 +46,7 @@ export function Manuscript({
   onOpenRoom,
   onOpenConversations,
   onSwitchToStoryContext,
+  onSwitchToAuthorContext,
   lifecycle,
   applying,
 }: ManuscriptProps) {
@@ -111,6 +113,9 @@ export function Manuscript({
             <span className={styles.controlsRule} />
             <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
               story context
+            </button>
+            <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
+              author context
             </button>
             <button type="button" className={styles.control} onClick={onOpenConversations}>
               conversations

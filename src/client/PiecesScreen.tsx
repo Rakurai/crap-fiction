@@ -18,11 +18,16 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
   const pieces = usePieces(refreshKey)
   const theme = useTheme()
   const [showCallSites, setShowCallSites] = useState(false)
+  // Outlives any one opened piece, so the author-context conversation the author is in stays
+  // selected across a piece switch. `undefined` until the author has picked one this session —
+  // until then, each opened piece falls back to whichever global conversation it last opened with.
+  const [authorContextConversationId, setAuthorContextConversationId] = useState<string | null | undefined>(undefined)
 
   if (openedId !== undefined) {
     return (
       <OpenedPiece
         id={openedId}
+        authorContextSelection={{ value: authorContextConversationId, onChange: setAuthorContextConversationId }}
         onClose={() => {
           setOpenedId(undefined)
           setRefreshKey((key) => key + 1)

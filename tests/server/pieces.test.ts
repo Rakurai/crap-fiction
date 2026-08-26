@@ -19,7 +19,15 @@ import {
 } from '../../src/server/pieces.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { ConversationEntryStore, DraftStore, readAppliedChanges, StoryContextStore, writeAppliedChange } from '../../src/server/store/index.js'
+import {
+  AuthorContextStore,
+  ConversationEntryStore,
+  DraftStore,
+  readAppliedChanges,
+  StoryContextStore,
+  writeAppliedChange,
+  writeAuthorContext,
+} from '../../src/server/store/index.js'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
@@ -188,6 +196,46 @@ describe('pieces', () => {
     expect(opened.surfaces.draft.referenceSchema).toBeNull()
   })
 
+  it('finds the same author-context document and conversations from two pieces in different workspaces, while their casts stay distinct', async () => {
+    const archivist: RoleDefinition = {
+      id: 'archivist',
+      handle: 'archivist',
+      displayName: 'Archivist',
+      description: 'keeps the notes that outlast any one piece',
+      persona: 'reasons about the notes that outlast any one piece',
+      eligibility: 'cast',
+      availability: [{ mode: 'flash', surface: 'authorContext', enabledByDefault: false }],
+    }
+    const withArchivist = [...specialists, archivist]
+
+    const otherWorkspaceDir = path.join(dataRoot, 'another-writing')
+    mkdirSync(otherWorkspaceDir, { recursive: true })
+
+    const inFirst = await createPiece(workspaceDir, 'Cups', flash.id, [flash], withArchivist)
+    const inSecond = await createPiece(otherWorkspaceDir, 'Saucers', flash.id, [flash], withArchivist)
+
+    await writeAuthorContext(dataRoot, 'Notes that generalize across every piece.')
+    await new ConversationEntryStore().append(dataRoot, { kind: 'global' }, 'shared-conversation', {
+      id: 'e1',
+      kind: 'authorMessage',
+      text: 'a note that belongs to no single piece',
+      audience: [],
+      brought: [],
+    })
+    await setPieceCast(workspaceDir, inFirst.id, withArchivist, 'authorContext', ['archivist'])
+
+    const openedFromFirst = getPiece(dataRoot, workspaceDir, inFirst.id, withArchivist, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+    const openedFromSecond = getPiece(dataRoot, otherWorkspaceDir, inSecond.id, withArchivist, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+
+    expect(openedFromFirst.surfaces.authorContext.text).toBe('Notes that generalize across every piece.')
+    expect(openedFromSecond.surfaces.authorContext.text).toBe(openedFromFirst.surfaces.authorContext.text)
+    expect(openedFromFirst.surfaces.authorContext.conversations.map((c) => c.id)).toEqual(['shared-conversation'])
+    expect(openedFromSecond.surfaces.authorContext.conversations).toEqual(openedFromFirst.surfaces.authorContext.conversations)
+
+    expect(openedFromFirst.surfaces.authorContext.cast.find((member) => member.id === 'archivist')?.enabled).toBe(true)
+    expect(openedFromSecond.surfaces.authorContext.cast.find((member) => member.id === 'archivist')?.enabled).toBe(false)
+  })
+
   /**
    * One claim, held by every entry point: a piece is resolved before anything is read or
    * written, so neither a piece that is absent nor an id reaching past the workspace can
@@ -198,9 +246,9 @@ describe('pieces', () => {
       expect(() => getPiece(dataRoot, workspaceDir, id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)).toThrowError(PieceNotFoundError)
       await expect(setPieceCast(workspaceDir, id, specialists, 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
-      await expect(new PieceDocumentWriter(new DraftStore(), new StoryContextStore()).save(workspaceDir, id, 'draft', 'text')).rejects.toThrowError(
-        PieceNotFoundError,
-      )
+      await expect(
+        new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot).save(workspaceDir, id, 'draft', 'text'),
+      ).rejects.toThrowError(PieceNotFoundError)
     }
   })
 })
@@ -302,7 +350,7 @@ describe('PieceDocumentWriter', () => {
   })
 
   function documentWriter(): PieceDocumentWriter {
-    return new PieceDocumentWriter(new DraftStore(), new StoryContextStore())
+    return new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), workspaceDir)
   }
 
   it("writes an existing piece's draft through to the store", async () => {

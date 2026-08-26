@@ -47,7 +47,8 @@ GET    /pieces/:id                                 metadata and the Story Editor
                                                    has one, conversation index, current conversation,
                                                    and roster with enabled state
 PATCH  /pieces/:id                                 title, status, one surface's enabled cast
-PUT    /pieces/:id/surfaces/:surface/document      the draft's or the story context's whole text
+PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
+                                                   author context's whole text
 GET    /pieces/:id/surfaces/:surface/conversations/:cid
                                                    the durable entries, each application joined to
                                                    the change it names
@@ -84,9 +85,11 @@ GET    /models                                     what the runtime holds, and w
 reports whether the runtime can be reached at all, which is the state where the manuscript still opens
 and only the room is unavailable.
 
-Every `:surface` above names `draft` or `storyContext` — the two surfaces a piece's own routes
-address. Author context generalizes across every piece rather than belonging to one, so `GET
-/pieces/:id` is the whole of how a piece's routes reach it.
+Every `:surface` above names `draft`, `storyContext` or `authorContext`. The piece id in the path
+always selects the room the request gates — its cast, its activity, the evidence a call reads —
+but for `authorContext` the conversation, document and applied-change routes above land in the
+studio's one global collection rather than anything held under that piece, the same collection
+`GET /pieces/:id` already reports reaching identically from any other piece.
 
 ## The event stream
 
