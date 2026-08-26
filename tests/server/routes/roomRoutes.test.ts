@@ -171,10 +171,10 @@ describe('the room over HTTP', () => {
     expect(entries.find((entry) => entry.kind === 'concreteChangeRequest')).toMatchObject({ respondingTo: responseId, clarification: 'be specific' })
   })
 
-  it('reports an application in flight naming the response it came from, then answers with a pending manuscript that becomes the change on that response once confirmed', async () => {
+  it('reports an application in flight naming the response it came from, then answers with a pending replacement that becomes the change on that response once confirmed', async () => {
     const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
     })
     const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
@@ -189,7 +189,7 @@ describe('the room over HTTP', () => {
 
     modelAccess.release('apply')
     const { data: applied } = await (await applying).json()
-    expect(applied).toMatchObject({ outcome: 'pending', manuscript: 'The cups sat where she left them, revised.' })
+    expect(applied).toMatchObject({ outcome: 'pending', replacement: 'The cups sat where she left them, revised.' })
 
     // Still busy: pending, not settled, until the client installs, saves and confirms it.
     expect(room.activitySnapshot(draftScope)).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
@@ -197,7 +197,7 @@ describe('the room over HTTP', () => {
     await app.request('/pieces/cups/surfaces/draft/document', {
       method: 'PUT',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ text: applied.manuscript }),
+      body: JSON.stringify({ text: applied.replacement }),
     })
     const confirming = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
     expect(confirming.status).toBe(200)
@@ -215,7 +215,7 @@ describe('the room over HTTP', () => {
   it('retrieves the pending replacement by its provisional identity, so a reconnecting client resumes without a further model call, and refuses an unknown identity', async () => {
     const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
     })
     const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
@@ -229,7 +229,7 @@ describe('the room over HTTP', () => {
 
     const retrieved = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}`)
     expect(retrieved.status).toBe(200)
-    expect(await retrieved.json()).toMatchObject({ success: true, data: { manuscript: applied.manuscript } })
+    expect(await retrieved.json()).toMatchObject({ success: true, data: { replacement: applied.replacement } })
 
     const unknown = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application')
     expect(unknown.status).toBe(404)
@@ -239,7 +239,7 @@ describe('the room over HTTP', () => {
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved before the client has saved the replacement', async () => {
     const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
     })
     const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 

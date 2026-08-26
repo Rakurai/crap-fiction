@@ -20,12 +20,35 @@ export async function openPiece(page: Page, title: string): Promise<void> {
     await expect(newPiece).toBeVisible()
   }
 
-  await newPiece.click()
+  await createPiece(page, title)
+}
+
+export async function createPiece(page: Page, title: string): Promise<void> {
+  await control(page, 'new piece').click()
   await page.getByLabel('title', { exact: true }).fill(title)
   await control(page, 'create').click()
 
+  await reopenPiece(page, title)
+}
+
+export async function reopenPiece(page: Page, title: string): Promise<void> {
   await control(page, title).click()
   await expect(manuscript(page)).toBeVisible()
+}
+
+/** The ordinary way out, which is also what flushes every surface to disk. */
+export async function leavePiece(page: Page): Promise<void> {
+  await control(page, '‹ pieces').click()
+  await expect(control(page, 'new piece')).toBeVisible()
+}
+
+/** One answer's controls: a transcript draws the same ones under every answer it holds. */
+export function answerOf(page: Page, participantName: string): Locator {
+  return page.getByRole('group', { name: `${participantName}'s answer` })
+}
+
+export function answerControl(page: Page, participantName: string, name: string): Locator {
+  return answerOf(page, participantName).getByRole('button', { name, exact: true })
 }
 
 export function manuscript(page: Page): Locator {

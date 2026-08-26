@@ -8,7 +8,7 @@ import { failureReasonSchema } from './modelResult.js'
  */
 export const applyOutcomeSchema = z.union([
   z.object({ outcome: z.literal('noChange'), actionId: z.string().min(1) }),
-  z.object({ outcome: z.literal('pending'), actionId: z.string().min(1), applicationId: z.string().min(1), manuscript: z.string().min(1) }),
+  z.object({ outcome: z.literal('pending'), actionId: z.string().min(1), applicationId: z.string().min(1), replacement: z.string().min(1) }),
   z.object({ outcome: z.literal('failed'), actionId: z.string().min(1), reason: failureReasonSchema, returned: z.string().optional() }),
   z.object({ outcome: z.literal('abandoned'), actionId: z.string().min(1) }),
 ])
@@ -30,6 +30,6 @@ export type ApplyConfirmation = z.infer<typeof applyConfirmationSchema>
  * diff or string replacement changes this schema, not the activity contract that names the
  * identity to retrieve it by.
  */
-export const pendingApplySchema = z.object({ manuscript: z.string().min(1) })
+export const pendingApplySchema = z.object({ replacement: z.string().min(1) })
 
 export type PendingApply = z.infer<typeof pendingApplySchema>

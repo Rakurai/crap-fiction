@@ -34,7 +34,7 @@ function roomHolding(
     abandonOperation,
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
     confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } }),
-    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { manuscript: 'unused' } }),
+    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'unused' } }),
     saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
   }
 }
@@ -530,7 +530,7 @@ describe('conversation activity, truthfully', () => {
   })
 
   it('reconnect: a pending Apply resumes installation and confirmation from the retrieved replacement, calling no model', async () => {
-    const retrievePendingApply = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { manuscript: 'resumed text' } }))
+    const retrievePendingApply = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { replacement: 'resumed text' } }))
     const confirmApplication = vi.fn(() =>
       Promise.resolve({ outcome: 'value' as const, value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' as const } } }),
     )

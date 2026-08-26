@@ -153,8 +153,8 @@ export function createApp(
 
   app.get('/pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId', param, (c) => {
     const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
-    const manuscript = room.pendingReplacement(scope, c.req.param('cid'), c.req.param('applicationId'))
-    return c.json(ok({ manuscript }))
+    const replacement = room.pendingReplacement(scope, c.req.param('cid'), c.req.param('applicationId'))
+    return c.json(ok({ replacement }))
   })
 
   app.post('/pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm', param, async (c) => {

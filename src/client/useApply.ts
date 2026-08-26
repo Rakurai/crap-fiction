@@ -56,8 +56,8 @@ export function useApply(
   // Shared by a fresh Apply's 'pending' outcome and a resumed one's retrieved result: install
   // through the surface's one persistence owner, then confirm only once that write has durably
   // settled — the model is never called again to reach this point.
-  async function installAndConfirm(cid: string, actionId: string, applicationId: string, manuscript: string): Promise<void> {
-    const saved = await install(manuscript)
+  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string): Promise<void> {
+    const saved = await install(replacement)
     if (saved.failed) {
       await stopAndAbandon(cid, actionId, saved.message)
       return
@@ -93,7 +93,7 @@ export function useApply(
         await stopAndAbandon(cid, actionId, failureMessage(result))
         return
       }
-      await installAndConfirm(cid, actionId, applicationId, result.value.manuscript)
+      await installAndConfirm(cid, actionId, applicationId, result.value.replacement)
     }
 
     void resume().catch((err: unknown) => {
@@ -130,7 +130,7 @@ export function useApply(
       }
 
       // outcome.outcome === 'pending'
-      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.manuscript)
+      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement)
     }
 
     void run().catch((err: unknown) => {

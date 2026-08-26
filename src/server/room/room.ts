@@ -656,8 +656,8 @@ export class Room {
         }
       }
 
-      const { manuscript } = result.value
-      if (manuscript === target) {
+      const { replacement } = result.value
+      if (replacement === target) {
         closeOut('settled')
         return { actionId, outcome: { outcome: 'noChange', actionId } }
       }
@@ -666,12 +666,12 @@ export class Room {
         applicationId: nanoid(),
         responseId,
         constraint,
-        replacement: manuscript,
-        change: { id: nanoid(), content: computeAppliedChangeContent(target, manuscript) },
+        replacement,
+        change: { id: nanoid(), content: computeAppliedChangeContent(target, replacement) },
       }
       const current = this.#operations.get(key)
       if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
-      return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, manuscript } }
+      return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, replacement } }
     } catch (err) {
       closeOut('failed')
       throw err

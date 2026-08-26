@@ -43,6 +43,7 @@ const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to writ
 function ResponseActions({
   responseId,
   participantId,
+  participantName,
   outcome,
   disabled,
   onApply,
@@ -52,6 +53,7 @@ function ResponseActions({
 }: {
   readonly responseId: string
   readonly participantId: string
+  readonly participantName: string
   readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
@@ -93,7 +95,7 @@ function ResponseActions({
         : 'Reply, in your own words'
 
   return (
-    <div className={styles.actions}>
+    <div className={styles.actions} role="group" aria-label={`${participantName}'s answer`}>
       {outcome === 'applicableSuggestion' && (
         <button type="button" className={styles.applyButton} disabled={disabled} onClick={apply}>
           apply
@@ -282,6 +284,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
           <ResponseActions
             responseId={entry.id}
             participantId={entry.participantId}
+            participantName={displayName(entry.participantId)}
             outcome="failed"
             disabled={applyDisabled}
             onApply={onApply}
@@ -308,6 +311,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             <ResponseActions
               responseId={entry.id}
               participantId={entry.participantId}
+              participantName={displayName(entry.participantId)}
               outcome={entry.outcome}
               disabled={applyDisabled}
               onApply={onApply}

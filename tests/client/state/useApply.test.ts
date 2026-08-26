@@ -12,14 +12,14 @@ const DOCUMENTS: DocumentSnapshot = { draft: 'the draft', storyContext: '', auth
 const SAVED: AutosaveState = { failed: false }
 const CONFIRMATION: ApplyConfirmation = { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } }
 
-const PENDING: ApplyOutcome = { outcome: 'pending', actionId: 'a1', applicationId: 'app1', manuscript: 'the applied text' }
+const PENDING: ApplyOutcome = { outcome: 'pending', actionId: 'a1', applicationId: 'app1', replacement: 'the applied text' }
 
 function adapters(overrides: Partial<ApplyAdapters> = {}): ApplyAdapters {
   return {
     applyRecommendation: vi.fn(() => Promise.resolve<RequestResult<ApplyOutcome>>({ outcome: 'value', value: PENDING })),
     confirmApplication: vi.fn(() => Promise.resolve<RequestResult<ApplyConfirmation>>({ outcome: 'value', value: CONFIRMATION })),
     abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
-    retrievePendingApply: vi.fn(() => Promise.resolve<RequestResult<PendingApply>>({ outcome: 'value', value: { manuscript: 'the resumed text' } })),
+    retrievePendingApply: vi.fn(() => Promise.resolve<RequestResult<PendingApply>>({ outcome: 'value', value: { replacement: 'the resumed text' } })),
     ...overrides,
   }
 }

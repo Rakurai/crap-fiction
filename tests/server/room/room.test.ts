@@ -505,7 +505,7 @@ describe('Room.apply', () => {
   it('produces the manuscript the model returned as a pending application, calling no participant, and writes nothing until confirmed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
     })
 
     const { outcome } = await room.apply(
@@ -518,7 +518,7 @@ describe('Room.apply', () => {
     )
 
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
-    expect(outcome.manuscript).toBe('The cups sat where she left them.')
+    expect(outcome.replacement).toBe('The cups sat where she left them.')
     expect(adapter.promptFor('shape')).toBeUndefined()
     expect(adapter.promptFor('compression')).toBeUndefined()
     expect(adapter.promptFor('story-editor')).toBeUndefined()
@@ -531,7 +531,7 @@ describe('Room.apply', () => {
   it("the activity snapshot names the pending application's own identity once the model has answered, and carries no document", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
     })
 
     const { outcome } = await room.apply(
@@ -552,7 +552,7 @@ describe('Room.apply', () => {
   it('retrieves the pending replacement by its provisional identity, and refuses an identity that is not this scope’s pending Apply', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
     })
 
     const { outcome } = await room.apply(
@@ -568,7 +568,7 @@ describe('Room.apply', () => {
     expect(room.pendingReplacement(scope(pieceId), 'c1', outcome.applicationId)).toBe('The cups sat where she left them.')
     expect(() => room.pendingReplacement(scope(pieceId), 'c1', 'no-such-application')).toThrowError(ApplicationNotPendingError)
 
-    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+    await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
     await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
 
     // Committed rather than pending: the identity now names a durable application, not this
@@ -591,7 +591,7 @@ describe('Room.apply', () => {
     await writeAuthorContext(dataRoot, 'stale author context nobody submitted')
 
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised' } } },
     })
 
     await room.apply(
@@ -656,7 +656,7 @@ describe('Room.apply', () => {
 
     // And the other way round: an application in flight refuses a second dispatch at its own scope.
     const { room: applyRoom, adapter: applyAdapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
     })
     const applying = applyRoom.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('draft'))
 
@@ -722,7 +722,7 @@ describe('Room.apply', () => {
 
     // Abandoned mid-call.
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
     })
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
@@ -745,7 +745,7 @@ describe('Room.apply', () => {
     adapter.release('apply')
     const retried = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('draft text'))
     if (retried.outcome.outcome !== 'pending') throw new Error('expected the retried application to be pending')
-    expect(retried.outcome.manuscript).toBe('revised')
+    expect(retried.outcome.replacement).toBe('revised')
   })
 
   it("states the application's own collapse: a seam that throws closes the action at its scope rather than leaving it open", async () => {
@@ -771,14 +771,14 @@ describe('Room.apply', () => {
   it('confirmed against the document as saved, persists the change and the entry that names the response it came from, and frees the scope', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
     })
     const source = responseId(pieceId)
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', source, undefined, documents('The cups sat where she left them, twice.'))
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
 
-    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+    await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
     const confirmed = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
 
     const [onDisk] = readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)
@@ -793,7 +793,7 @@ describe('Room.apply', () => {
   it('carries no change where the application returned the manuscript unchanged, and creates nothing pending or durable', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'unchanged text' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'unchanged text' } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('unchanged text'))
@@ -807,7 +807,7 @@ describe('Room.apply', () => {
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved while the target does not yet match — either refusal records nothing but frees the scope for a fresh application', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised text' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised text' } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('draft text'))
@@ -830,12 +830,12 @@ describe('Room.apply', () => {
   it('confirming an already-committed identity a second time is a no-op that answers with what it already committed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'revised text' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'revised text' } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, documents('draft text'))
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
-    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+    await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
 
     const first = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
     const second = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
@@ -867,7 +867,7 @@ describe('Room.apply', () => {
     if (response === undefined) throw new Error('expected a landed response')
 
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { manuscript: 'Premise: two cups, one chipped.' } } },
+      apply: { result: { outcome: 'value', value: { replacement: 'Premise: two cups, one chipped.' } } },
     })
 
     const { outcome } = await room.apply(
@@ -879,7 +879,7 @@ describe('Room.apply', () => {
       documents('the draft, untouched', { storyContext: 'Premise: two cups.' }),
     )
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
-    expect(outcome.manuscript).toBe('Premise: two cups, one chipped.')
+    expect(outcome.replacement).toBe('Premise: two cups, one chipped.')
 
     // The document verbatim, its own reference schema, the story-context framing, and the
     // generic preserve-instruction — never the draft as what is being rewritten.
@@ -888,7 +888,7 @@ describe('Room.apply', () => {
     expect(adapter.promptFor('apply')).toContain('FIXTURE_STORY_CONTEXT_SURFACE')
     expect(adapter.promptFor('apply')).toContain('FIXTURE_APPLY_TASK')
 
-    await writeStoryContext(workspaceDir, piece.id, outcome.manuscript)
+    await writeStoryContext(workspaceDir, piece.id, outcome.replacement)
     const confirmed = await room.confirmApply(workspaceDir, storyContextScope, 'c1', outcome.applicationId)
 
     const [onDisk] = readAppliedChanges(dataRoot, storyContextConversationScope, appliedChangeSchema)
