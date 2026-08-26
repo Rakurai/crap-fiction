@@ -11,7 +11,6 @@ import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
 import { DraftWriter } from './pieces.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
-import { durableContextReader } from './room/durableContext.js'
 import { Room } from './room/room.js'
 import { resolveRoster, type RoomRoster } from './room/roster.js'
 import { ConversationEntryStore, DraftStore, readShippedAuthorContextReference } from './store/index.js'
@@ -54,7 +53,6 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   const modelAccess = makeModelAccess(env, logger)
   const room = new Room(
     modelAccess,
-    durableContextReader(env.dataRoot),
     new ConversationEntryStore(),
     env.dataRoot,
     roster,

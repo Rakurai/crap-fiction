@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
+import type { DocumentSnapshot } from '../shared/surfaces.js'
 import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -45,7 +46,7 @@ export function useConversation(
   pieceId: string,
   initialConversationId: string | null,
   flushDraft: () => void,
-  getDraft: () => string,
+  getDocuments: () => DocumentSnapshot,
   room: RoomAdapters,
 ): ConversationViewModel {
   const { createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation } = room
@@ -152,7 +153,7 @@ export function useConversation(
         conversationIdRef.current = created.value.id
       }
 
-      const result = await dispatch(pieceId, conversationId, opening, getDraft())
+      const result = await dispatch(pieceId, conversationId, opening, getDocuments())
       if (result.outcome !== 'value') stop(failureMessage(result))
     }
 

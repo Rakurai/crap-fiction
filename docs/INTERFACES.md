@@ -53,11 +53,12 @@ GET    /pieces/:id/conversations/:cid              the durable entries, each app
 POST   /pieces/:id/conversations                   returns the new conversation
 DELETE /pieces/:id/conversations/:cid
 POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
-                                                   the response answered and any clarification
-POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint;
-                                                   settles a no-change result on the spot, or answers
-                                                   with a pending replacement and its provisional
-                                                   identity
+                                                   the response answered and any clarification, and
+                                                   the current text of all three documents
+POST   /pieces/:id/conversations/:cid/apply        the response applied, any constraint, and the
+                                                   current text of all three documents; settles a
+                                                   no-change result on the spot, or answers with a
+                                                   pending replacement and its provisional identity
 POST   /pieces/:id/conversations/:cid/apply/:applicationId/confirm
                                                    the provisional identity a pending replacement was
                                                    given, confirmed once the client has saved it

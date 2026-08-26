@@ -9,6 +9,7 @@ import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 
 const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+const DOCUMENTS = { draft: 'First light.', storyContext: '', authorContext: '' }
 
 const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experience', editor: 'Story Editor' }
 
@@ -41,7 +42,7 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
     <Conversation
       pieceId="the-lighthouse"
       currentConversationId="c1"
-      draft="First light."
+      documents={DOCUMENTS}
       flushDraft={() => {}}
       room={roomHolding(entries)}
       displayName={(id) => NAMES[id] ?? id}
@@ -253,7 +254,7 @@ describe('the applied change, shown on its originating response', () => {
         'the-lighthouse',
         'c1',
         { message: 'Take a look at the change I just made and tell me what you think.' },
-        'First light.',
+        DOCUMENTS,
       ),
     )
   })
@@ -294,7 +295,7 @@ describe('replying to a response', () => {
     fireEvent.click(screen.getByRole('button', { name: 'reply' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { target: 'shape', message: 'say more about that' }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { target: 'shape', message: 'say more about that' }, DOCUMENTS),
     )
     expect((field as HTMLInputElement).value).toBe('')
 
@@ -328,7 +329,7 @@ describe('asking for a concrete change', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'ask for a concrete change' }))
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: undefined }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: undefined }, DOCUMENTS),
     )
 
     // A fresh surface: the first dispatch leaves this one busy until the room reports back.
@@ -340,7 +341,7 @@ describe('asking for a concrete change', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ask for a concrete change' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, DOCUMENTS),
     )
   })
 
@@ -376,7 +377,7 @@ describe('one response-local field shared by every action on the response', () =
     fireEvent.change(field, { target: { value: 'keep the last line' } })
     fireEvent.click(screen.getByRole('button', { name: 'apply' }))
 
-    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'e1', 'First light.', 'keep the last line'))
+    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'e1', DOCUMENTS, 'keep the last line'))
   })
 })
 

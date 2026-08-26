@@ -345,16 +345,20 @@ missing entry, because they have no entries the studio knows the name of: a cont
 written to is empty text, never a template with words already in it, and a participant reads only what
 the author put there.
 
-**Piece metadata, both context documents and the model assignments are read when a piece is opened and
-again when a model call is compiled.** Nothing watches the filesystem and nothing polls: a file the
-author edited by hand is picked up by the next call that uses it, which is the only moment its content
-matters. Re-reading at compilation is what stops an external edit from being ignored for a whole
-session; holding no watcher is what stops one from arriving underneath the author's own state. The
-manuscript is exempt because the client is its writer and carries it in the request. Assignments are
-on that list rather than held from startup because reassigning one participant and asking the room
-again is the whole of the diagnostic loop this design depends on — telling a weakly written role apart
-from a weak model. The workspace path is the exception and is process configuration: it is read once,
-because everything the application does is already inside it.
+**Piece metadata and the model assignments are read when a piece is opened and again when a model call
+is compiled.** Nothing watches the filesystem and nothing polls: a file the author edited by hand is
+picked up by the next call that uses it, which is the only moment its content matters. Re-reading at
+compilation is what stops an external edit from being ignored for a whole session; holding no watcher
+is what stops one from arriving underneath the author's own state. Assignments are on that list rather
+than held from startup because reassigning one participant and asking the room again is the whole of
+the diagnostic loop this design depends on — telling a weakly written role apart from a weak model. The
+workspace path is the exception and is process configuration: it is read once, because everything the
+application does is already inside it.
+
+**The manuscript, story context and author context are exempt: the client is their writer and carries
+each in the request.** All three are read from disk only when a piece is opened, into the client text
+an editing surface holds from then on; a hand-edit to any of the three while its piece stays open is
+picked up the next time the piece is opened, not by the next call that uses it.
 
 ### Write semantics
 
@@ -830,6 +834,11 @@ or not at all.
 the open piece, outliving any single dispatch or Apply. Every event corresponds to an entry landing or to
 a frame around one.
 
+**The client opens that one connection per open piece and every surface observes it**, rather than a
+surface or a conversation opening a connection of its own. Switching which conversation a surface shows
+never reconnects the stream; a surface that starts observing after the piece connected is caught up to
+the activity the events already delivered rather than by a second, race-prone read from the server.
+
 **Only one piece is open at a time, and opening one is server-authoritative.** A different piece that was
 open has its unfinished work abandoned, across all three of its room scopes, including author-context
 work whose evidence and cast came from it; opening the same piece again resumes it untouched. Work
@@ -904,11 +913,15 @@ which is a rule about the room's composition and belongs to the server that reso
 specialists that declare themselves on by default for the chosen mode, so a piece is creatable and
 writable with the runtime not even running.
 
-**Every model operation receives the manuscript as it currently stands**, carried in the request that
-starts it. The draft file remains the sole durable representation of the manuscript, and the room never
-reads it from disk to serve an operation. What this prevents is the room working from prose the author has
-already changed, and it is why model use does not depend on a write having succeeded: the author keeps
-writing through a failed save, and the room keeps seeing what they wrote.
+**Every model operation receives all three documents as the client currently holds them** — the draft,
+story context and author context alike, unsaved and save-failing text included — carried in the request
+that starts it, rather than any of the three read from disk. What this prevents is the room working from
+text the author has already changed, and it is why model use does not depend on a write having
+succeeded: the author keeps writing through a failed save, and the room keeps seeing what they wrote.
+
+**The client closes over that snapshot at the moment an author action or an Apply is submitted.** Work
+already under way keeps the documents, room scope and evidence it started with; a later edit or a later
+piece switch cannot retarget it.
 
 ## Local exposure
 

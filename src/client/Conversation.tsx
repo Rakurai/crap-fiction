@@ -4,6 +4,7 @@ import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { DocumentSnapshot } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
@@ -21,7 +22,7 @@ export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 type ConversationProps = {
   readonly pieceId: string
   readonly currentConversationId: string | null
-  readonly draft: string
+  readonly documents: DocumentSnapshot
   readonly flushDraft: () => void
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
@@ -361,7 +362,7 @@ function DispatchFlight({
 export function Conversation({
   pieceId,
   currentConversationId,
-  draft,
+  documents,
   flushDraft,
   room,
   displayName,
@@ -395,9 +396,9 @@ export function Conversation({
     textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
   }, [caretOffset])
 
-  const conversation = useConversation(pieceId, currentConversationId, flushDraft, () => draft, room)
+  const conversation = useConversation(pieceId, currentConversationId, flushDraft, () => documents, room)
 
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, conversation.resumedApplying)
+  const apply = useApply(pieceId, conversation.conversationId, () => documents, onApplied, room, conversation.resumedApplying)
 
   useEffect(() => {
     onApplyingChange(

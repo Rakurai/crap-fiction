@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { DocumentSnapshot } from '../shared/surfaces.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -26,7 +27,7 @@ export type ApplyViewModel = Readonly<{
 export function useApply(
   pieceId: string,
   conversationId: string | null,
-  getDraft: () => string,
+  getDocuments: () => DocumentSnapshot,
   onApplied: (markdown: string) => void,
   adapters: ApplyAdapters,
   initialApplying?: ApplyingResponse,
@@ -61,7 +62,7 @@ export function useApply(
     }
 
     async function run(): Promise<void> {
-      const result = await applyRecommendation(pieceId, cid, responseId, getDraft(), constraint)
+      const result = await applyRecommendation(pieceId, cid, responseId, getDocuments(), constraint)
       if (result.outcome !== 'value') {
         stop(failureMessage(result))
         return

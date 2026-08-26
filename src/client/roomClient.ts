@@ -11,6 +11,7 @@ import {
   type ConversationErrorEvent,
   type RoomActivitySnapshot,
 } from '../shared/conversationEvents.js'
+import type { DocumentSnapshot } from '../shared/surfaces.js'
 import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
 
@@ -57,13 +58,13 @@ export function dispatch(
   pieceId: string,
   conversationId: string,
   opening: DispatchOpening,
-  draft: string,
+  documents: DocumentSnapshot,
   signal?: AbortSignal,
 ): Promise<RequestResult<{ conversationId: string; actionId: string }>> {
   return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...opening, draft }),
+    body: JSON.stringify({ ...opening, documents }),
     signal: signal ?? null,
   })
 }
@@ -72,14 +73,14 @@ export function applyRecommendation(
   pieceId: string,
   conversationId: string,
   responseId: string,
-  draft: string,
+  documents: DocumentSnapshot,
   constraint: string | undefined,
   signal?: AbortSignal,
 ): Promise<RequestResult<ApplyOutcome>> {
   return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ responseId, draft, constraint }),
+    body: JSON.stringify({ responseId, documents, constraint }),
     signal: signal ?? null,
   })
 }
@@ -110,7 +111,7 @@ export function abandonOperation(
   )
 }
 
-const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+export const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
 
 export function subscribeToRoom(
   pieceId: string,

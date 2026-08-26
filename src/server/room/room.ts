@@ -24,7 +24,7 @@ import {
   type ParticipantActivityEvent,
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
-import { SURFACE_IDS } from '../../shared/surfaces.js'
+import { SURFACE_IDS, type DocumentSnapshot } from '../../shared/surfaces.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
@@ -50,7 +50,6 @@ import {
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
-import type { ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
@@ -173,7 +172,7 @@ type DispatchPlan = Readonly<{
   eligibleAddressedOnly: readonly RoleDefinition[]
   storyEditorIncluded: boolean
   existingEntries: readonly ConversationEntry[]
-  draft: string
+  documents: DocumentSnapshot
   modeDescription: string
 }>
 
@@ -187,7 +186,6 @@ function findResponse(
 
 export class Room {
   readonly #modelAccess: ModelAccess
-  readonly #readDurableContext: ReadDurableContext
   readonly #entries: ConversationEntryStore
   readonly #dataRoot: string
   readonly #logger: Logger
@@ -206,7 +204,6 @@ export class Room {
 
   constructor(
     modelAccess: ModelAccess,
-    readDurableContext: ReadDurableContext,
     entries: ConversationEntryStore,
     dataRoot: string,
     roster: RoomRoster,
@@ -218,7 +215,6 @@ export class Room {
     now: Clock,
   ) {
     this.#modelAccess = modelAccess
-    this.#readDurableContext = readDurableContext
     this.#entries = entries
     this.#dataRoot = dataRoot
     this.#logger = logger
@@ -330,7 +326,7 @@ export class Room {
     roomScope: RoomScope,
     conversationId: string,
     opening: DispatchOpening,
-    draft: string,
+    documents: DocumentSnapshot,
   ): Promise<{ conversationId: string; actionId: string }> {
     const pieceId = roomScope.pieceId
     const holder = this.#operationFor(roomScope)
@@ -417,7 +413,7 @@ export class Room {
       eligibleAddressedOnly,
       storyEditorIncluded,
       existingEntries,
-      draft,
+      documents,
       modeDescription,
     }
     const cause = causeEntry
@@ -436,7 +432,7 @@ export class Room {
             data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience, surface: roomScope.surface },
           })
           this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause, surface: roomScope.surface } })
-          return this.#run(workspaceDir, roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
+          return this.#run(roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
             this.#fail(pieceId, roomScope.surface, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
           })
         },
@@ -458,7 +454,6 @@ export class Room {
   }
 
   async #run(
-    workspaceDir: string,
     roomScope: RoomScope,
     conversationScope: ConversationScope,
     conversationId: string,
@@ -466,19 +461,27 @@ export class Room {
     operation: ActiveDispatch,
   ): Promise<void> {
     const pieceId = roomScope.pieceId
-    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft, modeDescription } =
-      plan
+    const {
+      causeEntry,
+      message,
+      ask,
+      addressedIds,
+      eligibleSpecialists,
+      eligibleAddressedOnly,
+      storyEditorIncluded,
+      existingEntries,
+      documents,
+      modeDescription,
+    } = plan
     const { actionId, controller } = operation
     const signal = controller.signal
-
-    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
 
     const shared = {
       message,
       ask,
-      authorContext: durableContext.authorContext,
-      storyContext: durableContext.storyContext,
-      draft,
+      authorContext: documents.authorContext,
+      storyContext: documents.storyContext,
+      draft: documents.draft,
       surface: roomScope.surface,
       entries: existingEntries,
       policy: this.#policy,
@@ -581,7 +584,7 @@ export class Room {
     conversationId: string,
     responseId: string,
     constraint: string | undefined,
-    draft: string,
+    documents: DocumentSnapshot,
   ): Promise<{ actionId: string; outcome: ApplyOutcome }> {
     const pieceId = roomScope.pieceId
     const holder = this.#operationFor(roomScope)
@@ -595,8 +598,7 @@ export class Room {
     const response = findResponse(entries, responseId)
     if (response === undefined || response.outcome !== 'applicableSuggestion') throw new RecommendationNotFoundError(pieceId, responseId)
 
-    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
-
+    const draft = documents.draft
     const actionId = nanoid()
     const controller = new AbortController()
     const startedAt = this.#now()
@@ -618,8 +620,8 @@ export class Room {
         recommendationClaim: response.claim,
         recommendationNote: response.note,
         constraint,
-        authorContext: durableContext.authorContext,
-        storyContext: durableContext.storyContext,
+        authorContext: documents.authorContext,
+        storyContext: documents.storyContext,
         draft,
         surface: roomScope.surface,
         referenceSchema: undefined,

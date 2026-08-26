@@ -64,6 +64,7 @@ describe('the room over HTTP', () => {
   })
 
   const draftScope: RoomScope = { pieceId: 'cups', surface: 'draft' }
+  const DOCUMENTS = { draft: 'The cups sat where she left them.', storyContext: '', authorContext: '' }
 
   async function withPiece(
     behaviors: Readonly<Record<string, FixtureBehavior>>,
@@ -89,7 +90,7 @@ describe('the room over HTTP', () => {
     return await app.request(`/pieces/cups/conversations/${conversationId}/dispatch`, {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ draft: 'The cups sat where she left them.', ...body }),
+      body: JSON.stringify({ documents: DOCUMENTS, ...body }),
     })
   }
 
@@ -179,7 +180,7 @@ describe('the room over HTTP', () => {
     const applying = app.request('/pieces/cups/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ responseId, draft: 'The cups sat where she left them.' }),
+      body: JSON.stringify({ responseId, documents: DOCUMENTS }),
     })
     await new Promise((resolve) => setImmediate(resolve))
 
@@ -220,7 +221,7 @@ describe('the room over HTTP', () => {
     const applying = app.request('/pieces/cups/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ responseId, draft: 'The cups sat where she left them.' }),
+      body: JSON.stringify({ responseId, documents: DOCUMENTS }),
     })
     modelAccess.release('apply')
     const { data: applied } = await (await applying).json()
@@ -266,7 +267,7 @@ describe('the room over HTTP', () => {
     const unknownRecommendation = await app.request('/pieces/cups/conversations/c1/apply', {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ responseId: 'no-such-response', draft: 'text' }),
+      body: JSON.stringify({ responseId: 'no-such-response', documents: { draft: 'text', storyContext: '', authorContext: '' } }),
     })
     expect(unknownRecommendation.status).toBe(404)
     expect(await unknownRecommendation.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })

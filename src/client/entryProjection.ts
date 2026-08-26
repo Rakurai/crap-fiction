@@ -22,7 +22,7 @@ export type ConversationProjection = Readonly<{
 
 export const EMPTY_PROJECTION: ConversationProjection = { entries: [], activity: undefined }
 
-function isParticipantOutcome(
+export function isParticipantOutcome(
   entry: ConversationEntryView,
 ): entry is Extract<ConversationEntryView, { kind: 'participantResponse' | 'participantNoComment' | 'participantFailure' }> {
   return entry.kind === 'participantResponse' || entry.kind === 'participantNoComment' || entry.kind === 'participantFailure'

@@ -5,6 +5,7 @@ import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
+import { documentSnapshotSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
@@ -54,7 +55,7 @@ const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postApplySchema = z.object({
   responseId: z.string().min(1),
   constraint: z.string().min(1).optional(),
-  draft: z.string(),
+  documents: documentSnapshotSchema,
 })
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
@@ -139,14 +140,14 @@ export function createApp(
   app.post('/pieces/:id/conversations/:cid/dispatch', body(dispatchRequestSchema), async (c) => {
     const request = c.req.valid('json')
     const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
-    const result = await room.dispatch(workspace.require(), scope, c.req.param('cid'), dispatchOpening(request), request.draft)
+    const result = await room.dispatch(workspace.require(), scope, c.req.param('cid'), dispatchOpening(request), request.documents)
     return c.json(ok(result))
   })
 
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
-    const { responseId, constraint, draft } = c.req.valid('json')
+    const { responseId, constraint, documents } = c.req.valid('json')
     const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
-    const { outcome } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, draft)
+    const { outcome } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, documents)
     return c.json(ok(outcome))
   })
 

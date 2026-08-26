@@ -74,7 +74,7 @@ describe('a dispatch\'s events through the dev server', () => {
 
     await post(`/pieces/${piece.id}/conversations/${conversation.id}/dispatch`, {
       message: 'What do you make of this?',
-      draft: 'The cups sat where she left them.',
+      documents: { draft: 'The cups sat where she left them.', storyContext: '', authorContext: '' },
     })
 
     const decoder = new TextDecoder()

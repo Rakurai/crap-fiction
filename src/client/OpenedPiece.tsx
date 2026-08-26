@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { Conversation, type HandleEntry } from './Conversation.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
+import { documentSnapshotFrom } from './documentSnapshot.js'
 import { useLoaded } from './load.js'
 import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
+import { usePieceStream } from './pieceStream.js'
 import { RoomEditor } from './RoomEditor.js'
 import {
   abandonOperation,
@@ -71,6 +73,15 @@ function Surfaces({
   const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
+  // One event source for the whole opened piece: every surface's conversation subscribes through
+  // this rather than reconnecting the stream when the author switches which conversation it shows.
+  const pieceStream = usePieceStream(piece.id, subscribeToRoom)
+  // The closed snapshot every author action and Apply carries. Story context and author context
+  // have no editing surface yet, so their current client text is the text the piece opened with.
+  const documents = useMemo(
+    () => documentSnapshotFrom(manuscript.markdown, piece.surfaces),
+    [manuscript.markdown, piece.surfaces],
+  )
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
   const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.surfaces.draft.currentConversationId)
@@ -122,9 +133,18 @@ function Surfaces({
           key={session}
           pieceId={piece.id}
           currentConversationId={activeConversationId}
-          draft={manuscript.markdown}
+          documents={documents}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation, confirmApplication, saveDraft }}
+          room={{
+            createConversation,
+            fetchConversation,
+            dispatch,
+            subscribeToRoom: pieceStream,
+            abandonOperation,
+            applyRecommendation,
+            confirmApplication,
+            saveDraft,
+          }}
           displayName={roster.displayName}
           handle={roster.handle}
           handles={addressable}

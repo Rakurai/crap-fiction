@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
 import type { ConversationActivitySnapshot, DispatchActivitySnapshot, RoomActivitySnapshot } from '../../../src/shared/conversationEvents.js'
+import type { DocumentSnapshot } from '../../../src/shared/surfaces.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import { useConversation, type RoomAdapters } from '../../../src/client/useConversation.js'
@@ -9,6 +10,7 @@ import { useConversation, type RoomAdapters } from '../../../src/client/useConve
 const STARTED_AT = 1_700_000_000_000
 
 const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+const DOCUMENTS: DocumentSnapshot = { draft: 'the draft', storyContext: 'the story context', authorContext: 'the author context' }
 
 function authorMessage(id: string, text: string): ConversationEntryView {
   return { id, kind: 'authorMessage', text, audience: [], brought: [] }
@@ -60,7 +62,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it('keeps an entry that landed while the file was still being read, behind the entries that preceded it', async () => {
     const { room, stream, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1'), authorMessage('e2', 'what about e2')])
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     stream({
       type: 'action.started',
@@ -81,7 +83,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it("resumes the dispatch the room reports in flight once the stream's snapshot resolves, behind the file's entries too", async () => {
     const { room, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1')], activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => {
       expect(result.current.busy).toBe(true)
@@ -98,7 +100,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
   it('ignores the snapshot when its action belongs to a different conversation than the one this hook opened', async () => {
     const { room } = roomWithHeldConversation([], { ...activitySnapshot('a1'), conversationId: 'some-other-conversation' })
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await act(async () => {
       await Promise.resolve()
@@ -134,7 +136,7 @@ describe('releasing the controls an action holds', () => {
   it('holds them for the newer action when the one it replaced settles behind it', async () => {
     const { room, stream } = streamingRoom(activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 
@@ -154,7 +156,7 @@ describe('releasing the controls an action holds', () => {
   it('releases them for an action started and finished in the same batch of frames', () => {
     const { room, stream } = streamingRoom()
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => DOCUMENTS, room))
 
     stream(
       {
@@ -189,7 +191,7 @@ describe('abandoning an operation', () => {
   it('asks the room to abandon the operation in flight, and asks nothing where there is none', async () => {
     const room = idleRoom(undefined, activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 
@@ -200,7 +202,7 @@ describe('abandoning an operation', () => {
     expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'a1')
 
     const idle = idleRoom()
-    const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => 'the draft', idle))
+    const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', null, () => {}, () => DOCUMENTS, idle))
 
     nothingInFlight.current.abandon()
 
@@ -210,7 +212,7 @@ describe('abandoning an operation', () => {
   it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', async () => {
     const room = idleRoom(vi.fn(() => new Promise<RequestResult<null>>(() => {})), activitySnapshot('a1'))
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.busy).toBe(true))
 
@@ -228,7 +230,7 @@ describe('abandoning an operation', () => {
       activitySnapshot('a1'),
     )
 
-    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => 'the draft', room))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'c1', () => {}, () => DOCUMENTS, room))
 
     await waitFor(() => expect(result.current.actionId).toBe('a1'))
 
