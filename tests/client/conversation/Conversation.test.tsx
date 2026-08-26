@@ -2,14 +2,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApplicationEntryView, ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
-import type { ConversationActivitySnapshot, RoomActivitySnapshot } from '../../../src/shared/conversationEvents.js'
+import type { ConversationActivitySnapshot } from '../../../src/shared/conversationEvents.js'
 import { Conversation } from '../../../src/client/Conversation.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { AutosaveState } from '../../../src/client/autosave.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
+import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
-const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
 const DOCUMENTS = { draft: 'First light.', storyContext: '', authorContext: '' }
 
 const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experience', editor: 'Story Editor' }
@@ -24,21 +24,24 @@ const INTERVIEWER = { handle: 'interview', displayName: 'Interviewer', descripti
 
 const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
 
+/**
+ * What every rendered conversation reaches: the stream it subscribes to, the file it reads, and
+ * the acts its controls open. An Apply answers `noChange`, so that clicking apply is the author's
+ * act and nothing more — a scenario turning on what the model made of it states that itself, and
+ * one reaching further into the Apply protocol states that too.
+ */
 function roomHolding(
   entries: readonly ConversationEntryView[],
   abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
 ): RoomAdapters {
-  return {
-    subscribeToRoom: () => ({ snapshot: Promise.resolve(EMPTY_ROOM_ACTIVITY), unsubscribe: () => {} }),
+  return roomAdapters({
+    subscribeToRoom: () => ({ snapshot: onTheDraft(null), unsubscribe: () => {} }),
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1' } }),
-    fetchConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1', entries } }),
+    fetchConversation: conversationOnDisk('c1', entries),
     dispatch: () => Promise.resolve({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
     abandonOperation,
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
-    confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } }),
-    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'unused' } }),
-    saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
-  }
+  })
 }
 
 function renderConversation(entries: readonly ConversationEntryView[], extra: Partial<ComponentProps<typeof Conversation>> = {}) {
@@ -66,18 +69,9 @@ function roomStreaming(
   entries: readonly ConversationEntryView[],
   abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
   draftActivity: ConversationActivitySnapshot | null = null,
-): { room: RoomAdapters; stream: (event: RoomEvent) => void } {
-  let deliver: (event: RoomEvent) => void = () => {
-    throw new Error('the room was never subscribed to')
-  }
-  const room: RoomAdapters = {
-    ...roomHolding(entries, abandonOperation),
-    subscribeToRoom: (_pieceId, onEvent) => {
-      deliver = onEvent
-      return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
-    },
-  }
-  return { room, stream: (event) => act(() => deliver(event)) }
+): { room: RoomAdapters; stream: (...events: readonly RoomEvent[]) => void } {
+  const { subscribeToRoom, stream } = roomStream(onTheDraft(draftActivity))
+  return { room: { ...roomHolding(entries, abandonOperation), subscribeToRoom }, stream }
 }
 
 function blockContaining(text: string): HTMLElement {

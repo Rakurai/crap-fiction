@@ -5,12 +5,11 @@ import type { ConversationActivitySnapshot, DispatchActivitySnapshot, RoomActivi
 import type { DocumentSnapshot } from '../../../src/shared/surfaces.js'
 import type { AutosaveState } from '../../../src/client/autosave.js'
 import type { RequestResult } from '../../../src/client/request.js'
-import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import { useConversation, type RoomAdapters } from '../../../src/client/useConversation.js'
+import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
 const STARTED_AT = 1_700_000_000_000
 
-const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
 const DOCUMENTS: DocumentSnapshot = { draft: 'the draft', storyContext: 'the story context', authorContext: 'the author context' }
 const NOOP_FLUSH = (): Promise<AutosaveState> => Promise.resolve({ failed: false })
 
@@ -22,10 +21,17 @@ function activitySnapshot(actionId: string): DispatchActivitySnapshot {
   return { actionId, conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', audience: ['shape'], states: {}, startedAt: STARTED_AT }
 }
 
-function roomWithHeldConversation(entries: readonly ConversationEntryView[], draftActivity: ConversationActivitySnapshot | null = null) {
-  let deliver: (event: RoomEvent) => void = () => {
-    throw new Error('the room was never subscribed to')
-  }
+/** An abandonment the studio grants. */
+function letsGo(): RoomAdapters['abandonOperation'] {
+  return vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null }))
+}
+
+/** Adapters whose conversation is on disk and whose room reports the activity the scenario stated. */
+function roomReporting(snapshot: Promise<RoomActivitySnapshot>): RoomAdapters {
+  return roomAdapters({ fetchConversation: conversationOnDisk('c1', []), subscribeToRoom: roomStream(snapshot).subscribeToRoom })
+}
+
+function roomWithHeldConversation(entries: readonly ConversationEntryView[], draftActivity: ConversationActivitySnapshot | null) {
   let answer: () => void = () => {
     throw new Error('the conversation was never asked for')
   }
@@ -34,24 +40,12 @@ function roomWithHeldConversation(entries: readonly ConversationEntryView[], dra
     answer = () => resolve({ outcome: 'value', value: { id: 'c1', entries } })
   })
 
-  const room: RoomAdapters = {
-    createConversation: vi.fn(),
-    fetchConversation: vi.fn(() => held),
-    dispatch: vi.fn(),
-    abandonOperation: vi.fn(),
-    applyRecommendation: vi.fn(),
-    confirmApplication: vi.fn(),
-    retrievePendingApply: vi.fn(),
-    saveDocument: vi.fn(),
-    subscribeToRoom: vi.fn((_pieceId, onEvent) => {
-      deliver = onEvent
-      return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
-    }),
-  }
+  const { subscribeToRoom, stream } = roomStream(onTheDraft(draftActivity))
+  const room = roomAdapters({ fetchConversation: vi.fn(() => held), subscribeToRoom })
 
   return {
     room,
-    stream: (event: RoomEvent) => act(() => deliver(event)),
+    stream,
     answerTheConversationRead: async () => {
       answer()
       await act(async () => {
@@ -63,7 +57,7 @@ function roomWithHeldConversation(entries: readonly ConversationEntryView[], dra
 
 describe('merging the conversation on disk with the one being streamed', () => {
   it('keeps an entry that landed while the file was still being read, behind the entries that preceded it', async () => {
-    const { room, stream, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1'), authorMessage('e2', 'what about e2')])
+    const { room, stream, answerTheConversationRead } = roomWithHeldConversation([authorMessage('e1', 'what about e1'), authorMessage('e2', 'what about e2')], null)
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -121,27 +115,11 @@ describe('merging the conversation on disk with the one being streamed', () => {
 })
 
 describe('releasing the controls an action holds', () => {
-  function streamingRoom(draftActivity: ConversationActivitySnapshot | null = null) {
-    let deliver: (event: RoomEvent) => void = () => {
-      throw new Error('the room was never subscribed to')
-    }
+  function streamingRoom(draftActivity: ConversationActivitySnapshot | null) {
+    const { subscribeToRoom, stream } = roomStream(onTheDraft(draftActivity))
+    const room = roomAdapters({ fetchConversation: conversationOnDisk('c1', []), abandonOperation: letsGo(), subscribeToRoom })
 
-    const room: RoomAdapters = {
-      createConversation: vi.fn(),
-      fetchConversation: vi.fn(() => Promise.resolve<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>({ outcome: 'value', value: { id: 'c1', entries: [] } })),
-      dispatch: vi.fn(),
-      abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
-      applyRecommendation: vi.fn(),
-      confirmApplication: vi.fn(),
-      retrievePendingApply: vi.fn(),
-      saveDocument: vi.fn(),
-      subscribeToRoom: vi.fn((_pieceId, onEvent) => {
-        deliver = onEvent
-        return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
-      }),
-    }
-
-    return { room, stream: (...events: readonly RoomEvent[]) => act(() => events.forEach((event) => deliver(event))) }
+    return { room, stream }
   }
 
   it('holds them for the newer action when the one it replaced settles behind it', async () => {
@@ -165,7 +143,7 @@ describe('releasing the controls an action holds', () => {
   })
 
   it('releases them for an action started and finished in the same batch of frames', async () => {
-    const { room, stream } = streamingRoom()
+    const { room, stream } = streamingRoom(null)
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', null, NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -182,7 +160,7 @@ describe('releasing the controls an action holds', () => {
   })
 
   it('is held by live work from another conversation without showing that conversation as its own', async () => {
-    const { room, stream } = streamingRoom()
+    const { room, stream } = streamingRoom(null)
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
     await waitFor(() => expect(result.current.busy).toBe(false))
 
@@ -214,25 +192,16 @@ describe('releasing the controls an action holds', () => {
 })
 
 describe('abandoning an operation', () => {
-  function idleRoom(
-    abandonOperation: RoomAdapters['abandonOperation'] = vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
-    draftActivity: ConversationActivitySnapshot | null = null,
-  ): RoomAdapters {
-    return {
-      createConversation: vi.fn(),
-      fetchConversation: vi.fn(() => Promise.resolve<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>({ outcome: 'value', value: { id: 'c1', entries: [] } })),
-      dispatch: vi.fn(),
+  function roomAsked(draftActivity: ConversationActivitySnapshot | null, abandonOperation: RoomAdapters['abandonOperation']): RoomAdapters {
+    return roomAdapters({
+      fetchConversation: conversationOnDisk('c1', []),
       abandonOperation,
-      applyRecommendation: vi.fn(),
-      confirmApplication: vi.fn(),
-      retrievePendingApply: vi.fn(),
-      saveDocument: vi.fn(),
-      subscribeToRoom: vi.fn(() => ({ snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} })),
-    }
+      subscribeToRoom: roomStream(onTheDraft(draftActivity)).subscribeToRoom,
+    })
   }
 
   it('asks the room to abandon the operation in flight, and asks nothing where there is none', async () => {
-    const room = idleRoom(undefined, activitySnapshot('a1'))
+    const room = roomAsked(activitySnapshot('a1'), letsGo())
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -244,7 +213,7 @@ describe('abandoning an operation', () => {
 
     expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
 
-    const idle = idleRoom()
+    const idle = roomAsked(null, letsGo())
     const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', 'draft', null, NOOP_FLUSH, () => DOCUMENTS, idle))
 
     nothingInFlight.current.abandon()
@@ -259,7 +228,7 @@ describe('abandoning an operation', () => {
     const answered = new Promise<RequestResult<null>>((resolve) => {
       letGo = () => resolve({ outcome: 'value', value: null })
     })
-    const room = idleRoom(vi.fn(() => answered), activitySnapshot('a1'))
+    const room = roomAsked(activitySnapshot('a1'), vi.fn(() => answered))
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -282,9 +251,9 @@ describe('abandoning an operation', () => {
   })
 
   it('reports it when the studio cannot be asked to abandon, and stays held by the operation it still has', async () => {
-    const room = idleRoom(
-      vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })),
+    const room = roomAsked(
       activitySnapshot('a1'),
+      vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })),
     )
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
@@ -303,23 +272,7 @@ describe('abandoning an operation', () => {
 
 describe('resuming an Apply the room reported already in flight', () => {
   function roomWithApplyActivity(applicationId: string | undefined): RoomAdapters {
-    return {
-      createConversation: vi.fn(),
-      fetchConversation: vi.fn(() => Promise.resolve<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>({ outcome: 'value', value: { id: 'c1', entries: [] } })),
-      dispatch: vi.fn(),
-      abandonOperation: vi.fn(),
-      applyRecommendation: vi.fn(),
-      confirmApplication: vi.fn(),
-      retrievePendingApply: vi.fn(),
-      saveDocument: vi.fn(),
-      subscribeToRoom: vi.fn(() => ({
-        snapshot: Promise.resolve<RoomActivitySnapshot>({
-          ...EMPTY_ROOM_ACTIVITY,
-          draft: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: STARTED_AT, applicationId },
-        }),
-        unsubscribe: () => {},
-      })),
-    }
+    return roomReporting(onTheDraft({ actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: STARTED_AT, applicationId }))
   }
 
   it('carries the provisional application identity through once the model has answered, so a reconnecting client can resume it', async () => {
@@ -338,22 +291,8 @@ describe('resuming an Apply the room reported already in flight', () => {
 })
 
 describe('a room scope whose activity is not yet known', () => {
-  function roomWithSnapshot(snapshot: Promise<RoomActivitySnapshot>): RoomAdapters {
-    return {
-      createConversation: vi.fn(),
-      fetchConversation: vi.fn(() => Promise.resolve<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>({ outcome: 'value', value: { id: 'c1', entries: [] } })),
-      dispatch: vi.fn(),
-      abandonOperation: vi.fn(),
-      applyRecommendation: vi.fn(),
-      confirmApplication: vi.fn(),
-      retrievePendingApply: vi.fn(),
-      saveDocument: vi.fn(),
-      subscribeToRoom: vi.fn(() => ({ snapshot, unsubscribe: () => {} })),
-    }
-  }
-
   it('is locked from the first render, before any snapshot has arrived — unknown is not idle', () => {
-    const room = roomWithSnapshot(new Promise<RoomActivitySnapshot>(() => {}))
+    const room = roomReporting(new Promise<RoomActivitySnapshot>(() => {}))
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -363,7 +302,7 @@ describe('a room scope whose activity is not yet known', () => {
   })
 
   it('stays locked and carries the studio’s own account of why, when the activity cannot be learned at all', async () => {
-    const room = roomWithSnapshot(Promise.reject(new Error('malformed "activity.snapshot" event from the studio')))
+    const room = roomReporting(Promise.reject(new Error('malformed "activity.snapshot" event from the studio')))
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 

@@ -3,19 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 import { EditingSurface } from '../../../src/client/EditingSurface.js'
+import { conversationOnDisk, onTheDraft, roomAdapters } from '../../support/roomAdapters.js'
 
+/** A room that answers what mounting a surface reaches, and refuses everything a scenario has not. */
 function roomHolding(): RoomAdapters {
-  return {
-    subscribeToRoom: () => ({ snapshot: Promise.resolve({ draft: null, storyContext: null, authorContext: null }), unsubscribe: () => {} }),
+  return roomAdapters({
+    subscribeToRoom: () => ({ snapshot: onTheDraft(null), unsubscribe: () => {} }),
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1' } }),
-    fetchConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1', entries: [] } }),
-    dispatch: () => Promise.resolve({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
-    abandonOperation: () => Promise.resolve({ outcome: 'value', value: null }),
-    applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
-    confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e1', change: { kind: 'rewrittenWhole' as const } } }),
-    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'unused' } }),
-    saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
-  }
+    fetchConversation: conversationOnDisk('c1', []),
+  })
 }
 
 const ROSTER = { settled: true, displayName: (id: string) => id, handle: () => undefined }
