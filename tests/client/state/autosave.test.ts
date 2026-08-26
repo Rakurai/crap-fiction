@@ -109,12 +109,68 @@ describe('createAutosaveController', () => {
     const controller = createAutosaveController('', save, onStateChange, clock, 1000)
 
     controller.update('unsaved')
-    controller.flush()
+    const flushed = controller.flush()
     // Immediately: no debounce interval has elapsed.
     expect(save).toHaveBeenCalledWith('unsaved')
     expect(onStateChange).not.toHaveBeenCalled()
 
     resolveSave?.(WROTE)
     await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledWith({ failed: false }))
+    expect(await flushed).toEqual({ failed: false })
+  })
+
+  it('resolves the returned promise through a durable failure rather than only reporting it as a side effect', async () => {
+    const save = saver().mockResolvedValueOnce(refused('disk unhappy'))
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
+
+    controller.update('unsaved')
+    const flushed = controller.flush()
+
+    expect(await flushed).toEqual({ failed: true, message: 'disk unhappy', atMs: FAILED_AT_MS })
+  })
+
+  it('resolves flush immediately, with no write at all, when nothing is dirty', async () => {
+    const save = saver()
+    const controller = createAutosaveController('unchanged', save, vi.fn(), clock, 1000)
+
+    expect(await controller.flush()).toEqual({ failed: false })
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('installs a replacement immediately, ahead of any pending debounce, and resolves once that exact write settles', async () => {
+    const save = saver().mockResolvedValueOnce(WROTE)
+    const controller = createAutosaveController('original', save, vi.fn(), clock, 1000)
+
+    controller.update('a stray keystroke')
+    const installed = controller.install('the applied text')
+
+    // Immediately: install does not wait for the debounce interval, and it writes exactly what
+    // was installed rather than whatever the debounced edit left behind.
+    expect(save).toHaveBeenCalledOnce()
+    expect(save).toHaveBeenCalledWith('the applied text')
+    expect(await installed).toEqual({ failed: false })
+
+    // The debounced edit is superseded: nothing further is written once the timer would have fired.
+    vi.advanceTimersByTime(2000)
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+  })
+
+  it('serializes install behind a write already in flight rather than starting a second one', async () => {
+    const save = saver()
+    let resolveFirst: ((result: RequestResult<null>) => void) | undefined
+    save.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+    save.mockImplementationOnce(() => Promise.resolve(WROTE))
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
+
+    controller.update('first')
+    vi.advanceTimersByTime(1000)
+    expect(save).toHaveBeenCalledTimes(1)
+
+    const installed = controller.install('the applied text')
+    expect(save).toHaveBeenCalledTimes(1)
+
+    resolveFirst?.(WROTE)
+    expect(await installed).toEqual({ failed: false })
+    expect(save).toHaveBeenNthCalledWith(2, 'the applied text')
   })
 })

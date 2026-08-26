@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
+import type { AutosaveState } from './autosave.js'
 import { type BySurface, withSurface } from './bySurface.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import { closePiece } from './closePiece.js'
 import { documentSnapshotFrom } from './documentSnapshot.js'
 import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
 import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
@@ -84,9 +86,14 @@ function Surfaces({
   const [activeSurface, setActiveSurface] = useState<SurfaceId>('draft')
   const [saveFailed, setSaveFailed] = useState<BySurface<boolean>>({})
   const [liveActions, setLiveActions] = useState<BySurface<LiveAction>>({})
+  const [closing, setClosing] = useState(false)
+  // A plain ref rather than state: every mounted surface's flush is registered once and never
+  // drawn from, so re-rendering the shell whenever one changed identity would buy nothing.
+  const flushersRef = useRef<BySurface<() => Promise<AutosaveState>>>({})
 
-  // Whether leaving the piece is refused — any surface's own failed save, not only the visible one's.
-  const leaveBlocked = SURFACE_IDS.some((surface) => saveFailed[surface] === true)
+  // Whether leaving the piece is refused — any surface's own failed save, not only the visible
+  // one's — or a close already under way, so a repeated request cannot start a second one.
+  const leaveBlocked = closing || SURFACE_IDS.some((surface) => saveFailed[surface] === true)
 
   // Stable across renders, and shared by every mounted surface, so a surface reporting its own
   // state upward never itself becomes the reason the shell — and every other surface — re-renders.
@@ -95,6 +102,9 @@ function Surfaces({
   }, [])
   const handleLiveActionChange = useCallback((surface: SurfaceId, action: LiveAction | undefined) => {
     setLiveActions((current) => (current[surface] === action ? current : withSurface(surface, action)(current)))
+  }, [])
+  const handleFlushRegister = useCallback((surface: SurfaceId, flush: () => Promise<AutosaveState>) => {
+    flushersRef.current = withSurface(surface, flush)(flushersRef.current)
   }, [])
 
   const roomAdapters = {
@@ -108,10 +118,18 @@ function Surfaces({
     saveDocument: saveSurfaceDocument,
   }
 
-  function closeAndAbandon(): void {
-    for (const surface of SURFACE_IDS) {
-      const action = liveActions[surface]
-      if (action !== undefined) void abandonOperation(piece.id, surface, action.conversationId, action.actionId)
+  // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
+  // flushed and awaited first, because a failed write is the one thing that keeps the piece open,
+  // and only once persistence has durably settled does closing own abandoning what each surface
+  // still has in flight. `closing` disables repeated requests and keeps every surface's own
+  // persistence status visible for as long as this is waiting.
+  async function closeAndAbandon(): Promise<void> {
+    if (closing) return
+    setClosing(true)
+    const result = await closePiece(piece.id, flushersRef.current, liveActions, abandonOperation)
+    if (result.blocked) {
+      setClosing(false)
+      return
     }
     onClose()
   }
@@ -139,10 +157,11 @@ function Surfaces({
           active={activeSurface === surface}
           onSwitchToSurface={setActiveSurface}
           leaveBlocked={leaveBlocked}
-          onClose={closeAndAbandon}
+          onClose={() => void closeAndAbandon()}
           onTextChange={registry.update}
           onSaveFailedChange={handleSaveFailedChange}
           onLiveActionChange={handleLiveActionChange}
+          onFlushRegister={handleFlushRegister}
           documents={registry.documents}
           castToggling={room.toggling[surface]}
           castError={room.error[surface]}

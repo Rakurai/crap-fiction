@@ -44,7 +44,7 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       surface="draft"
       currentConversationId="c1"
       documents={DOCUMENTS}
-      flushDocument={() => {}}
+      flushDocument={() => Promise.resolve({ failed: false })}
       room={roomHolding(entries)}
       displayName={(id) => NAMES[id] ?? id}
       handle={(id) => HANDLE_BY_ID[id]}

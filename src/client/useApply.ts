@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
+import type { AutosaveState } from './autosave.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
   confirmApplication as confirmApplicationFn,
 } from './roomClient.js'
-import type { saveSurfaceDocument as saveSurfaceDocumentFn } from './piecesClient.js'
 import { failureMessage } from './request.js'
 
 export type ApplyAdapters = Readonly<{
   applyRecommendation: typeof applyRecommendationFn
   confirmApplication: typeof confirmApplicationFn
-  saveDocument: typeof saveSurfaceDocumentFn
   abandonOperation: typeof abandonOperationFn
 }>
 
@@ -29,11 +28,11 @@ export function useApply(
   surface: SurfaceId,
   conversationId: string | null,
   getDocuments: () => DocumentSnapshot,
-  onApplied: (markdown: string) => void,
+  install: (markdown: string) => Promise<AutosaveState>,
   adapters: ApplyAdapters,
   initialApplying?: ApplyingResponse,
 ): ApplyViewModel {
-  const { applyRecommendation, confirmApplication, saveDocument, abandonOperation } = adapters
+  const { applyRecommendation, confirmApplication, abandonOperation } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(initialApplying)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -56,10 +55,11 @@ export function useApply(
 
     // A save or confirmation failure leaves the server's pending Apply sitting at its room
     // scope; abandoning it is what frees that scope and closes out the action, same as the
-    // author doing so by hand.
-    function stopAndAbandon(actionId: string, message: string | undefined): void {
+    // author doing so by hand. Awaited rather than fired off, so this terminal failure is fully
+    // settled — reported and unlocked — before `apply` returns control to its caller.
+    async function stopAndAbandon(actionId: string, message: string | undefined): Promise<void> {
       stop(message)
-      void abandonOperation(pieceId, surface, cid, actionId)
+      await abandonOperation(pieceId, surface, cid, actionId)
     }
 
     async function run(): Promise<void> {
@@ -79,18 +79,17 @@ export function useApply(
         return
       }
 
-      // outcome.outcome === 'pending': install the replacement, save it exactly, then confirm.
-      onApplied(outcome.manuscript)
-
-      const saved = await saveDocument(pieceId, surface, outcome.manuscript)
-      if (saved.outcome !== 'value') {
-        stopAndAbandon(outcome.actionId, failureMessage(saved) ?? 'the applied text could not be saved')
+      // outcome.outcome === 'pending': install the replacement through the surface's one
+      // persistence owner, then confirm only once that write has durably settled.
+      const saved = await install(outcome.manuscript)
+      if (saved.failed) {
+        await stopAndAbandon(outcome.actionId, saved.message)
         return
       }
 
       const confirmed = await confirmApplication(pieceId, surface, cid, outcome.applicationId)
       if (confirmed.outcome !== 'value') {
-        stopAndAbandon(outcome.actionId, failureMessage(confirmed))
+        await stopAndAbandon(outcome.actionId, failureMessage(confirmed))
         return
       }
       stop(undefined)

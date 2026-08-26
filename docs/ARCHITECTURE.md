@@ -425,6 +425,14 @@ who read it and stopped typing is never written.
 rather than confirmed. Nothing asks the author to confirm discarding anything, and every surface
 stays editable throughout.
 
+**Leaving flushes every surface's document first and waits for each write to durably settle before
+deciding.** A repeated request while that wait is outstanding is refused on the same terms as a
+failing write, so the wait can never be raced into two attempts. Once every document has landed,
+leaving abandons whatever operation each surface still has in flight and proceeds whether or not
+that abandonment succeeds: the request is bounded and cancellable so an unreachable studio cannot
+turn it into an indefinite wait, and its failure is reported rather than trusted as evidence that
+the work actually stopped.
+
 ## Model access
 
 **One narrow internal interface for every model call**, and every call in the product goes through

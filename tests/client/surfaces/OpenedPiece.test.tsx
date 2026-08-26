@@ -1,5 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RoomEvent } from '../../../src/client/entryProjection.js'
+import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomActivitySnapshot } from '../../../src/shared/conversationEvents.js'
 import type { PieceDetail } from '../../../src/shared/pieceViews.js'
 import { OpenedPiece } from '../../../src/client/OpenedPiece.js'
@@ -106,9 +108,25 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-async function renderOpened() {
-  render(<OpenedPiece id="cups" onClose={() => {}} />)
+async function renderOpened(onClose: () => void = () => {}) {
+  render(<OpenedPiece id="cups" onClose={onClose} />)
   await screen.findByRole('button', { name: 'The Cups' })
+}
+
+/** Captures the stream's own event callback, so a test can deliver an event as the server would. */
+function streamingRoom(): { stream: (event: RoomEvent) => void } {
+  let deliver: (event: RoomEvent) => void = () => {
+    throw new Error('the room was never subscribed to')
+  }
+  mocks.subscribeToRoom.mockImplementation((_pieceId: string, onEvent: (event: RoomEvent) => void) => {
+    deliver = onEvent
+    return { snapshot: Promise.resolve(EMPTY_ACTIVITY), unsubscribe: () => {} }
+  })
+  return { stream: (event) => act(() => deliver(event)) }
+}
+
+function leaveButton(): HTMLButtonElement {
+  return screen.getByRole('button', { name: '‹ pieces' }) as HTMLButtonElement
 }
 
 async function settle() {
@@ -200,6 +218,62 @@ describe('a failed save on one document', () => {
     await settle()
 
     expect(screen.getByRole('button', { name: '‹ pieces' }).hasAttribute('disabled')).toBe(false)
+  })
+})
+
+describe('leaving the piece', () => {
+  it('waits on a dirty surface, and stays mounted with the failure visible and leaving disabled when that write fails', async () => {
+    let resolveSave: ((result: RequestResult<null>) => void) | undefined
+    mocks.saveSurfaceDocument.mockImplementation(
+      () =>
+        new Promise<RequestResult<null>>((resolve) => {
+          resolveSave = resolve
+        }),
+    )
+    const onClose = vi.fn()
+    await renderOpened(onClose)
+    vi.useFakeTimers()
+
+    fireEvent.click(screen.getByRole('button', { name: 'source' }))
+    fireEvent.change(screen.getByLabelText('Manuscript source'), { target: { value: 'First light of the day. Then none.' } })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+
+    fireEvent.click(leaveButton())
+    expect(leaveButton().disabled).toBe(true)
+    expect(onClose).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolveSave?.({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
+    })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('EACCES: PERMISSION DENIED')).toBeTruthy()
+    // The failure keeps the piece open rather than the close request itself: the button is
+    // disabled by the standing failure, not merely by a `closing` flag stuck on.
+    expect(leaveButton().disabled).toBe(true)
+  })
+
+  it('leaves once every abandonment attempt has settled, even where one of them fails — the server, not this request, is authoritative', async () => {
+    const { stream } = streamingRoom()
+    mocks.abandonOperation.mockResolvedValue({ outcome: 'unreachable', message: 'the studio did not answer' })
+    const onClose = vi.fn()
+    await renderOpened(onClose)
+
+    fireEvent.change(activeComposer(), { target: { value: 'what isn’t working' } })
+    fireEvent.click(screen.getByRole('button', { name: 'send' }))
+    await waitFor(() => expect(mocks.dispatch).toHaveBeenCalled())
+
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a1', conversationId: 'd1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: [], surface: 'draft' },
+    })
+
+    fireEvent.click(leaveButton())
+
+    await waitFor(() => expect(mocks.abandonOperation).toHaveBeenCalledWith('cups', 'draft', 'd1', 'a1', expect.any(AbortSignal)))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })
 

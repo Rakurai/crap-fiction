@@ -3,7 +3,8 @@ import { createAutosaveController, type AutosaveState, type SaveDocument } from 
 
 export type AutosaveViewModel = Readonly<{
   state: AutosaveState
-  flush: () => void
+  flush: () => Promise<AutosaveState>
+  install: (text: string) => Promise<AutosaveState>
 }>
 
 export function useAutosave(markdown: string, save: SaveDocument): AutosaveViewModel {
@@ -17,9 +18,5 @@ export function useAutosave(markdown: string, save: SaveDocument): AutosaveViewM
     controller.update(markdown)
   }, [controller, markdown])
 
-  useEffect(() => {
-    return () => controller.flush()
-  }, [controller])
-
-  return { state, flush: controller.flush }
+  return { state, flush: controller.flush, install: controller.install }
 }

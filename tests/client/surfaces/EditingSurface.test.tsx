@@ -49,6 +49,7 @@ const BASE_PROPS = {
   onTextChange: vi.fn(),
   onSaveFailedChange: vi.fn(),
   onLiveActionChange: vi.fn(),
+  onFlushRegister: vi.fn(),
   documents: { draft: 'First light.', storyContext: '', authorContext: '' },
   castToggling: undefined,
   castError: undefined,

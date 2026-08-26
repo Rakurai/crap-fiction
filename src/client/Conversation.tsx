@@ -6,6 +6,7 @@ import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
+import type { AutosaveState } from './autosave.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
@@ -24,14 +25,14 @@ type ConversationProps = {
   readonly surface: SurfaceId
   readonly currentConversationId: string | null
   readonly documents: DocumentSnapshot
-  readonly flushDocument: () => void
+  readonly flushDocument: () => Promise<AutosaveState>
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
   readonly handles: readonly HandleEntry[]
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
-  readonly onApplied?: (markdown: string) => void
+  readonly onApplied?: (markdown: string) => Promise<AutosaveState>
   readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
   readonly onActionIdChange?: (action: { readonly conversationId: string; readonly actionId: string } | undefined) => void
@@ -372,7 +373,7 @@ export function Conversation({
   handles,
   runtime,
   clock,
-  onApplied = () => {},
+  onApplied = () => Promise.resolve({ failed: false }),
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
   onActionIdChange = () => {},

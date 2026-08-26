@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
+import type { AutosaveState } from './autosave.js'
 import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -46,7 +47,7 @@ export function useConversation(
   pieceId: string,
   surface: SurfaceId,
   initialConversationId: string | null,
-  flushDocument: () => void,
+  flushDocument: () => Promise<AutosaveState>,
   getDocuments: () => DocumentSnapshot,
   room: RoomAdapters,
 ): ConversationViewModel {
@@ -133,7 +134,9 @@ export function useConversation(
 
   function openDispatch(opening: DispatchOpening): void {
     if (busy) return
-    flushDocument()
+    // Started, not waited on: the current documents travel in the request either way, so the
+    // dispatch never depends on this write having landed before it opens.
+    void flushDocument()
     setError(undefined)
     setBusy(true)
 

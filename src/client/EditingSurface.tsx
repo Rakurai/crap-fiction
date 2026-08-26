@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
+import type { AutosaveState } from './autosave.js'
 import { ContextSurface, isContextSurfaceId } from './ContextSurface.js'
 import { Conversation, type HandleEntry } from './Conversation.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
@@ -47,6 +48,8 @@ type EditingSurfaceProps = {
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
   readonly onLiveActionChange: (surface: SurfaceId, action: LiveAction | undefined) => void
+  /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
+  readonly onFlushRegister: (surface: SurfaceId, flush: () => Promise<AutosaveState>) => void
   readonly documents: DocumentSnapshot
   readonly castToggling: string | undefined
   readonly castError: string | undefined
@@ -89,6 +92,7 @@ export function EditingSurface({
   onTextChange,
   onSaveFailedChange,
   onLiveActionChange,
+  onFlushRegister,
   documents,
   castToggling,
   castError,
@@ -113,6 +117,10 @@ export function EditingSurface({
   useEffect(() => {
     onLiveActionChange(surface, conversation.liveAction)
   }, [surface, conversation.liveAction, onLiveActionChange])
+
+  useEffect(() => {
+    onFlushRegister(surface, documentSession.autosave.flush)
+  }, [surface, documentSession.autosave.flush, onFlushRegister])
 
   const handles: readonly HandleEntry[] = [
     ...cast.map(({ handle, displayName }) => ({ handle, displayName })),
@@ -182,7 +190,7 @@ export function EditingSurface({
           handles={handles}
           runtime={runtime}
           clock={Date.now}
-          onApplied={documentSession.kind === 'prose' ? documentSession.manuscript.applyRecommendation : documentSession.setText}
+          onApplied={documentSession.install}
           onApplyingChange={conversation.setApplying}
           onConversationIdChange={conversation.setActiveConversationId}
           onActionIdChange={conversation.setLiveAction}

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { SaveDocument } from './autosave.js'
+import { useCallback, useState } from 'react'
+import type { AutosaveState, SaveDocument } from './autosave.js'
 import { useAutosave, type AutosaveViewModel } from './useAutosave.js'
 import { useManuscript, type ManuscriptViewModel } from './useManuscript.js'
 
@@ -8,23 +8,40 @@ export type DocumentSessionKind = 'prose' | 'plainText'
 /**
  * A surface's document, its editor state where the body is prose, and the persistence lifecycle
  * behind it. Prose and plain text share only what `EditingSurface` itself needs from either —
- * current text and save state — which is why this is a union rather than one shape wide enough
- * to cover both bodies; everything else belongs to whichever body renders it.
+ * current text, save state, and installing a replacement — which is why this is a union rather
+ * than one shape wide enough to cover both bodies; everything else belongs to whichever body
+ * renders it. `install` is the only path Apply may install a replacement through: it updates this
+ * surface's own state and hands the exact text to the autosave controller, the surface's one
+ * persistence writer, and resolves once that write has durably settled.
  */
 export type DocumentSession =
-  | Readonly<{ kind: 'prose'; manuscript: ManuscriptViewModel; autosave: AutosaveViewModel; text: string }>
-  | Readonly<{ kind: 'plainText'; text: string; setText: (text: string) => void; autosave: AutosaveViewModel }>
+  | Readonly<{ kind: 'prose'; manuscript: ManuscriptViewModel; autosave: AutosaveViewModel; text: string; install: (text: string) => Promise<AutosaveState> }>
+  | Readonly<{ kind: 'plainText'; text: string; setText: (text: string) => void; autosave: AutosaveViewModel; install: (text: string) => Promise<AutosaveState> }>
 
 function useProseSession(initialText: string, save: SaveDocument): DocumentSession {
   const manuscript = useManuscript(initialText)
   const autosave = useAutosave(manuscript.markdown, save)
-  return { kind: 'prose', manuscript, autosave, text: manuscript.markdown }
+  const install = useCallback(
+    (text: string) => {
+      manuscript.applyRecommendation(text)
+      return autosave.install(text)
+    },
+    [manuscript.applyRecommendation, autosave.install],
+  )
+  return { kind: 'prose', manuscript, autosave, text: manuscript.markdown, install }
 }
 
 function usePlainTextSession(initialText: string, save: SaveDocument): DocumentSession {
   const [text, setText] = useState(initialText)
   const autosave = useAutosave(text, save)
-  return { kind: 'plainText', text, setText, autosave }
+  const install = useCallback(
+    (next: string) => {
+      setText(next)
+      return autosave.install(next)
+    },
+    [autosave.install],
+  )
+  return { kind: 'plainText', text, setText, autosave, install }
 }
 
 /**

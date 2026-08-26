@@ -391,6 +391,11 @@ unavailable while any of the piece's documents is in this state, and it is unava
 than confirmed: an author asked whether to discard their own prose has been asked the wrong
 question.
 
+**Leaving while a write is settling.** The control that leaves the piece disables the instant it
+is asked for and stays disabled until every document has durably saved; a repeated request in
+that window does nothing further. A write that fails during this wait keeps the piece open and
+reads as an ordinary failed save, not as a second kind of failure.
+
 **Models unreachable.** The manuscript opens, is writable, and stays writable. Only the room
 is unavailable, and it says so where the author would otherwise address it. The ordinary cause is a
 program on this machine that is not running, which is recoverable in a way a network problem is not,
