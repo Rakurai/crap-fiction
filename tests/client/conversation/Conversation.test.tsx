@@ -450,7 +450,7 @@ describe('conversation activity, truthfully', () => {
     },
   }
 
-  it('ACTIVE-ESCAPE: offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
+  it('offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -461,7 +461,7 @@ describe('conversation activity, truthfully', () => {
     expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 
-  it('PROGRESS-REAL, PROGRESS-PARALLEL, NO-WAITING-PLACES: one "is thinking" line per participant actually reporting progress, and none for the rest of a resolved audience it never got', async () => {
+  it('shows one "is thinking" line per participant actually reporting progress, and none for the rest of a resolved audience it never got', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
@@ -479,7 +479,7 @@ describe('conversation activity, truthfully', () => {
     expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
   })
 
-  it('ACTION-EXCLUSION: disables send while busy without relabelling it', async () => {
+  it('disables send while busy without relabelling it', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 

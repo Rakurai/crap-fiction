@@ -6,7 +6,7 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import type { ConversationScope } from '../../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
-import { buildTestApp } from '../../support/harness.js'
+import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
@@ -72,7 +72,13 @@ describe('the piece routes', () => {
   })
 
   function studio(modes: readonly ModeDescriptor[] = [MODE]) {
-    return buildTestApp(dataRoot, { modes, roles: ROLES, runtimeStatus: undefined })
+    return buildTestApp(dataRoot, {
+      modes,
+      roles: ROLES,
+      runtimeStatus: undefined,
+      room: idleRoom(dataRoot, modes, ROLES),
+      authorContextReference: UNREACHED_REFERENCE,
+    })
   }
 
   async function withWorkspace(modes?: readonly ModeDescriptor[]) {

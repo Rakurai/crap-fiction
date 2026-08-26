@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { firstSchemaIssue } from './schemaIssue.js'
 import { isAbsoluteLocation } from './store/index.js'
 
-const VARIABLES = [
+/** The whole of the studio's environment: nothing outside this set is read. */
+export const STUDIO_VARIABLES = [
   'STUDIO_DATA_ROOT',
   'STUDIO_PORT',
   'STUDIO_MODEL_RUNTIME_URL',
@@ -33,7 +34,7 @@ export type StudioEnv = Readonly<{
 }>
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): StudioEnv {
-  const missing = VARIABLES.filter((name) => !source[name])
+  const missing = STUDIO_VARIABLES.filter((name) => !source[name])
   if (missing.length > 0) {
     throw new Error(`missing required environment variable(s): ${missing.join(', ')}`)
   }

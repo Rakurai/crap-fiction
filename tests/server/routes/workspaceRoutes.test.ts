@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildTestApp } from '../../support/harness.js'
+import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { MODE_FIXTURE, ROLES_FIXTURE } from '../../support/roomFixtures.js'
 
 describe('the workspace routes', () => {
@@ -17,7 +17,13 @@ describe('the workspace routes', () => {
   })
 
   function studio() {
-    return buildTestApp(dataRoot, { modes: [MODE_FIXTURE], roles: ROLES_FIXTURE, runtimeStatus: undefined }).app
+    return buildTestApp(dataRoot, {
+      modes: [MODE_FIXTURE],
+      roles: ROLES_FIXTURE,
+      runtimeStatus: undefined,
+      room: idleRoom(dataRoot, [MODE_FIXTURE], ROLES_FIXTURE),
+      authorContextReference: UNREACHED_REFERENCE,
+    }).app
   }
 
   it('reports an unconfigured workspace as null, and the resolved directory on every read after', async () => {

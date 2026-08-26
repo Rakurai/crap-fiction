@@ -74,7 +74,7 @@ const PIECE: PieceDetail = {
     },
     authorContext: {
       text: '',
-      referenceSchema: 'Notes about the author that generalize beyond any single piece.',
+      referenceSchema: 'What this test calls the author-context reference; the studio\'s own wording is the server\'s.',
       currentConversationId: null,
       conversations: [],
       cast: [],

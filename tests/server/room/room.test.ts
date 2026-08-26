@@ -402,7 +402,7 @@ describe('Room.dispatch', () => {
     expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
   })
 
-  it('ABANDON-UNTRACK: lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {
+  it('lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },

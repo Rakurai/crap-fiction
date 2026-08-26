@@ -3,8 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-
-const STUDIO_VARIABLES = ['STUDIO_DATA_ROOT', 'STUDIO_PORT', 'STUDIO_MODEL_RUNTIME_URL', 'STUDIO_LOG_LEVEL'] as const
+import { STUDIO_VARIABLES } from '../../src/server/env.js'
 
 describe('the fixture studio', () => {
   let dataRoot: string

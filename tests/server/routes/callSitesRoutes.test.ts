@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import type { RuntimeStatus } from '../../../src/shared/runtimeStatus.js'
-import { buildTestApp } from '../../support/harness.js'
+import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
 /**
@@ -57,7 +57,13 @@ describe('the call-site and model routes', () => {
   })
 
   function studio(runtimeStatus?: RuntimeStatus) {
-    return buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus }).app
+    return buildTestApp(dataRoot, {
+      modes: [MODE],
+      roles: ROLES,
+      runtimeStatus,
+      room: idleRoom(dataRoot, [MODE], ROLES),
+      authorContextReference: UNREACHED_REFERENCE,
+    }).app
   }
 
   it('carries every call site the roles compose to, in the order the studio names them', async () => {

@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-
-const STUDIO_VARIABLES = ['STUDIO_DATA_ROOT', 'STUDIO_PORT', 'STUDIO_MODEL_RUNTIME_URL', 'STUDIO_LOG_LEVEL'] as const
+import { STUDIO_VARIABLES } from '../../src/server/env.js'
 
 describe('a dispatch\'s events through the dev server', () => {
   let server: ViteDevServer

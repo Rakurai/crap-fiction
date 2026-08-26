@@ -82,7 +82,13 @@ describe('the room over HTTP', () => {
       now: () => 1_700_000_000_000,
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
     })
-    const { app, workspace } = buildTestApp(dataRoot, { modes: [MODE], roles: ROLES, runtimeStatus: undefined, room })
+    const { app, workspace } = buildTestApp(dataRoot, {
+      modes: [MODE],
+      roles: ROLES,
+      runtimeStatus: undefined,
+      room,
+      authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
+    })
 
     await workspace.set('my-writing')
     await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', mode: 'flash' }) })
@@ -105,14 +111,14 @@ describe('the room over HTTP', () => {
     return await (await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}`)).json()
   }
 
-  /** Watched at the scope the author's studio watches through the event stream's snapshot. */
+  /**
+   * Waits on the settlement the room itself hands out, so nothing here races a clock, then reads
+   * the same in-flight view the author's studio reads to confirm the scope came back to rest.
+   */
   async function untilIdle(room: Room): Promise<void> {
-    const deadline = Date.now() + 5_000
-    while (Date.now() < deadline) {
-      if (room.activitySnapshot(draftScope) === undefined) return
-      await new Promise((resolve) => setImmediate(resolve))
-    }
-    throw new Error('the room still reports a conversation action in flight')
+    await room.settlement(draftScope)
+    const inFlight = room.activitySnapshot(draftScope)
+    if (inFlight !== undefined) throw new Error(`the room still reports a ${inFlight.kind} in flight`)
   }
 
   /** The id of the response a settled dispatch produced, which later acts name. */

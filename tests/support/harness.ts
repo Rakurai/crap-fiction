@@ -22,10 +22,10 @@ export type AppSpec = Readonly<{
   roles: readonly RoleDefinition[]
   /** Scripted, never defaulted: a test that never asks for it passes `undefined`. */
   runtimeStatus: RuntimeStatus | undefined
-  /** A room the test drives itself. Omitted where the scenario asks the room for nothing. */
-  room?: Room
-  /** The studio's one author-context reference. Defaulted where a scenario never reads it. */
-  authorContextReference?: string
+  /** A room the test drives itself, or `idleRoom` where the scenario asks the room for nothing. */
+  room: Room
+  /** The studio's one author-context reference, or `UNREACHED_REFERENCE` where nothing reads it. */
+  authorContextReference: string
 }>
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
@@ -55,7 +55,11 @@ function unreachedFragments(): PromptFragments {
   }
 }
 
-function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
+/** The author-context reference for a scenario that renders no prompt and reads no reference. */
+export const UNREACHED_REFERENCE = UNREACHED
+
+/** A room that can answer nothing, for a scenario that opens no operation through it. */
+export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {
     modes,
     roles,
@@ -79,7 +83,6 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
   })
 
   const workspace = WorkspaceRegistry.openAt(dataRoot)
-  const room = spec.room ?? idleRoom(dataRoot, spec.modes, spec.roles)
   const modelAccess = FixtureModelAdapter.bySite({}, spec.runtimeStatus)
 
   const app = createApp(
@@ -89,9 +92,9 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
     callSites(spec.roles),
     modelAccess,
-    room,
+    spec.room,
     createLogger(env.logLevel),
-    spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
+    spec.authorContextReference,
   )
   return { app, workspace }
 }
