@@ -22,6 +22,16 @@ export const actionStartedEventSchema = z.discriminatedUnion('kind', [dispatchSt
 
 export type ActionStartedEvent = z.infer<typeof actionStartedEventSchema>
 
+export const applyPendingEventSchema = z.object({
+  actionId: z.string().min(1),
+  conversationId: z.string().min(1),
+  applicationId: z.string().min(1),
+  sourceEntryId: z.string().min(1),
+  surface: surfaceIdSchema,
+})
+
+export type ApplyPendingEvent = z.infer<typeof applyPendingEventSchema>
+
 export const participantActivityEventSchema = z.object({
   actionId: z.string().min(1),
   participantId: z.string().min(1),

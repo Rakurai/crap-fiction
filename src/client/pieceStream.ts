@@ -39,6 +39,10 @@ export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent)
       if (current === null || current.kind !== 'dispatch' || current.actionId !== event.data.actionId) return snapshot
       return { ...snapshot, [surface]: { ...current, states: { ...current.states, [event.data.participantId]: event.data.state } } }
     }
+    case 'apply.pending': {
+      if (current === null || current.kind !== 'apply' || current.actionId !== event.data.actionId) return snapshot
+      return { ...snapshot, [surface]: { ...current, applicationId: event.data.applicationId } }
+    }
     case 'entry.appended': {
       if (current === null || current.kind !== 'dispatch' || current.actionId !== event.data.actionId) return snapshot
       const { entry } = event.data
@@ -93,9 +97,8 @@ export function createPieceStream(pieceId: string, subscribeToRoom: typeof subsc
     },
   )
 
-  // A snapshot that failed to arrive propagates as a rejection rather than settling this piece's
-  // activity as idle: every subscriber's own `snapshot` below rejects the same way, and none
-  // substitutes an empty one.
+  // Deliberately uncaught: a snapshot that failed to arrive rejects every subscriber below rather
+  // than settling this piece's activity as idle.
   const activityReady: Promise<RoomActivitySnapshot> = real.snapshot.then((initial) => {
     const settled = buffered.reduce(applyRoomEvent, initial)
     buffered = []
@@ -112,10 +115,7 @@ export function createPieceStream(pieceId: string, subscribeToRoom: typeof subsc
     listeners.add(listener)
     return {
       // A fresh derivation per subscriber, not `activityReady` itself: a subscriber joining after
-      // events already mutated `activity` reads the current value at the moment it asks, the same
-      // guarantee the module's own doc comment promises. `activity` is always set by the time this
-      // runs — `activityReady`'s own handler sets it before resolving — so this never substitutes
-      // a placeholder; it only narrows a type the promise chain already proves.
+      // events already advanced `activity` reads the current value at the moment it asks.
       snapshot: activityReady.then(() => {
         if (activity === undefined) throw new Error('the piece stream resolved its snapshot without recording one')
         return activity

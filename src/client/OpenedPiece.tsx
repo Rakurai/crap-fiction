@@ -1,9 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
-import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { PieceDetail } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
-import { type BySurface, withSurface } from './bySurface.js'
+import type { BySurface } from './bySurface.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { closePiece } from './closePiece.js'
 import { documentSnapshotFrom } from './documentSnapshot.js'
@@ -24,7 +23,7 @@ import {
   retrievePendingApply,
   subscribeToRoom,
 } from './roomClient.js'
-import { type AuthorContextSelection, type LiveAction } from './useConversationSession.js'
+import { type AuthorContextSelection } from './useConversationSession.js'
 import { usePiece } from './usePiece.js'
 import { useRoster } from './useRoster.js'
 
@@ -37,41 +36,25 @@ type OpenedPieceProps = {
   readonly onClose: () => void
 }
 
-type RoomProps = {
-  readonly toggling: BySurface<string>
-  readonly error: BySurface<string>
-  readonly onToggle: (surface: SurfaceId, memberId: string) => void
-}
-
-type ConversationsProps = {
-  readonly onRefresh: (surface: SurfaceId) => void
-  readonly deletingId: BySurface<string>
-  readonly error: BySurface<string>
-  readonly onDelete: (surface: SurfaceId, conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
-}
-
 function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfig {
-  return surface === 'draft' ? { kind: 'prose' } : { kind: 'plainText', referenceSchema: piece.surfaces[surface].referenceSchema }
+  if (surface === 'draft') return { kind: 'prose', surface }
+  return { kind: 'plainText', surface, referenceSchema: piece.surfaces[surface].referenceSchema }
 }
 
 /**
  * The shell over one open piece: piece-level chrome and close, the one event connection every
  * surface observes, and the document-snapshot registry each surface's own text feeds. Everything
- * specific to one surface — its document, its conversation, its cast controls, its Apply — belongs
- * to the `EditingSurface` mounted for it, not here.
+ * specific to one surface — its document, its conversation, its cast, its Apply — belongs to the
+ * `EditingSurface` mounted for it, not here.
  */
 function Surfaces({
   piece,
-  room,
   lifecycle,
-  conversations,
   authorContextSelection,
   onClose,
 }: {
   readonly piece: PieceDetail
-  readonly room: RoomProps
   readonly lifecycle: LifecycleProps
-  readonly conversations: ConversationsProps
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onClose: () => void
 }) {
@@ -86,10 +69,7 @@ function Surfaces({
 
   const [activeSurface, setActiveSurface] = useState<SurfaceId>('draft')
   const [saveFailed, setSaveFailed] = useState<BySurface<boolean>>({})
-  const [liveActions, setLiveActions] = useState<BySurface<LiveAction>>({})
   const [closing, setClosing] = useState(false)
-  // A plain ref rather than state: every mounted surface's flush is registered once and never
-  // drawn from, so re-rendering the shell whenever one changed identity would buy nothing.
   const flushersRef = useRef<BySurface<() => Promise<AutosaveState>>>({})
 
   // Whether leaving the piece is refused — any surface's own failed save, not only the visible
@@ -99,13 +79,10 @@ function Surfaces({
   // Stable across renders, and shared by every mounted surface, so a surface reporting its own
   // state upward never itself becomes the reason the shell — and every other surface — re-renders.
   const handleSaveFailedChange = useCallback((surface: SurfaceId, failed: boolean) => {
-    setSaveFailed((current) => (current[surface] === failed ? current : withSurface(surface, failed)(current)))
-  }, [])
-  const handleLiveActionChange = useCallback((surface: SurfaceId, action: LiveAction | undefined) => {
-    setLiveActions((current) => (current[surface] === action ? current : withSurface(surface, action)(current)))
+    setSaveFailed((current) => (current[surface] === failed ? current : { ...current, [surface]: failed }))
   }, [])
   const handleFlushRegister = useCallback((surface: SurfaceId, flush: () => Promise<AutosaveState>) => {
-    flushersRef.current = withSurface(surface, flush)(flushersRef.current)
+    flushersRef.current = { ...flushersRef.current, [surface]: flush }
   }, [])
 
   const roomAdapters = {
@@ -121,14 +98,13 @@ function Surfaces({
   }
 
   // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
-  // flushed and awaited first, because a failed write is the one thing that keeps the piece open,
-  // and only once persistence has durably settled does closing own abandoning what each surface
-  // still has in flight. `closing` disables repeated requests and keeps every surface's own
-  // persistence status visible for as long as this is waiting.
-  async function closeAndAbandon(): Promise<void> {
+  // flushed and awaited first, because a failed write is the one thing that keeps the piece open.
+  // `closing` disables repeated requests and keeps every surface's own persistence status visible
+  // for as long as this is waiting.
+  async function leave(): Promise<void> {
     if (closing) return
     setClosing(true)
-    const result = await closePiece(piece.id, flushersRef.current, liveActions, abandonOperation)
+    const result = await closePiece(flushersRef.current)
     if (result.blocked) {
       setClosing(false)
       return
@@ -142,15 +118,14 @@ function Surfaces({
         <EditingSurface
           key={surface}
           pieceId={piece.id}
-          surface={surface}
           title={piece.title}
           mode={piece.mode}
           body={bodyConfigFor(piece, surface)}
           initialText={piece.surfaces[surface].text}
           initialConversationId={piece.surfaces[surface].currentConversationId}
           conversationSelection={surface === 'authorContext' ? authorContextSelection : undefined}
-          cast={piece.surfaces[surface].cast}
-          conversations={piece.surfaces[surface].conversations}
+          initialCast={piece.surfaces[surface].cast}
+          initialConversations={piece.surfaces[surface].conversations}
           storyEditor={piece.storyEditor}
           room={roomAdapters}
           roster={roster}
@@ -159,19 +134,11 @@ function Surfaces({
           active={activeSurface === surface}
           onSwitchToSurface={setActiveSurface}
           leaveBlocked={leaveBlocked}
-          onClose={() => void closeAndAbandon()}
+          onClose={() => void leave()}
           onTextChange={registry.update}
           onSaveFailedChange={handleSaveFailedChange}
-          onLiveActionChange={handleLiveActionChange}
           onFlushRegister={handleFlushRegister}
           documents={registry.documents}
-          castToggling={room.toggling[surface]}
-          castError={room.error[surface]}
-          onToggleCast={(memberId) => room.onToggle(surface, memberId)}
-          deletingConversationId={conversations.deletingId[surface]}
-          conversationsError={conversations.error[surface]}
-          onDeleteConversation={(conversationId) => conversations.onDelete(surface, conversationId)}
-          onRefreshConversations={() => conversations.onRefresh(surface)}
         />
       ))}
     </div>
@@ -185,11 +152,6 @@ export function OpenedPiece({ id, authorContextSelection, onClose }: OpenedPiece
     return (
       <Surfaces
         piece={piece.piece}
-        room={{
-          toggling: piece.castToggling,
-          error: piece.castError,
-          onToggle: piece.toggleCast,
-        }}
         lifecycle={{
           status: piece.piece.status,
           retitling: piece.retitling,
@@ -198,12 +160,6 @@ export function OpenedPiece({ id, authorContextSelection, onClose }: OpenedPiece
           settingStatus: piece.settingStatus,
           statusError: piece.statusError,
           onSetStatus: piece.setStatus,
-        }}
-        conversations={{
-          onRefresh: piece.refreshConversations,
-          deletingId: piece.deletingConversationId,
-          error: piece.conversationsError,
-          onDelete: piece.deleteConversation,
         }}
         authorContextSelection={authorContextSelection}
         onClose={onClose}

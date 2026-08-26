@@ -14,6 +14,13 @@ export function useAutosave(markdown: string, save: SaveDocument): AutosaveViewM
   controllerRef.current ??= createAutosaveController(markdown, save, setState, () => Date.now())
   const controller = controllerRef.current
 
+  // React may verify an effect by cleaning it up and starting it again without another render. The
+  // controller therefore follows the effect lifecycle rather than being removed from its render ref.
+  useEffect(() => {
+    controller.activate()
+    return controller.dispose
+  }, [controller])
+
   useEffect(() => {
     controller.update(markdown)
   }, [controller, markdown])

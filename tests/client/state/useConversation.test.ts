@@ -100,16 +100,23 @@ describe('merging the conversation on disk with the one being streamed', () => {
     })
   })
 
-  it('ignores the snapshot when its action belongs to a different conversation than the one this hook opened', async () => {
+  it('stays held by an action the room reports on this surface for another conversation, and shows nothing of it', async () => {
     const { room } = roomWithHeldConversation([], { ...activitySnapshot('a1'), conversationId: 'some-other-conversation' })
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await act(async () => {
-      await Promise.resolve()
+    // Learning the snapshot is what could have released the surface: before it, every surface is
+    // held anyway.
+    await act(async () => {})
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.projection.activity).toBeUndefined()
+
+    act(() => {
+      result.current.abandon()
     })
-    expect(result.current.busy).toBe(false)
-    expect(result.current.actionId).toBeUndefined()
+
+    expect(room.abandonOperation).not.toHaveBeenCalled()
   })
 })
 
@@ -142,7 +149,7 @@ describe('releasing the controls an action holds', () => {
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await waitFor(() => expect(result.current.actionId).toBe('a1'))
+    await waitFor(() => expect(result.current.projection.activity?.actionId).toBe('a1'))
 
     act(() => {
       result.current.abandon()
@@ -154,10 +161,10 @@ describe('releasing the controls an action holds', () => {
     stream({ type: 'action.finished', data: { actionId: 'a1', outcome: 'abandoned', surface: 'draft' } })
 
     expect(result.current.busy).toBe(true)
-    expect(result.current.actionId).toBe('a2')
+    expect(result.current.projection.activity?.actionId).toBe('a2')
   })
 
-  it('releases them for an action started and finished in the same batch of frames', () => {
+  it('releases them for an action started and finished in the same batch of frames', async () => {
     const { room, stream } = streamingRoom()
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', null, NOOP_FLUSH, () => DOCUMENTS, room))
@@ -170,8 +177,39 @@ describe('releasing the controls an action holds', () => {
       { type: 'action.finished', data: { actionId: 'a1', outcome: 'settled', surface: 'draft' } },
     )
 
-    expect(result.current.busy).toBe(false)
-    expect(result.current.actionId).toBeUndefined()
+    await waitFor(() => expect(result.current.busy).toBe(false))
+    expect(result.current.projection.activity).toBeUndefined()
+  })
+
+  it('is held by live work from another conversation without showing that conversation as its own', async () => {
+    const { room, stream } = streamingRoom()
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    stream({
+      type: 'action.started',
+      data: {
+        actionId: 'a1',
+        conversationId: 'another-conversation',
+        kind: 'dispatch',
+        sourceEntryId: 'e1',
+        startedAt: STARTED_AT,
+        audience: ['shape'],
+        surface: 'draft',
+      },
+    })
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.projection.activity).toBeUndefined()
+    stream({ type: 'action.finished', data: { actionId: 'a1', outcome: 'settled', surface: 'draft' } })
+
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a2', conversationId: 'another-conversation', kind: 'apply', sourceEntryId: 'e2', startedAt: STARTED_AT, surface: 'draft' },
+    })
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.projection.activity).toBeUndefined()
   })
 })
 
@@ -198,7 +236,7 @@ describe('abandoning an operation', () => {
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await waitFor(() => expect(result.current.actionId).toBe('a1'))
+    await waitFor(() => expect(result.current.projection.activity?.actionId).toBe('a1'))
 
     await act(async () => {
       result.current.abandon()
@@ -214,22 +252,36 @@ describe('abandoning an operation', () => {
     expect(idle.abandonOperation).not.toHaveBeenCalled()
   })
 
-  it('releases busy and the activity snapshot the instant abandon is called, before the request resolves', async () => {
-    const room = idleRoom(vi.fn(() => new Promise<RequestResult<null>>(() => {})), activitySnapshot('a1'))
+  it('holds the surface until the studio has answered that it let the operation go', async () => {
+    let letGo: () => void = () => {
+      throw new Error('the studio was never asked')
+    }
+    const answered = new Promise<RequestResult<null>>((resolve) => {
+      letGo = () => resolve({ outcome: 'value', value: null })
+    })
+    const room = idleRoom(vi.fn(() => answered), activitySnapshot('a1'))
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await waitFor(() => expect(result.current.busy).toBe(true))
+    await waitFor(() => expect(result.current.projection.activity?.actionId).toBe('a1'))
 
     act(() => {
       result.current.abandon()
+    })
+
+    expect(result.current.busy).toBe(true)
+    expect(result.current.projection.activity?.actionId).toBe('a1')
+
+    await act(async () => {
+      letGo()
+      await answered
     })
 
     expect(result.current.busy).toBe(false)
     expect(result.current.projection.activity).toBeUndefined()
   })
 
-  it('reports it when the studio cannot be asked to abandon', async () => {
+  it('reports it when the studio cannot be asked to abandon, and stays held by the operation it still has', async () => {
     const room = idleRoom(
       vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })),
       activitySnapshot('a1'),
@@ -237,13 +289,15 @@ describe('abandoning an operation', () => {
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await waitFor(() => expect(result.current.actionId).toBe('a1'))
+    await waitFor(() => expect(result.current.projection.activity?.actionId).toBe('a1'))
 
     await act(async () => {
       result.current.abandon()
     })
 
     await waitFor(() => expect(result.current.error).toBe('the studio did not answer'))
+    expect(result.current.busy).toBe(true)
+    expect(result.current.projection.activity?.actionId).toBe('a1')
   })
 })
 
@@ -283,8 +337,8 @@ describe('resuming an Apply the room reported already in flight', () => {
   })
 })
 
-describe('failing to learn a room scope’s activity', () => {
-  function roomWithFailingSnapshot(): RoomAdapters {
+describe('a room scope whose activity is not yet known', () => {
+  function roomWithSnapshot(snapshot: Promise<RoomActivitySnapshot>): RoomAdapters {
     return {
       createConversation: vi.fn(),
       fetchConversation: vi.fn(() => Promise.resolve<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>({ outcome: 'value', value: { id: 'c1', entries: [] } })),
@@ -294,19 +348,26 @@ describe('failing to learn a room scope’s activity', () => {
       confirmApplication: vi.fn(),
       retrievePendingApply: vi.fn(),
       saveDocument: vi.fn(),
-      subscribeToRoom: vi.fn(() => ({
-        snapshot: Promise.reject(new Error('malformed "activity.snapshot" event from the studio')),
-        unsubscribe: () => {},
-      })),
+      subscribeToRoom: vi.fn(() => ({ snapshot, unsubscribe: () => {} })),
     }
   }
 
-  it('locks the surface and states a distinguishable error rather than falling back to an idle one', async () => {
-    const room = roomWithFailingSnapshot()
+  it('is locked from the first render, before any snapshot has arrived — unknown is not idle', () => {
+    const room = roomWithSnapshot(new Promise<RoomActivitySnapshot>(() => {}))
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    await waitFor(() => expect(result.current.busy).toBe(true))
-    expect(result.current.error).toMatch(/could not learn/)
+    expect(result.current.busy).toBe(true)
+    result.current.sendMessage('is the opening carrying its weight')
+    expect(room.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('stays locked and carries the studio’s own account of why, when the activity cannot be learned at all', async () => {
+    const room = roomWithSnapshot(Promise.reject(new Error('malformed "activity.snapshot" event from the studio')))
+
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+
+    await waitFor(() => expect(result.current.error).toMatch(/^malformed "activity.snapshot" event from the studio —/))
+    expect(result.current.busy).toBe(true)
   })
 })

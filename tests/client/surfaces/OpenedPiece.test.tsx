@@ -257,9 +257,8 @@ describe('leaving the piece', () => {
     expect(leaveButton().disabled).toBe(true)
   })
 
-  it('leaves once every abandonment attempt has settled, even where one of them fails — the server, not this request, is authoritative', async () => {
+  it('leaves while a surface still has work in flight, without asking the studio to end it', async () => {
     const { stream } = streamingRoom()
-    mocks.abandonOperation.mockResolvedValue({ outcome: 'unreachable', message: 'the studio did not answer' })
     const onClose = vi.fn()
     await renderOpened(onClose)
 
@@ -274,8 +273,8 @@ describe('leaving the piece', () => {
 
     fireEvent.click(leaveButton())
 
-    await waitFor(() => expect(mocks.abandonOperation).toHaveBeenCalledWith('cups', 'draft', 'd1', 'a1', expect.any(AbortSignal)))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(mocks.abandonOperation).not.toHaveBeenCalled()
   })
 })
 

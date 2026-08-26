@@ -65,9 +65,9 @@ POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply
                                                    pending replacement and its provisional identity
 GET    /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId
                                                    the generated document a pending Apply is holding,
-                                                   by the provisional identity its activity snapshot
-                                                   named — what a reconnecting client resumes
-                                                   installation from, without a further model call
+                                                   by the provisional identity the stream named — what
+                                                   a client resumes installation from, without a
+                                                   further model call
 POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm
                                                    the provisional identity a pending replacement was
                                                    given, confirmed once the client has saved it
@@ -87,7 +87,7 @@ GET    /models                                     what the runtime holds, and w
 ```
 
 `GET /call-sites` is what the room-editing surface and the assignment surface both read. `GET /models`
-reports whether the runtime can be reached at all, which is the state where the manuscript still opens
+reports whether the runtime can be reached at all, which is the state where every surface still opens
 and only the room is unavailable.
 
 Every `:surface` above names `draft`, `storyContext` or `authorContext`. The piece id in the path
@@ -105,16 +105,19 @@ The set is closed.
 |---|---|
 | `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes — delivered once, atomically with the subscription, before any other frame |
 | `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
+| `apply.pending` | The room scope, action, the entry applied, and the provisional identity of the replacement the model has just answered with |
 | `participant.activity` | The room scope, action, participant, and whether it is having its model prepared or working |
 | `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
 | `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
 | `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
 
-Where the action the snapshot names for a room scope is an Apply already answered by the model, the
-snapshot additionally names the pending replacement's own provisional identity. It never carries the
-generated document itself — that is discovered by identity here and retrieved separately, by the
-route above that names an application id, so a reconnecting client resumes installation and
-confirmation without asking the model again.
+A pending replacement's provisional identity reaches a client two ways: live on `apply.pending` the
+moment the model answers, and on the snapshot where the action a room scope reports in flight is an
+Apply already answered. Neither carries the generated document itself — that is discovered by identity
+and retrieved separately, by the route above that names an application id, so a client resumes
+installation and confirmation without asking the model again. Both paths exist because the client that
+opened an Apply can lose the reply to its own request while the studio goes on working, and it is then
+holding a room scope whose replacement it could otherwise neither reach nor abandon.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the envelope is the shape of a reply to a request, and a frame on a stream is not one.
@@ -210,8 +213,7 @@ The author hand-edits everything under `config/` and every YAML file in a piece.
 change file are machinery, and nothing invites an edit to them. The draft and the story context each
 keep their own conversations and changes, nested under the piece by surface; the author context's live
 once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
-validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention and are
-not.
+validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention.
 
 Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
 reference schema — travels with the application and not under the data root, under a content root
@@ -235,11 +237,12 @@ carries the shared **description** of its form and scale that every participant 
 number of modes may load; the roster and initial cast for a given mode and surface are derived from
 every cast participant's declared availability, never listed by the mode.
 
-A **reference schema** is one YAML document under the content root, shown to the author and given
-whole to a context Apply for the surface it belongs to: one per mode, at
+A **reference schema** is one opaque text file under the content root, read whole and never parsed,
+shown to the author and given whole to a context Apply for the surface it belongs to: one per mode, at
 `content/modes/<mode>/story-context.yaml`, for that mode's story context, and one at
-`content/author-context.yaml` for the studio's author context. It is guidance, not a contract —
-nothing parses it, and it is never compared with a context document or an Apply result.
+`content/author-context.yaml` for the studio's author context. It is guidance, not a contract: it is
+never compared with a context document or an Apply result, and its `.yaml` path names where the file
+lives rather than a structure anything reads out of it.
 
 A **prompt fragment** is one Markdown document under the content root, holding a heading or an
 instruction addressed to a model together with frontmatter declaring the names it interpolates as

@@ -3,6 +3,7 @@ import type { SSEStreamingApi } from 'hono/streaming'
 export const SSE_EVENT_NAMES = [
   'activity.snapshot',
   'action.started',
+  'apply.pending',
   'participant.activity',
   'entry.appended',
   'action.finished',

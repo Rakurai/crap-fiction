@@ -2,12 +2,9 @@ import { useCallback, useState } from 'react'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 
 /**
- * The shell's registry of every surface's current client text. Each mounted surface owns its own
- * document session and reports its text here as it changes; the shell never holds a surface's text
- * as its own state, only this derived mirror — which is what makes it reactive: every surface's
- * `Conversation` receives the same `documents` value and re-renders when any surface's text
- * changes, the same as when all three lived in one component. The closing-over an author action or
- * an Apply needs happens at the call site that submits it, not here.
+ * The shell's mirror of every surface's current client text, which is what a call carrying all three
+ * documents is composed from. Each surface owns its own document and reports its text here as it
+ * changes; the shell holds no surface's text as its own state.
  */
 export type DocumentSnapshotRegistry = Readonly<{
   documents: DocumentSnapshot

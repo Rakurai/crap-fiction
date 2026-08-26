@@ -77,6 +77,22 @@ describe('installing a pending Apply result', () => {
     expect(result.current.error).toBe('the target moved')
     expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
   })
+
+  it('stays locked when the abandonment itself fails, rather than unlocking a surface the room still holds an Apply for', async () => {
+    const install = vi.fn(() => Promise.resolve<AutosaveState>({ failed: true, message: 'disk unhappy', atMs: 1 }))
+    const room = adapters({
+      abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'unreachable', message: 'the studio did not answer' })),
+    })
+
+    const { result } = renderHook(() => useApply('the-lighthouse', 'draft', 'c1', () => DOCUMENTS, install, room))
+
+    act(() => {
+      result.current.apply('e1', undefined)
+    })
+
+    await waitFor(() => expect(result.current.error).toBe('disk unhappy — the studio did not answer'))
+    expect(result.current.applying).toEqual({ responseId: 'e1' })
+  })
 })
 
 describe('resuming a pending Apply the room reported already in flight on reconnect', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AutosaveState } from './autosave.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
@@ -38,19 +38,29 @@ export function useApply(
   const { applyRecommendation, confirmApplication, abandonOperation, retrievePendingApply } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(resumed !== undefined ? { responseId: resumed.responseId } : undefined)
   const [error, setError] = useState<string | undefined>(undefined)
+  const startedHere = useRef(false)
+  const resumingApplication = useRef<string | undefined>(undefined)
 
   function stop(message: string | undefined): void {
+    startedHere.current = false
+    resumingApplication.current = undefined
     setApplying(undefined)
     if (message !== undefined) setError(message)
   }
 
-  // A save, confirmation or retrieval failure leaves the server's pending Apply sitting at its
-  // room scope; abandoning it is what frees that scope and closes out the action, same as the
-  // author doing so by hand. Awaited rather than fired off, so this terminal failure is fully
-  // settled — reported and unlocked — before the caller regains control.
+  // A save, confirmation or retrieval failure leaves the server's pending Apply sitting at its room
+  // scope; abandoning it is what frees that scope and closes out the action, same as the author
+  // doing so by hand. The document is released only once the room has answered that it is free: an
+  // abandonment that failed leaves the room still holding the Apply, and unlocking here would
+  // invite an edit the room's own pending replacement is about to contradict.
   async function stopAndAbandon(cid: string, actionId: string, message: string | undefined): Promise<void> {
+    const abandoned = await abandonOperation(pieceId, surface, cid, actionId)
+    const unfreed = failureMessage(abandoned)
+    if (unfreed !== undefined) {
+      setError(message === undefined ? unfreed : `${message} — ${unfreed}`)
+      return
+    }
     stop(message)
-    await abandonOperation(pieceId, surface, cid, actionId)
   }
 
   // Shared by a fresh Apply's 'pending' outcome and a resumed one's retrieved result: install
@@ -78,11 +88,14 @@ export function useApply(
   // room reports the call finished or the author abandons it.
   useEffect(() => {
     if (resumed === undefined || conversationId === null) return
+    if (startedHere.current) return
     const cid = conversationId
     const actionId = resumed.actionId
     setApplying((current) => current ?? { responseId: resumed.responseId })
     if (resumed.applicationId === undefined) return
     const applicationId = resumed.applicationId
+    if (resumingApplication.current === applicationId) return
+    resumingApplication.current = applicationId
 
     let active = true
 
@@ -103,12 +116,14 @@ export function useApply(
 
     return () => {
       active = false
+      if (resumingApplication.current === applicationId) resumingApplication.current = undefined
     }
   }, [resumed, conversationId])
 
   function apply(responseId: string, constraint: string | undefined): void {
     if (applying !== undefined || conversationId === null) return
     const cid = conversationId
+    startedHere.current = true
     setError(undefined)
     setApplying({ responseId })
 
@@ -138,6 +153,7 @@ export function useApply(
   }
 
   function clear(): void {
+    startedHere.current = false
     setApplying(undefined)
   }
 

@@ -17,6 +17,7 @@ import type {
 import {
   type ActionFinishedEvent,
   type ActionStartedEvent,
+  type ApplyPendingEvent,
   type ConversationActivitySnapshot,
   type ConversationErrorEvent,
   type ConversationFailureCode,
@@ -62,6 +63,7 @@ function referenceSchemaFor(mode: ModeDescriptor, authorContextReference: string
 
 export type RoomEvent =
   | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
+  | { readonly type: 'apply.pending'; readonly data: ApplyPendingEvent }
   | { readonly type: 'participant.activity'; readonly data: ParticipantActivityEvent }
   | { readonly type: 'entry.appended'; readonly data: EntryAppendedEvent }
   | { readonly type: 'action.finished'; readonly data: ActionFinishedEvent }
@@ -671,6 +673,16 @@ export class Room {
       }
       const current = this.#operations.get(key)
       if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
+      this.#emit(pieceId, {
+        type: 'apply.pending',
+        data: {
+          actionId,
+          conversationId,
+          applicationId: pending.applicationId,
+          sourceEntryId: responseId,
+          surface: roomScope.surface,
+        },
+      })
       return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, replacement } }
     } catch (err) {
       closeOut('failed')
@@ -735,7 +747,15 @@ export class Room {
       changeId: pending.change.id,
       constraint: pending.constraint,
     }
-    await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
+    try {
+      await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
+    } catch (err) {
+      // The durable write is what commits an Apply, so a failed one ends the operation rather than
+      // leaving the scope holding a replacement no author can now reach or abandon.
+      this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
+      throw err
+    }
     this.#emit(pieceId, {
       type: 'entry.appended',
       data: { actionId, entry: { ...application, change: pending.change.content }, surface: roomScope.surface },

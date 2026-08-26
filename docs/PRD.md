@@ -207,16 +207,16 @@ in and shows that it did, the change affects only which specialists are called o
 unaddressed messages, historical conversation is untouched, and no rationale is generated to
 justify the cast.
 
-### Working the prose
+### Applying what the room recommended
 
 **Apply a recommendation** — *constant*
-*Done when:* one action makes the manuscript embody the recommendation, interpreted against
-the draft and the full current conversation as they currently stand, with no second acceptance
-step and no automatic critique of the result; the manuscript is not editable for as long as the
-application is under way — the model answering, the result being saved, and that save being
-confirmed — and is editable again the moment it settles, fails or is abandoned; and nothing in
-the manuscript changes beyond what embodying the recommendation and the author's constraint
-requires.
+*Done when:* one action makes the document of the surface the recommendation was made on embody
+it, interpreted against that document and the full current conversation as they currently stand,
+with no second acceptance step and no automatic critique of the result; that document is not
+editable for as long as the application is under way — the model answering, the result being
+saved, and that save being confirmed — and is editable again the moment it settles, fails or is
+abandoned; no other surface is locked by it; and nothing in the document changes beyond what
+embodying the recommendation and the author's constraint requires.
 
 **Apply with a constraint** — *per session*
 *Done when:* text the author supplies alongside the action is carried verbatim as an
@@ -224,18 +224,18 @@ additional instruction, and the same field serves replying and asking for a conc
 
 **Apply something said an hour ago** — *per session*
 *Done when:* every recommendation stays applicable indefinitely, nothing is disabled by age,
-and no staleness detection, prose reconstruction or recommendation-to-prose synchronization
+and no staleness detection, text reconstruction or recommendation-to-document synchronization
 exists.
 
 **See what an application changed** — *constant*
 *Done when:* the change is shown as a before-and-after computed by the application from the
-manuscript states, presented with the response that caused it, still there when the author returns
+document's states, presented with the response that caused it, still there when the author returns
 to that conversation days later, requiring nothing of the participant and leaving no marks in the
-manuscript; and it is never shown as having happened before the manuscript holding it was actually
+document; and it is never shown as having happened before the document holding it was actually
 saved.
 
 **Take it back** — *constant*
-*Done when:* an application is reversed by the prose editor's ordinary history, it counts as
+*Done when:* an application is reversed by the surface editor's ordinary history, it counts as
 one history action however many places it changed, and reversal needs no application-specific
 affordance.
 
@@ -249,19 +249,10 @@ affordance.
 call, without the author assembling anything.
 
 **Keep exploration inconsequential** — *constant*
-*Done when:* no discussion, edit, application or message changes author context or story
-context, and no analysis of the conversation happens that the author did not ask for.
-
-**Consolidate what has settled** — *per session*
-Progress has stabilized and the author wants the durable understanding to catch up.
-*Done when:* one author action analyses the current draft, the current conversation and both
-contexts as they stand when it is invoked, and returns granular proposed changes; the author
-keeps writing while it runs; and editing afterwards neither cancels the analysis nor is
-reconciled against it.
-
-**Approve changes one at a time** — *per session*
-*Done when:* each proposal names its destination context, is approved or ignored on its own,
-may add, revise, replace or remove, and nothing is written that the author did not approve.
+*Done when:* nothing the author does on one surface changes another surface's document, no
+analysis of the conversation happens that the author did not ask for, and a context document
+changes only where the author went to that context's own surface and changed it — by hand or by
+applying a recommendation made there.
 
 **Edit context directly** — *rare*
 *Done when:* both contexts are human-readable and hand-editable on disk, and edits made
@@ -334,8 +325,8 @@ work, and visible when something breaks.
 **Assign models to participants** — *rare*
 *Done when:* any participant can be pointed at a different model without touching another, whether
 that model runs on the author's machine or is hosted, so weak differentiation is diagnosable as a
-design problem rather than confounded with model capacity, and applying a recommendation and
-capturing context are each assigned a model the same way without entering the room.
+design problem rather than confounded with model capacity, and applying a recommendation is
+assigned a model the same way without entering the room.
 
 ## Out of scope
 
@@ -350,17 +341,17 @@ is whether the number describes the machine or the work.
 proposal the author did not ask for.
 
 **Staleness machinery.** Nothing decides that a recommendation has expired, that a response no
-longer applies, or that the conversation and the manuscript need reconciling.
+longer applies, or that a conversation and its surface's document need reconciling.
 
-**A durable link between a response and a location in the prose.** Responses live in
-conversation. Nothing resolves them into the manuscript, nothing tracks them through edits,
-and nothing orphans.
+**A durable link between a response and a location in a document.** Responses live in
+conversation. Nothing resolves them into the document they were said about, nothing tracks them
+through edits, and nothing orphans.
 
 **A record of what the author declined**, or any mechanism promising an idea is never
 re-raised.
 
-**An application-level undo stack.** The prose editor's history is the whole of manuscript
-reversal.
+**An application-level undo stack.** The history of the editor the author is typing in is the whole
+of reversal, on every surface.
 
 **Author-assigned categories for responses.** Which participant spoke is the category.
 
@@ -370,11 +361,6 @@ reversal.
 
 Deliberately not part of this software. Recorded so they are not designed around, and so
 nothing is preserved in anticipation of them.
-
-**Story-planning mode.** A workflow whose primary artifact is story context, intentionally
-developed with the room's help while the draft may or may not change. Its natural home is the
-same conceptual model, so planning and writing would differ in workflow rather than in
-ontology. To be designed from actual planning behaviour rather than in advance.
 
 **One-shot rough drafting.** A convenience that generates a complete rough pass from a thin
 premise, on the grounds that a blank page is a worse problem than a bad draft. Prose inserted

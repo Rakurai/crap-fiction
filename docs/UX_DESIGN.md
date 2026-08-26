@@ -8,20 +8,20 @@ Where this document describes a required interaction, it is settling its present
 
 ## Design thesis
 
-> **Two surfaces are always present: the prose, and the conversation about it.**
+> **Two halves are always present: the document being worked on, and the conversation about it.**
 
-The manuscript is where the story lives and the conversation is where the work gets decided,
-so both are permanent and adjacent. On a window wider than the two of them the surplus is
-margin around the pair rather than a void between them, the conversation stays wide enough to
-read the room's sentences in, and neither surface is pushed to an edge. Everything else —
-choosing a conversation, editing the room, reviewing context proposals, configuration — arrives
-when the author reaches for it, over the window and on a ground of its own that accounts for
-what it covers, and leaves without disturbing either.
+Whichever surface the author is on, its document is where the work is and the conversation is
+where the work gets decided, so both halves are permanent and adjacent. On a window wider than
+the two of them the surplus is margin around the pair rather than a void between them, the
+conversation stays wide enough to read the room's sentences in, and neither half is pushed to an
+edge. Everything else — choosing a conversation, editing the room, configuration — arrives when
+the author reaches for it, over the window and on a ground of its own that accounts for what it
+covers, and leaves without disturbing either.
 
-**One piece is open at a time.** Opening another replaces both surfaces with nothing to save
+**One piece is open at a time.** Opening another replaces both halves with nothing to save
 and nothing to confirm, because everything the author has written is already on disk. The
 exception is the one state where it isn't: while a save is failing, leaving is refused rather
-than confirmed, and the refusal names the prose it is protecting.
+than confirmed, and the refusal names the document it is protecting.
 
 The interface's job, in priority order: get prose written and revised; make the room's
 readings legible and actionable; keep the cost of consulting the room low enough that the
@@ -78,9 +78,9 @@ plain text with its own reference schema, exactly as story context is.
 
 **Only its cast and its evidence are the open piece's own.** Which specialists are enabled here is
 stored per piece, and a call made here reads the currently open piece's draft, story context and
-mode. Leaving for another piece abandons work in progress here the same way leaving abandons work
-on the draft or the story context, because that work was reasoning about evidence that piece no
-longer supplies.
+mode. Work in progress here does not survive opening another piece, the same as work on the draft or
+the story context: the studio ends it, because it was reasoning about evidence that piece no longer
+supplies.
 
 ## The conversation
 
@@ -98,7 +98,7 @@ never something the author discovers later.
 
 ### While the room answers
 
-**The author keeps writing.** A live cursor stays in the manuscript throughout, and nothing about
+**The author keeps writing.** A live cursor stays in the document throughout, and nothing about
 an author action in flight is modal, blocking, or a reason to stop typing. Chat send and every
 other response-triggering control are disabled for the action's whole duration, visibly so, but
 without losing their ordinary size or position — a control that shrank or relabelled itself would
@@ -190,15 +190,14 @@ response scrolled far up the conversation is one the author has to go looking fo
 
 ### Applying, and seeing what it did
 
-**Applying changes the manuscript immediately.** There is no second acceptance step, no
+**Applying changes the surface's document immediately.** There is no second acceptance step, no
 preview to confirm, and no staged state in the editor.
 
 **The response that caused the change shows what changed**, as a before-and-after the
-application computed from the manuscript itself. Showing it here is what keeps the manuscript
-clean: the author can see what an application did without the story being annotated to tell
-them.
+application computed from the document itself. Showing it here is what keeps the document clean:
+the author can see what an application did without the document being annotated to tell them.
 
-**It is set as prose, struck through and replaced.** The passage as it stood reads as withdrawn and
+**It is set as text, struck through and replaced.** The passage as it stood reads as withdrawn and
 the passage as it now stands reads as current, in the register the room's words are in — not as a
 code diff, because the author is reading sentences and judging whether they are better.
 
@@ -208,8 +207,8 @@ count of what was altered, in the register facts about the machine are in, so le
 constrain it. Neither a reload nor navigating away and back auto-collapses it on the author's behalf.
 
 **It says what changed and never where.** No paragraph number, no position, and nothing that jumps
-to the passage in the prose. The author reads the change on the response and finds the prose by
-reading the story, which is the only relationship between the two that stays true after the next
+to the passage in the document. The author reads the change on the response and finds the passage by
+reading the document, which is the only relationship between the two that stays true after the next
 edit.
 
 **Reversal is the editor's own history**, reached by the keystroke the author already uses.
@@ -231,14 +230,14 @@ the one they are starting, because the state that would need explaining is unrea
 has produced its result — a response that landed is not one the author is abandoning.
 
 **A conversation action and an application do not share one register for work under way.** During a
-conversation action the prose is fully editable and a live cursor stays in it. During an application
-the prose is visibly read-only, and reads as the manuscript being held for a moment rather than as
-the application being busy. One undifferentiated *something is happening* treatment would tell the
+conversation action the document is fully editable and a live cursor stays in it. During an application
+the document is visibly read-only, and reads as it being held for a moment rather than as the
+application being busy. One undifferentiated *something is happening* treatment would tell the
 author to stop typing when they do not have to. That hold spans the model answering, the result being
 saved and that save being confirmed — one uninterrupted moment to the author, whatever the number of
-requests behind it.
+requests behind it. Only the surface being applied to is held; the other two stay writable.
 
-**A locked manuscript is accounted for by the response being applied**, so what the author cannot
+**A locked document is accounted for by the response being applied**, so what the author cannot
 type into is explained by something they just did. That accounting names the participant even where
 the response holding it has scrolled out of view.
 
@@ -260,7 +259,7 @@ several messages simply appears again.
 
 ## Conversations
 
-**Opening a piece lands in its most recent conversation**, with the manuscript and the
+**Opening a piece lands in its most recent conversation**, with the document and the
 discussion where the author left them.
 
 **A lightweight listing offers the piece's conversations**, each recognizable by the author's own
@@ -284,7 +283,7 @@ author-written text at all does it show what the author did instead, stated as a
 beside the time. Nothing is ever recognizable by the room's words standing in for the author's.
 
 **A resumed conversation is presented exactly as it was said.** Nothing marks a passage as
-having been written against earlier prose, nothing warns that the manuscript has moved on, and
+having been written against earlier text, nothing warns that the document has moved on, and
 nothing offers to reconcile them.
 
 ## Registers
@@ -306,10 +305,10 @@ composition, and its values are the token layer's.
 
 Derived from how often the author does each thing.
 
-**Permanently present** — the manuscript; the conversation; the input; the actions on a
-response.
+**Permanently present** — the current surface's document; the conversation; the input; the
+actions on a response.
 
-**One action away** — the reading view; the Markdown view; story context; choosing or starting a
+**One action away** — the reading view; the Markdown view; another surface; choosing or starting a
 conversation; editing the room.
 
 **A place the author goes** — model assignment, the workspace, other pieces, the interface theme.
@@ -376,10 +375,10 @@ breakage, and nothing suggests the author's question was at fault.
 beside them as an ordinary response. Nothing landing at all is what happens when that call fails
 too, and it says so.
 
-**A failed application.** The manuscript is unchanged, editable again, and says so. Nothing is
+**A failed application.** The document is unchanged, editable again, and says so. Nothing is
 half-applied, and the recommendation remains applicable.
 
-**An abandoned application.** Identical to the author's eye: the manuscript is as they left it,
+**An abandoned application.** Identical to the author's eye: the document is as they left it,
 editable again, and the recommendation is still there to apply.
 
 **A failed save.** The failure is stated quietly and persistently where the writing surface can be
@@ -392,11 +391,11 @@ than confirmed: an author asked whether to discard their own prose has been aske
 question.
 
 **Leaving while a write is settling.** The control that leaves the piece disables the instant it
-is asked for and stays disabled until every document has durably saved; a repeated request in
-that window does nothing further. A write that fails during this wait keeps the piece open and
-reads as an ordinary failed save, not as a second kind of failure.
+is asked for and stays disabled until every document has durably saved. A write that fails during
+this wait keeps the piece open and reads as an ordinary failed save, not as a second kind of
+failure.
 
-**Models unreachable.** The manuscript opens, is writable, and stays writable. Only the room
+**Models unreachable.** Every surface's document opens, is writable, and stays writable. Only the room
 is unavailable, and it says so where the author would otherwise address it. The ordinary cause is a
 program on this machine that is not running, which is recoverable in a way a network problem is not,
 so nothing about this state may compose as one.
@@ -424,11 +423,11 @@ label.
 that guarantee: no arrangement may read as one response replying to another, and no device relates
 two specialists' readings except the Story Editor's own words.
 
-**Prose and conversation stay adjacent.** The author never chooses between seeing the
-manuscript and seeing what the room said about it.
+**Document and conversation stay adjacent.** The author never chooses between seeing the
+document and seeing what the room said about it.
 
-**Manuscript reversal is the editor's.** No application-specific undo affordance, no second
-history, and no notion of a past manuscript state anywhere on screen.
+**Reversal is the editor's.** No application-specific undo affordance, no second history, and no
+notion of a past document state anywhere on screen.
 
 **No model call restates text the interface already has.** Nothing on screen is a generated
 summary, label or status line for content already present. If a slot needs shorter text,

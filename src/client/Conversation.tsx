@@ -32,10 +32,10 @@ type ConversationProps = {
   readonly handles: readonly HandleEntry[]
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
-  readonly onApplied?: (markdown: string) => Promise<AutosaveState>
-  readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
+  /** The surface's one persistence writer: what an Apply installs its replacement through. */
+  readonly onApplied: (text: string) => Promise<AutosaveState>
+  readonly onApplyingChange?: (applying: { readonly participantName?: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
-  readonly onActionIdChange?: (action: { readonly conversationId: string; readonly actionId: string } | undefined) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -377,10 +377,9 @@ export function Conversation({
   handles,
   runtime,
   clock,
-  onApplied = () => Promise.resolve({ failed: false }),
+  onApplied,
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
-  onActionIdChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -409,23 +408,17 @@ export function Conversation({
 
   useEffect(() => {
     onApplyingChange(
-      apply.applying === undefined
-        ? undefined
-        : { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) },
+      apply.applying !== undefined
+        ? { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) }
+        : conversation.applyingInRoom
+          ? {}
+          : undefined,
     )
-  }, [apply.applying, conversation.projection.entries, displayName, onApplyingChange])
+  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, displayName, onApplyingChange])
 
-  function abandonCurrentAction(): void {
-    conversation.abandon()
-    apply.clear()
+  async function abandonCurrentAction(): Promise<void> {
+    if (await conversation.abandon()) apply.clear()
   }
-
-  useEffect(() => {
-    const conversationId = conversation.conversationId
-    onActionIdChange(
-      conversation.actionId === undefined || conversationId === null ? undefined : { conversationId, actionId: conversation.actionId },
-    )
-  }, [conversation.actionId, conversation.conversationId, onActionIdChange])
 
   const applicationsByResponse = useMemo(() => {
     const map = new Map<string, ApplicationEntryView[]>()
@@ -499,7 +492,7 @@ export function Conversation({
     applyDisabled: roomBusy,
     applicationsFor,
     onApply: apply.apply,
-    onAbandonApply: abandonCurrentAction,
+    onAbandonApply: () => void abandonCurrentAction(),
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,
     onReply: reply,
@@ -513,7 +506,12 @@ export function Conversation({
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
         {conversation.projection.activity !== undefined && (
-          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} onAbandon={abandonCurrentAction} />
+          <DispatchFlight
+            activity={conversation.projection.activity}
+            displayName={displayName}
+            nowMs={nowMs}
+            onAbandon={() => void abandonCurrentAction()}
+          />
         )}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (

@@ -22,14 +22,13 @@ const ROSTER = { settled: true, displayName: (id: string) => id, handle: () => u
 
 const BASE_PROPS = {
   pieceId: 'the-lighthouse',
-  surface: 'draft' as const,
   title: 'The Lighthouse',
   mode: 'flash',
-  body: { kind: 'prose' as const },
+  body: { kind: 'prose', surface: 'draft' } as const,
   initialText: 'First light.',
   initialConversationId: null,
-  cast: [],
-  conversations: [],
+  initialCast: [],
+  initialConversations: [],
   storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
   room: roomHolding(),
   roster: ROSTER,
@@ -49,16 +48,8 @@ const BASE_PROPS = {
   onClose: vi.fn(),
   onTextChange: vi.fn(),
   onSaveFailedChange: vi.fn(),
-  onLiveActionChange: vi.fn(),
   onFlushRegister: vi.fn(),
   documents: { draft: 'First light.', storyContext: '', authorContext: '' },
-  castToggling: undefined,
-  castError: undefined,
-  onToggleCast: vi.fn(),
-  deletingConversationId: undefined,
-  conversationsError: undefined,
-  onDeleteConversation: () => Promise.resolve(undefined),
-  onRefreshConversations: vi.fn(),
 }
 
 describe('a surface mounted on its own, with no other transport standing in for it', () => {
@@ -80,8 +71,7 @@ describe('a surface mounted on its own, with no other transport standing in for 
     render(
       <EditingSurface
         {...BASE_PROPS}
-        surface="storyContext"
-        body={{ kind: 'plainText', referenceSchema: 'Sections, each holding entries.' }}
+        body={{ kind: 'plainText', surface: 'storyContext', referenceSchema: 'Sections, each holding entries.' }}
         initialText="Premise: two cups, one left behind."
       />,
     )

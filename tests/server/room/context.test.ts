@@ -355,20 +355,27 @@ describe('the task instruction names the surface it was compiled for', () => {
     {
       kind: 'specialist',
       marker: 'FIXTURE_SPECIALIST_TASK',
-      render: (surface: (typeof SURFACES)[number]) => renderPrompt(compileSpecialistContext(contextInput({ role: shape, surface })), fragments, charter),
+      render: (surface: (typeof SURFACES)[number]) =>
+        renderPrompt(compileSpecialistContext(contextInput({ role: shape, surface, draft: MANUSCRIPT })), fragments, charter),
     },
     {
       kind: 'generalist',
       marker: 'FIXTURE_GENERALIST_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
-        renderPrompt(compileSpecialistContext(contextInput({ role: { ...shape, eligibility: 'generalist' }, surface })), fragments, charter),
+        renderPrompt(
+          compileSpecialistContext(contextInput({ role: { ...shape, eligibility: 'generalist' }, surface, draft: MANUSCRIPT })),
+          fragments,
+          charter,
+        ),
     },
     {
       kind: 'concreteChange',
       marker: 'FIXTURE_CONCRETE_CHANGE_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
         renderPrompt(
-          compileSpecialistContext(contextInput({ role: shape, surface, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } })),
+          compileSpecialistContext(
+            contextInput({ role: shape, surface, draft: MANUSCRIPT, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
+          ),
           fragments,
           charter,
         ),
@@ -376,7 +383,8 @@ describe('the task instruction names the surface it was compiled for', () => {
     {
       kind: 'apply',
       marker: 'FIXTURE_APPLY_TASK',
-      render: (surface: (typeof SURFACES)[number]) => renderApplyPrompt(compileApplyContext(applyContextInput({ surface, entries: [] })), fragments),
+      render: (surface: (typeof SURFACES)[number]) =>
+        renderApplyPrompt(compileApplyContext(applyContextInput({ surface, draft: MANUSCRIPT, entries: [] })), fragments),
     },
   ]
 
@@ -387,8 +395,9 @@ describe('the task instruction names the surface it was compiled for', () => {
       for (const other of SURFACES) {
         if (other !== surface) expect(prompt).not.toContain(`${marker} ${TARGET_DOCUMENT_LABEL[other]}`)
       }
-      // A context surface's task never carries the draft-only "manuscript" action directive.
-      if (surface !== 'draft') expect(prompt).not.toContain('manuscript')
+      // The manuscript reaches every surface's call as evidence — what the directive above fixes is
+      // which document the call is being asked to act on, not which ones it gets to read.
+      expect(prompt).toContain(MANUSCRIPT)
     })
   })
 })

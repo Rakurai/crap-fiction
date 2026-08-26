@@ -11,6 +11,7 @@ import { entryConversationViewSchema, type EntryConversationView } from '../shar
 import {
   actionFinishedEventSchema,
   actionStartedEventSchema,
+  applyPendingEventSchema,
   conversationErrorEventSchema,
   entryAppendedEventSchema,
   participantActivityEventSchema,
@@ -172,9 +173,9 @@ export function subscribeToRoom(
     })
   }
 
-  // Failure to learn the room's activity is never an idle snapshot: a malformed frame or a
-  // connection that never delivers one rejects, so a caller cannot mistake "unknown" for "idle"
-  // by treating this promise's resolution as the only outcome.
+  // Resolving is the only way to say "idle": a malformed frame, or a transport that has given up
+  // reconnecting, rejects instead, and a transport still retrying leaves this pending — so a caller
+  // reading only resolution can never mistake "unknown" for "nothing in flight".
   const snapshot = new Promise<RoomActivitySnapshot>((resolve, reject) => {
     source.addEventListener(
       'activity.snapshot',
@@ -195,14 +196,18 @@ export function subscribeToRoom(
       },
       { once: true },
     )
-    source.addEventListener(
-      'error',
-      () => reject(new Error('the room’s activity could not be learned — the connection to the studio failed')),
-      { once: true },
-    )
+    // An `EventSource` reports a dropped connection it is about to retry the same way it reports one
+    // it has abandoned; only the closed state is terminal, and a retry that succeeds still delivers
+    // the snapshot this is waiting for.
+    source.addEventListener('error', () => {
+      if (source.readyState === source.CLOSED) {
+        reject(new Error('the room’s activity could not be learned — the connection to the studio failed'))
+      }
+    })
   })
 
   listen('action.started', actionStartedEventSchema, (data) => ({ type: 'action.started', data }))
+  listen('apply.pending', applyPendingEventSchema, (data) => ({ type: 'apply.pending', data }))
   listen('participant.activity', participantActivityEventSchema, (data) => ({ type: 'participant.activity', data }))
   listen('entry.appended', entryAppendedEventSchema, (data) => ({ type: 'entry.appended', data }))
   listen('action.finished', actionFinishedEventSchema, (data) => ({ type: 'action.finished', data }))

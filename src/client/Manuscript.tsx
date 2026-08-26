@@ -22,7 +22,7 @@ type ManuscriptProps = {
   readonly onSwitchToStoryContext: () => void
   readonly onSwitchToAuthorContext: () => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName: string } | undefined
+  readonly applying: { readonly participantName?: string } | undefined
 }
 
 /** How long the way out of the reading view stands after the author last moved the pointer. */
@@ -128,7 +128,9 @@ export function Manuscript({
       {!reading && applying !== undefined && (
         <div className={styles.applyingBanner}>
           <span className={styles.applyingBannerFacts}>READ-ONLY</span>
-          <span className={styles.applyingBannerWords}>{`Held while ${applying.participantName}'s change is applied.`}</span>
+          <span className={styles.applyingBannerWords}>
+            {applying.participantName === undefined ? 'Held while a change is applied.' : `Held while ${applying.participantName}'s change is applied.`}
+          </span>
         </div>
       )}
 

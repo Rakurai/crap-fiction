@@ -19,7 +19,7 @@ import type { saveSurfaceDocument as saveSurfaceDocumentFn } from './piecesClien
 
 const UNSENT = 'the message was not sent'
 
-const ACTIVITY_UNLEARNABLE = 'this surface could not learn what the room is doing, and stays locked until it is reopened'
+const STAYS_LOCKED = 'this surface stays locked until it is reopened'
 
 /**
  * The Apply this surface's activity reported already in flight when its stream connected.
@@ -31,14 +31,21 @@ export type ResumedApply = Readonly<{ actionId: string; responseId: string; appl
 
 export type ConversationViewModel = Readonly<{
   projection: ConversationProjection
+  /**
+   * Whether the room is the author's to address. False only while this surface knows its room scope
+   * is idle: an action in flight, activity not yet learned, and activity that could not be learned
+   * all read the same way to a control, because none of them is an idle room.
+   */
   busy: boolean
+  /** Whether this surface's authoritative room scope is applying, whichever conversation owns it. */
+  applyingInRoom: boolean
   error: string | undefined
   sendMessage: (message: string) => void
   reply: (participantId: string, message: string) => void
   askForConcreteChange: (respondingTo: string, clarification: string | undefined) => void
-  abandon: () => void
+  /** Resolves true only when the room authoritatively released this conversation's operation. */
+  abandon: () => Promise<boolean>
   conversationId: string | null
-  actionId: string | undefined
   /** The Apply this conversation was mid-flight on when its stream connected, if any. */
   resumedApplying: ResumedApply | undefined
 }>
@@ -65,9 +72,17 @@ export function useConversation(
 ): ConversationViewModel {
   const { createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation } = room
   const [projection, setProjection] = useState<ConversationProjection>(EMPTY_PROJECTION)
+  // Until the room's own activity has arrived, what this surface has in flight is unknown rather
+  // than nothing, and unknown locks the surface exactly as an action in flight does.
+  const [activityStatus, setActivityStatus] = useState<'learning' | 'known' | 'failed'>('learning')
   const [busy, setBusy] = useState(false)
+  const [applyingInRoom, setApplyingInRoom] = useState(false)
   const [actionId, setActionId] = useState<string | undefined>(undefined)
   const actionIdRef = useRef(actionId)
+  // Whether the action this surface holds was opened in the conversation this hook is showing. Only
+  // its own is this hook's to abandon; another conversation's still holds the surface's controls.
+  const ownActionRef = useRef(false)
+  const abandoningRef = useRef(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [resumedApplying, setResumedApplying] = useState<ResumedApply | undefined>(undefined)
   const conversationIdRef = useRef<string | null>(initialConversationId)
@@ -102,36 +117,66 @@ export function useConversation(
           return
         }
         if (event.type === 'action.started') {
+          ownActionRef.current = event.data.conversationId === conversationIdRef.current
           actionIdRef.current = event.data.actionId
           setActionId(event.data.actionId)
-          if (event.data.kind === 'dispatch') {
-            conversationIdRef.current = event.data.conversationId
-            setBusy(true)
+          setBusy(true)
+          setApplyingInRoom(event.data.kind === 'apply')
+          if (ownActionRef.current) setProjection((prev) => projectEvent(prev, event))
+          return
+        }
+        if (event.type === 'apply.pending' && actionIdRef.current === event.data.actionId) {
+          if (ownActionRef.current) {
+            setResumedApplying({
+              actionId: event.data.actionId,
+              responseId: event.data.sourceEntryId,
+              applicationId: event.data.applicationId,
+            })
           }
+          return
         }
         if (event.type === 'action.finished' && actionIdRef.current === event.data.actionId) {
+          const ownAction = ownActionRef.current
           actionIdRef.current = undefined
+          ownActionRef.current = false
+          abandoningRef.current = false
           setActionId(undefined)
           setBusy(false)
+          setApplyingInRoom(false)
+          setResumedApplying(undefined)
+          if (ownAction) setProjection((prev) => projectEvent(prev, event))
+          return
         }
+        if ('actionId' in event.data && actionIdRef.current === event.data.actionId && !ownActionRef.current) return
         setProjection((prev) => projectEvent(prev, event))
       },
+      // A frame this client cannot read is reported and otherwise passed over. Only the snapshot's
+      // own failure locks the surface, and it says so where it is awaited: a malformed frame of any
+      // other kind leaves what the room is doing already learned.
       (message) => {
         if (active) setError(message)
       },
     )
 
-    // The action in flight for this surface, if any, only belongs to this conversation when its
-    // identity matches: this surface admits one operation at a time, but it may belong to a
-    // conversation other than the one this hook opened.
+    // A surface admits one operation at a time, so whatever the room reports in flight here holds
+    // this surface's controls whichever conversation opened it — the room would refuse a dispatch
+    // from this one either way. Only an action opened in this conversation is shown in it, or
+    // resumed by it.
     void snapshot
       .then((activity) => {
         if (!active) return
+        setActivityStatus('known')
         const surfaceActivity = activity[surface]
-        if (surfaceActivity === null || surfaceActivity.conversationId !== openedWithConversationId) return
+        if (surfaceActivity === null) {
+          setApplyingInRoom(false)
+          return
+        }
         actionIdRef.current = surfaceActivity.actionId
+        ownActionRef.current = surfaceActivity.conversationId === openedWithConversationId
         setActionId(surfaceActivity.actionId)
         setBusy(true)
+        setApplyingInRoom(surfaceActivity.kind === 'apply')
+        if (!ownActionRef.current) return
         if (surfaceActivity.kind === 'dispatch') {
           setProjection((prev) => ({ ...prev, activity: surfaceActivity }))
         } else {
@@ -142,13 +187,12 @@ export function useConversation(
           })
         }
       })
-      // Failing to learn what this surface's room scope is doing is an error state, never idle:
-      // it locks the controls a genuine busy state would, rather than leaving them free on the
-      // unproven assumption that nothing is in flight.
-      .catch(() => {
+      // Terminal: the surface never learns what its room scope is doing, so it stays locked for the
+      // life of this mount and says why in the studio's own words rather than a substitute of ours.
+      .catch((err: unknown) => {
         if (!active) return
-        setBusy(true)
-        setError(ACTIVITY_UNLEARNABLE)
+        setActivityStatus('failed')
+        setError(`${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}`)
       })
 
     return () => {
@@ -157,8 +201,10 @@ export function useConversation(
     }
   }, [pieceId, surface, openedWithConversationId])
 
+  const roomBusy = busy || activityStatus !== 'known'
+
   function openDispatch(opening: DispatchOpening): void {
-    if (busy) return
+    if (roomBusy) return
     // Started, not waited on: the current documents travel in the request either way, so the
     // dispatch never depends on this write having landed before it opens.
     void flushDocument()
@@ -203,30 +249,42 @@ export function useConversation(
     openDispatch({ respondingTo, clarification })
   }
 
-  function abandon(): void {
+  // The controls are the author's again only once the studio has answered that it let the action go.
+  // Releasing them on the request would show an idle surface the room is still working on, and a
+  // failed abandonment would leave that surface addressable and every dispatch from it refused.
+  async function abandon(): Promise<boolean> {
     const target = actionId
     const conversationId = conversationIdRef.current
-    if (target === undefined || conversationId === null) return
-    actionIdRef.current = undefined
-    setActionId(undefined)
-    setBusy(false)
-    setProjection((prev) => (prev.activity?.actionId === target ? { ...prev, activity: undefined } : prev))
-    void abandonOperation(pieceId, surface, conversationId, target).then((result) => {
-      const message = failureMessage(result)
-      if (message !== undefined) setError(message)
-    })
+    if (target === undefined || conversationId === null || !ownActionRef.current || abandoningRef.current) return false
+    abandoningRef.current = true
+    const result = await abandonOperation(pieceId, surface, conversationId, target)
+    const message = failureMessage(result)
+    if (message !== undefined) {
+      abandoningRef.current = false
+      setError(message)
+      return false
+    }
+    if (actionIdRef.current === target) {
+      actionIdRef.current = undefined
+      ownActionRef.current = false
+      abandoningRef.current = false
+      setActionId(undefined)
+      setBusy(false)
+      setProjection((prev) => (prev.activity?.actionId === target ? { ...prev, activity: undefined } : prev))
+    }
+    return true
   }
 
   return {
     projection,
-    busy,
+    busy: roomBusy,
+    applyingInRoom,
     error,
     sendMessage,
     reply,
     askForConcreteChange,
     abandon,
     conversationId: conversationIdRef.current,
-    actionId,
     resumedApplying,
   }
 }

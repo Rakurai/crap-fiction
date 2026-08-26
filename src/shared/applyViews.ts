@@ -26,9 +26,6 @@ export type ApplyConfirmation = z.infer<typeof applyConfirmationSchema>
 /**
  * What retrieving a pending Apply by its provisional identity answers with — the generated
  * document alone, so a reconnecting client can resume installation without a further model call.
- * This shape is the current protocol's whole-document replacement; a later change to a bounded
- * diff or string replacement changes this schema, not the activity contract that names the
- * identity to retrieve it by.
  */
 export const pendingApplySchema = z.object({ replacement: z.string().min(1) })
 

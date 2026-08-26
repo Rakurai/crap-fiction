@@ -53,6 +53,7 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       handles={HANDLES}
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
+      onApplied={() => Promise.resolve({ failed: false })}
       {...extra}
     />,
   )
@@ -474,7 +475,7 @@ describe('conversation activity, truthfully', () => {
     expect(send.textContent).toBe('send')
   })
 
-  it('ABANDON-UNTRACK: targets the action by identity and releases controls immediately, without waiting for the request to resolve', async () => {
+  it('ABANDON-UNTRACK: targets the action by identity and keeps the controls held while the studio has not answered', async () => {
     const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
     const { room, stream } = roomStreaming([], abandonOperation)
     renderConversation([], { room })
@@ -486,9 +487,32 @@ describe('conversation activity, truthfully', () => {
     const abandon = await screen.findByRole('button', { name: 'abandon' })
     fireEvent.click(abandon)
 
-    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
-    expect(screen.queryByText(/ACTIVE/)).toBeNull()
-    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
+    expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
+    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('keeps an Apply held when the studio cannot abandon it', async () => {
+    let answerAbandon: (result: RequestResult<null>) => void = () => {
+      throw new Error('the studio was never asked')
+    }
+    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>((resolve) => (answerAbandon = resolve)))
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], abandonOperation)
+    const applyRecommendation = vi.fn(() => new Promise<Awaited<ReturnType<RoomAdapters['applyRecommendation']>>>(() => {}))
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, applyRecommendation } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: 1_700_000_000_000, surface: 'draft' },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'abandon' }))
+
+    expect(screen.getByText('APPLYING')).toBeTruthy()
+    await act(async () => answerAbandon({ outcome: 'unreachable', message: 'the studio did not answer' }))
+    expect(await screen.findByText('the studio did not answer')).toBeTruthy()
+    expect(screen.getByText('APPLYING')).toBeTruthy()
   })
 
   it('ABANDON-KEEP-LANDED: an entry accepted before abandonment stays, and a late progress callback for the same action cannot resurrect its activity', async () => {
@@ -507,7 +531,7 @@ describe('conversation activity, truthfully', () => {
     await screen.findByText('It holds.')
 
     fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
-    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull())
 
     stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working', surface: 'draft' } })
 

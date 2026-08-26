@@ -9,6 +9,10 @@ import { abandonOperation, subscribeToRoom } from '../../../src/client/roomClien
 class FakeEventSource {
   static instances: FakeEventSource[] = []
   readonly listeners = new Map<string, Set<(event: Event) => void>>()
+  readonly CONNECTING = 0
+  readonly OPEN = 1
+  readonly CLOSED = 2
+  readyState = 0
 
   constructor(readonly url: string) {
     FakeEventSource.instances.push(this)
@@ -20,10 +24,18 @@ class FakeEventSource {
     this.listeners.set(type, set)
   }
 
-  close(): void {}
+  close(): void {
+    this.readyState = this.CLOSED
+  }
 
   emit(type: string, event: Event): void {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
+  }
+
+  /** The one `error` event the platform uses for both a drop it will retry and an abandoned connection. */
+  failWith(readyState: number): void {
+    this.readyState = readyState
+    this.emit('error', new Event('error'))
   }
 }
 
@@ -93,11 +105,31 @@ describe('learning a piece’s activity over its event stream', () => {
     expect(onMalformedFrame).toHaveBeenCalledWith(expect.stringContaining('activity.snapshot'))
   })
 
-  it('rejects rather than hanging forever when the connection fails before any snapshot arrives', async () => {
+  it('stays waiting through a drop the connection will retry, and takes the snapshot that arrives once it reconnects', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const settled = vi.fn()
+
+    const { snapshot } = subscribeToRoom('the-lighthouse', () => {}, () => {})
+    void snapshot.then(settled, settled)
+    const source = firstFakeSource()
+    source.failWith(source.CONNECTING)
+    await Promise.resolve()
+
+    expect(settled).not.toHaveBeenCalled()
+
+    const parsedActivity = { draft: null, storyContext: null, authorContext: null }
+    source.readyState = source.OPEN
+    source.emit('activity.snapshot', new MessageEvent('activity.snapshot', { data: JSON.stringify(parsedActivity) }))
+
+    await expect(snapshot).resolves.toEqual(parsedActivity)
+  })
+
+  it('rejects rather than hanging forever once the connection has been abandoned with no snapshot ever delivered', async () => {
     vi.stubGlobal('EventSource', FakeEventSource)
 
     const { snapshot } = subscribeToRoom('the-lighthouse', () => {}, () => {})
-    firstFakeSource().emit('error', new Event('error'))
+    const source = firstFakeSource()
+    source.failWith(source.CLOSED)
 
     await expect(snapshot).rejects.toThrow()
   })

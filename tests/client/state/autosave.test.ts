@@ -173,4 +173,50 @@ describe('createAutosaveController', () => {
     expect(await installed).toEqual({ failed: false })
     expect(save).toHaveBeenNthCalledWith(2, 'the applied text')
   })
+
+  it('starts no write of its own when it is retired, and its cancelled debounce never fires', () => {
+    const save = saver().mockResolvedValue(WROTE)
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
+
+    controller.update('typed and never paused for')
+    controller.dispose()
+
+    expect(save).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(5000)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('reports nothing to a retired caller, not even the failure of a write already in flight when it retired', async () => {
+    let refuse: (result: RequestResult<null>) => void = () => {
+      throw new Error('nothing was written')
+    }
+    const save = saver().mockImplementation(() => new Promise((resolve) => (refuse = resolve)))
+    const onStateChange = vi.fn()
+    const controller = createAutosaveController('', save, onStateChange, clock, 1000)
+
+    const pending = controller.install('the applied text')
+    controller.dispose()
+    refuse(refused('EACCES: permission denied'))
+    await pending
+
+    expect(onStateChange).not.toHaveBeenCalled()
+  })
+
+  it('does not start the dirty write queued behind an in-flight write after retirement', async () => {
+    let finish: (result: RequestResult<null>) => void = () => {
+      throw new Error('nothing was written')
+    }
+    const save = saver().mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    const controller = createAutosaveController('', save, vi.fn(), clock, 1000)
+
+    const pending = controller.install('first')
+    controller.update('second')
+    controller.dispose()
+    finish(WROTE)
+    await pending
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(save).toHaveBeenCalledWith('first')
+  })
 })

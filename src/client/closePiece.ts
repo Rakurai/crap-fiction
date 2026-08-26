@@ -1,40 +1,23 @@
 import { SURFACE_IDS } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
 import type { BySurface } from './bySurface.js'
-import { failureMessage } from './request.js'
-import type { abandonOperation as abandonOperationFn } from './roomClient.js'
-import type { LiveAction } from './useConversationSession.js'
 
-export type ClosePieceResult = Readonly<{ blocked: boolean; abandonFailures: readonly string[] }>
-
-const ABANDON_TIMEOUT_MS = 5000
+export type ClosePieceResult = Readonly<{ blocked: boolean }>
 
 /**
- * Leaving an open piece: every surface's document is flushed and waited on before anything else
- * happens, because a document write failure is the one thing that keeps the piece open — the
- * author's prose is what this protects. Only once every write has durably settled does closing own
- * abandoning whatever each surface still has in flight, bounded so an unreachable studio cannot
- * turn that non-blocking failure policy into an indefinite wait. An abandonment failure is returned
- * for the caller to report; it never blocks or reverses the decision to leave, because the server —
- * not this request — is authoritative over whether the work it named is still running.
+ * Leaving an open piece: every surface is flushed and waited on, and a failed write is the one thing
+ * that keeps the piece open — the author's text is what this protects. A surface with no writer is a
+ * document nothing can flush, so it blocks leaving exactly as a failed write does rather than being
+ * read as a surface with nothing to save. What a surface still has in flight is not this request's
+ * to end: the studio abandons a piece's unfinished work itself when another piece is opened.
  */
-export async function closePiece(
-  pieceId: string,
-  flush: BySurface<() => Promise<AutosaveState>>,
-  liveActions: BySurface<LiveAction>,
-  abandonOperation: typeof abandonOperationFn,
-): Promise<ClosePieceResult> {
-  const flushed = await Promise.all(SURFACE_IDS.map((surface) => flush[surface]?.() ?? Promise.resolve<AutosaveState>({ failed: false })))
-  if (flushed.some((state) => state.failed)) return { blocked: true, abandonFailures: [] }
-
-  const abandoned = await Promise.all(
-    SURFACE_IDS.map(async (surface): Promise<string | undefined> => {
-      const action = liveActions[surface]
-      if (action === undefined) return undefined
-      const result = await abandonOperation(pieceId, surface, action.conversationId, action.actionId, AbortSignal.timeout(ABANDON_TIMEOUT_MS))
-      return failureMessage(result)
-    }),
-  )
-
-  return { blocked: false, abandonFailures: abandoned.filter((message): message is string => message !== undefined) }
+export async function closePiece(flush: BySurface<() => Promise<AutosaveState>>): Promise<ClosePieceResult> {
+  const writers: (() => Promise<AutosaveState>)[] = []
+  for (const surface of SURFACE_IDS) {
+    const write = flush[surface]
+    if (write === undefined) return { blocked: true }
+    writers.push(write)
+  }
+  const flushed = await Promise.all(writers.map((write) => write()))
+  return { blocked: flushed.some((state) => state.failed) }
 }

@@ -3,7 +3,7 @@ import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
-import { ContextSurface, isContextSurfaceId } from './ContextSurface.js'
+import { ContextSurface, type ContextSurfaceId } from './ContextSurface.js'
 import { Conversation, type HandleEntry } from './Conversation.js'
 import { ConversationSwitcher } from './ConversationSwitcher.js'
 import styles from './EditingSurface.module.css'
@@ -11,21 +11,19 @@ import { Manuscript } from './Manuscript.js'
 import type { LifecycleProps } from './pieceLifecycle.js'
 import { RoomEditor } from './RoomEditor.js'
 import type { RosterViewModel } from './useRoster.js'
-import { type AuthorContextSelection, type LiveAction, useConversationSession } from './useConversationSession.js'
-import { useDocumentSession, type DocumentSessionKind } from './useDocumentSession.js'
+import { type AuthorContextSelection, useConversationSession } from './useConversationSession.js'
+import { usePlainTextSession, useProseSession, type PlainTextSession, type ProseSession } from './useDocumentSession.js'
 import type { RoomAdapters } from './useConversation.js'
+import { useSurfaceCast } from './useSurfaceCast.js'
+import { useSurfaceConversations } from './useSurfaceConversations.js'
 
+/** The surface identity travels with its body so its document and room state cannot disagree. */
 export type SurfaceBodyConfig =
-  | Readonly<{ kind: 'prose' }>
-  | Readonly<{ kind: 'plainText'; referenceSchema: string | null }>
-
-function documentSessionKindOf(body: SurfaceBodyConfig): DocumentSessionKind {
-  return body.kind === 'prose' ? 'prose' : 'plainText'
-}
+  | Readonly<{ kind: 'prose'; surface: 'draft' }>
+  | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; referenceSchema: string | null }>
 
 type EditingSurfaceProps = {
   readonly pieceId: string
-  readonly surface: SurfaceId
   readonly title: string
   readonly mode: string
   readonly body: SurfaceBodyConfig
@@ -33,8 +31,8 @@ type EditingSurfaceProps = {
   readonly initialConversationId: string | null
   /** Given only for author context: its selection is global, outlasting the piece that is open. */
   readonly conversationSelection?: AuthorContextSelection | undefined
-  readonly cast: readonly CastMemberView[]
-  readonly conversations: readonly ConversationSummary[]
+  readonly initialCast: readonly CastMemberView[]
+  readonly initialConversations: readonly ConversationSummary[]
   readonly storyEditor: StoryEditorView
   readonly room: RoomAdapters
   readonly roster: RosterViewModel
@@ -47,39 +45,59 @@ type EditingSurfaceProps = {
   readonly onClose: () => void
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
-  readonly onLiveActionChange: (surface: SurfaceId, action: LiveAction | undefined) => void
   /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
   readonly onFlushRegister: (surface: SurfaceId, flush: () => Promise<AutosaveState>) => void
   readonly documents: DocumentSnapshot
-  readonly castToggling: string | undefined
-  readonly castError: string | undefined
-  readonly onToggleCast: (memberId: string) => void
-  readonly deletingConversationId: string | undefined
-  readonly conversationsError: string | undefined
-  readonly onDeleteConversation: (conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
-  readonly onRefreshConversations: () => void
 }
 
+type MountedProps = Omit<EditingSurfaceProps, 'body' | 'initialText'>
+
+type MountedDocument =
+  | Readonly<{ kind: 'prose'; surface: 'draft'; session: ProseSession }>
+  | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; session: PlainTextSession; referenceSchema: string | null }>
+
 /**
- * One editing surface, mounted once per surface `OpenedPiece` opens. It owns everything specific
- * to this surface — its document session and persistence, its conversation selection and session,
- * its cast controls, its Apply and abandonment, and the body that composes its document with its
- * conversation panel — and reports upward only what the shell needs from outside this surface: its
- * current text (into the shell's document-snapshot registry), whether its own save is failing
- * (into the shell's aggregate leave-blocking) and what it has in flight (so the shell can abandon it
- * on close). Nothing else about one surface reaches another.
+ * One editing surface, mounted once per surface `OpenedPiece` opens. It owns its document session and
+ * persistence, its cast, its conversations, its Apply and abandonment, and reports upward only its
+ * current text and whether its own save is failing.
+ *
+ * Which body draws the document decides which document session the surface has, so the two are
+ * chosen together, once, at a mount that never switches from one to the other.
  */
-export function EditingSurface({
-  pieceId,
+export function EditingSurface({ body, initialText, ...mounted }: EditingSurfaceProps) {
+  return body.kind === 'prose' ? (
+    <ProseEditingSurface {...mounted} initialText={initialText} />
+  ) : (
+    <PlainTextEditingSurface {...mounted} initialText={initialText} surface={body.surface} referenceSchema={body.referenceSchema} />
+  )
+}
+
+function ProseEditingSurface({ initialText, ...mounted }: MountedProps & { readonly initialText: string }) {
+  const { pieceId, room } = mounted
+  const session = useProseSession(initialText, (text) => room.saveDocument(pieceId, 'draft', text))
+  return <MountedSurface {...mounted} document={{ kind: 'prose', surface: 'draft', session }} />
+}
+
+function PlainTextEditingSurface({
+  initialText,
   surface,
+  referenceSchema,
+  ...mounted
+}: MountedProps & { readonly initialText: string; readonly surface: ContextSurfaceId; readonly referenceSchema: string | null }) {
+  const { pieceId, room } = mounted
+  const session = usePlainTextSession(initialText, (text) => room.saveDocument(pieceId, surface, text))
+  return <MountedSurface {...mounted} document={{ kind: 'plainText', surface, session, referenceSchema }} />
+}
+
+function MountedSurface({
+  pieceId,
   title,
   mode,
-  body,
-  initialText,
+  document,
   initialConversationId,
   conversationSelection,
-  cast,
-  conversations,
+  initialCast,
+  initialConversations,
   storyEditor,
   room,
   roster,
@@ -91,91 +109,80 @@ export function EditingSurface({
   onClose,
   onTextChange,
   onSaveFailedChange,
-  onLiveActionChange,
   onFlushRegister,
   documents,
-  castToggling,
-  castError,
-  onToggleCast,
-  deletingConversationId,
-  conversationsError,
-  onDeleteConversation,
-  onRefreshConversations,
-}: EditingSurfaceProps) {
-  const documentSession = useDocumentSession(documentSessionKindOf(body), initialText, (text) => room.saveDocument(pieceId, surface, text))
+}: MountedProps & { readonly document: MountedDocument }) {
+  const { surface, session } = document
   const conversation = useConversationSession(initialConversationId, conversationSelection)
+  const cast = useSurfaceCast(pieceId, surface, initialCast)
+  const conversations = useSurfaceConversations(pieceId, surface, initialConversations)
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
 
   useEffect(() => {
-    onTextChange(surface, documentSession.text)
-  }, [surface, documentSession.text, onTextChange])
+    onTextChange(surface, session.text)
+  }, [surface, session.text, onTextChange])
 
   useEffect(() => {
-    onSaveFailedChange(surface, documentSession.autosave.state.failed)
-  }, [surface, documentSession.autosave.state.failed, onSaveFailedChange])
+    onSaveFailedChange(surface, session.autosave.state.failed)
+  }, [surface, session.autosave.state.failed, onSaveFailedChange])
 
   useEffect(() => {
-    onLiveActionChange(surface, conversation.liveAction)
-  }, [surface, conversation.liveAction, onLiveActionChange])
-
-  useEffect(() => {
-    onFlushRegister(surface, documentSession.autosave.flush)
-  }, [surface, documentSession.autosave.flush, onFlushRegister])
+    onFlushRegister(surface, session.autosave.flush)
+  }, [surface, session.autosave.flush, onFlushRegister])
 
   const handles: readonly HandleEntry[] = [
-    ...cast.map(({ handle, displayName }) => ({ handle, displayName })),
+    ...cast.members.map(({ handle, displayName }) => ({ handle, displayName })),
     { handle: storyEditor.handle, displayName: storyEditor.displayName },
   ]
 
   async function deleteConversation(conversationId: string): Promise<void> {
-    const remaining = await onDeleteConversation(conversationId)
+    const remaining = await conversations.remove(conversationId)
     if (remaining !== undefined && conversation.activeConversationId === conversationId) {
       conversation.switchTo(remaining[0]?.id ?? null)
     }
   }
 
-  const showConversation = roster.settled && !(documentSession.kind === 'prose' && documentSession.manuscript.view === 'reading')
+  function openConversations(): void {
+    conversations.refresh()
+    setPanel('conversations')
+  }
+
+  const showConversation = roster.settled && !(document.kind === 'prose' && document.session.manuscript.view === 'reading')
 
   return (
     <div className={styles.surfacePane} hidden={!active} inert={!active}>
-      {documentSession.kind === 'prose' ? (
+      {document.kind === 'prose' ? (
         <Manuscript
           title={title}
           mode={mode}
           onClose={onClose}
-          manuscript={documentSession.manuscript}
-          autosave={documentSession.autosave}
+          manuscript={document.session.manuscript}
+          autosave={session.autosave}
           leaveBlocked={leaveBlocked}
           onOpenRoom={() => setPanel('room')}
-          onOpenConversations={() => {
-            onRefreshConversations()
-            setPanel('conversations')
-          }}
+          onOpenConversations={openConversations}
           onSwitchToStoryContext={() => onSwitchToSurface('storyContext')}
           onSwitchToAuthorContext={() => onSwitchToSurface('authorContext')}
           lifecycle={lifecycle}
           applying={conversation.applying}
         />
-      ) : isContextSurfaceId(surface) ? (
+      ) : (
         <ContextSurface
-          surface={surface}
+          surface={document.surface}
           title={title}
           onClose={onClose}
-          text={documentSession.text}
-          onChange={documentSession.setText}
-          referenceSchema={body.kind === 'plainText' ? body.referenceSchema : null}
-          autosave={documentSession.autosave}
+          text={document.session.text}
+          onChange={document.session.setText}
+          referenceSchema={document.referenceSchema}
+          autosave={session.autosave}
           leaveBlocked={leaveBlocked}
           onOpenRoom={() => setPanel('room')}
-          onOpenConversations={() => {
-            onRefreshConversations()
-            setPanel('conversations')
-          }}
+          onOpenConversations={openConversations}
           onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
         />
-      ) : null}
+      )}
       {showConversation && (
         <Conversation
           key={conversation.session}
@@ -183,34 +190,33 @@ export function EditingSurface({
           surface={surface}
           currentConversationId={conversation.activeConversationId}
           documents={documents}
-          flushDocument={documentSession.autosave.flush}
+          flushDocument={session.autosave.flush}
           room={room}
           displayName={roster.displayName}
           handle={roster.handle}
           handles={handles}
           runtime={runtime}
           clock={Date.now}
-          onApplied={documentSession.install}
+          onApplied={session.install}
           onApplyingChange={conversation.setApplying}
           onConversationIdChange={conversation.setActiveConversationId}
-          onActionIdChange={conversation.setLiveAction}
         />
       )}
       {panel === 'room' && (
         <RoomEditor
-          members={cast}
+          members={cast.members}
           storyEditor={storyEditor}
-          toggling={castToggling}
-          onToggle={onToggleCast}
+          toggling={cast.toggling}
+          onToggle={cast.toggle}
           onClose={() => setPanel('none')}
         />
       )}
       {panel === 'conversations' && (
         <ConversationSwitcher
-          conversations={conversations}
+          conversations={conversations.listed}
           activeId={conversation.activeConversationId}
-          deletingId={deletingConversationId}
-          error={conversationsError}
+          deletingId={conversations.deletingId}
+          error={conversations.error}
           clock={Date.now}
           onSelect={(conversationId) => {
             if (conversationId !== conversation.activeConversationId) conversation.switchTo(conversationId)
@@ -224,9 +230,9 @@ export function EditingSurface({
           onClose={() => setPanel('none')}
         />
       )}
-      {castError !== undefined && (
+      {cast.error !== undefined && (
         <p className={styles.error} role="alert">
-          {castError}
+          {cast.error}
         </p>
       )}
     </div>

@@ -10,10 +10,6 @@ import type { AutosaveViewModel } from './useAutosave.js'
 /** The surfaces this component draws: a plain text document beside a reference schema. */
 export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
 
-export function isContextSurfaceId(surface: SurfaceId): surface is ContextSurfaceId {
-  return surface !== 'draft'
-}
-
 const DOCUMENT: Readonly<Record<ContextSurfaceId, { readonly label: string; readonly file: string }>> = {
   storyContext: { label: 'Story context', file: 'story-context.yaml' },
   authorContext: { label: 'Author context', file: 'author-context.yaml' },
@@ -33,7 +29,7 @@ type ContextSurfaceProps = {
   readonly onOpenConversations: () => void
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName: string } | undefined
+  readonly applying: { readonly participantName?: string } | undefined
 }
 
 export function ContextSurface({
@@ -97,7 +93,9 @@ export function ContextSurface({
       {applying !== undefined && (
         <div className={styles.applyingBanner}>
           <span className={styles.applyingBannerFacts}>READ-ONLY</span>
-          <span className={styles.applyingBannerWords}>{`Held while ${applying.participantName}'s change is applied.`}</span>
+          <span className={styles.applyingBannerWords}>
+            {applying.participantName === undefined ? 'Held while a change is applied.' : `Held while ${applying.participantName}'s change is applied.`}
+          </span>
         </div>
       )}
 
