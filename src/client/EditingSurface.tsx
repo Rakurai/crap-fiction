@@ -14,6 +14,7 @@ import type { RosterViewModel } from './useRoster.js'
 import { type AuthorContextSelection, useConversationSession } from './useConversationSession.js'
 import { usePlainTextSession, useProseSession, type PlainTextSession, type ProseSession } from './useDocumentSession.js'
 import type { RoomAdapters } from './useConversation.js'
+import type { PieceAdapters } from './usePiece.js'
 import { useSurfaceCast } from './useSurfaceCast.js'
 import { useSurfaceConversations } from './useSurfaceConversations.js'
 
@@ -36,6 +37,7 @@ type EditingSurfaceProps = {
   readonly storyEditor: StoryEditorView
   readonly interviewer: InterviewerView
   readonly room: RoomAdapters
+  readonly pieceAdapters: PieceAdapters
   readonly roster: RosterViewModel
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly lifecycle: LifecycleProps
@@ -102,6 +104,7 @@ function MountedSurface({
   storyEditor,
   interviewer,
   room,
+  pieceAdapters,
   roster,
   runtime,
   lifecycle,
@@ -116,7 +119,7 @@ function MountedSurface({
 }: MountedProps & { readonly document: MountedDocument }) {
   const { surface, session } = document
   const conversation = useConversationSession(initialConversationId, conversationSelection)
-  const cast = useSurfaceCast(pieceId, surface, initialCast)
+  const cast = useSurfaceCast(pieceId, surface, initialCast, pieceAdapters)
   const conversations = useSurfaceConversations(pieceId, surface, initialConversations)
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
 

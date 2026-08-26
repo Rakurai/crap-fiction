@@ -3,7 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 import { EditingSurface } from '../../../src/client/EditingSurface.js'
+import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { conversationOnDisk, onTheDraft, roomAdapters } from '../../support/roomAdapters.js'
+
+/** Nothing here asks the studio about the piece itself, so a scenario that does fails at the reach. */
+function unreached(name: string) {
+  return vi.fn(() => {
+    throw new Error(`unreached: no scenario here asks the studio to ${name}`)
+  })
+}
 
 /** A room that answers what mounting a surface reaches, and refuses everything a scenario has not. */
 function roomHolding(): RoomAdapters {
@@ -28,6 +36,10 @@ const BASE_PROPS = {
   storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
   interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
   room: roomHolding(),
+  pieceAdapters: {
+    fetchPiece: unreached('fetchPiece'),
+    updatePiece: unreached('updatePiece'),
+  } as unknown as PieceAdapters,
   roster: ROSTER,
   runtime: { reachable: true },
   lifecycle: {

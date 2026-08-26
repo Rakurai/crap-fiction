@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CastMemberView } from '../shared/pieceViews.js'
 import type { SurfaceId } from '../shared/surfaces.js'
-import { updatePiece } from './piecesClient.js'
 import { failureMessage } from './request.js'
+import type { PieceAdapters } from './usePiece.js'
 
 export type SurfaceCastViewModel = Readonly<{
   members: readonly CastMemberView[]
@@ -17,7 +17,12 @@ export type SurfaceCastViewModel = Readonly<{
  * what went wrong if that request failed. A cast is per surface, so the roster the studio answers
  * with is read back for this surface alone — another surface's cast is untouched by it.
  */
-export function useSurfaceCast(pieceId: string, surface: SurfaceId, initialMembers: readonly CastMemberView[]): SurfaceCastViewModel {
+export function useSurfaceCast(
+  pieceId: string,
+  surface: SurfaceId,
+  initialMembers: readonly CastMemberView[],
+  { updatePiece }: PieceAdapters,
+): SurfaceCastViewModel {
   const [members, setMembers] = useState(initialMembers)
   const [toggling, setToggling] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -70,7 +75,7 @@ export function useSurfaceCast(pieceId: string, surface: SurfaceId, initialMembe
         }
       })
     },
-    [pieceId, surface],
+    [pieceId, surface, updatePiece],
   )
 
   return { members, toggling, error, toggle }

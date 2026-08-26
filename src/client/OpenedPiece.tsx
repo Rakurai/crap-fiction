@@ -3,33 +3,32 @@ import type { PieceDetail } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
 import type { BySurface } from './bySurface.js'
-import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import type { fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRuntimeStatusFn } from './callSitesClient.js'
 import { closePiece } from './closePiece.js'
 import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
 import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
 import { useLoaded } from './load.js'
 import styles from './OpenedPiece.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
-import { saveSurfaceDocument } from './piecesClient.js'
 import { usePieceStream } from './pieceStream.js'
-import {
-  abandonOperation,
-  applyRecommendation,
-  confirmApplication,
-  createConversation,
-  dispatch,
-  fetchConversation,
-  retrievePendingApply,
-  subscribeToRoom,
-} from './roomClient.js'
 import { type AuthorContextSelection } from './useConversationSession.js'
-import { usePiece } from './usePiece.js'
+import type { RoomAdapters } from './useConversation.js'
+import { usePiece, type PieceAdapters } from './usePiece.js'
 import { useRoster } from './useRoster.js'
 
 export type { AuthorContextSelection } from './useConversationSession.js'
 
+/** What the studio can be asked about the call sites a piece's chrome reports. */
+export type CallSiteAdapters = Readonly<{
+  fetchCallSites: typeof fetchCallSitesFn
+  fetchRuntimeStatus: typeof fetchRuntimeStatusFn
+}>
+
 type OpenedPieceProps = {
   readonly id: string
+  readonly pieceAdapters: PieceAdapters
+  readonly room: RoomAdapters
+  readonly callSites: CallSiteAdapters
   /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onClose: () => void
@@ -49,19 +48,25 @@ function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfi
 function Surfaces({
   piece,
   lifecycle,
+  room,
+  pieceAdapters,
+  callSites,
   authorContextSelection,
   onClose,
 }: {
   readonly piece: PieceDetail
   readonly lifecycle: LifecycleProps
+  readonly room: RoomAdapters
+  readonly pieceAdapters: PieceAdapters
+  readonly callSites: CallSiteAdapters
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onClose: () => void
 }) {
-  const roster = useRoster(fetchCallSites)
-  const [probe] = useLoaded(fetchRuntimeStatus, [])
+  const roster = useRoster(callSites.fetchCallSites)
+  const [probe] = useLoaded(callSites.fetchRuntimeStatus, [])
   // One event source for the whole opened piece: every surface's conversation subscribes through
   // this rather than reconnecting the stream when the author switches which surface it shows.
-  const pieceStream = usePieceStream(piece.id, subscribeToRoom)
+  const pieceStream = usePieceStream(piece.id, room.subscribeToRoom)
   const registry = useDocumentSnapshotRegistry({
     draft: piece.surfaces.draft.text,
     storyContext: piece.surfaces.storyContext.text,
@@ -86,17 +91,8 @@ function Surfaces({
     flushersRef.current = { ...flushersRef.current, [surface]: flush }
   }, [])
 
-  const roomAdapters = {
-    createConversation,
-    fetchConversation,
-    dispatch,
-    subscribeToRoom: pieceStream,
-    abandonOperation,
-    applyRecommendation,
-    confirmApplication,
-    retrievePendingApply,
-    saveDocument: saveSurfaceDocument,
-  }
+  // Each surface subscribes through the one connection this shell holds, not its own.
+  const surfaceRoom: RoomAdapters = { ...room, subscribeToRoom: pieceStream }
 
   // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
   // flushed and awaited first, because a failed write is the one thing that keeps the piece open.
@@ -129,7 +125,8 @@ function Surfaces({
           initialConversations={piece.surfaces[surface].conversations}
           storyEditor={piece.storyEditor}
           interviewer={piece.interviewer}
-          room={roomAdapters}
+          room={surfaceRoom}
+          pieceAdapters={pieceAdapters}
           roster={roster}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
           lifecycle={lifecycle}
@@ -147,13 +144,16 @@ function Surfaces({
   )
 }
 
-export function OpenedPiece({ id, authorContextSelection, onClose }: OpenedPieceProps) {
-  const piece = usePiece(id)
+export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextSelection, onClose }: OpenedPieceProps) {
+  const piece = usePiece(id, pieceAdapters)
 
   if (piece.status === 'ready') {
     return (
       <Surfaces
         piece={piece.piece}
+        room={room}
+        pieceAdapters={pieceAdapters}
+        callSites={callSites}
         lifecycle={{
           status: piece.piece.status,
           retitling: piece.retitling,

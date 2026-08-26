@@ -1,8 +1,13 @@
 import { useCallback, useState } from 'react'
 import type { PieceDetail, PieceStatus } from '../shared/pieceViews.js'
 import { useLoaded } from './load.js'
-import { fetchPiece, updatePiece } from './piecesClient.js'
+import type { fetchPiece as fetchPieceFn, updatePiece as updatePieceFn } from './piecesClient.js'
 import { failureMessage } from './request.js'
+
+export type PieceAdapters = Readonly<{
+  fetchPiece: typeof fetchPieceFn
+  updatePiece: typeof updatePieceFn
+}>
 
 export type PieceViewModel =
   | { readonly status: 'loading' }
@@ -23,8 +28,8 @@ export type PieceViewModel =
  * than to any one of its surfaces. Everything scoped to a surface — its cast, its conversations, its
  * document — is that surface's own to hold.
  */
-export function usePiece(id: string): PieceViewModel {
-  const load = useCallback((signal: AbortSignal) => fetchPiece(id, signal), [id])
+export function usePiece(id: string, { fetchPiece, updatePiece }: PieceAdapters): PieceViewModel {
+  const load = useCallback((signal: AbortSignal) => fetchPiece(id, signal), [id, fetchPiece])
   const [state, setState] = useLoaded(load, [id])
   const [retitling, setRetitling] = useState(false)
   const [retitleError, setRetitleError] = useState<string | undefined>(undefined)
@@ -44,7 +49,7 @@ export function usePiece(id: string): PieceViewModel {
         setRetitleError(failureMessage(result))
       })
     },
-    [id],
+    [id, updatePiece],
   )
 
   const setStatus = useCallback(
@@ -60,7 +65,7 @@ export function usePiece(id: string): PieceViewModel {
         setStatusError(failureMessage(result))
       })
     },
-    [id],
+    [id, updatePiece],
   )
 
   if (state.kind === 'loading') return { status: 'loading' }

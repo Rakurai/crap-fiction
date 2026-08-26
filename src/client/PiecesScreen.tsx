@@ -1,15 +1,45 @@
 import { useState } from 'react'
 import { CallSitesScreen } from './CallSitesScreen.js'
+import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { NewPieceForm, offeredModes } from './NewPieceForm.js'
-import { OpenedPiece } from './OpenedPiece.js'
+import { OpenedPiece, type CallSiteAdapters } from './OpenedPiece.js'
 import { PieceList } from './PieceList.js'
+import { fetchPiece, saveSurfaceDocument, updatePiece } from './piecesClient.js'
 import styles from './PiecesScreen.module.css'
+import {
+  abandonOperation,
+  applyRecommendation,
+  confirmApplication,
+  createConversation,
+  dispatch,
+  fetchConversation,
+  retrievePendingApply,
+  subscribeToRoom,
+} from './roomClient.js'
 import { ThemeToggle } from './ThemeToggle.js'
+import type { RoomAdapters } from './useConversation.js'
+import type { PieceAdapters } from './usePiece.js'
 import { usePieces } from './usePieces.js'
 import { useTheme } from './useTheme.js'
 
 type PiecesScreenProps = {
   readonly workspace: string
+}
+
+// The studio's own transports, wired where the piece the author opened is chosen, so nothing
+// inside an open piece reaches for one itself.
+const PIECE_ADAPTERS: PieceAdapters = { fetchPiece, updatePiece }
+const CALL_SITE_ADAPTERS: CallSiteAdapters = { fetchCallSites, fetchRuntimeStatus }
+const ROOM_ADAPTERS: RoomAdapters = {
+  createConversation,
+  fetchConversation,
+  dispatch,
+  subscribeToRoom,
+  abandonOperation,
+  applyRecommendation,
+  confirmApplication,
+  retrievePendingApply,
+  saveDocument: saveSurfaceDocument,
 }
 
 export function PiecesScreen({ workspace }: PiecesScreenProps) {
@@ -28,6 +58,9 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
     return (
       <OpenedPiece
         id={openedId}
+        pieceAdapters={PIECE_ADAPTERS}
+        room={ROOM_ADAPTERS}
+        callSites={CALL_SITE_ADAPTERS}
         authorContextSelection={{ value: authorContextConversationId, onChange: setAuthorContextConversationId }}
         onClose={() => {
           setOpenedId(undefined)

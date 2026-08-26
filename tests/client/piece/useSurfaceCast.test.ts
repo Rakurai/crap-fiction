@@ -2,11 +2,18 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { CastMemberView, PieceDetail, SurfaceDetail } from '../../../src/shared/pieceViews.js'
 import type { RequestResult } from '../../../src/client/request.js'
+import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { useSurfaceCast } from '../../../src/client/useSurfaceCast.js'
 
-const mocks = vi.hoisted(() => ({ updatePiece: vi.fn() }))
-
-vi.mock('../../../src/client/piecesClient.js', () => ({ updatePiece: mocks.updatePiece }))
+/** Only the piece update this hook makes is stated; asking the studio for the piece is not. */
+function adapters(updatePiece: PieceAdapters['updatePiece']): PieceAdapters {
+  return {
+    fetchPiece: vi.fn(() => {
+      throw new Error('unreached: this hook never asks the studio for the piece')
+    }) as unknown as PieceAdapters['fetchPiece'],
+    updatePiece,
+  }
+}
 
 function member(id: string, enabled: boolean): CastMemberView {
   return { id, handle: id, displayName: id, description: `about ${id}`, enabled }
@@ -42,8 +49,8 @@ describe('one surface’s cast', () => {
     let answerTheFirst: (result: RequestResult<PieceDetail>) => void = () => {
       throw new Error('nothing was asked of the studio')
     }
-    mocks.updatePiece.mockReset()
-    mocks.updatePiece
+    const updatePiece = vi
+      .fn()
       .mockImplementationOnce((_id: string, _patch: unknown, signal: AbortSignal) => {
         signals.push(signal)
         return new Promise<RequestResult<PieceDetail>>((resolve) => (answerTheFirst = resolve))
@@ -53,7 +60,7 @@ describe('one surface’s cast', () => {
         return Promise.resolve(detailWith([member('shape', true), member('reader', true)]))
       })
 
-    const { result } = renderHook(() => useSurfaceCast('the-lighthouse', 'draft', [SHAPE, READER]))
+    const { result } = renderHook(() => useSurfaceCast('the-lighthouse', 'draft', [SHAPE, READER], adapters(updatePiece)))
 
     act(() => result.current.toggle('shape'))
     await act(async () => {
@@ -73,13 +80,12 @@ describe('one surface’s cast', () => {
 
   it('abandons the request still in flight when the surface goes away', async () => {
     let signal: AbortSignal | undefined
-    mocks.updatePiece.mockReset()
-    mocks.updatePiece.mockImplementation((_id: string, _patch: unknown, given: AbortSignal) => {
+    const updatePiece = vi.fn((_id: string, _patch: unknown, given?: AbortSignal) => {
       signal = given
       return new Promise<RequestResult<PieceDetail>>(() => {})
     })
 
-    const { result, unmount } = renderHook(() => useSurfaceCast('the-lighthouse', 'draft', [SHAPE]))
+    const { result, unmount } = renderHook(() => useSurfaceCast('the-lighthouse', 'draft', [SHAPE], adapters(updatePiece)))
 
     await act(async () => result.current.toggle('shape'))
     unmount()

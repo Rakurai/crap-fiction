@@ -1,51 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RoomEvent } from '../../../src/client/entryProjection.js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RequestResult } from '../../../src/client/request.js'
-import type { RoomActivitySnapshot } from '../../../src/shared/conversationEvents.js'
+import type { RoomAdapters } from '../../../src/client/useConversation.js'
 import type { PieceDetail } from '../../../src/shared/pieceViews.js'
-import { OpenedPiece } from '../../../src/client/OpenedPiece.js'
-
-const mocks = vi.hoisted(() => ({
-  fetchPiece: vi.fn(),
-  updatePiece: vi.fn(),
-  saveSurfaceDocument: vi.fn(),
-  createConversation: vi.fn(),
-  fetchConversation: vi.fn(),
-  dispatch: vi.fn(),
-  subscribeToRoom: vi.fn(),
-  abandonOperation: vi.fn(),
-  applyRecommendation: vi.fn(),
-  confirmApplication: vi.fn(),
-  retrievePendingApply: vi.fn(),
-  fetchCallSites: vi.fn(),
-  fetchRuntimeStatus: vi.fn(),
-}))
-
-vi.mock('../../../src/client/piecesClient.js', () => ({
-  fetchPiece: mocks.fetchPiece,
-  updatePiece: mocks.updatePiece,
-  saveSurfaceDocument: mocks.saveSurfaceDocument,
-}))
-
-vi.mock('../../../src/client/roomClient.js', () => ({
-  createConversation: mocks.createConversation,
-  fetchConversation: mocks.fetchConversation,
-  dispatch: mocks.dispatch,
-  subscribeToRoom: mocks.subscribeToRoom,
-  abandonOperation: mocks.abandonOperation,
-  applyRecommendation: mocks.applyRecommendation,
-  confirmApplication: mocks.confirmApplication,
-  retrievePendingApply: mocks.retrievePendingApply,
-  EMPTY_ROOM_ACTIVITY: { draft: null, storyContext: null, authorContext: null },
-}))
-
-vi.mock('../../../src/client/callSitesClient.js', () => ({
-  fetchCallSites: mocks.fetchCallSites,
-  fetchRuntimeStatus: mocks.fetchRuntimeStatus,
-}))
-
-const EMPTY_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+import { OpenedPiece, type CallSiteAdapters } from '../../../src/client/OpenedPiece.js'
+import type { PieceAdapters } from '../../../src/client/usePiece.js'
+import { onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
 const PIECE: PieceDetail = {
   id: 'cups',
@@ -88,44 +48,58 @@ function conversationEntries(conversationId: string) {
   return [{ id: `${conversationId}-e1`, kind: 'authorMessage' as const, text: `opened as ${conversationId}`, audience: [], brought: [] }]
 }
 
-beforeEach(() => {
-  mocks.fetchPiece.mockResolvedValue({ outcome: 'value', value: PIECE })
-  mocks.updatePiece.mockResolvedValue({ outcome: 'value', value: PIECE })
-  mocks.saveSurfaceDocument.mockResolvedValue({ outcome: 'value', value: null })
-  mocks.createConversation.mockResolvedValue({ outcome: 'value', value: { id: 'new-conversation' } })
-  mocks.fetchConversation.mockImplementation((_pieceId: string, _surface: string, conversationId: string) =>
-    Promise.resolve({ outcome: 'value', value: { id: conversationId, entries: conversationEntries(conversationId) } }),
-  )
-  mocks.dispatch.mockResolvedValue({ outcome: 'value', value: { conversationId: 'd1', actionId: 'a1' } })
-  mocks.abandonOperation.mockResolvedValue({ outcome: 'value', value: null })
-  mocks.applyRecommendation.mockResolvedValue({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } })
-  mocks.confirmApplication.mockResolvedValue({ outcome: 'value', value: { entryId: 'e1', change: { kind: 'rewrittenWhole' } } })
-  mocks.subscribeToRoom.mockImplementation(() => ({ snapshot: Promise.resolve(EMPTY_ACTIVITY), unsubscribe: () => {} }))
-  mocks.fetchCallSites.mockResolvedValue({ outcome: 'value', value: [] })
-  mocks.fetchRuntimeStatus.mockResolvedValue({ outcome: 'value', value: { reachable: true, models: [] } })
-})
+const SAVED: RequestResult<null> = { outcome: 'value', value: null }
+
+/**
+ * The studio a piece is opened in: the piece itself, the conversations each surface opens with,
+ * and a stream the test delivers events on. What a scenario states about the room replaces what
+ * is stated here; everything the room is never asked for stays unreachable.
+ */
+function studio(room: Partial<RoomAdapters> = {}) {
+  const stream = roomStream(onTheDraft(null))
+  const saveDocument = vi.fn(() => Promise.resolve(SAVED))
+  const dispatched = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { conversationId: 'd1', actionId: 'a1' } }))
+  const abandonOperation = vi.fn(() => Promise.resolve(SAVED))
+
+  return {
+    stream: stream.stream,
+    saveDocument,
+    dispatch: dispatched,
+    abandonOperation,
+    props: {
+      pieceAdapters: {
+        fetchPiece: vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: PIECE })),
+        updatePiece: vi.fn(() => {
+          throw new Error('unreached: this scenario never retitles the piece or changes its status')
+        }),
+      } as unknown as PieceAdapters,
+      callSites: {
+        fetchCallSites: vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: [] })),
+        fetchRuntimeStatus: vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { reachable: true, models: [] } })),
+      } as unknown as CallSiteAdapters,
+      room: roomAdapters({
+        subscribeToRoom: stream.subscribeToRoom,
+        createConversation: vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { id: 'new-conversation' } })),
+        fetchConversation: vi.fn((_pieceId: string, _surface: string, conversationId: string) =>
+          Promise.resolve({ outcome: 'value' as const, value: { id: conversationId, entries: conversationEntries(conversationId) } }),
+        ) as unknown as RoomAdapters['fetchConversation'],
+        dispatch: dispatched as unknown as RoomAdapters['dispatch'],
+        abandonOperation: abandonOperation as unknown as RoomAdapters['abandonOperation'],
+        saveDocument: saveDocument as unknown as RoomAdapters['saveDocument'],
+        ...room,
+      }),
+    },
+  }
+}
 
 afterEach(() => {
   cleanup()
-  vi.clearAllMocks()
   vi.useRealTimers()
 })
 
-async function renderOpened(onClose: () => void = () => {}) {
-  render(<OpenedPiece id="cups" onClose={onClose} />)
+async function renderOpened(opened: ReturnType<typeof studio>, onClose: () => void = () => {}) {
+  render(<OpenedPiece id="cups" {...opened.props} onClose={onClose} />)
   await screen.findByRole('button', { name: 'The Cups' })
-}
-
-/** Captures the stream's own event callback, so a test can deliver an event as the server would. */
-function streamingRoom(): { stream: (event: RoomEvent) => void } {
-  let deliver: (event: RoomEvent) => void = () => {
-    throw new Error('the room was never subscribed to')
-  }
-  mocks.subscribeToRoom.mockImplementation((_pieceId: string, onEvent: (event: RoomEvent) => void) => {
-    deliver = onEvent
-    return { snapshot: Promise.resolve(EMPTY_ACTIVITY), unsubscribe: () => {} }
-  })
-  return { stream: (event) => act(() => deliver(event)) }
 }
 
 function leaveButton(): HTMLButtonElement {
@@ -160,7 +134,7 @@ function activeComposer(): HTMLTextAreaElement {
 
 describe('switching between the draft and story context surfaces', () => {
   it("preserves each surface's own text, conversation selection and composer state across a switch away and back", async () => {
-    await renderOpened()
+    await renderOpened(studio())
 
     // Select the conversation the piece did not open with, then compose against it, without
     // sending: switching conversations is its own fresh session, but switching surfaces is not.
@@ -190,12 +164,12 @@ describe('switching between the draft and story context surfaces', () => {
 
 describe('a failed save on one document', () => {
   it("leaves the other document's state untouched, and blocks leaving until the failure resolves", async () => {
-    mocks.saveSurfaceDocument.mockImplementation((_id: string, surface: string, _text: string) =>
+    const failingDraft = vi.fn((_id: string, surface: string, _text: string) =>
       surface === 'draft'
-        ? Promise.resolve({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
-        : Promise.resolve({ outcome: 'value', value: null }),
+        ? Promise.resolve<RequestResult<null>>({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
+        : Promise.resolve(SAVED),
     )
-    await renderOpened()
+    await renderOpened(studio({ saveDocument: failingDraft as unknown as RoomAdapters['saveDocument'] }))
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
@@ -216,7 +190,7 @@ describe('a failed save on one document', () => {
     expect(screen.getByRole('button', { name: '‹ pieces' }).hasAttribute('disabled')).toBe(true)
 
     switchToDraft()
-    mocks.saveSurfaceDocument.mockResolvedValue({ outcome: 'value', value: null })
+    failingDraft.mockImplementation(() => Promise.resolve(SAVED))
     fireEvent.change(screen.getByLabelText('Manuscript source'), { target: { value: 'First light of the day. Then light again.' } })
     await settle()
 
@@ -227,14 +201,14 @@ describe('a failed save on one document', () => {
 describe('leaving the piece', () => {
   it('waits on a dirty surface, and stays mounted with the failure visible and leaving disabled when that write fails', async () => {
     let resolveSave: ((result: RequestResult<null>) => void) | undefined
-    mocks.saveSurfaceDocument.mockImplementation(
+    const heldSave = vi.fn(
       () =>
         new Promise<RequestResult<null>>((resolve) => {
           resolveSave = resolve
         }),
     )
     const onClose = vi.fn()
-    await renderOpened(onClose)
+    await renderOpened(studio({ saveDocument: heldSave as unknown as RoomAdapters['saveDocument'] }), onClose)
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
@@ -259,15 +233,15 @@ describe('leaving the piece', () => {
   })
 
   it('leaves while a surface still has work in flight, without asking the studio to end it', async () => {
-    const { stream } = streamingRoom()
+    const opened = studio()
     const onClose = vi.fn()
-    await renderOpened(onClose)
+    await renderOpened(opened, onClose)
 
     fireEvent.change(activeComposer(), { target: { value: 'what isn’t working' } })
     fireEvent.click(screen.getByRole('button', { name: 'send' }))
-    await waitFor(() => expect(mocks.dispatch).toHaveBeenCalled())
+    await waitFor(() => expect(opened.dispatch).toHaveBeenCalled())
 
-    stream({
+    opened.stream({
       type: 'action.started',
       data: { actionId: 'a1', conversationId: 'd1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: [], surface: 'draft' },
     })
@@ -275,13 +249,13 @@ describe('leaving the piece', () => {
     fireEvent.click(leaveButton())
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(mocks.abandonOperation).not.toHaveBeenCalled()
+    expect(opened.abandonOperation).not.toHaveBeenCalled()
   })
 })
 
 describe('activity on one surface', () => {
   it('leaves the other two free to start their own work', async () => {
-    await renderOpened()
+    await renderOpened(studio())
 
     fireEvent.change(activeComposer(), { target: { value: 'a message for the draft room' } })
     fireEvent.click(screen.getByRole('button', { name: 'send' }))
@@ -303,6 +277,7 @@ describe('the author-context conversation selection', () => {
     render(
       <OpenedPiece
         id="cups"
+        {...studio().props}
         authorContextSelection={{ value: 'kept-across-a-piece-switch', onChange: onAuthorContextSelectionChange }}
         onClose={() => {}}
       />,
