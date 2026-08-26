@@ -212,10 +212,11 @@ justify the cast.
 **Apply a recommendation** — *constant*
 *Done when:* one action makes the manuscript embody the recommendation, interpreted against
 the draft and the full current conversation as they currently stand, with no second acceptance
-step and no automatic critique of the result; the manuscript is not editable for as long as
-that call is in flight and is editable again the moment it settles, fails or is abandoned; and
-nothing in the manuscript changes beyond what embodying the recommendation and the author's
-constraint requires.
+step and no automatic critique of the result; the manuscript is not editable for as long as the
+application is under way — the model answering, the result being saved, and that save being
+confirmed — and is editable again the moment it settles, fails or is abandoned; and nothing in
+the manuscript changes beyond what embodying the recommendation and the author's constraint
+requires.
 
 **Apply with a constraint** — *per session*
 *Done when:* text the author supplies alongside the action is carried verbatim as an
@@ -230,7 +231,8 @@ exists.
 *Done when:* the change is shown as a before-and-after computed by the application from the
 manuscript states, presented with the response that caused it, still there when the author returns
 to that conversation days later, requiring nothing of the participant and leaving no marks in the
-manuscript.
+manuscript; and it is never shown as having happened before the manuscript holding it was actually
+saved.
 
 **Take it back** — *constant*
 *Done when:* an application is reversed by the prose editor's ordinary history, it counts as

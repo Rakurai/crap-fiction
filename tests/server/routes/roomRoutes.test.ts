@@ -162,7 +162,7 @@ describe('the room over HTTP', () => {
     expect(entries.find((entry) => entry.kind === 'concreteChangeRequest')).toMatchObject({ respondingTo: responseId, clarification: 'be specific' })
   })
 
-  it('reports an application in flight naming the response it came from, then answers with the manuscript and shows the change on that response', async () => {
+  it('reports an application in flight naming the response it came from, then answers with a pending manuscript that becomes the change on that response once confirmed', async () => {
     const { app, modelAccess } = await withPiece({
       shape: RECOMMENDATION,
       apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } }, held: true },
@@ -180,10 +180,51 @@ describe('the room over HTTP', () => {
 
     modelAccess.release('apply')
     const { data: applied } = await (await applying).json()
-    expect(applied).toMatchObject({ outcome: 'applied', manuscript: 'The cups sat where she left them, revised.' })
+    expect(applied).toMatchObject({ outcome: 'pending', manuscript: 'The cups sat where she left them, revised.' })
 
+    // Still busy: pending, not settled, until the client installs, saves and confirms it.
+    expect((await piece(app)).data.conversationActionInFlight).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
+
+    await app.request('/pieces/cups/draft', {
+      method: 'PUT',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ draft: applied.manuscript }),
+    })
+    const confirming = await app.request(`/pieces/cups/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
+    expect(confirming.status).toBe(200)
+    const { data: confirmed } = await confirming.json()
+
+    expect((await piece(app)).data.conversationActionInFlight).toBeNull()
     const entries: readonly { kind: string }[] = (await conversation(app, 'c1')).data.entries
-    expect(entries.find((entry) => entry.kind === 'application')).toMatchObject({ responseId, changeId: applied.change.id, change: applied.change.content })
+    expect(entries.find((entry) => entry.kind === 'application')).toMatchObject({
+      id: confirmed.entryId,
+      responseId,
+      change: confirmed.change,
+    })
+  })
+
+  it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved before the client has saved the replacement', async () => {
+    const { app, modelAccess } = await withPiece({
+      shape: RECOMMENDATION,
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
+    })
+    const responseId = await respondedTo(app, { target: 'shape', message: 'a direct question' })
+
+    const applying = app.request('/pieces/cups/conversations/c1/apply', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ responseId, draft: 'The cups sat where she left them.' }),
+    })
+    modelAccess.release('apply')
+    const { data: applied } = await (await applying).json()
+
+    const unknown = await app.request('/pieces/cups/conversations/c1/apply/no-such-application/confirm', { method: 'POST' })
+    expect(unknown.status).toBe(404)
+    expect(await unknown.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
+
+    const unsaved = await app.request(`/pieces/cups/conversations/c1/apply/${applied.applicationId}/confirm`, { method: 'POST' })
+    expect(unsaved.status).toBe(409)
+    expect(await unsaved.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_DOCUMENT_NOT_SAVED' } })
   })
 
   /** The act that reaches no model at all, and so answers within the request that opened it. */

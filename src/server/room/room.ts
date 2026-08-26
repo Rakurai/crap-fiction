@@ -1,10 +1,12 @@
 import { nanoid } from 'nanoid'
-import type { AppliedChange } from '../../shared/appliedChange.js'
+import type { AppliedChange, AppliedChangeContent } from '../../shared/appliedChange.js'
+import { appliedChangeSchema } from '../../shared/appliedChange.js'
+import type { ApplyOutcome } from '../../shared/applyViews.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
 import type { PromptFragments } from '../model/prompts.js'
-import type { CallResult, ModelAccess } from '../model/types.js'
+import type { ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
 import type {
   ApplicationEntry,
@@ -24,7 +26,15 @@ import {
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
-import { ConversationEntryStore, readConversationEntries, readPiece, writeAppliedChange, writePieceCast } from '../store/index.js'
+import {
+  ConversationEntryStore,
+  readAppliedChanges,
+  readConversationEntries,
+  readPiece,
+  readStoryContext,
+  writeApplication,
+  writePieceCast,
+} from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
 import {
@@ -61,6 +71,20 @@ export class RecommendationNotFoundError extends Error {
   constructor(pieceId: string, responseId: string) {
     super(`no applicable suggestion at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'RecommendationNotFoundError'
+  }
+}
+
+export class ApplicationNotPendingError extends Error {
+  constructor(pieceId: string, applicationId: string) {
+    super(`no pending or committed application "${applicationId}" for piece "${pieceId}"`)
+    this.name = 'ApplicationNotPendingError'
+  }
+}
+
+export class ApplicationDocumentNotSavedError extends Error {
+  constructor(pieceId: string, applicationId: string) {
+    super(`application "${applicationId}" for piece "${pieceId}" does not match the document as saved`)
+    this.name = 'ApplicationDocumentNotSavedError'
   }
 }
 
@@ -112,14 +136,28 @@ type RunningDispatch = ActiveDispatch & {
   readonly settlement: Promise<void>
 }
 
+/**
+ * A replacement the model returned, held until the client installs, saves and confirms it.
+ * `applicationId` is provisional identity: it becomes the durable application entry's id.
+ */
+type PendingReplacement = Readonly<{
+  applicationId: string
+  responseId: string
+  constraint: string | undefined
+  replacement: string
+  change: AppliedChange
+}>
+
 type ActiveApply = {
   readonly kind: 'apply'
   readonly roomScope: RoomScope
+  readonly conversationScope: ConversationScope
   readonly conversationId: string
   readonly actionId: string
   readonly sourceEntryId: string
   readonly controller: AbortController
   readonly startedAt: number
+  readonly pending?: PendingReplacement
 }
 
 type ActiveOperation = RunningDispatch | ActiveApply
@@ -254,6 +292,11 @@ export class Room {
     if (operation === undefined || operation.actionId !== actionId) return
     operation.controller.abort()
     this.#operations.delete(roomScopeKey(scope))
+    // A pending Apply has no async work left for the abort signal to interrupt — the model call
+    // already settled — so abandoning it is the only thing that will ever close out its action.
+    if (operation.kind === 'apply' && operation.pending !== undefined) {
+      this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome: 'abandoned' } })
+    }
   }
 
   async dispatch(
@@ -499,6 +542,13 @@ export class Room {
     }
   }
 
+  /**
+   * Starts an Apply: a no-change result settles on the spot, a replacement is retained as a
+   * pending application and its scope stays busy until {@link confirmApply} or {@link abandon}
+   * closes it out. Model, installation, save and confirmation failures all unlock the same way —
+   * only {@link confirmApply}'s own failure paths land here too, by way of the pending state this
+   * method leaves behind.
+   */
   async apply(
     workspaceDir: string,
     roomScope: RoomScope,
@@ -506,7 +556,7 @@ export class Room {
     responseId: string,
     constraint: string | undefined,
     draft: string,
-  ): Promise<{ actionId: string; result: CallResult<{ manuscript: string; change: AppliedChange | undefined; entryId: string | undefined }> }> {
+  ): Promise<{ actionId: string; outcome: ApplyOutcome }> {
     const pieceId = roomScope.pieceId
     const holder = this.#operationFor(roomScope)
     if (holder !== undefined) throw new RoomBusyError(pieceId, roomScope.surface)
@@ -525,11 +575,16 @@ export class Room {
     const controller = new AbortController()
     const startedAt = this.#now()
     const key = roomScopeKey(roomScope)
-    this.#operations.set(key, { kind: 'apply', roomScope, conversationId, actionId, sourceEntryId: responseId, controller, startedAt })
+    this.#operations.set(key, { kind: 'apply', roomScope, conversationScope, conversationId, actionId, sourceEntryId: responseId, controller, startedAt })
     this.#emit(pieceId, {
       type: 'action.started',
       data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt },
     })
+
+    const closeOut = (outcome: 'settled' | 'abandoned' | 'failed'): void => {
+      if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome } })
+    }
 
     try {
       const context = compileApplyContext({
@@ -548,26 +603,92 @@ export class Room {
       const prompt = renderApplyPrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
       if (result.outcome !== 'value') {
-        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: result.outcome === 'abandoned' ? 'abandoned' : 'failed' } })
-        return { actionId, result }
+        closeOut(result.outcome === 'abandoned' ? 'abandoned' : 'failed')
+        return {
+          actionId,
+          outcome:
+            result.outcome === 'abandoned'
+              ? { outcome: 'abandoned', actionId }
+              : { outcome: 'failed', actionId, reason: result.reason, returned: result.returned },
+        }
       }
 
       const { manuscript } = result.value
       if (manuscript === draft) {
-        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
-        return { actionId, result: { outcome: 'value', value: { manuscript, change: undefined, entryId: undefined } } }
+        closeOut('settled')
+        return { actionId, outcome: { outcome: 'noChange', actionId } }
       }
 
-      const changeId = nanoid()
-      const change: AppliedChange = { id: changeId, content: computeAppliedChangeContent(draft, manuscript) }
-      await writeAppliedChange(this.#dataRoot, conversationScope, change)
-      const application: ApplicationEntry = { id: nanoid(), kind: 'application', responseId, changeId, constraint }
-      await this.#entries.append(this.#dataRoot, conversationScope, conversationId, application)
-      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: change.content } } })
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
-      return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
-    } finally {
+      const pending: PendingReplacement = {
+        applicationId: nanoid(),
+        responseId,
+        constraint,
+        replacement: manuscript,
+        change: { id: nanoid(), content: computeAppliedChangeContent(draft, manuscript) },
+      }
+      const current = this.#operations.get(key)
+      if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
+      return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, manuscript } }
+    } catch (err) {
       if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
+      throw err
     }
+  }
+
+  /**
+   * Commits a pending Apply once its replacement is confirmed saved. Re-confirming an identity
+   * that already committed, with its change already on file, is a no-op rather than a refusal —
+   * confirmation is protocol, not a second author decision.
+   */
+  async confirmApply(
+    workspaceDir: string,
+    roomScope: RoomScope,
+    conversationId: string,
+    applicationId: string,
+  ): Promise<{ entryId: string; change: AppliedChangeContent }> {
+    const pieceId = roomScope.pieceId
+    const key = roomScopeKey(roomScope)
+    const operation = this.#operationFor(roomScope)
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+
+    if (operation?.kind !== 'apply' || operation.pending?.applicationId !== applicationId) {
+      const existing = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries.find(
+        (entry): entry is ApplicationEntry => entry.kind === 'application' && entry.id === applicationId,
+      )
+      if (existing === undefined) throw new ApplicationNotPendingError(pieceId, applicationId)
+      const change = readAppliedChanges(this.#dataRoot, conversationScope, appliedChangeSchema).find(
+        (candidate) => candidate.id === existing.changeId,
+      )
+      if (change === undefined) throw new ApplicationNotPendingError(pieceId, applicationId)
+      return { entryId: existing.id, change: change.content }
+    }
+
+    const { pending, actionId } = operation
+    const target = this.#readTargetText(workspaceDir, pieceId, roomScope.surface)
+    if (target !== pending.replacement) {
+      this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed' } })
+      throw new ApplicationDocumentNotSavedError(pieceId, applicationId)
+    }
+
+    const application: ApplicationEntry = {
+      id: pending.applicationId,
+      kind: 'application',
+      responseId: pending.responseId,
+      changeId: pending.change.id,
+      constraint: pending.constraint,
+    }
+    await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
+    this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: pending.change.content } } })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
+    this.#operations.delete(key)
+    return { entryId: application.id, change: pending.change.content }
+  }
+
+  /** The document Apply targets, read as it stands persisted — never the client's in-memory copy. */
+  #readTargetText(workspaceDir: string, pieceId: string, surface: RoomScope['surface']): string {
+    if (surface === 'draft') return readPiece(workspaceDir, pieceId)?.draft?.text ?? ''
+    if (surface === 'storyContext') return readStoryContext(workspaceDir, pieceId) ?? ''
+    throw new Error(`Apply confirmation is not wired for the "${surface}" surface`)
   }
 }

@@ -27,8 +27,9 @@ function roomHolding(
     fetchConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1', entries } }),
     dispatch: () => Promise.resolve({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
     abandonOperation,
-    applyRecommendation: () =>
-      Promise.resolve({ outcome: 'value', value: { outcome: 'applied', actionId: 'a1', manuscript: 'the revised manuscript' } }),
+    applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
+    confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } }),
+    saveDraft: () => Promise.resolve({ outcome: 'value', value: null }),
   }
 }
 
@@ -358,7 +359,7 @@ describe('one response-local field shared by every action on the response', () =
     const applyRecommendation = vi.fn(() =>
       Promise.resolve({
         outcome: 'value' as const,
-        value: { outcome: 'applied' as const, actionId: 'a1', entryId: 'e-app1', manuscript: 'revised', change: undefined },
+        value: { outcome: 'noChange' as const, actionId: 'a1' },
       }),
     )
     const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_RECOMMENDATION]), applyRecommendation }

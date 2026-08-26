@@ -232,15 +232,35 @@ export function readConversationEntries(dataRoot: string, scope: ConversationSco
 export class ConversationEntryStore {
   readonly #lock = new Mutex()
 
+  /** Appending an entry whose id is already on file is a no-op: retrying a write is safe. */
   async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
     const dir = namespaceDirectoryForWrite(dataRoot, scope, 'conversations')
     const file = conversationFile(dir, conversationId)
     await this.#lock.runExclusive(async () => {
       const existing = readJsonArtifact(file, entryConversationSchema)
+      if (existing?.entries.some((candidate) => candidate.id === entry.id) === true) return
       const next: EntryConversation = { id: conversationId, entries: [...(existing?.entries ?? []), entry] }
       await writeJsonArtifact(file, next)
     })
   }
+}
+
+/**
+ * Confirming a pending Apply in one call: the applied-change record lands before the entry that
+ * references it, so a process loss between the two writes can only leave a change no entry names,
+ * never an entry whose change is missing. Each write is independently idempotent, so retrying the
+ * whole call is safe.
+ */
+export async function writeApplication(
+  dataRoot: string,
+  scope: ConversationScope,
+  conversationId: string,
+  entries: ConversationEntryStore,
+  change: AppliedChange,
+  entry: ConversationEntry,
+): Promise<void> {
+  await writeAppliedChange(dataRoot, scope, change)
+  await entries.append(dataRoot, scope, conversationId, entry)
 }
 
 const CHANGE_SUFFIX = '.json'

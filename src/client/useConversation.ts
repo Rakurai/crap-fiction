@@ -5,6 +5,7 @@ import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjectio
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
+  confirmApplication as confirmApplicationFn,
   createConversation as createConversationFn,
   DispatchOpening,
   dispatch as dispatchFn,
@@ -12,6 +13,7 @@ import type {
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
+import type { saveDraft as saveDraftFn } from './piecesClient.js'
 
 const UNSENT = 'the message was not sent'
 
@@ -34,6 +36,8 @@ export type RoomAdapters = Readonly<{
   subscribeToRoom: typeof subscribeToRoomFn
   abandonOperation: typeof abandonOperationFn
   applyRecommendation: typeof applyRecommendationFn
+  confirmApplication: typeof confirmApplicationFn
+  saveDraft: typeof saveDraftFn
 }>
 
 export function useConversation(

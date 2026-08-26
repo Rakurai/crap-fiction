@@ -34,6 +34,8 @@ function roomWithHeldConversation(entries: readonly ConversationEntryView[]) {
     dispatch: vi.fn(),
     abandonOperation: vi.fn(),
     applyRecommendation: vi.fn(),
+    confirmApplication: vi.fn(),
+    saveDraft: vi.fn(),
     subscribeToRoom: vi.fn((_pieceId, onEvent) => {
       deliver = onEvent
       return () => {}
@@ -120,6 +122,8 @@ describe('releasing the controls an action holds', () => {
       dispatch: vi.fn(),
       abandonOperation: vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null })),
       applyRecommendation: vi.fn(),
+      confirmApplication: vi.fn(),
+      saveDraft: vi.fn(),
       subscribeToRoom: vi.fn((_pieceId, onEvent) => {
         deliver = onEvent
         return () => {}
@@ -177,6 +181,8 @@ describe('abandoning an operation', () => {
       dispatch: vi.fn(),
       abandonOperation,
       applyRecommendation: vi.fn(),
+      confirmApplication: vi.fn(),
+      saveDraft: vi.fn(),
       subscribeToRoom: vi.fn(() => () => {}),
     }
   }

@@ -28,8 +28,15 @@ import {
   updatePiece,
 } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
-import { applyOutcome } from './room/outcomes.js'
-import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
+import {
+  ApplicationDocumentNotSavedError,
+  ApplicationNotPendingError,
+  CommentaryNotFoundError,
+  ParticipantNotFoundError,
+  RecommendationNotFoundError,
+  RoomBusyError,
+  type Room,
+} from './room/room.js'
 import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
@@ -140,8 +147,14 @@ export function createApp(
   app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
     const { responseId, constraint, draft } = c.req.valid('json')
     const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
-    const { actionId, result } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, draft)
-    return c.json(ok(applyOutcome(actionId, result)))
+    const { outcome } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, draft)
+    return c.json(ok(outcome))
+  })
+
+  app.post('/pieces/:id/conversations/:cid/apply/:applicationId/confirm', async (c) => {
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: OPENED_SURFACE }
+    const confirmation = await room.confirmApply(workspace.require(), scope, c.req.param('cid'), c.req.param('applicationId'))
+    return c.json(ok(confirmation))
   })
 
   app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
@@ -202,6 +215,8 @@ export function createApp(
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
     if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
+    if (err instanceof ApplicationNotPendingError) return refused('APPLICATION_NOT_PENDING', 404)
+    if (err instanceof ApplicationDocumentNotSavedError) return refused('APPLICATION_DOCUMENT_NOT_SAVED', 409)
     if (err instanceof CommentaryNotFoundError) return refused('COMMENTARY_NOT_FOUND', 404)
     if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)

@@ -53,7 +53,13 @@ POST   /pieces/:id/conversations                   returns the new conversation
 DELETE /pieces/:id/conversations/:cid
 POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
                                                    the response answered and any clarification
-POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
+POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint;
+                                                   settles a no-change result on the spot, or answers
+                                                   with a pending replacement and its provisional
+                                                   identity
+POST   /pieces/:id/conversations/:cid/apply/:applicationId/confirm
+                                                   the provisional identity a pending replacement was
+                                                   given, confirmed once the client has saved it
 POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
                                                    targets that action by identity, so a request
                                                    naming one already finished touches nothing

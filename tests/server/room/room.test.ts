@@ -7,10 +7,12 @@ import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { createPiece } from '../../../src/server/pieces.js'
 import type { ConversationScope, RoomScope } from '../../../src/server/scope.js'
-import { readAppliedChanges, readConversationEntries, readPiece, TolerantReadError, writePieceCast } from '../../../src/server/store/index.js'
+import { DraftStore, readAppliedChanges, readConversationEntries, readPiece, TolerantReadError, writePieceCast } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 import {
+  ApplicationDocumentNotSavedError,
+  ApplicationNotPendingError,
   CommentaryNotFoundError,
   ParticipantNotFoundError,
   RecommendationNotFoundError,
@@ -455,20 +457,23 @@ describe('Room.apply', () => {
     return response.id
   }
 
-  it('produces the manuscript the model returned, calling no participant', async () => {
+  it('produces the manuscript the model returned as a pending application, calling no participant, and writes nothing until confirmed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room, adapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
     })
 
-    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'The cups sat where she left them, twice.')
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'The cups sat where she left them, twice.')
 
-    if (result.outcome !== 'value') throw new Error('expected the application to settle')
-    expect(result.value.manuscript).toBe('The cups sat where she left them.')
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+    expect(outcome.manuscript).toBe('The cups sat where she left them.')
     expect(adapter.promptFor('shape')).toBeUndefined()
     expect(adapter.promptFor('compression')).toBeUndefined()
     expect(adapter.promptFor('story-editor')).toBeUndefined()
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
+    expect(room.activitySnapshot(scope(pieceId))).toMatchObject({ kind: 'apply' })
   })
 
   it("carries the recommendation, the author's constraint and the draft verbatim, beside the full current conversation including discussion after the recommendation", async () => {
@@ -611,51 +616,97 @@ describe('Room.apply', () => {
     const started = events.find((event) => event.type === 'action.started')
     if (started === undefined) throw new Error('expected action.started to have fired synchronously')
     room.abandon(scope(pieceId), started.data.actionId)
-    await expect(applying).resolves.toMatchObject({ result: { outcome: 'abandoned' } })
+    await expect(applying).resolves.toMatchObject({ outcome: { outcome: 'abandoned' } })
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
 
     // Failed outright.
     const { room: failing } = buildRoom(dataRoot, { apply: { result: { outcome: 'failed', reason: 'unconfigured' } } })
-    const { result } = await failing.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
-    expect(result).toEqual({ outcome: 'failed', reason: 'unconfigured' })
+    const { outcome } = await failing.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
+    expect(outcome).toMatchObject({ outcome: 'failed', reason: 'unconfigured' })
     expect(failing.activitySnapshot(scope(pieceId))).toBeUndefined()
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
 
-    // The recommendation still stands at its identity, so a later application settles.
+    // The recommendation still stands at its identity, so a later application opens pending again.
     adapter.release('apply')
     const retried = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
-    if (retried.result.outcome !== 'value') throw new Error('expected the retried application to settle')
-    expect(retried.result.value.manuscript).toBe('revised')
+    if (retried.outcome.outcome !== 'pending') throw new Error('expected the retried application to be pending')
+    expect(retried.outcome.manuscript).toBe('revised')
   })
 
-  it('persists the change a settled call actually made, naming the response it came from', async () => {
+  it('confirmed against the document as saved, persists the change and the entry that names the response it came from, and frees the scope', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
     })
     const source = responseId(pieceId)
 
-    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', source, undefined, 'The cups sat where she left them, twice.')
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', source, undefined, 'The cups sat where she left them, twice.')
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
 
-    if (result.outcome !== 'value') throw new Error('expected the application to settle')
+    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+    const confirmed = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
+
     const [onDisk] = readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)
-    expect(onDisk).toEqual(result.value.change)
+    expect(onDisk?.content).toEqual(confirmed.change)
+    expect(confirmed.entryId).toBe(outcome.applicationId)
 
     const [application] = entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')
-    expect(application).toMatchObject({ responseId: source, changeId: result.value.change?.id })
+    expect(application).toMatchObject({ id: outcome.applicationId, responseId: source, changeId: onDisk?.id })
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
-  it('carries no change where the application returned the manuscript unchanged', async () => {
+  it('carries no change where the application returned the manuscript unchanged, and creates nothing pending or durable', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { manuscript: 'unchanged text' } } },
     })
 
-    const { result } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'unchanged text')
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'unchanged text')
 
-    if (result.outcome !== 'value') throw new Error('expected the application to settle')
-    expect(result.value.change).toBeUndefined()
+    expect(outcome).toMatchObject({ outcome: 'noChange' })
     expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+  })
+
+  it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved while the target does not yet match — either refusal records nothing but frees the scope for a fresh application', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised text' } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+
+    await expect(room.confirmApply(workspaceDir, scope(pieceId), 'c1', 'no-such-application')).rejects.toThrowError(ApplicationNotPendingError)
+
+    // The pending application's own identity, but the draft was never saved to match it.
+    await expect(room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)).rejects.toThrowError(
+      ApplicationDocumentNotSavedError,
+    )
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+
+    const retried = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
+    expect(retried.outcome.outcome).toBe('pending')
+  })
+
+  it('confirming an already-committed identity a second time is a no-op that answers with what it already committed', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'revised text' } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), 'c1', responseId(pieceId), undefined, 'draft text')
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+
+    const first = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
+    const second = await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
+
+    expect(second).toEqual(first)
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toHaveLength(1)
   })
 })
 

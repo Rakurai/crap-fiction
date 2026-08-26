@@ -619,6 +619,10 @@ exhaustively and is what the client's controls observe. A busy scope's controls 
 client need disable: another surface of the same piece, or another piece entirely, is a different
 scope and is never held busy by this one.
 
+An Apply's busy window outlasts its model call: a replacement is pending confirmation before it
+durably lands, and the scope stays `applying` until that confirmation settles it or the author's
+abandonment does.
+
 ```
 idle
   ├─ send a message, or ask a participant for a concrete change ─→ dispatching ─→ idle
@@ -775,6 +779,15 @@ nothing about what the model was given.
 the request and returns the applied manuscript; nothing reaches disk until the author's own editor holds
 it.
 
+**A replacement is provisional until the client confirms it was saved.** The room retains it — the
+manuscript, the change computed from it, and a provisional identity — as the one pending application its
+room scope may hold, rather than writing anything durable yet. Confirming reads the target document as
+persisted and requires it to equal the replacement exactly before the change record and the entry naming
+it are written, the change first; a mismatch, an absent document, or an identity that is neither pending
+nor already committed refuses the confirmation and writes nothing. Confirming an identity already
+committed, with its change already on file, is answered as if it had just committed rather than refused —
+confirmation is the protocol closing out an application already decided, not a second author decision.
+
 **The application changes only what embodying the recommendation and the constraint requires.** Stable
 input does not imply restrained output: a model asked to cut one sentence will otherwise renormalize
 punctuation, reflow paragraphs and revise prose nobody asked about.
@@ -794,6 +807,12 @@ disk for as long as the conversation lives.
 untouched, recommendation still applicable. With the timeout in the model layer, a model that never
 answers returns the piece to `idle` without the author acting.
 
+**Abandoning a pending replacement is different only in what there is to undo.** No call is left to
+cancel — the model already answered — so abandoning simply clears the pending state and frees the scope.
+Whatever the client already installed or saved stays exactly as it is: Apply does not roll back an
+editor's own text, and the recommendation is still applicable because nothing was ever recorded against
+it.
+
 **An application that returned the manuscript unchanged is recorded as nothing.** No change file, no
 conversation entry, and the operation settles as ordinarily as any other: what the author would read
 from an entry is that a recommendation was applied, and nothing was.
@@ -801,7 +820,9 @@ from an entry is that a recommendation was applied, and nothing was.
 **Nothing is stored that would let an application be replayed.** A recommendation is interpreted afresh
 against whatever the manuscript is at the moment it is applied, which is what makes an old
 recommendation applicable at all. **A failed application changes nothing** — no partial write, no
-half-applied manuscript, and the recommendation stays applicable.
+half-applied manuscript, and the recommendation stays applicable. A replacement whose confirmation is
+refused changes nothing by the same rule: the change record and the entry naming it are written together
+or not at all.
 
 ## Transport
 
@@ -845,7 +866,9 @@ already durable, and the client reads them from the conversation itself rather t
 the client on the response to the request that started them, so a connection that dropped lost the
 result: the state returns to what it was, the manuscript is editable, the recommendation stays applicable,
 and nothing reissues the call on the author's behalf. A local connection dropping is rare enough that a
-delivery mechanism built to survive it would cost more than the loss does.
+delivery mechanism built to survive it would cost more than the loss does. The same holds once a
+replacement is pending: a dropped connection before confirmation leaves it pending rather than committed,
+and it is process restart or an explicit abandonment — never a timeout — that clears it.
 
 **One channel per thing that can fail, so nothing is reported twice.** A participant's failure rides its
 own appended entry. An application's failure belongs to the response of the request

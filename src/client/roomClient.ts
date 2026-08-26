@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
+import { applyConfirmationSchema, applyOutcomeSchema, type ApplyConfirmation, type ApplyOutcome } from '../shared/applyViews.js'
 import { entryConversationViewSchema, type EntryConversationView } from '../shared/conversationEntryViews.js'
 import {
   actionFinishedEventSchema,
@@ -80,6 +80,19 @@ export function applyRecommendation(
     body: JSON.stringify({ responseId, draft, constraint }),
     signal: signal ?? null,
   })
+}
+
+export function confirmApplication(
+  pieceId: string,
+  conversationId: string,
+  applicationId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<ApplyConfirmation>> {
+  return requestJson(
+    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}/confirm`,
+    applyConfirmationSchema,
+    { method: 'POST', signal: signal ?? null },
+  )
 }
 
 export function abandonOperation(

@@ -206,7 +206,9 @@ has produced its result — a response that landed is not one the author is aban
 conversation action the prose is fully editable and a live cursor stays in it. During an application
 the prose is visibly read-only, and reads as the manuscript being held for a moment rather than as
 the application being busy. One undifferentiated *something is happening* treatment would tell the
-author to stop typing when they do not have to.
+author to stop typing when they do not have to. That hold spans the model answering, the result being
+saved and that save being confirmed — one uninterrupted moment to the author, whatever the number of
+requests behind it.
 
 **A locked manuscript is accounted for by the response being applied**, so what the author cannot
 type into is explained by something they just did. That accounting names the participant even where

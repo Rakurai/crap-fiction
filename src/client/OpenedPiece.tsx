@@ -9,7 +9,15 @@ import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
 import { saveDraft } from './piecesClient.js'
 import { RoomEditor } from './RoomEditor.js'
-import { abandonOperation, applyRecommendation, createConversation, dispatch, fetchConversation, subscribeToRoom } from './roomClient.js'
+import {
+  abandonOperation,
+  applyRecommendation,
+  confirmApplication,
+  createConversation,
+  dispatch,
+  fetchConversation,
+  subscribeToRoom,
+} from './roomClient.js'
 import { useAutosave } from './useAutosave.js'
 import { useManuscript } from './useManuscript.js'
 import { usePiece } from './usePiece.js'
@@ -121,7 +129,7 @@ function Surfaces({
           }
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
+          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation, confirmApplication, saveDraft }}
           displayName={roster.displayName}
           handle={roster.handle}
           handles={addressable}

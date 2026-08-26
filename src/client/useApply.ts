@@ -1,9 +1,17 @@
 import { useState } from 'react'
-import type { applyRecommendation as applyRecommendationFn } from './roomClient.js'
+import type {
+  abandonOperation as abandonOperationFn,
+  applyRecommendation as applyRecommendationFn,
+  confirmApplication as confirmApplicationFn,
+} from './roomClient.js'
+import type { saveDraft as saveDraftFn } from './piecesClient.js'
 import { failureMessage } from './request.js'
 
 export type ApplyAdapters = Readonly<{
   applyRecommendation: typeof applyRecommendationFn
+  confirmApplication: typeof confirmApplicationFn
+  saveDraft: typeof saveDraftFn
+  abandonOperation: typeof abandonOperationFn
 }>
 
 export type ApplyingResponse = Readonly<{ responseId: string }>
@@ -23,7 +31,7 @@ export function useApply(
   adapters: ApplyAdapters,
   initialApplying?: ApplyingResponse,
 ): ApplyViewModel {
-  const { applyRecommendation } = adapters
+  const { applyRecommendation, confirmApplication, saveDraft, abandonOperation } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(initialApplying)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -38,6 +46,14 @@ export function useApply(
       if (message !== undefined) setError(message)
     }
 
+    // A save or confirmation failure leaves the server's pending Apply sitting at its room
+    // scope; abandoning it is what frees that scope and closes out the action, same as the
+    // author doing so by hand.
+    function stopAndAbandon(actionId: string, message: string | undefined): void {
+      stop(message)
+      void abandonOperation(pieceId, cid, actionId)
+    }
+
     async function run(): Promise<void> {
       const result = await applyRecommendation(pieceId, cid, responseId, getDraft(), constraint)
       if (result.outcome !== 'value') {
@@ -46,13 +62,27 @@ export function useApply(
       }
 
       const outcome = result.value
-      if (outcome.outcome === 'applied') {
+      if (outcome.outcome === 'noChange' || outcome.outcome === 'abandoned') {
         stop(undefined)
-        onApplied(outcome.manuscript)
         return
       }
       if (outcome.outcome === 'failed') {
         stop(`the application did not settle — ${outcome.reason}`)
+        return
+      }
+
+      // outcome.outcome === 'pending': install the replacement, save it exactly, then confirm.
+      onApplied(outcome.manuscript)
+
+      const saved = await saveDraft(pieceId, outcome.manuscript)
+      if (saved.outcome !== 'value') {
+        stopAndAbandon(outcome.actionId, failureMessage(saved) ?? 'the applied text could not be saved')
+        return
+      }
+
+      const confirmed = await confirmApplication(pieceId, cid, outcome.applicationId)
+      if (confirmed.outcome !== 'value') {
+        stopAndAbandon(outcome.actionId, failureMessage(confirmed))
         return
       }
       stop(undefined)
