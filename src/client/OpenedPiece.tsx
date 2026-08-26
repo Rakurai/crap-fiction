@@ -1,218 +1,157 @@
-import { useState } from 'react'
-import type { ConversationSummary } from '../shared/conversationEntries.js'
-import type { CastMemberView, PieceDetail, PieceStatus, StoryEditorView } from '../shared/pieceViews.js'
+import { useCallback, useRef, useState } from 'react'
+import type { PieceDetail } from '../shared/pieceViews.js'
+import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
+import type { AutosaveState } from './autosave.js'
+import type { BySurface } from './bySurface.js'
 import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
-import { Conversation, type HandleEntry } from './Conversation.js'
-import { ContextReview } from './ContextReview.js'
-import { ConversationSwitcher } from './ConversationSwitcher.js'
+import { closePiece } from './closePiece.js'
+import { documentSnapshotFrom } from './documentSnapshot.js'
+import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
+import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
 import { useLoaded } from './load.js'
-import { Manuscript } from './Manuscript.js'
 import styles from './OpenedPiece.module.css'
-import { saveDraft } from './piecesClient.js'
-import { RoomEditor } from './RoomEditor.js'
+import type { LifecycleProps } from './pieceLifecycle.js'
+import { saveSurfaceDocument } from './piecesClient.js'
+import { usePieceStream } from './pieceStream.js'
 import {
   abandonOperation,
   applyRecommendation,
-  approveCapture,
-  captureContext,
+  confirmApplication,
   createConversation,
   dispatch,
   fetchConversation,
+  retrievePendingApply,
   subscribeToRoom,
 } from './roomClient.js'
-import { useAutosave } from './useAutosave.js'
-import { useCapture } from './useCapture.js'
-import { useManuscript } from './useManuscript.js'
+import { type AuthorContextSelection } from './useConversationSession.js'
 import { usePiece } from './usePiece.js'
 import { useRoster } from './useRoster.js'
 
+export type { AuthorContextSelection } from './useConversationSession.js'
+
 type OpenedPieceProps = {
   readonly id: string
+  /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
+  readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onClose: () => void
 }
 
-type RoomProps = {
-  readonly cast: readonly CastMemberView[]
-  readonly storyEditor: StoryEditorView
-  readonly toggling: string | undefined
-  readonly error: string | undefined
-  readonly onToggle: (id: string) => void
+function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfig {
+  if (surface === 'draft') return { kind: 'prose', surface }
+  return { kind: 'plainText', surface, referenceSchema: piece.surfaces[surface].referenceSchema }
 }
 
-type LifecycleProps = {
-  readonly status: PieceStatus
-  readonly retitling: boolean
-  readonly retitleError: string | undefined
-  readonly onRetitle: (title: string) => void
-  readonly settingStatus: boolean
-  readonly statusError: string | undefined
-  readonly onSetStatus: (status: PieceStatus) => void
-}
-
-type ConversationsProps = {
-  readonly conversations: readonly ConversationSummary[]
-  readonly onRefresh: () => void
-  readonly deletingId: string | undefined
-  readonly error: string | undefined
-  readonly onDelete: (id: string) => Promise<readonly ConversationSummary[] | undefined>
-}
-
+/**
+ * The shell over one open piece: piece-level chrome and close, the one event connection every
+ * surface observes, and the document-snapshot registry each surface's own text feeds. Everything
+ * specific to one surface — its document, its conversation, its cast, its Apply — belongs to the
+ * `EditingSurface` mounted for it, not here.
+ */
 function Surfaces({
   piece,
-  room,
   lifecycle,
-  conversations,
+  authorContextSelection,
   onClose,
 }: {
   readonly piece: PieceDetail
-  readonly room: RoomProps
   readonly lifecycle: LifecycleProps
-  readonly conversations: ConversationsProps
+  readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onClose: () => void
 }) {
-  const manuscript = useManuscript(piece.draft)
-  const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
-  const [panel, setPanel] = useState<'none' | 'room' | 'conversations' | 'capture'>('none')
-  const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
-  // Keyed on this rather than on `activeConversationId`, which `Conversation` reports back when it
-  // mints one on a first dispatch: remounting on that report would tear the dispatch down mid-flight.
-  const [session, setSession] = useState(0)
-  const capture = useCapture(piece.id, activeConversationId, () => manuscript.markdown, { captureContext, approveCapture })
-  const [liveAction, setLiveAction] = useState<{ readonly conversationId: string; readonly actionId: string } | undefined>(undefined)
+  // One event source for the whole opened piece: every surface's conversation subscribes through
+  // this rather than reconnecting the stream when the author switches which surface it shows.
+  const pieceStream = usePieceStream(piece.id, subscribeToRoom)
+  const registry = useDocumentSnapshotRegistry(
+    documentSnapshotFrom(piece.surfaces.draft.text, piece.surfaces.storyContext.text, piece.surfaces.authorContext.text),
+  )
 
-  const addressable: readonly HandleEntry[] = [
-    ...room.cast.map(({ handle, displayName }) => ({ handle, displayName })),
-    { handle: room.storyEditor.handle, displayName: room.storyEditor.displayName },
-  ]
+  const [activeSurface, setActiveSurface] = useState<SurfaceId>('draft')
+  const [saveFailed, setSaveFailed] = useState<BySurface<boolean>>({})
+  const [closing, setClosing] = useState(false)
+  const flushersRef = useRef<BySurface<() => Promise<AutosaveState>>>({})
 
-  function switchTo(conversationId: string | null): void {
-    setActiveConversationId(conversationId)
-    setSession((current) => current + 1)
+  // Whether leaving the piece is refused — any surface's own failed save, not only the visible
+  // one's — or a close already under way, so a repeated request cannot start a second one.
+  const leaveBlocked = closing || SURFACE_IDS.some((surface) => saveFailed[surface] === true)
+
+  // Stable across renders, and shared by every mounted surface, so a surface reporting its own
+  // state upward never itself becomes the reason the shell — and every other surface — re-renders.
+  const handleSaveFailedChange = useCallback((surface: SurfaceId, failed: boolean) => {
+    setSaveFailed((current) => (current[surface] === failed ? current : { ...current, [surface]: failed }))
+  }, [])
+  const handleFlushRegister = useCallback((surface: SurfaceId, flush: () => Promise<AutosaveState>) => {
+    flushersRef.current = { ...flushersRef.current, [surface]: flush }
+  }, [])
+
+  const roomAdapters = {
+    createConversation,
+    fetchConversation,
+    dispatch,
+    subscribeToRoom: pieceStream,
+    abandonOperation,
+    applyRecommendation,
+    confirmApplication,
+    retrievePendingApply,
+    saveDocument: saveSurfaceDocument,
   }
 
-  async function deleteConversation(conversationId: string): Promise<void> {
-    const remaining = await conversations.onDelete(conversationId)
-    if (remaining !== undefined && activeConversationId === conversationId) {
-      switchTo(remaining[0]?.id ?? null)
+  // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
+  // flushed and awaited first, because a failed write is the one thing that keeps the piece open.
+  // `closing` disables repeated requests and keeps every surface's own persistence status visible
+  // for as long as this is waiting.
+  async function leave(): Promise<void> {
+    if (closing) return
+    setClosing(true)
+    const result = await closePiece(flushersRef.current)
+    if (result.blocked) {
+      setClosing(false)
+      return
     }
-  }
-
-  function closeAndAbandon(): void {
-    if (liveAction !== undefined) void abandonOperation(piece.id, liveAction.conversationId, liveAction.actionId)
     onClose()
   }
 
   return (
     <div className={styles.row}>
-      <Manuscript
-        title={piece.title}
-        mode={piece.mode}
-        onClose={closeAndAbandon}
-        manuscript={manuscript}
-        autosave={autosave}
-        onOpenRoom={() => setPanel('room')}
-        onOpenConversations={() => {
-          conversations.onRefresh()
-          setPanel('conversations')
-        }}
-        onOpenCapture={() => {
-          setPanel('capture')
-          if (!capture.capturing && capture.proposals.length === 0) capture.capture()
-        }}
-        lifecycle={lifecycle}
-        applying={applying}
-      />
-      {manuscript.view !== 'reading' && roster.settled && (
-        <Conversation
-          key={session}
+      {SURFACE_IDS.map((surface) => (
+        <EditingSurface
+          key={surface}
           pieceId={piece.id}
-          currentConversationId={activeConversationId}
-          conversationActionInFlight={
-            piece.conversationActionInFlight !== null && piece.conversationActionInFlight.conversationId === activeConversationId
-              ? piece.conversationActionInFlight
-              : null
-          }
-          draft={manuscript.markdown}
-          flushDraft={autosave.flush}
-          room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation }}
-          displayName={roster.displayName}
-          handle={roster.handle}
-          handles={addressable}
+          title={piece.title}
+          mode={piece.mode}
+          body={bodyConfigFor(piece, surface)}
+          initialText={piece.surfaces[surface].text}
+          initialConversationId={piece.surfaces[surface].currentConversationId}
+          conversationSelection={surface === 'authorContext' ? authorContextSelection : undefined}
+          initialCast={piece.surfaces[surface].cast}
+          initialConversations={piece.surfaces[surface].conversations}
+          storyEditor={piece.storyEditor}
+          room={roomAdapters}
+          roster={roster}
           runtime={probe.kind === 'ready' ? probe.value : undefined}
-          clock={Date.now}
-          onApplied={manuscript.applyRecommendation}
-          onApplyingChange={setApplying}
-          onConversationIdChange={setActiveConversationId}
-          onActionIdChange={setLiveAction}
+          lifecycle={lifecycle}
+          active={activeSurface === surface}
+          onSwitchToSurface={setActiveSurface}
+          leaveBlocked={leaveBlocked}
+          onClose={() => void leave()}
+          onTextChange={registry.update}
+          onSaveFailedChange={handleSaveFailedChange}
+          onFlushRegister={handleFlushRegister}
+          documents={registry.documents}
         />
-      )}
-      {panel === 'room' && (
-        <RoomEditor
-          members={room.cast}
-          storyEditor={room.storyEditor}
-          toggling={room.toggling}
-          onToggle={room.onToggle}
-          onClose={() => setPanel('none')}
-        />
-      )}
-      {panel === 'conversations' && (
-        <ConversationSwitcher
-          conversations={conversations.conversations}
-          activeId={activeConversationId}
-          deletingId={conversations.deletingId}
-          error={conversations.error}
-          clock={Date.now}
-          onSelect={(conversationId) => {
-            if (conversationId !== activeConversationId) switchTo(conversationId)
-            setPanel('none')
-          }}
-          onStartNew={() => {
-            if (activeConversationId !== null) switchTo(null)
-            setPanel('none')
-          }}
-          onDelete={deleteConversation}
-          onClose={() => setPanel('none')}
-        />
-      )}
-      {panel === 'capture' && (
-        <ContextReview
-          proposals={capture.proposals}
-          approved={capture.approved}
-          closing={capture.closing}
-          error={capture.error}
-          onToggle={capture.toggle}
-          onClose={() => {
-            capture.close()
-            setPanel('none')
-          }}
-        />
-      )}
-      {room.error !== undefined && (
-        <p className={styles.error} role="alert">
-          {room.error}
-        </p>
-      )}
+      ))}
     </div>
   )
 }
 
-export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
+export function OpenedPiece({ id, authorContextSelection, onClose }: OpenedPieceProps) {
   const piece = usePiece(id)
 
   if (piece.status === 'ready') {
     return (
       <Surfaces
         piece={piece.piece}
-        room={{
-          cast: piece.piece.cast,
-          storyEditor: piece.piece.storyEditor,
-          toggling: piece.castToggling,
-          error: piece.castError,
-          onToggle: piece.toggleCast,
-        }}
         lifecycle={{
           status: piece.piece.status,
           retitling: piece.retitling,
@@ -222,13 +161,7 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
           statusError: piece.statusError,
           onSetStatus: piece.setStatus,
         }}
-        conversations={{
-          conversations: piece.piece.conversations,
-          onRefresh: piece.refreshConversations,
-          deletingId: piece.deletingConversationId,
-          error: piece.conversationsError,
-          onDelete: piece.deleteConversation,
-        }}
+        authorContextSelection={authorContextSelection}
         onClose={onClose}
       />
     )

@@ -1,16 +1,25 @@
 import { z } from 'zod'
-import { applyOutcomeSchema, type ApplyOutcome } from '../shared/applyViews.js'
-import { captureApproveOutcomeSchema, type CaptureApproveOutcome, type CaptureProposal } from '../shared/captureProposal.js'
-import { captureOutcomeSchema, type CaptureOutcome } from '../shared/captureViews.js'
+import {
+  applyConfirmationSchema,
+  applyOutcomeSchema,
+  pendingApplySchema,
+  type ApplyConfirmation,
+  type ApplyOutcome,
+  type PendingApply,
+} from '../shared/applyViews.js'
 import { entryConversationViewSchema, type EntryConversationView } from '../shared/conversationEntryViews.js'
 import {
   actionFinishedEventSchema,
   actionStartedEventSchema,
+  applyPendingEventSchema,
   conversationErrorEventSchema,
   entryAppendedEventSchema,
   participantActivityEventSchema,
+  roomActivitySnapshotSchema,
   type ConversationErrorEvent,
+  type RoomActivitySnapshot,
 } from '../shared/conversationEvents.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
 
@@ -22,8 +31,12 @@ function readJson(text: string): unknown {
   }
 }
 
-export function createConversation(pieceId: string, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations`, z.object({ id: z.string() }), {
+function surfacePath(pieceId: string, surface: SurfaceId): string {
+  return `/pieces/${encodeURIComponent(pieceId)}/surfaces/${surface}`
+}
+
+export function createConversation(pieceId: string, surface: SurfaceId, signal?: AbortSignal): Promise<RequestResult<{ id: string }>> {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations`, z.object({ id: z.string() }), {
     method: 'POST',
     signal: signal ?? null,
   })
@@ -31,16 +44,22 @@ export function createConversation(pieceId: string, signal?: AbortSignal): Promi
 
 export function fetchConversation(
   pieceId: string,
+  surface: SurfaceId,
   conversationId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<EntryConversationView>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, entryConversationViewSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}`, entryConversationViewSchema, {
     signal: signal ?? null,
   })
 }
 
-export function deleteConversation(pieceId: string, conversationId: string, signal?: AbortSignal): Promise<RequestResult<null>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}`, z.null(), {
+export function deleteConversation(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<null>> {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}`, z.null(), {
     method: 'DELETE',
     signal: signal ?? null,
   })
@@ -55,80 +74,90 @@ export type DispatchOpening =
 
 export function dispatch(
   pieceId: string,
+  surface: SurfaceId,
   conversationId: string,
   opening: DispatchOpening,
-  draft: string,
+  documents: DocumentSnapshot,
   signal?: AbortSignal,
 ): Promise<RequestResult<{ conversationId: string; actionId: string }>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/dispatch`, dispatchResultSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...opening, draft }),
+    body: JSON.stringify({ ...opening, documents }),
     signal: signal ?? null,
   })
 }
 
 export function applyRecommendation(
   pieceId: string,
+  surface: SurfaceId,
   conversationId: string,
   responseId: string,
-  draft: string,
+  documents: DocumentSnapshot,
   constraint: string | undefined,
   signal?: AbortSignal,
 ): Promise<RequestResult<ApplyOutcome>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
+  return requestJson(`${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply`, applyOutcomeSchema, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ responseId, draft, constraint }),
+    body: JSON.stringify({ responseId, documents, constraint }),
     signal: signal ?? null,
   })
 }
 
-export function captureContext(
+export function confirmApplication(
   pieceId: string,
+  surface: SurfaceId,
   conversationId: string,
-  draft: string,
+  applicationId: string,
   signal?: AbortSignal,
-): Promise<RequestResult<CaptureOutcome>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/capture`, captureOutcomeSchema, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ conversationId, draft }),
-    signal: signal ?? null,
-  })
+): Promise<RequestResult<ApplyConfirmation>> {
+  return requestJson(
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}/confirm`,
+    applyConfirmationSchema,
+    { method: 'POST', signal: signal ?? null },
+  )
 }
 
-export function approveCapture(
+/**
+ * The generated document a pending Apply is holding, by the provisional identity its `activity.snapshot`
+ * reported — what a reconnecting client resumes installation from, without asking the model again.
+ */
+export function retrievePendingApply(
   pieceId: string,
-  approved: readonly CaptureProposal[],
+  surface: SurfaceId,
+  conversationId: string,
+  applicationId: string,
   signal?: AbortSignal,
-): Promise<RequestResult<CaptureApproveOutcome>> {
-  return requestJson(`/pieces/${encodeURIComponent(pieceId)}/capture/approve`, captureApproveOutcomeSchema, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ approved }),
-    signal: signal ?? null,
-  })
+): Promise<RequestResult<PendingApply>> {
+  return requestJson(
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}`,
+    pendingApplySchema,
+    { signal: signal ?? null },
+  )
 }
 
 export function abandonOperation(
   pieceId: string,
+  surface: SurfaceId,
   conversationId: string,
   actionId: string,
   signal?: AbortSignal,
 ): Promise<RequestResult<null>> {
   return requestJson(
-    `/pieces/${encodeURIComponent(pieceId)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/abandon`,
     z.null(),
     { method: 'POST', signal: signal ?? null },
   )
 }
 
+export const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+
 export function subscribeToRoom(
   pieceId: string,
   onEvent: (event: RoomEvent) => void,
   onMalformedFrame: (message: string) => void,
-): () => void {
+): Readonly<{ snapshot: Promise<RoomActivitySnapshot>; unsubscribe: () => void }> {
   const source = new EventSource(`/pieces/${encodeURIComponent(pieceId)}/events`)
 
   function listen<T>(name: string, schema: z.ZodType<T>, wrap: (data: T) => RoomEvent): void {
@@ -144,11 +173,45 @@ export function subscribeToRoom(
     })
   }
 
+  // Resolving is the only way to say "idle": a malformed frame, or a transport that has given up
+  // reconnecting, rejects instead, and a transport still retrying leaves this pending — so a caller
+  // reading only resolution can never mistake "unknown" for "nothing in flight".
+  const snapshot = new Promise<RoomActivitySnapshot>((resolve, reject) => {
+    source.addEventListener(
+      'activity.snapshot',
+      (event) => {
+        if (!(event instanceof MessageEvent)) {
+          reject(new Error('the room’s activity arrived as something this client cannot read'))
+          return
+        }
+        const frame: unknown = event.data
+        const parsed = typeof frame === 'string' ? roomActivitySnapshotSchema.safeParse(readJson(frame)) : { success: false as const }
+        if (!parsed.success) {
+          const message = 'malformed "activity.snapshot" event from the studio'
+          onMalformedFrame(message)
+          reject(new Error(message))
+          return
+        }
+        resolve(parsed.data)
+      },
+      { once: true },
+    )
+    // An `EventSource` reports a dropped connection it is about to retry the same way it reports one
+    // it has abandoned; only the closed state is terminal, and a retry that succeeds still delivers
+    // the snapshot this is waiting for.
+    source.addEventListener('error', () => {
+      if (source.readyState === source.CLOSED) {
+        reject(new Error('the room’s activity could not be learned — the connection to the studio failed'))
+      }
+    })
+  })
+
   listen('action.started', actionStartedEventSchema, (data) => ({ type: 'action.started', data }))
+  listen('apply.pending', applyPendingEventSchema, (data) => ({ type: 'apply.pending', data }))
   listen('participant.activity', participantActivityEventSchema, (data) => ({ type: 'participant.activity', data }))
   listen('entry.appended', entryAppendedEventSchema, (data) => ({ type: 'entry.appended', data }))
   listen('action.finished', actionFinishedEventSchema, (data) => ({ type: 'action.finished', data }))
   listen('error', conversationErrorEventSchema, (data: ConversationErrorEvent) => ({ type: 'error', data }))
 
-  return () => source.close()
+  return { snapshot, unsubscribe: () => source.close() }
 }

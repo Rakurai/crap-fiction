@@ -119,6 +119,7 @@ export type ApplyContextInput = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   entries: readonly ConversationEntry[]
   participants: ReadonlyMap<string, string>
 }>
@@ -132,6 +133,7 @@ export type ApplyContext = Readonly<{
   storyContext: string | undefined
   draft: string
   surface: SurfaceId
+  referenceSchema: string | undefined
   history: readonly HistoryEntry[]
 }>
 
@@ -155,6 +157,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     storyContext: input.storyContext,
     draft: input.draft,
     surface: input.surface,
+    referenceSchema: input.referenceSchema,
     history: fullHistory(input.entries, input.participants),
   }
 }
@@ -172,6 +175,17 @@ function compose(parts: readonly string[]): string {
 
 function fixedSection(fragment: Fragment): string {
   return renderFragment(fragment, {})
+}
+
+/** What a task instruction calls the document it targets, so an Apply or a reading task names the surface it was actually issued for. */
+const TARGET_DOCUMENT: Readonly<Record<SurfaceId, string>> = {
+  draft: 'manuscript',
+  storyContext: 'story context',
+  authorContext: 'author context',
+}
+
+function taskSection(fragment: Fragment, surface: SurfaceId): string {
+  return renderFragment(fragment, { targetDocument: TARGET_DOCUMENT[surface] })
 }
 
 function section(fragments: PromptFragments, name: SectionName, variable: string, value: string | undefined): string {
@@ -204,8 +218,9 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
 export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallPrompt {
   const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.apply)])
   const perCall = compose([
-    fixedSection(fragments.tasks.apply),
+    taskSection(fragments.tasks.apply, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
+    section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
     section(fragments, 'storyContext', 'storyContext', context.storyContext),
     section(fragments, 'manuscript', 'manuscript', context.draft),
@@ -227,7 +242,7 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
   ])
 
   const perCall = compose([
-    fixedSection(task),
+    taskSection(task, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
     context.owesAnswer ? fixedSection(fragments.sections.addressed) : '',
     section(fragments, 'authorContext', 'authorContext', context.authorContext),
@@ -243,45 +258,3 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
   return { durable, perCall }
 }
 
-export type CaptureContextInput = Readonly<{
-  modeDescription: string
-  authorContext: string | undefined
-  storyContext: string | undefined
-  draft: string
-  surface: SurfaceId
-  entries: readonly ConversationEntry[] | undefined
-  participants: ReadonlyMap<string, string>
-}>
-
-export type CaptureContext = Readonly<{
-  modeDescription: string
-  authorContext: string | undefined
-  storyContext: string | undefined
-  draft: string
-  surface: SurfaceId
-  history: readonly HistoryEntry[]
-}>
-
-export function compileCaptureContext(input: CaptureContextInput): CaptureContext {
-  return {
-    modeDescription: input.modeDescription,
-    authorContext: input.authorContext,
-    storyContext: input.storyContext,
-    draft: input.draft,
-    surface: input.surface,
-    history: input.entries === undefined ? [] : fullHistory(input.entries, input.participants),
-  }
-}
-
-export function renderCapturePrompt(context: CaptureContext, fragments: PromptFragments): CallPrompt {
-  const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.capture)])
-  const perCall = compose([
-    fixedSection(fragments.tasks.capture),
-    fixedSection(fragments.surfaces[context.surface]),
-    section(fragments, 'authorContext', 'authorContext', context.authorContext),
-    section(fragments, 'storyContext', 'storyContext', context.storyContext),
-    section(fragments, 'manuscript', 'manuscript', context.draft),
-    section(fragments, 'history', 'history', historyLines(fragments, context.history)),
-  ])
-  return { durable, perCall }
-}

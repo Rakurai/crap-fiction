@@ -1,17 +1,15 @@
 import slugify from '@sindresorhus/slugify'
 import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
-import type { CaptureSnapshot } from '../shared/captureViews.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
-import { durableContextSchema } from '../shared/durableContext.js'
-import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
-import { WORKED_SURFACE } from '../shared/surfaces.js'
+import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import { defaultCastFor, specialistsFor } from './room/roster.js'
+import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
   conversationActivity,
   deleteAppliedChange,
@@ -20,15 +18,22 @@ import {
   pieceExists,
   pieceIds,
   readAppliedChanges,
+  readAuthorContext,
   readConversationEntries,
   readPiece,
   readStoryContext,
   writePieceCast,
   writePieceDetails,
   writePieceMetadata,
+  type AuthorContextStore,
   type DraftStore,
   type StoredPiece,
+  type StoryContextStore,
 } from './store/index.js'
+
+function surfaceScope(workspaceDir: string, pieceId: string, surface: SurfaceId): ConversationScope {
+  return conversationScopeFor(workspaceDir, { pieceId, surface })
+}
 
 export class PieceNotFoundError extends Error {
   constructor(id: string) {
@@ -86,10 +91,16 @@ function castView(specialists: readonly RoleDefinition[], enabled: readonly stri
   }))
 }
 
-export function listConversations(workspaceDir: string, pieceId: string): readonly ConversationSummary[] {
-  return conversationActivity(workspaceDir, pieceId)
+export function listConversations(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: SurfaceId,
+): readonly ConversationSummary[] {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
+  return conversationActivity(dataRoot, scope)
     .map(({ id, modifiedMs }) => {
-      const conversation = readConversationEntries(workspaceDir, pieceId, id)
+      const conversation = readConversationEntries(dataRoot, scope, id)
       const opening = conversation === undefined ? undefined : openingWords(conversation.entries)
       return { id, opening, lastActivity: modifiedMs }
     })
@@ -119,7 +130,11 @@ export async function createPiece(
     title,
     mode: modeId,
     status: 'drafting',
-    cast: [...defaultCastFor(specialists, modeId, WORKED_SURFACE)],
+    cast: {
+      draft: [...defaultCastFor(specialists, modeId, 'draft')],
+      storyContext: [...defaultCastFor(specialists, modeId, 'storyContext')],
+      authorContext: [...defaultCastFor(specialists, modeId, 'authorContext')],
+    },
   })
 
   return summarize(id, requirePiece(workspaceDir, id))
@@ -130,25 +145,60 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
   return pieces.sort((a, b) => b.modified - a.modified)
 }
 
-export function getPiece(
+function surfaceText(workspaceDir: string, dataRoot: string, id: string, piece: StoredPiece, surface: SurfaceId): string {
+  if (surface === 'draft') return piece.draft?.text ?? ''
+  if (surface === 'storyContext') return readStoryContext(workspaceDir, id) ?? ''
+  return readAuthorContext(dataRoot) ?? ''
+}
+
+function surfaceReferenceSchema(piece: StoredPiece, surface: SurfaceId, modes: readonly ModeDescriptor[], authorContextReference: string): string | null {
+  if (surface === 'draft') return null
+  if (surface === 'authorContext') return authorContextReference
+  const mode = modes.find((candidate) => candidate.id === piece.metadata.mode)
+  if (mode === undefined) throw new UnknownModeError(piece.metadata.mode)
+  return mode.storyContextReference
+}
+
+function surfaceDetail(
+  dataRoot: string,
   workspaceDir: string,
   id: string,
-  conversationActionInFlight: ConversationActivitySnapshot | null,
-  captureInFlight: CaptureSnapshot | null,
+  piece: StoredPiece,
+  specialists: readonly RoleDefinition[],
+  modes: readonly ModeDescriptor[],
+  authorContextReference: string,
+  surface: SurfaceId,
+): SurfaceDetail {
+  const available = specialistsFor(specialists, piece.metadata.mode, surface)
+  return {
+    text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
+    referenceSchema: surfaceReferenceSchema(piece, surface, modes, authorContextReference),
+    currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
+    conversations: listConversations(dataRoot, workspaceDir, id, surface),
+    cast: castView(available, piece.metadata.cast[surface]),
+  }
+}
+
+export function getPiece(
+  dataRoot: string,
+  workspaceDir: string,
+  id: string,
   specialists: readonly RoleDefinition[],
   storyEditor: RoleDefinition,
+  modes: readonly ModeDescriptor[],
+  authorContextReference: string,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, WORKED_SURFACE)
+  const detailFor = (surface: SurfaceId): SurfaceDetail =>
+    surfaceDetail(dataRoot, workspaceDir, id, piece, specialists, modes, authorContextReference, surface)
+  const surfaces: PieceDetail['surfaces'] = {
+    draft: detailFor('draft'),
+    storyContext: detailFor('storyContext'),
+    authorContext: detailFor('authorContext'),
+  }
   return {
     ...summarize(id, piece),
-    draft: piece.draft?.text ?? '',
-    storyContext: readStoryContext(workspaceDir, id, durableContextSchema) ?? {},
-    currentConversationId: mostRecentConversationId(workspaceDir, id) ?? null,
-    conversations: listConversations(workspaceDir, id),
-    conversationActionInFlight,
-    captureInFlight,
-    cast: castView(available, piece.metadata.cast),
+    surfaces,
     storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
   }
 }
@@ -157,15 +207,16 @@ export async function setPieceCast(
   workspaceDir: string,
   id: string,
   specialists: readonly RoleDefinition[],
+  surface: SurfaceId,
   cast: readonly string[],
 ): Promise<readonly CastMemberView[]> {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, WORKED_SURFACE)
+  const available = specialistsFor(specialists, piece.metadata.mode, surface)
   const ceiling = new Set(available.map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
-  await writePieceCast(workspaceDir, id, cast)
+  await writePieceCast(workspaceDir, id, surface, cast)
   return castView(available, cast)
 }
 
@@ -187,7 +238,7 @@ export async function updatePieceDetails(
 export type PieceChanges = Readonly<{
   title?: string | undefined
   status?: PieceStatus | undefined
-  cast?: readonly string[] | undefined
+  cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
 export async function updatePiece(
@@ -202,7 +253,7 @@ export async function updatePiece(
     await updatePieceDetails(workspaceDir, id, { ...(title !== undefined ? { title } : {}), ...(status !== undefined ? { status } : {}) })
   }
   if (cast !== undefined) {
-    await setPieceCast(workspaceDir, id, specialists, cast)
+    await setPieceCast(workspaceDir, id, specialists, cast.surface, cast.ids)
   }
 }
 
@@ -211,11 +262,18 @@ export function startConversation(workspaceDir: string, pieceId: string): { read
   return { id: nanoid() }
 }
 
-export function getConversation(workspaceDir: string, pieceId: string, conversationId: string): EntryConversationView {
-  const conversation = readConversationEntries(workspaceDir, pieceId, conversationId)
+export function getConversation(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+): EntryConversationView {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
+  const conversation = readConversationEntries(dataRoot, scope, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
-  const changes = new Map(readAppliedChanges(workspaceDir, pieceId, appliedChangeSchema).map((change) => [change.id, change]))
+  const changes = new Map(readAppliedChanges(dataRoot, scope, appliedChangeSchema).map((change) => [change.id, change]))
 
   const entries: ConversationEntryView[] = conversation.entries.map((entry) =>
     entry.kind === 'application' ? { ...entry, change: changes.get(entry.changeId)?.content } : entry,
@@ -224,28 +282,44 @@ export function getConversation(workspaceDir: string, pieceId: string, conversat
   return { id: conversation.id, entries }
 }
 
-export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
-  const conversation = readConversationEntries(workspaceDir, pieceId, conversationId)
+export async function deleteConversation(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+): Promise<void> {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
+  const conversation = readConversationEntries(dataRoot, scope, conversationId)
   if (conversation === undefined) throw new ConversationNotFoundError(pieceId, conversationId)
 
   const changeIds = conversation.entries.flatMap((entry) => (entry.kind === 'application' ? [entry.changeId] : []))
   for (const changeId of changeIds) {
-    await deleteAppliedChange(workspaceDir, pieceId, changeId)
+    await deleteAppliedChange(dataRoot, scope, changeId)
   }
 
   // Last: a failure partway through leaves the file that names the changes still readable.
-  await deleteConversationFile(workspaceDir, pieceId, conversationId)
+  await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
-export class DraftWriter {
-  readonly #drafts: DraftStore
+/** Every document's own writer, each serialized independently of the others. */
+export class PieceDocumentWriter {
+  readonly #draft: DraftStore
+  readonly #storyContext: StoryContextStore
+  readonly #authorContext: AuthorContextStore
+  readonly #dataRoot: string
 
-  constructor(drafts: DraftStore) {
-    this.#drafts = drafts
+  constructor(draft: DraftStore, storyContext: StoryContextStore, authorContext: AuthorContextStore, dataRoot: string) {
+    this.#draft = draft
+    this.#storyContext = storyContext
+    this.#authorContext = authorContext
+    this.#dataRoot = dataRoot
   }
 
-  async save(workspaceDir: string, id: string, draft: string): Promise<void> {
+  async save(workspaceDir: string, id: string, surface: SurfaceId, text: string): Promise<void> {
     if (!pieceExists(workspaceDir, id)) throw new PieceNotFoundError(id)
-    await this.#drafts.write(workspaceDir, id, draft)
+    if (surface === 'draft') await this.#draft.write(workspaceDir, id, text)
+    else if (surface === 'storyContext') await this.#storyContext.write(workspaceDir, id, text)
+    else await this.#authorContext.write(this.#dataRoot, text)
   }
 }

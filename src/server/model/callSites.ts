@@ -3,9 +3,7 @@ import type { RoleDefinition } from './roles.js'
 
 export const APPLY_CALL_SITE = 'apply'
 
-export const CAPTURE_CALL_SITE = 'capture'
-
-export const OPERATION_CALL_SITES = [APPLY_CALL_SITE, CAPTURE_CALL_SITE] as const
+export const OPERATION_CALL_SITES = [APPLY_CALL_SITE] as const
 
 export type OperationCallSite = (typeof OPERATION_CALL_SITES)[number]
 
@@ -41,12 +39,6 @@ const OPERATIONS: readonly CallSiteDescriptor[] = [
     handle: null,
     displayName: 'Apply',
     description: 'Rewrites the passage a recommendation names, in the manuscript, in your prose rather than its own.',
-  },
-  {
-    site: CAPTURE_CALL_SITE,
-    handle: null,
-    displayName: 'Capture context',
-    description: 'Reads the manuscript for facts about the story worth keeping, and proposes them for your approval.',
   },
 ]
 

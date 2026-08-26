@@ -12,8 +12,8 @@ restated only to use it, never to redefine it.
 These pairs are near-synonyms in ordinary English and different things here.
 
 - **Author context** generalizes across every piece. **Story context** belongs to one piece.
-- **Commentary** is a reading. An **applicable suggestion** is something the manuscript can
-  be made to embody.
+- **Commentary** is a reading. An **applicable suggestion** is something a surface's document
+  can be made to embody.
 - The **Story Editor** is a collaborator in the room. The **prose editor** is the text
   editing surface.
 
@@ -36,6 +36,9 @@ default voice tendencies that genuinely hold across stories.
 
 It changes rarely. A choice that worked in one story is not thereby an author-level
 preference.
+
+Author context is opaque text: the application never parses, validates or normalizes it, so a
+hand-written comment or an idiosyncratic layout survives exactly as the author left it.
 
 ## Piece
 
@@ -69,30 +72,39 @@ durable notes.
 Story context may change considerably as a piece develops, but never without the author
 saying so. Ordinary discussion and ordinary editing do not rewrite it.
 
+Like author context, story context is opaque text: the application never parses, validates or
+normalizes it.
+
 ## Surface
 
 The closed set of places written material can be edited: the draft, the story context, or the
-author context.
+author context. Each surface has exactly one document — the manuscript, the piece's story
+context, or the author context — and everything the author and the room do on a surface is done
+to that document.
 
 ## Room
 
-The participants engaged on a piece: its roster and the Story Editor.
+The participants engaged on a piece: its roster and the Story Editor. A piece has one room, but
+the room's roster, cast and engagement are independent per editing surface: enabling a specialist,
+or engaging the room in work, on one surface says nothing about any other.
 
 ### Roster
 
-The specialists available to a piece, given its mode. A mode names no specialist; each
-specialist declares for itself the modes it is available in. The roster is everything that
-declaration yields for the piece's mode, whether currently enabled or not.
+The specialists available to a piece on one editing surface, given its mode. A mode names no
+specialist; each specialist declares for itself the mode-and-surface pairs it is available for.
+The roster for a mode and surface is everything that declaration yields, whether currently
+enabled or not.
 
-**Cast** means the roster's enabled subset. The Story Editor is always present and belongs to
-neither the roster nor the cast.
+**Cast** means the roster's enabled subset, for one editing surface. The Story Editor is always
+present and belongs to neither the roster nor the cast, on any surface.
 
-**Initial cast** — the cast a newly created piece begins with, drawn from the default each
-roster specialist declares for the piece's mode.
+**Initial cast** — the cast a newly created piece begins with on one editing surface, drawn from
+the default each roster specialist declares for the piece's mode and that surface.
 
-A specialist is **enabled** or it is not, within the roster. There is no joining or leaving
-lifecycle and no temporary presence: a specialist disabled for a time and re-enabled later
-simply becomes answerable again.
+A specialist is **enabled** or it is not, within the roster of one editing surface. There is no
+joining or leaving lifecycle and no temporary presence: a specialist disabled for a time and
+re-enabled later simply becomes answerable again. Enabling it on one surface has no bearing on
+its standing on another.
 
 ## Participant
 
@@ -134,14 +146,17 @@ one edit rather than one per participant.
 
 ## Conversation
 
-A durable, resumable, multi-turn discussion about a piece. A piece may have several.
+A durable, resumable, multi-turn discussion about a piece's draft, about its story context, or
+about the author context that generalizes across every piece. A piece may have several
+conversations on each of its own two surfaces; the author context has one shared collection,
+reached the same way from any piece.
 
 A conversation exists once its first author action opens. Until then, starting one is an
 intention rather than a thing: nothing empty is kept, and nothing accumulates to be pruned.
 
-**Conversation history and manuscript state are independent.** A conversation does not
-version, own, or restore the draft. A discussion held against earlier prose stands as it was
-said, and nothing reconciles it with the draft as it now is.
+**Conversation history and document state are independent.** A conversation does not version,
+own, or restore its surface's document. A discussion held against earlier text stands as it was
+said, and nothing reconciles it with the document as it now is.
 
 ## Author action
 
@@ -180,8 +195,8 @@ conversation, and absent from the settled discussion.
 concrete enough to act on. The author's natural follow-up is to ask the participant what it
 would change.
 
-**Applicable suggestion** — a recommendation concrete enough that the manuscript can be made
-to embody it.
+**Applicable suggestion** — a recommendation concrete enough that the document of the surface
+it was made on can be made to embody it.
 
 A response that says anything says it in two parts. Its **claim** is one sentence stating the
 reading the participant commits to. Its **note** is elaboration, and is optional: a claim
@@ -194,20 +209,21 @@ a mechanically executable edit. *The last paragraph explains the realization twi
 the explanation and let the unopened letter carry it* is a recommendation.
 
 A recommendation carries no required executable location, replacement field or patch. It may
-quote the manuscript and propose prose naturally as part of what it says — *change "walked
+quote the document and propose text naturally as part of what it says — *change "walked
 slowly" to "crept"*, or three candidate endings when the author asked for three — and that
-prose is part of an ordinary response rather than a stored edit to be executed.
+text is part of an ordinary response rather than a stored edit to be executed.
 
 **A recommendation is implementable as it stands**: one change, or a small set of related
 changes that address the concern together.
 
 ## Apply
 
-Semantic acceptance of a recommendation: make the current manuscript embody it.
+Semantic acceptance of a recommendation: make the current document of the surface the
+recommendation was made on embody it.
 
-Apply interprets the recommendation against the draft and the full conversation as they stand
-at the moment the author applies it, together with any constraint the author supplies. It does
-not replay a stored edit. Prose that arrives through Apply is ordinary manuscript prose
+Apply interprets the recommendation against that document and the full conversation as they
+stand at the moment the author applies it, together with any constraint the author supplies. It
+does not replay a stored edit. Text that arrives through Apply is ordinary text of that document
 immediately, with no further acceptance state.
 
 **Applied change** — what an application changed, kept, and not a version of the story. The
@@ -223,22 +239,8 @@ additional instruction. *Keep the opening image intact.*
 An ordinary message that asks the room to evaluate the current prose in light of a change just
 made. A convenience for something the author could type; not a distinct mode of reasoning.
 
-## Capture context
-
-An author-invoked analysis that proposes changes to the durable contexts, reading the
-current draft, the current conversation, and both existing contexts.
-
-It produces **proposals**: granular, individually approvable changes, each identifying
-whether it belongs to story context or author context. A proposal may add, revise, replace a
-statement that no longer holds, or remove something no longer true. The question it answers
-is what should change, not what was mentioned.
-
-The threshold differs by destination. Story context is appropriate where information appears
-settled or intentionally preserved about this piece. Author context requires substantially
-stronger evidence that a preference generalizes beyond it, so author-context proposals are
-rare.
-
 ## Durable state
 
-Everything the application keeps: author context, and per piece its metadata, draft, story
-context, and conversations.
+Everything the application keeps: author context and its conversations, generalizing across
+every piece; and per piece its metadata, draft, story context, and the draft's and the story
+context's own conversations.

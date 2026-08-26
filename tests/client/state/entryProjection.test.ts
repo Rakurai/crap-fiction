@@ -13,19 +13,22 @@ function response(id: string, participantId: string, causeId: string): Conversat
 }
 
 function started(actionId: string, audience: readonly string[] = ['shape', 'compression']): RoomEvent {
-  return { type: 'action.started', data: { actionId, conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: STARTED_AT, audience } }
+  return {
+    type: 'action.started',
+    data: { actionId, conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: STARTED_AT, audience, surface: 'draft' },
+  }
 }
 
 function activity(participantId: string, state: 'preparing' | 'working', actionId = 'a1'): RoomEvent {
-  return { type: 'participant.activity', data: { actionId, participantId, state } }
+  return { type: 'participant.activity', data: { actionId, participantId, state, surface: 'draft' } }
 }
 
 function appended(entry: ConversationEntryView, actionId = 'a1'): RoomEvent {
-  return { type: 'entry.appended', data: { actionId, entry } }
+  return { type: 'entry.appended', data: { actionId, entry, surface: 'draft' } }
 }
 
 function finished(actionId: string, outcome: 'settled' | 'abandoned' | 'failed'): RoomEvent {
-  return { type: 'action.finished', data: { actionId, outcome } }
+  return { type: 'action.finished', data: { actionId, outcome, surface: 'draft' } }
 }
 
 describe('projectEvent', () => {
@@ -82,7 +85,7 @@ describe('projectEvent', () => {
   it('ignores an event that is not this dispatch — an apply, or an activity or a finish naming another action', () => {
     const apply = projectEvent(EMPTY_PROJECTION, {
       type: 'action.started',
-      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e0', startedAt: STARTED_AT },
+      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e0', startedAt: STARTED_AT, surface: 'draft' },
     })
     expect(apply.activity).toBeUndefined()
 

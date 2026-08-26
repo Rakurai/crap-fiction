@@ -7,6 +7,7 @@ export const MODE_FIXTURE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
   description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 export const ROLES_FIXTURE: readonly RoleDefinition[] = [
@@ -32,6 +33,8 @@ export const ROLES_FIXTURE: readonly RoleDefinition[] = [
 
 export const CHARTER_FIXTURE: Charter = 'nothing material to contribute; a reading without a concrete action; a recommendation concrete enough to apply'
 
+export const AUTHOR_CONTEXT_REFERENCE_FIXTURE = 'Recurring stylistic preferences and collaboration notes, generalizing across every piece.'
+
 function fixedFragment(name: string, template: string): Fragment {
   return { name, variables: [], template }
 }
@@ -55,6 +58,7 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     clarification: variableFragment('sections/clarification', ['clarification'], 'FIXTURE_CLARIFICATION_HEADING\n\n{{clarification}}'),
     recommendation: variableFragment('sections/recommendation', ['recommendation'], 'FIXTURE_RECOMMENDATION_HEADING\n\n{{recommendation}}'),
     constraint: variableFragment('sections/constraint', ['constraint'], 'FIXTURE_CONSTRAINT_HEADING\n\n{{constraint}}'),
+    referenceSchema: variableFragment('sections/referenceSchema', ['referenceSchema'], 'FIXTURE_REFERENCE_SCHEMA_HEADING\n\n{{referenceSchema}}'),
   },
   lines: {
     historyMessage: variableFragment('lines/historyMessage', ['text'], 'Author: {{text}}'),
@@ -63,15 +67,13 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     readingNoComment: variableFragment('lines/readingNoComment', ['participant'], '{{participant}} found nothing material in its discipline.'),
   },
   tasks: {
-    specialist: fixedFragment('tasks/specialist', 'FIXTURE_SPECIALIST_TASK'),
-    generalist: fixedFragment('tasks/generalist', 'FIXTURE_GENERALIST_TASK'),
-    concreteChange: fixedFragment('tasks/concreteChange', 'FIXTURE_CONCRETE_CHANGE_TASK'),
-    apply: fixedFragment('tasks/apply', 'FIXTURE_APPLY_TASK'),
-    capture: fixedFragment('tasks/capture', 'FIXTURE_CAPTURE_TASK'),
+    specialist: variableFragment('tasks/specialist', ['targetDocument'], 'FIXTURE_SPECIALIST_TASK {{targetDocument}}'),
+    generalist: variableFragment('tasks/generalist', ['targetDocument'], 'FIXTURE_GENERALIST_TASK {{targetDocument}}'),
+    concreteChange: variableFragment('tasks/concreteChange', ['targetDocument'], 'FIXTURE_CONCRETE_CHANGE_TASK {{targetDocument}}'),
+    apply: variableFragment('tasks/apply', ['targetDocument'], 'FIXTURE_APPLY_TASK {{targetDocument}}'),
   },
   roles: {
     apply: fixedFragment('roles/apply', 'FIXTURE_APPLY_ROLE'),
-    capture: fixedFragment('roles/capture', 'FIXTURE_CAPTURE_ROLE'),
   },
   surfaces: {
     draft: fixedFragment('surfaces/draft', 'FIXTURE_DRAFT_SURFACE'),

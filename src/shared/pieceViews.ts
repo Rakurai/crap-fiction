@@ -1,8 +1,5 @@
 import { z } from 'zod'
-import { captureSnapshotSchema } from './captureViews.js'
 import { conversationSummarySchema } from './conversationEntries.js'
-import { conversationActivitySnapshotSchema } from './conversationEvents.js'
-import { durableContextSchema } from './durableContext.js'
 
 export const pieceStatusSchema = z.enum(['drafting', 'finished', 'abandoned'])
 
@@ -40,15 +37,29 @@ export const storyEditorViewSchema = z
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 
-export const pieceDetailSchema = pieceSummaryShape
-  .extend({
-    draft: z.string(),
-    storyContext: durableContextSchema,
+export const surfaceDetailSchema = z
+  .object({
+    text: z.string(),
+    referenceSchema: z.string().nullable(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
-    conversationActionInFlight: conversationActivitySnapshotSchema.nullable(),
-    captureInFlight: captureSnapshotSchema.nullable(),
     cast: z.array(castMemberViewSchema).readonly(),
+  })
+  .readonly()
+export type SurfaceDetail = z.infer<typeof surfaceDetailSchema>
+
+export const pieceSurfacesSchema = z
+  .object({
+    draft: surfaceDetailSchema,
+    storyContext: surfaceDetailSchema,
+    authorContext: surfaceDetailSchema,
+  })
+  .readonly()
+export type PieceSurfaces = z.infer<typeof pieceSurfacesSchema>
+
+export const pieceDetailSchema = pieceSummaryShape
+  .extend({
+    surfaces: pieceSurfacesSchema,
     storyEditor: storyEditorViewSchema,
   })
   .readonly()

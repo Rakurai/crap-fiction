@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { documentSnapshotSchema } from '../../shared/surfaces.js'
 import type { DispatchOpening } from './room.js'
 
 /**
@@ -7,12 +8,12 @@ import type { DispatchOpening } from './room.js'
  * carrying `target` a reply to one participant, is the room's own reading of its request.
  */
 export const dispatchRequestSchema = z.union([
-  z.strictObject({ message: z.string().min(1), draft: z.string() }),
-  z.strictObject({ target: z.string().min(1), message: z.string().min(1), draft: z.string() }),
+  z.strictObject({ message: z.string().min(1), documents: documentSnapshotSchema }),
+  z.strictObject({ target: z.string().min(1), message: z.string().min(1), documents: documentSnapshotSchema }),
   z.strictObject({
     respondingTo: z.string().min(1),
     clarification: z.string().min(1).optional(),
-    draft: z.string(),
+    documents: documentSnapshotSchema,
   }),
 ])
 

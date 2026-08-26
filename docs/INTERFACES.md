@@ -42,25 +42,38 @@ GET    /modes                                      every loaded mode's id and di
 GET    /pieces                                     title, mode, status, length, modified
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
-GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the room (the cast and the Story Editor), the
-                                                   conversation action in flight if there is one,
-                                                   and whether a capture is
-PATCH  /pieces/:id                                 title, status, enabled cast
-PUT    /pieces/:id/draft
-GET    /pieces/:id/conversations/:cid              the durable entries, each application joined to
+GET    /pieces/:id                                 metadata and the Story Editor, plus each of the
+                                                   three surfaces' text, its reference schema where it
+                                                   has one, conversation index, current conversation,
+                                                   and roster with enabled state
+PATCH  /pieces/:id                                 title, status, one surface's enabled cast
+PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
+                                                   author context's whole text
+GET    /pieces/:id/surfaces/:surface/conversations/:cid
+                                                   the durable entries, each application joined to
                                                    the change it names
-POST   /pieces/:id/conversations                   returns the new conversation
-DELETE /pieces/:id/conversations/:cid
-POST   /pieces/:id/conversations/:cid/dispatch     the author's message, a target and a message, or
-                                                   the response answered and any clarification
-POST   /pieces/:id/conversations/:cid/apply        the response applied, and any constraint
-POST   /pieces/:id/conversations/:cid/actions/:actionId/abandon
+POST   /pieces/:id/surfaces/:surface/conversations returns the new conversation
+DELETE /pieces/:id/surfaces/:surface/conversations/:cid
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/dispatch
+                                                   the author's message, a target and a message, or
+                                                   the response answered and any clarification, and
+                                                   the current text of all three documents
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply
+                                                   the response applied, any constraint, and the
+                                                   current text of all three documents; settles a
+                                                   no-change result on the spot, or answers with a
+                                                   pending replacement and its provisional identity
+GET    /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId
+                                                   the generated document a pending Apply is holding,
+                                                   by the provisional identity the stream named — what
+                                                   a client resumes installation from, without a
+                                                   further model call
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm
+                                                   the provisional identity a pending replacement was
+                                                   given, confirmed once the client has saved it
+POST   /pieces/:id/surfaces/:surface/conversations/:cid/actions/:actionId/abandon
                                                    targets that action by identity, so a request
-                                                   naming one already finished touches nothing;
-                                                   never a capture
-POST   /pieces/:id/capture                         returns proposals
-POST   /pieces/:id/capture/approve                 writes the approved proposals
+                                                   naming one already finished touches nothing
 GET    /pieces/:id/events                          the event stream
 GET    /workspace                                  the configured directory, or that there is none
 PUT    /workspace                                  the directory the author chose
@@ -74,25 +87,44 @@ GET    /models                                     what the runtime holds, and w
 ```
 
 `GET /call-sites` is what the room-editing surface and the assignment surface both read. `GET /models`
-reports whether the runtime can be reached at all, which is the state where the manuscript still opens
+reports whether the runtime can be reached at all, which is the state where every surface still opens
 and only the room is unavailable.
+
+Every `:surface` above names `draft`, `storyContext` or `authorContext`. The piece id in the path
+always selects the room the request gates — its cast, its activity, the evidence a call reads —
+but for `authorContext` the conversation, document and applied-change routes above land in the
+studio's one global collection rather than anything held under that piece, the same collection
+`GET /pieces/:id` already reports reaching identically from any other piece.
 
 ## The event stream
 
-Server-sent events, one stream for the open piece. The set is closed.
+Server-sent events, one stream for the open piece, covering all three of its room scopes together.
+The set is closed.
 
 | Event | Carries |
 |---|---|
-| `action.started` | The action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
-| `participant.activity` | Action, participant, and whether it is having its model prepared or working |
-| `entry.appended` | Action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
-| `action.finished` | Action, and how it ended — settled, abandoned, or failed |
-| `error` | A room failure belonging to no participant, in terms the author can act on |
+| `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes — delivered once, atomically with the subscription, before any other frame |
+| `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
+| `apply.pending` | The room scope, action, the entry applied, and the provisional identity of the replacement the model has just answered with |
+| `participant.activity` | The room scope, action, participant, and whether it is having its model prepared or working |
+| `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
+| `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
+| `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
+
+A pending replacement's provisional identity reaches a client two ways: live on `apply.pending` the
+moment the model answers, and on the snapshot where the action a room scope reports in flight is an
+Apply already answered. Neither carries the generated document itself — that is discovered by identity
+and retrieved separately, by the route above that names an application id, so a client resumes
+installation and confirmation without asking the model again. Both paths exist because the client that
+opened an Apply can lose the reply to its own request while the studio goes on working, and it is then
+holding a room scope whose replacement it could otherwise neither reach nor abandon.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the envelope is the shape of a reply to a request, and a frame on a stream is not one.
 Reusing the two fields is what keeps one failure from having two vocabularies depending on which
 channel it arrived by.
+
+Connecting to a piece's stream is what opens it.
 
 ## The model seam
 
@@ -136,17 +168,17 @@ One compilation per kind of call, each returning the whole of what its prompt is
 |---|---|
 | a specialist | its role, the mode's shared description, whether it owes an answer, and the dispatch's input |
 | the Story Editor | the same, plus the dispatch's settled specialist responses as evidence |
-| an application | the recommendation and the author's constraint |
-| a context capture | nothing beyond the shared input |
+| an application | the recommendation, the author's constraint, and the reference schema for the surface it targets, where that surface has one |
 
-Every kind receives both durable contexts, the current draft whole, the surface it is compiling for, and
-the conversation's entries. A participant compilation also receives the history policy, which selects
-between shared history and stricter independence and is the whole of the difference between them; the
-other two kinds read the conversation whole and have no policy.
+Every kind receives both context documents, the current draft whole, the surface it is compiling for, and
+the conversation's entries, with author context and story context reaching every compilation unchanged.
+A participant compilation also receives the history policy, which selects between shared history and
+stricter independence and is the whole of the difference between them; the application compilation reads
+the conversation whole and has no policy.
 
-The two participant compilations return one type. The other two return their own, because a call that
-is not a participant has no role, no mode description and no owed answer, and a shape carrying those
-as absent would invite something to read them.
+The two participant compilations return one type. The application compilation returns its own, because a
+call that is not a participant has no role, no mode description and no owed answer, and a shape carrying
+those as absent would invite something to read them.
 
 ## Persisted artifacts
 
@@ -155,28 +187,43 @@ as absent would invite something to read them.
   config/
     settings.yaml              model assignments, workspace path, the interface theme
     author-context.yaml
+  author-context/              the global namespace, reached identically from every piece
+    conversations/
+      <conversation-id>.json
+    changes/
+      <change-id>.json         the passages one application changed, before and after
   <workspace>/                 chosen by the author, inside the data root
     the-cups/
       draft.md                 the manuscript — clean prose, no tool artifacts
-      piece.yaml               title, mode, status, enabled cast
+      piece.yaml               title, mode, status, enabled cast per editing surface
       story-context.yaml
       conversations/
-        <conversation-id>.json
+        draft/
+          <conversation-id>.json
+        storyContext/
+          <conversation-id>.json
       changes/
-        <change-id>.json       the passages one application changed, before and after
+        draft/
+          <change-id>.json     the passages one application changed, before and after
+        storyContext/
+          <change-id>.json
 ```
 
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
-change file are machinery, and nothing invites an edit to them.
+change file are machinery, and nothing invites an edit to them. The draft and the story context each
+keep their own conversations and changes, nested under the piece by surface; the author context's live
+once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
+validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention.
 
-Shipped data — the charter, every participant, the mode descriptors, and every prompt fragment —
-travels with the application and not under the data root, under a content root resolved once at startup.
-The charter and every participant are one Markdown document each; a participant's filename is its id.
-Each mode is a descriptor paired with a sibling document describing its form and scale.
+Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
+reference schema — travels with the application and not under the data root, under a content root
+resolved once at startup. The charter and every participant are one Markdown document each; a
+participant's filename is its id. Each mode is a descriptor paired with a sibling document describing
+its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
-generalist call. It no longer carries the obligation to answer a direct question, which is call-specific
-rather than intrinsic to the charter and is composed only where a call addresses a participant directly.
+generalist call. The obligation to answer a direct question is call-specific rather than intrinsic to
+the charter, and is composed only where a call addresses a participant directly.
 
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
@@ -189,6 +236,13 @@ A **mode** carries its `id` and its `displayName`, and names no participant. Its
 carries the shared **description** of its form and scale that every participant call receives. Any
 number of modes may load; the roster and initial cast for a given mode and surface are derived from
 every cast participant's declared availability, never listed by the mode.
+
+A **reference schema** is one opaque text file under the content root, read whole and never parsed,
+shown to the author and given whole to a context Apply for the surface it belongs to: one per mode, at
+`content/modes/<mode>/story-context.yaml`, for that mode's story context, and one at
+`content/author-context.yaml` for the studio's author context. It is guidance, not a contract: it is
+never compared with a context document or an Apply result, and its `.yaml` path names where the file
+lives rather than a structure anything reads out of it.
 
 A **prompt fragment** is one Markdown document under the content root, holding a heading or an
 instruction addressed to a model together with frontmatter declaring the names it interpolates as

@@ -13,7 +13,12 @@ import { buildTestApp } from '../../support/harness.js'
  * two answers a runtime the author cannot reach arrives as.
  */
 
-const MODE: ModeDescriptor = { id: 'flash', displayName: 'Flash', description: 'A short piece read in one sitting.' }
+const MODE: ModeDescriptor = {
+  id: 'flash',
+  displayName: 'Flash',
+  description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
+}
 
 const ROLES: readonly RoleDefinition[] = [
   {
@@ -56,7 +61,7 @@ describe('the call-site and model routes', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.data.map((site: { site: string }) => site.site)).toEqual(['shape', 'story-editor', 'apply', 'capture'])
+    expect(body.data.map((site: { site: string }) => site.site)).toEqual(['shape', 'story-editor', 'apply'])
   })
 
   it('reaches the assignment a write names, and reports it on the composed view after', async () => {

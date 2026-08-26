@@ -5,6 +5,8 @@ import type { AppliedChange } from '../../shared/appliedChange.js'
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import { pieceStatusSchema } from '../../shared/pieceViews.js'
+import type { SurfaceId } from '../../shared/surfaces.js'
+import type { ConversationScope } from '../scope.js'
 import { resolveWithinRoot } from './containment.js'
 import {
   deleteFile,
@@ -47,23 +49,35 @@ export async function writeSettingsSection(dataRoot: string, section: SettingsSe
   await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
 }
 
-export function readAuthorContext<T>(dataRoot: string, schema: z.ZodType<T>): T | undefined {
-  return readYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), schema)
+function authorContextFile(dataRoot: string): string {
+  return path.join(dataRoot, 'config', 'author-context.yaml')
 }
 
-export async function writeAuthorContext(dataRoot: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
-  await writeYamlArtifact(path.join(dataRoot, 'config', 'author-context.yaml'), { ...context })
+export function readAuthorContext(dataRoot: string): string | undefined {
+  return readTextArtifact(authorContextFile(dataRoot))?.text
+}
+
+export async function writeAuthorContext(dataRoot: string, text: string): Promise<void> {
+  await writeTextArtifact(authorContextFile(dataRoot), text)
 }
 
 export function resolveWorkspaceDirectory(dataRoot: string, candidate: string): string {
   return resolveWithinRoot(dataRoot, candidate)
 }
 
+const castBySurfaceSchema = z.object({
+  draft: z.array(z.string().min(1)),
+  storyContext: z.array(z.string().min(1)),
+  authorContext: z.array(z.string().min(1)),
+})
+
+export type CastBySurface = Readonly<z.infer<typeof castBySurfaceSchema>>
+
 const pieceMetadataSchema = z.object({
   title: z.string().min(1),
   mode: z.string().min(1),
   status: pieceStatusSchema,
-  cast: z.array(z.string().min(1)),
+  cast: castBySurfaceSchema,
 })
 
 export type PieceMetadata = Readonly<z.infer<typeof pieceMetadataSchema>>
@@ -94,14 +108,14 @@ function storyContextFile(pieceDir: string): string {
   return path.join(pieceDir, 'story-context.yaml')
 }
 
-export function readStoryContext<T>(workspaceDir: string, id: string, schema: z.ZodType<T>): T | undefined {
+export function readStoryContext(workspaceDir: string, id: string): string | undefined {
   const pieceDir = pieceDirectory(workspaceDir, id)
   if (pieceDir === undefined) return undefined
-  return readYamlArtifact(storyContextFile(pieceDir), schema)
+  return readTextArtifact(storyContextFile(pieceDir))?.text
 }
 
-export async function writeStoryContext(workspaceDir: string, id: string, context: Readonly<Record<string, readonly string[]>>): Promise<void> {
-  await writeYamlArtifact(storyContextFile(resolveWithinRoot(workspaceDir, id)), { ...context })
+export async function writeStoryContext(workspaceDir: string, id: string, text: string): Promise<void> {
+  await writeTextArtifact(storyContextFile(resolveWithinRoot(workspaceDir, id)), text)
 }
 
 export function pieceIds(workspaceDir: string): readonly string[] {
@@ -147,8 +161,26 @@ export class DraftStore {
   }
 }
 
-export async function writePieceCast(workspaceDir: string, id: string, cast: readonly string[]): Promise<void> {
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: [...cast] })
+/** Story context's own writer, serialized independently of the draft's so neither write waits on the other. */
+export class StoryContextStore {
+  readonly #lock = new Mutex()
+
+  async write(workspaceDir: string, id: string, text: string): Promise<void> {
+    await this.#lock.runExclusive(() => writeStoryContext(workspaceDir, id, text))
+  }
+}
+
+/** Author context's own writer: global, so serialized independently of any piece's own documents. */
+export class AuthorContextStore {
+  readonly #lock = new Mutex()
+
+  async write(dataRoot: string, text: string): Promise<void> {
+    await this.#lock.runExclusive(() => writeAuthorContext(dataRoot, text))
+  }
+}
+
+export async function writePieceCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
+  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
 }
 
 export async function writePieceDetails(
@@ -163,89 +195,122 @@ export async function writePieceDetails(
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
 }
 
+type ScopedNamespace = 'conversations' | 'changes'
+
+/**
+ * A conversation scope's own directory: under the piece and its surface, or under the data
+ * root's global author-context namespace. The two read/write variants differ only in how they
+ * treat an escaping or absent piece — the same asymmetry `pieceDirectory` and
+ * `resolveWithinRoot` already carry for every other piece-relative artifact.
+ */
+function namespaceDirectoryForRead(dataRoot: string, scope: ConversationScope, namespace: ScopedNamespace): string | undefined {
+  if (scope.kind === 'global') return path.join(dataRoot, 'author-context', namespace)
+  const pieceDir = pieceDirectory(scope.workspaceDir, scope.pieceId)
+  return pieceDir === undefined ? undefined : path.join(pieceDir, namespace, scope.surface)
+}
+
+function namespaceDirectoryForWrite(dataRoot: string, scope: ConversationScope, namespace: ScopedNamespace): string {
+  if (scope.kind === 'global') return path.join(dataRoot, 'author-context', namespace)
+  const pieceDir = resolveWithinRoot(scope.workspaceDir, scope.pieceId)
+  return path.join(pieceDir, namespace, scope.surface)
+}
+
 const CONVERSATION_SUFFIX = '.json'
 
-function conversationsDirectory(pieceDir: string): string {
-  return path.join(pieceDir, 'conversations')
+function conversationFile(dir: string, conversationId: string): string {
+  return path.join(dir, `${conversationId}${CONVERSATION_SUFFIX}`)
 }
 
-function conversationFile(pieceDir: string, conversationId: string): string {
-  return path.join(conversationsDirectory(pieceDir), `${conversationId}${CONVERSATION_SUFFIX}`)
-}
+export function conversationActivity(dataRoot: string, scope: ConversationScope): readonly { readonly id: string; readonly modifiedMs: number }[] {
+  const dir = namespaceDirectoryForRead(dataRoot, scope, 'conversations')
+  if (dir === undefined) return []
 
-export function conversationActivity(workspaceDir: string, pieceId: string): readonly { readonly id: string; readonly modifiedMs: number }[] {
-  const pieceDir = pieceDirectory(workspaceDir, pieceId)
-  if (pieceDir === undefined) return []
-
-  const dir = conversationsDirectory(pieceDir)
   return fileNames(dir, CONVERSATION_SUFFIX).map((name) => ({
     id: name.slice(0, -CONVERSATION_SUFFIX.length),
     modifiedMs: fileModifiedMs(path.join(dir, name)),
   }))
 }
 
-export function mostRecentConversationId(workspaceDir: string, pieceId: string): string | undefined {
-  const [mostRecent] = [...conversationActivity(workspaceDir, pieceId)].sort((a, b) => b.modifiedMs - a.modifiedMs)
+export function mostRecentConversationId(dataRoot: string, scope: ConversationScope): string | undefined {
+  const [mostRecent] = [...conversationActivity(dataRoot, scope)].sort((a, b) => b.modifiedMs - a.modifiedMs)
   return mostRecent?.id
 }
 
-export async function deleteConversation(workspaceDir: string, pieceId: string, conversationId: string): Promise<void> {
-  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
-  await deleteFile(conversationFile(pieceDir, conversationId))
+export async function deleteConversation(dataRoot: string, scope: ConversationScope, conversationId: string): Promise<void> {
+  const dir = namespaceDirectoryForWrite(dataRoot, scope, 'conversations')
+  await deleteFile(conversationFile(dir, conversationId))
 }
 
-export function readConversationEntries(workspaceDir: string, pieceId: string, conversationId: string): EntryConversation | undefined {
-  const pieceDir = pieceDirectory(workspaceDir, pieceId)
-  if (pieceDir === undefined) return undefined
-  return readJsonArtifact(conversationFile(pieceDir, conversationId), entryConversationSchema)
+export function readConversationEntries(dataRoot: string, scope: ConversationScope, conversationId: string): EntryConversation | undefined {
+  const dir = namespaceDirectoryForRead(dataRoot, scope, 'conversations')
+  if (dir === undefined) return undefined
+  return readJsonArtifact(conversationFile(dir, conversationId), entryConversationSchema)
 }
 
 export class ConversationEntryStore {
   readonly #lock = new Mutex()
 
-  async append(workspaceDir: string, pieceId: string, conversationId: string, entry: ConversationEntry): Promise<void> {
-    const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
-    const file = conversationFile(pieceDir, conversationId)
+  /** Appending an entry whose id is already on file is a no-op: retrying a write is safe. */
+  async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
+    const dir = namespaceDirectoryForWrite(dataRoot, scope, 'conversations')
+    const file = conversationFile(dir, conversationId)
     await this.#lock.runExclusive(async () => {
       const existing = readJsonArtifact(file, entryConversationSchema)
+      if (existing?.entries.some((candidate) => candidate.id === entry.id) === true) return
       const next: EntryConversation = { id: conversationId, entries: [...(existing?.entries ?? []), entry] }
       await writeJsonArtifact(file, next)
     })
   }
 }
 
+/**
+ * Confirming a pending Apply in one call: the applied-change record lands before the entry that
+ * references it, so a process loss between the two writes can only leave a change no entry names,
+ * never an entry whose change is missing. Each write is independently idempotent, so retrying the
+ * whole call is safe.
+ */
+export async function writeApplication(
+  dataRoot: string,
+  scope: ConversationScope,
+  conversationId: string,
+  entries: ConversationEntryStore,
+  change: AppliedChange,
+  entry: ConversationEntry,
+): Promise<void> {
+  await writeAppliedChange(dataRoot, scope, change)
+  await entries.append(dataRoot, scope, conversationId, entry)
+}
+
 const CHANGE_SUFFIX = '.json'
 
-function changesDirectory(pieceDir: string): string {
-  return path.join(pieceDir, 'changes')
+function changeFile(dir: string, changeId: string): string {
+  return path.join(dir, `${changeId}${CHANGE_SUFFIX}`)
 }
 
-function changeFile(pieceDir: string, changeId: string): string {
-  return path.join(changesDirectory(pieceDir), `${changeId}${CHANGE_SUFFIX}`)
+export async function writeAppliedChange(dataRoot: string, scope: ConversationScope, change: AppliedChange): Promise<void> {
+  const dir = namespaceDirectoryForWrite(dataRoot, scope, 'changes')
+  await writeJsonArtifact(changeFile(dir, change.id), change)
 }
 
-export async function writeAppliedChange(workspaceDir: string, pieceId: string, change: AppliedChange): Promise<void> {
-  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
-  await writeJsonArtifact(changeFile(pieceDir, change.id), change)
-}
+export function readAppliedChanges<T>(dataRoot: string, scope: ConversationScope, schema: z.ZodType<T>): readonly T[] {
+  const dir = namespaceDirectoryForRead(dataRoot, scope, 'changes')
+  if (dir === undefined) return []
 
-export function readAppliedChanges<T>(workspaceDir: string, pieceId: string, schema: z.ZodType<T>): readonly T[] {
-  const pieceDir = pieceDirectory(workspaceDir, pieceId)
-  if (pieceDir === undefined) return []
-
-  const dir = changesDirectory(pieceDir)
   return fileNames(dir, CHANGE_SUFFIX).flatMap((name) => {
     const change = readJsonArtifact(path.join(dir, name), schema)
     return change === undefined ? [] : [change]
   })
 }
 
-export async function deleteAppliedChange(workspaceDir: string, pieceId: string, changeId: string): Promise<void> {
-  const pieceDir = resolveWithinRoot(workspaceDir, pieceId)
-  await deleteFile(changeFile(pieceDir, changeId))
+export async function deleteAppliedChange(dataRoot: string, scope: ConversationScope, changeId: string): Promise<void> {
+  const dir = namespaceDirectoryForWrite(dataRoot, scope, 'changes')
+  await deleteFile(changeFile(dir, changeId))
 }
 
-export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { description: string }>[] {
+export function readShippedModes<T>(
+  contentRoot: string,
+  schema: z.ZodType<T>,
+): readonly Readonly<T & { description: string; storyContextReference: string }>[] {
   const dir = path.join(contentRoot, 'modes')
   const modeIds = directoryNames(dir)
   if (modeIds.length === 0) {
@@ -256,12 +321,17 @@ export function readShippedModes<T>(contentRoot: string, schema: z.ZodType<T>): 
     const modeDir = path.join(dir, id)
     const descriptor = readYamlFile(path.join(modeDir, 'mode.yaml'), schema)
     const description = readShippedTextFile(path.join(modeDir, 'description.md'))
-    return { ...descriptor, description }
+    const storyContextReference = readShippedTextFile(path.join(modeDir, 'story-context.yaml'))
+    return { ...descriptor, description, storyContextReference }
   })
 }
 
 export function readShippedCharter(contentRoot: string): string {
   return readShippedTextFile(path.join(contentRoot, 'charter.md'))
+}
+
+export function readShippedAuthorContextReference(contentRoot: string): string {
+  return readShippedTextFile(path.join(contentRoot, 'author-context.yaml'))
 }
 
 export function readShippedParticipants<T>(contentRoot: string, schema: z.ZodType<T>): readonly Readonly<T & { id: string; persona: string }>[] {

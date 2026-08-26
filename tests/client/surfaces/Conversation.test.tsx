@@ -2,10 +2,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApplicationEntryView, ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
+import type { ConversationActivitySnapshot, RoomActivitySnapshot } from '../../../src/shared/conversationEvents.js'
 import { Conversation } from '../../../src/client/Conversation.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
+import type { AutosaveState } from '../../../src/client/autosave.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
+
+const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+const DOCUMENTS = { draft: 'First light.', storyContext: '', authorContext: '' }
 
 const NAMES: Record<string, string> = { shape: 'Shape', reader: 'Reader Experience', editor: 'Story Editor' }
 
@@ -22,13 +27,15 @@ function roomHolding(
   abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
 ): RoomAdapters {
   return {
-    subscribeToRoom: () => () => {},
+    subscribeToRoom: () => ({ snapshot: Promise.resolve(EMPTY_ROOM_ACTIVITY), unsubscribe: () => {} }),
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1' } }),
     fetchConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1', entries } }),
     dispatch: () => Promise.resolve({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
     abandonOperation,
-    applyRecommendation: () =>
-      Promise.resolve({ outcome: 'value', value: { outcome: 'applied', actionId: 'a1', manuscript: 'the revised manuscript' } }),
+    applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
+    confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } }),
+    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'unused' } }),
+    saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
   }
 }
 
@@ -36,16 +43,17 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
   return render(
     <Conversation
       pieceId="the-lighthouse"
+      surface="draft"
       currentConversationId="c1"
-      conversationActionInFlight={null}
-      draft="First light."
-      flushDraft={() => {}}
+      documents={DOCUMENTS}
+      flushDocument={() => Promise.resolve({ failed: false })}
       room={roomHolding(entries)}
       displayName={(id) => NAMES[id] ?? id}
       handle={(id) => HANDLE_BY_ID[id]}
       handles={HANDLES}
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
+      onApplied={() => Promise.resolve({ failed: false })}
       {...extra}
     />,
   )
@@ -54,6 +62,7 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
 function roomStreaming(
   entries: readonly ConversationEntryView[],
   abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
+  draftActivity: ConversationActivitySnapshot | null = null,
 ): { room: RoomAdapters; stream: (event: RoomEvent) => void } {
   let deliver: (event: RoomEvent) => void = () => {
     throw new Error('the room was never subscribed to')
@@ -62,7 +71,7 @@ function roomStreaming(
     ...roomHolding(entries, abandonOperation),
     subscribeToRoom: (_pieceId, onEvent) => {
       deliver = onEvent
-      return () => {}
+      return { snapshot: Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: draftActivity }), unsubscribe: () => {} }
     },
   }
   return { room, stream: (event) => act(() => deliver(event)) }
@@ -178,7 +187,10 @@ const RESPONSE_WITH_RECOMMENDATION: ConversationEntryView = {
 }
 
 function application(change: ApplicationEntryView['change']): RoomEvent {
-  return { type: 'entry.appended', data: { actionId: 'a1', entry: { id: 'e-app1', kind: 'application', responseId: 'e1', changeId: 'change1', change } } }
+  return {
+    type: 'entry.appended',
+    data: { actionId: 'a1', entry: { id: 'e-app1', kind: 'application', responseId: 'e1', changeId: 'change1', change }, surface: 'draft' },
+  }
 }
 
 describe('the applied change, shown on its originating response', () => {
@@ -244,9 +256,10 @@ describe('the applied change, shown on its originating response', () => {
     await waitFor(() =>
       expect(dispatch).toHaveBeenCalledWith(
         'the-lighthouse',
+        'draft',
         'c1',
         { message: 'Take a look at the change I just made and tell me what you think.' },
-        'First light.',
+        DOCUMENTS,
       ),
     )
   })
@@ -287,7 +300,7 @@ describe('replying to a response', () => {
     fireEvent.click(screen.getByRole('button', { name: 'reply' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { target: 'shape', message: 'say more about that' }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { target: 'shape', message: 'say more about that' }, DOCUMENTS),
     )
     expect((field as HTMLInputElement).value).toBe('')
 
@@ -321,7 +334,7 @@ describe('asking for a concrete change', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'ask for a concrete change' }))
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: undefined }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: undefined }, DOCUMENTS),
     )
 
     // A fresh surface: the first dispatch leaves this one busy until the room reports back.
@@ -333,7 +346,7 @@ describe('asking for a concrete change', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ask for a concrete change' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, 'First light.'),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, DOCUMENTS),
     )
   })
 
@@ -358,7 +371,7 @@ describe('one response-local field shared by every action on the response', () =
     const applyRecommendation = vi.fn(() =>
       Promise.resolve({
         outcome: 'value' as const,
-        value: { outcome: 'applied' as const, actionId: 'a1', entryId: 'e-app1', manuscript: 'revised', change: undefined },
+        value: { outcome: 'noChange' as const, actionId: 'a1' },
       }),
     )
     const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_RECOMMENDATION]), applyRecommendation }
@@ -369,7 +382,7 @@ describe('one response-local field shared by every action on the response', () =
     fireEvent.change(field, { target: { value: 'keep the last line' } })
     fireEvent.click(screen.getByRole('button', { name: 'apply' }))
 
-    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'c1', 'e1', 'First light.', 'keep the last line'))
+    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, 'keep the last line'))
   })
 })
 
@@ -407,7 +420,15 @@ describe('conversation activity, truthfully', () => {
 
   const STARTED: RoomEvent = {
     type: 'action.started',
-    data: { actionId: 'a1', conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: ['shape', 'reader'] },
+    data: {
+      actionId: 'a1',
+      conversationId: 'c1',
+      kind: 'dispatch',
+      sourceEntryId: 'e0',
+      startedAt: 1_700_000_000_000,
+      audience: ['shape', 'reader'],
+      surface: 'draft',
+    },
   }
 
   it('ACTIVE-ESCAPE: offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
@@ -426,14 +447,14 @@ describe('conversation activity, truthfully', () => {
     renderConversation([], { room })
 
     stream(STARTED)
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working' } })
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working', surface: 'draft' } })
 
     expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
     // The audience STARTED resolved holds `reader` too, which has reported nothing.
     expect(screen.queryByText(/Reader Experience is thinking/)).toBeNull()
     expect(screen.queryByText(/waiting/i)).toBeNull()
 
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing' } })
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing', surface: 'draft' } })
 
     expect(screen.getByText('Shape is thinking.')).toBeTruthy()
     expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
@@ -454,7 +475,7 @@ describe('conversation activity, truthfully', () => {
     expect(send.textContent).toBe('send')
   })
 
-  it('ABANDON-UNTRACK: targets the action by identity and releases controls immediately, without waiting for the request to resolve', async () => {
+  it('ABANDON-UNTRACK: targets the action by identity and keeps the controls held while the studio has not answered', async () => {
     const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
     const { room, stream } = roomStreaming([], abandonOperation)
     renderConversation([], { room })
@@ -466,9 +487,32 @@ describe('conversation activity, truthfully', () => {
     const abandon = await screen.findByRole('button', { name: 'abandon' })
     fireEvent.click(abandon)
 
-    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
-    expect(screen.queryByText(/ACTIVE/)).toBeNull()
-    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
+    expect(screen.getByRole('button', { name: 'abandon' })).toBeTruthy()
+    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('keeps an Apply held when the studio cannot abandon it', async () => {
+    let answerAbandon: (result: RequestResult<null>) => void = () => {
+      throw new Error('the studio was never asked')
+    }
+    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>((resolve) => (answerAbandon = resolve)))
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], abandonOperation)
+    const applyRecommendation = vi.fn(() => new Promise<Awaited<ReturnType<RoomAdapters['applyRecommendation']>>>(() => {}))
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, applyRecommendation } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream({
+      type: 'action.started',
+      data: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: 1_700_000_000_000, surface: 'draft' },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'abandon' }))
+
+    expect(screen.getByText('APPLYING')).toBeTruthy()
+    await act(async () => answerAbandon({ outcome: 'unreachable', message: 'the studio did not answer' }))
+    expect(await screen.findByText('the studio did not answer')).toBeTruthy()
+    expect(screen.getByText('APPLYING')).toBeTruthy()
   })
 
   it('ABANDON-KEEP-LANDED: an entry accepted before abandonment stays, and a late progress callback for the same action cannot resurrect its activity', async () => {
@@ -478,25 +522,57 @@ describe('conversation activity, truthfully', () => {
     stream(STARTED)
     stream({
       type: 'entry.appended',
-      data: { actionId: 'a1', entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' } },
+      data: {
+        actionId: 'a1',
+        entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' },
+        surface: 'draft',
+      },
     })
     await screen.findByText('It holds.')
 
     fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
-    expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull())
 
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working' } })
+    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'working', surface: 'draft' } })
 
     expect(screen.getByText('It holds.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull()
     expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 
-  it('reconnect: an apply already in flight for a response shows its flight from the piece snapshot alone, no new event required', async () => {
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], {
-      conversationActionInFlight: { actionId: 'a1', conversationId: 'c1', kind: 'apply', sourceEntryId: 'e1', startedAt: 1_700_000_000_000 },
+  it("reconnect: an apply already in flight for a response shows its flight from the stream's own snapshot alone, no new event required", async () => {
+    const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
+      actionId: 'a1',
+      conversationId: 'c1',
+      kind: 'apply',
+      sourceEntryId: 'e1',
+      startedAt: 1_700_000_000_000,
     })
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     expect(await screen.findByText('APPLYING')).toBeTruthy()
+  })
+
+  it('reconnect: a pending Apply resumes installation and confirmation from the retrieved replacement, calling no model', async () => {
+    const retrievePendingApply = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { replacement: 'resumed text' } }))
+    const confirmApplication = vi.fn(() =>
+      Promise.resolve({ outcome: 'value' as const, value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' as const } } }),
+    )
+    const onApplied = vi.fn((): Promise<AutosaveState> => Promise.resolve({ failed: false }))
+    const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
+      actionId: 'a1',
+      conversationId: 'c1',
+      kind: 'apply',
+      sourceEntryId: 'e1',
+      startedAt: 1_700_000_000_000,
+      applicationId: 'app1',
+    })
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, retrievePendingApply, confirmApplication }, onApplied })
+
+    await waitFor(() => expect(onApplied).toHaveBeenCalledWith('resumed text'))
+    expect(retrievePendingApply).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    await waitFor(() => expect(screen.queryByText('APPLYING')).toBeNull())
   })
 })

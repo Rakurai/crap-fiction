@@ -32,8 +32,9 @@ one seam where a plausible implementation defeats the product's central bet with
 against one local model, a dispatch costs the sum of its calls. This is an infrastructure fact
 before it is an interface one.
 
-**Applying a recommendation is interpretation, not replay.** It reads the current manuscript and
-produces the next one; nothing stored describes the edit in advance.
+**Applying a recommendation is interpretation, not replay.** It reads the current document of the
+surface the recommendation was made on and produces the next one; nothing stored describes the edit in
+advance.
 
 ---
 
@@ -62,11 +63,14 @@ may carry the call site, the outcome, the elapsed time, the model identity and t
 the piece and conversation, but never a prompt, a participant's response, manuscript text or the
 contents of either durable context. The author's story is not diagnostic data.
 
-**One piece is open at a time, and the application state is singular** — one draft, one current
-conversation, one operation. Switching pieces replaces that state rather than accumulating alongside
-it, and abandons whatever operation is in flight, keeping whatever landed. Nothing is ordinarily
-held unsaved. A switch is refused only while a draft write remains unwritten after a failure, having
-first retried it: prose the author typed is the one thing a piece switch may never discard.
+**One piece is open at a time, and the application state is singular** — each editing surface's own
+document, conversation and operation. Switching pieces replaces that state rather than accumulating
+alongside it, and abandons whatever operation is in flight on every surface, keeping whatever landed.
+Author context is the one exception to "replaces": its document and conversation are not the old
+piece's to begin with, so a switch changes only the transient evidence and cast a call there reads,
+never the document or which conversation is selected. Nothing is ordinarily held unsaved. A switch
+is refused only while a document's write remains unwritten after a failure, having first retried it:
+prose the author typed is the one thing a piece switch may never discard.
 
 ## Dependency roster
 
@@ -86,12 +90,12 @@ its own diff.
 | Schemas, derived types, and the JSON Schema for structured model output | `zod` |
 | YAML reading and writing | `yaml`, through its Document API |
 | Atomic file writes | `write-file-atomic` |
-| One-writer serialization of the draft write | `async-mutex` |
+| One-writer serialization of a document write | `async-mutex` |
 | Retry policy inside the model module | `p-retry` |
 | Timeout, and composing it with the author's abandon signal | the platform's `AbortSignal.timeout` and `AbortSignal.any` |
 | Prose editor | `@tiptap/*` over `prosemirror-*` |
 | Markdown parsing and serialization | `prosemirror-markdown`, over `prosemirror-model`, tokenizing with `markdown-it` |
-| Before-and-after comparison of two manuscript states | `diff` |
+| Before-and-after comparison of two document states | `diff` |
 | Design tokens and component styling | the repository's own token layer, through Vite's CSS Modules |
 | The prose and interface typefaces | latin-subset `woff2` files in this repository |
 | The combobox behind inline handle completion | `@ariakit/react` |
@@ -190,6 +194,27 @@ single transaction so that it participates in undo and redo as one action.
 **Nothing application-specific enters the document.** No node attributes carrying application state,
 no marks for recommendations, no decorations tracking responses.
 
+## The editing surface
+
+**One client module is mounted once per surface.** It owns that surface's document session and
+persistence, its cast and the controls that change it, its conversations and which one it shows, its
+Apply and abandonment, and the body that composes its document with its conversation panel. What
+differs between draft, story context and author context — the prose body against the plain-text body
+and its reference schema, a piece-scoped conversation selection against author context's global one,
+the label a control carries — is supplied to that one module as configuration. It is never a branch
+inside the piece that opens onto it, and it is never a second copy of the module for a second surface.
+
+Which body draws the document decides which document session the surface has, so the two are chosen
+together at the mount, and a mount never switches from one to the other. That is what keeps the choice
+out of the mounted surface's own body, where it would be a condition every hook below it had to hold.
+
+**The piece a surface opens onto holds none of that surface's own state.** What it holds is piece-wide
+chrome and close, and a registry of every surface's current client text compiled for whatever needs a
+snapshot of all three. A surface reports upward only its own text, whether its own write is failing,
+and the writer to flush when the piece closes — enough to compile the snapshot and to decide leaving
+once, from every surface's report. Nothing reads a sibling surface's state back out of it, and a
+surface's own read-only state is derived from nothing but its own.
+
 ## Persistence
 
 **A workspace directory the author chooses, one directory per piece.** Listing pieces is a directory
@@ -220,14 +245,15 @@ interface follows the operating system — an absent key means the author has no
 different thing from a value the application supplied on their behalf.
 
 **Shipped data travels with the application**, not under the data root: the charter, every participant,
-every mode descriptor and every prompt fragment are documents under a content root resolved once at
-startup. Where exactly that root sits is the store boundary's, like the rest of the layout — the modules
-that read it state what each document must contain and never where it is. It is kept apart from author
-configuration because conflating them means
+every mode descriptor, every prompt fragment and every reference schema are documents under a content
+root resolved once at startup. Where exactly that root sits is the store boundary's, like the rest of
+the layout — the modules that read it state what each document must contain and never where it is. It
+is kept apart from author configuration because conflating them means
 an upgrade either clobbers the author's assignments or fails to deliver a corrected participant. It is
-validated at startup, and invalid shipped data is a startup failure, since a document that parses
-partially would enable the wrong cast. Any number of modes may be shipped; each is its own descriptor
-and sibling description, and none names a participant.
+validated at startup, and invalid shipped data is a startup failure — a reference schema is required
+text and is missing exactly as fatally as a mode's description would be missing, while a document that
+parses partially would enable the wrong cast. Any number of modes may be shipped; each is its own
+descriptor and sibling description, and none names a participant.
 
 **The same startup validation gates a release, not only a running instance.** Content that could not
 start the application does not ship, so the check that decides this runs the real loaders against the
@@ -259,6 +285,20 @@ initial cast it yields, are both derived from these declarations rather than sto
 descriptor names no specialist, so making one available in a mode is an edit to that specialist's own
 document.
 
+**A piece's enabled cast is one record holding an independent list per editing surface**, all three
+written together at creation from the initial cast each surface derives, and read and written
+thereafter one surface at a time — enabling a specialist on one surface is a write that never touches
+another's list. A record missing one of the three surfaces is invalid data, never a gap the reader
+fills in.
+
+**Every conversation and its applied changes are addressed by a piece and an editing surface together,
+never by a piece alone, and the room is the sole place that maps what it gates onto that address.** The
+draft and the story context each hold their own conversations and applied changes, one collection per
+surface; the author context's hold no piece at all, and live once in the data root's global namespace,
+reached identically from every piece. Nothing outside the room derives this mapping, and nothing above
+the room's own gate — the busy-or-idle state a dispatch or an Apply holds — is shared across two
+surfaces of the same piece, or across two pieces: each is its own address and its own gate.
+
 **The piece directory is the piece's identity.** Its name derives from the title, slugified, with
 collisions disambiguated at creation, and it is what the application addresses a piece by. A renamed
 or copied directory is simply a piece at a new path, which is what plain files are for. The display
@@ -269,14 +309,16 @@ different matter and are real: a piece has several conversations, and each needs
 independently of its file's position on disk.
 
 **A directory is a piece when it holds piece metadata**, and nothing else about it is required: a
-piece with no draft, no story context and no conversations is a piece the author has only named. A
-piece with no conversations is opened by starting one, which is also what deleting the last one
-leaves behind. A piece's modified time is its draft's, and a conversation's last activity is its last
-entry's, so both are facts about the files rather than counters the application maintains.
+piece with no draft, no story context and no conversation on either of its own surfaces is a piece the
+author has only named. A surface with no conversations is opened by starting one, which is also what
+deleting the last one on that surface leaves behind. A piece's modified time is its draft's, and a
+conversation's last activity is its last entry's, so both are facts about the files rather than
+counters the application maintains.
 
-**Durable context and piece metadata are YAML; conversations are JSON.** The author hand-edits the
-first two, and context capture proposes changes against identified entries, so that format has to be
-readable and structured at once. A conversation is machinery the author does not edit.
+**Piece metadata is YAML; conversations are JSON; author context and story context are text.** The
+author hand-edits piece metadata and both contexts; a conversation is machinery the author does not
+edit. Author context and story context keep a `.yaml` name for the author's sake. Piece metadata is
+the only one of the three that is validated.
 
 **A conversation is an ordered, append-only sequence of entries the conversation surface is rebuilt
 from.** Every entry after the first carries the identity of the entry that caused it rather than a
@@ -292,38 +334,44 @@ remember to apply. A file that is missing degrades to the application shown with
 is never an error, because nothing may be derived from it in order to be true. Deleting a conversation
 deletes the change files its applications name.
 
-**There is one representation, so it carries no version and no compatibility layer.** Structured files
-are validated on read, and nothing the author wrote is silently discarded.
+**There is one representation for a structured file, so it carries no version and no compatibility
+layer.** Piece metadata and settings are validated on read, and nothing the author wrote is silently
+discarded. Both rules of representation reach structured files alone, and neither context document is
+one.
 
-**What a tolerant read of a hand-edited file tolerates is a closed list**: a key the current schema
-does not know is kept and survives a write; a scalar where a list is expected reads as a one-item
-list; an absent optional section reads as empty; surrounding whitespace is trimmed. Anything else — a
-value of the wrong kind, a required entry missing, YAML that does not parse — is a stated failure
-naming the file and the entry, reported to the author and never worked around. The list is closed
-because the alternative is a parser that keeps acquiring one more reasonable reading until it is
+**What a tolerant read of a hand-edited structured file tolerates is a closed list**: a key the
+current schema does not know is kept and survives a write; a scalar where a list is expected reads as
+a one-item list; an absent optional section reads as empty; surrounding whitespace is trimmed. Anything
+else — a value of the wrong kind, a required entry missing, YAML that does not parse — is a stated
+failure naming the file and the entry, reported to the author and never worked around. The list is
+closed because the alternative is a parser that keeps acquiring one more reasonable reading until it is
 recovery code, and because a reader who cannot say what the tolerance is cannot tell a tolerated file
 from a misread one.
 
-**A write preserves what the author's file carried and the schema does not describe.** Comments and
-key order survive a round trip, for the same reason an unknown key does: the author is invited to
-hand-edit these files, and a read-then-rewrite that drops the notes they left themselves has edited
-their file without saying so. This is a property of the read-and-write path rather than a reading of
-malformed input, so it is not one of the tolerances.
+**A write preserves what the author's file carried and a schema does not describe.** For piece
+metadata, comments and key order survive a round trip for the same reason an unknown key does: the
+author is invited to hand-edit the file, and a read-then-rewrite that drops the notes they left
+themselves has edited their file without saying so.
 
-**No tolerance ever supplies a value the author did not write.** A missing required entry is a
-failure, never a filled-in default: a default here would put words in the author context or the story
-context that the author never said, and every participant would then read them as the author's own.
+**Nothing ever supplies a value the author did not write.** For piece metadata, a missing required
+entry is a stated failure, never a filled-in default. Author context and story context have no entry
+the studio knows the name of, so there is nothing there to fill in: a context file nothing has written
+to reads as empty text, never as a template.
 
-**Piece metadata, both durable contexts and the model assignments are read when a piece is opened and
-again when a model call is compiled.** Nothing watches the filesystem and nothing polls: a file the
-author edited by hand is picked up by the next call that uses it, which is the only moment its content
-matters. Re-reading at compilation is what stops an external edit from being ignored for a whole
-session; holding no watcher is what stops one from arriving underneath the author's own state. The
-manuscript is exempt because the client is its writer and carries it in the request. Assignments are
-on that list rather than held from startup because reassigning one participant and asking the room
-again is the whole of the diagnostic loop this design depends on — telling a weakly written role apart
-from a weak model. The workspace path is the exception and is process configuration: it is read once,
-because everything the application does is already inside it.
+**Piece metadata and the model assignments are read when a piece is opened and again when a model call
+is compiled.** Nothing watches the filesystem and nothing polls: a file the author edited by hand is
+picked up by the next call that uses it, which is the only moment its content matters. Re-reading at
+compilation is what stops an external edit from being ignored for a whole session; holding no watcher
+is what stops one from arriving underneath the author's own state. Assignments are on that list rather
+than held from startup because reassigning one participant and asking the room again is the whole of
+the diagnostic loop this design depends on — telling a weakly written role apart from a weak model. The
+workspace path is the exception and is process configuration: it is read once, because everything the
+application does is already inside it.
+
+**The manuscript, story context and author context are exempt: the client is their writer and carries
+each in the request.** All three are read from disk only when a piece is opened, into the client text
+an editing surface holds from then on; a hand-edit to any of the three while its piece stays open is
+picked up the next time the piece is opened, not by the next call that uses it.
 
 ### Write semantics
 
@@ -336,39 +384,52 @@ filesystem and is a copy across one, and the data root is a bind mount whose fil
 holding the process's temp directory — so staging a write anywhere but beside its target would quietly
 stop being atomic.
 
-**Autosave of the manuscript is debounced and is a local write only.** No model call is on the save
-path.
+**Autosave of the manuscript, the story context and the author context is debounced and is a local
+write only, each independently of the other two.** No model call is on any save path, and a debounce
+or a failure on one never holds up or masks another's.
 
-**The client is the only writer of the manuscript.** No model operation writes it: an operation
-receives the current text in the request that starts it, and an application returns prose the client
-applies to the editor and then saves by the ordinary autosave path. This is what makes a failed or
-abandoned application change nothing — the room has no path to the manuscript to leave half-written —
-and it means the one artifact where two writers would silently lose prose has one.
+**The client is the only writer of the manuscript, the story context and the author context.** No
+model operation writes any of them: an operation receives the current text of all three in the
+request that starts it, and an application returns prose the client applies to the surface it
+targeted and then saves by that surface's own autosave path. This is what makes a failed or
+abandoned application change nothing — the room has no path to any document to leave half-written —
+and it means each of the three artifacts where two writers would silently lose prose has one.
 
-**One draft write is in flight at a time.** Text the author produces while a write is in flight
-accumulates and goes out with the next one. An atomic rename makes a write indivisible, not ordered:
-two in flight can complete oldest-last and restore prose the author has already replaced, and nothing
-about a single logical writer prevents that on its own. Serializing at that writer is what removes the
-whole class, and is why no write generation or stale-write rejection appears anywhere.
+**One write is in flight at a time for the manuscript, and likewise for the story context and for
+the author context.** Text the author produces while a write is in flight accumulates and goes out
+with the next one. An atomic rename makes a write indivisible, not ordered: two in flight can
+complete oldest-last and restore prose the author has already replaced, and nothing about a single
+logical writer prevents that on its own. Serializing at that writer is what removes the whole class,
+and is why no write generation or stale-write rejection appears anywhere.
 
-**Starting an operation flushes any pending draft write and does not wait on it.** The current text
-travels in the request either way, so the model never works from prose the author has already changed
-and no operation depends on a write having succeeded.
+**Starting an operation flushes whichever of the three its own surface holds pending, and does not
+wait on it.** The current text of all three travels in the request either way, so the model never
+works from prose the author has already changed and no operation depends on a write having
+succeeded.
 
-**A write that fails is never reported as a write that succeeded.** The editor stays usable, the
-unwritten state stays in memory, the failure is stated where the author can see it and stays stated
-until it clears, the next ordinary write retries it, and nothing resolves it optimistically. No retry
-is scheduled and nothing claims one: the retry rides the next ordinary write, so a promise of one
-would describe behaviour the client does not have, and an author who read it and stopped typing is
-never written.
+**A write that fails is never reported as a write that succeeded.** The surface it belongs to stays
+usable, the unwritten state stays in memory, the failure is stated where the author can see it and
+stays stated until it clears, the next ordinary write to that document retries it, and nothing
+resolves it optimistically. No retry is scheduled and nothing claims one: the retry rides the next
+ordinary write, so a promise of one would describe behaviour the client does not have, and an author
+who read it and stopped typing is never written.
 
-**Leaving the piece is refused while a draft write is failing**, and refused rather than confirmed.
-Nothing asks the author to confirm discarding anything, and the manuscript stays editable throughout.
+**Leaving the piece is refused while any of the three documents' write is failing**, and refused
+rather than confirmed. Nothing asks the author to confirm discarding anything, and every surface
+stays editable throughout.
+
+**Leaving flushes every surface's document first and waits for each write to durably settle before
+deciding.** A repeated request while that wait is outstanding is refused on the same terms as a
+failing write, so the wait can never be raced into two attempts. Once every document has landed,
+leaving proceeds. It asks nothing of the room about work still in flight: ending that work is not
+the leaving client's to do — the studio abandons a piece's unfinished operations itself when
+another piece is opened — and a client that tried would be reporting on an outcome it is not
+authoritative for.
 
 ## Model access
 
 **One narrow internal interface for every model call**, and every call in the product goes through
-it: a specialist's response, the Story Editor's response, an application, and context capture.
+it: a specialist's response, the Story Editor's response, and an application.
 
 **An interface is a ceiling, not a floor.** It states what this application needs, and every
 implementation owes that whether its runtime provides it or not. Defining the seam at what all
@@ -395,10 +456,10 @@ owes repair and re-issue.
 either, because a field the application can read is a field something eventually renders. Where the
 runtime emits reasoning as a distinct output segment this is structural rather than textual.
 
-**The call site is the whole of what the interface knows about the caller** — a participant, an
-application, or a capture — and it is how the assignment is found. The module never learns that a
-conversation, a dispatch, a participant's history or a manuscript exists, which is most of why
-replacing it is cheap.
+**The call site is the whole of what the interface knows about the caller** — a participant or an
+application — and it is how the assignment is found. The module never learns that a conversation, a
+dispatch, a participant's history or a manuscript exists, which is most of why replacing it is
+cheap.
 
 **Retry, timeout and model residency are policy inside the module, not parameters on a call.** A
 caller choosing a retry count is reasoning about model reliability, which is what the module exists
@@ -464,8 +525,8 @@ or chat abstraction be used, because the product's essential rule — that speci
 current-dispatch judgments independently and then the Story Editor may see them — has to remain
 visible and testable in this application's own code.
 
-**A model is assigned per call site, so applying and capturing are assigned like participants without
-being participants.** Each has its own prompt and its own context compilation, so each carries its own
+**A model is assigned per call site, so applying is assigned like a participant without being one.**
+Each call site has its own prompt and its own context compilation, so each carries its own
 assignment. An assignment names a model; its shape is the implementation's and is opaque above the
 seam, and where that model runs — on this machine, on another one reachable as though it were local,
 or hosted — appears nowhere above it. The application has no concept of an endpoint, a host or a
@@ -495,9 +556,8 @@ failure.
 **Schemas are as small as the call allows, because that is what makes constrained decoding hold.** A
 specialist's response is flat — its declared outcome, its claim, and its note — and a local model
 holds that reliably where it falls apart on a nested structure. The note is optional, so a claim
-standing alone conforms and nothing has to be invented to fill a field. Where a call would need a
-large schema, several small calls are the better shape, and context capture is the one such case.
-Shrinking the schema is always preferred to adding machinery that repairs what a larger one returned.
+standing alone conforms and nothing has to be invented to fill a field. Shrinking the schema is
+always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
 one, and so does the Story Editor on a dispatch where nothing substantive landed. Declaring it is then
@@ -583,8 +643,15 @@ inferring consensus from silence, or reporting the room's own behaviour back to 
 
 ## Operation state
 
-One conversation action runs at a time — a dispatch or an Apply — so that part of the application's
-interaction state is small enough to name exhaustively and is what the client's controls observe.
+One conversation action runs at a time per room scope — a dispatch or an Apply, on one piece's one
+editing surface — so that part of the application's interaction state is small enough to name
+exhaustively and is what the client's controls observe. A busy scope's controls are the only ones a
+client need disable: another surface of the same piece, or another piece entirely, is a different
+scope and is never held busy by this one.
+
+An Apply's busy window outlasts its model call: a replacement is pending confirmation before it
+durably lands, and the scope stays `applying` until that confirmation settles it or the author's
+abandonment does.
 
 ```
 idle
@@ -594,36 +661,25 @@ idle
 
 Abandonment applies to `dispatching` and `applying`, returning to `idle` with whatever landed kept.
 
-**Context capture is a second, independent operation, with a state of its own:**
-
-```
-capture context ─→ capturing ─→ reviewing ─→ idle
-```
-
-`reviewing` holds capture proposals with nothing in flight, and approving writes context files without
-a model call. Capture may be entered while a dispatch or an Apply holds, and neither of those waits on
-a capture in flight either — the conversation-action state and capture's own state are refused
-independently, never against each other. Reading the piece reports both, so a client that reloaded
-knows what it is looking at without any new event.
-
-**The room holds the conversation-action state and refuses to start one unless it is idle.** The client
-disables the controls that would start one, so the refusal is unreachable in ordinary use; it exists
-because the guard on the manuscript has to be where the state is, not in the surface that draws the
-buttons. A refused start is a failure and is never a question put to the author — nothing asks which of
-two operations to keep. Capture is refused only by a capture already in flight for the same piece.
+**The room holds the conversation-action state per room scope and refuses to start one at a scope
+unless that scope is idle.** The client disables the controls that would start one, so the refusal is
+unreachable in ordinary use; it exists because the guard has to be where the state is, not in the
+surface that draws the buttons. A refused start is a failure and is never a question put to
+the author — nothing asks which of two operations to keep.
 
 **Each operation in flight has an identifier, and a result belonging to any other is discarded.** A
 completion arriving late from an operation the author abandoned cannot settle, close or mutate the one
-that replaced it. Abandoning targets this identifier directly rather than whichever operation the piece
+that replaced it. Abandoning targets this identifier directly rather than whichever operation the scope
 is running: a request naming an action that has already finished, ordinary or abandoned, is a silent
 no-op. Untracking is synchronous with the abandon request itself rather than with the cancelled call's
-eventual settlement, which is what lets the room accept the next operation immediately.
+eventual settlement, which is what lets the scope accept the next operation immediately.
 
-**Serialization is a simplification, not a principle.** Overlapping conversation actions would buy
-little wall-clock against capacity bounded by the loaded model while multiplying the states the
-interface has to compose, and nothing is built to make that concurrency impossible. Capture overlaps
-the other two anyway: gating a whole-story analysis the author invokes rarely on whatever the room
-happens to be doing would cost more in waiting than the shared capacity would ever save.
+**Serialization is a simplification scoped to one room scope, not a principle held over the whole
+studio.** Overlapping conversation actions at the same scope would buy little wall-clock against
+capacity bounded by the loaded model while multiplying the states the interface has to compose, and
+nothing is built to make that concurrency impossible within a scope. Two different scopes contending for
+the same runtime is the model layer's own queuing to absorb, never a reason for one scope to refuse
+another's work.
 
 ## Dispatch
 
@@ -727,14 +783,15 @@ mid-flight appends no entry of its own: an abandoned call said nothing, and noth
 dispatch does not record. A result settling for a call this dispatch no longer tracks is likewise
 discarded rather than appended behind a finish the author already saw.
 
-**The author edits the manuscript mid-dispatch.** The edit lands. Responses in flight were compiled
-against the draft as it was when the dispatch opened, and nothing reconciles that; locking the manuscript
-for a dispatch would break the premise that the author writes while the room thinks.
+**The author edits the surface's document mid-dispatch.** The edit lands. Responses in flight were
+compiled against the documents as they were when the dispatch opened, and nothing reconciles that;
+locking a document for a dispatch would break the premise that the author writes while the room thinks.
 
 ## Applying a recommendation
 
 **One call.** Its input is the current draft, the full current conversation, the recommendation itself,
-both durable contexts, and the author's constraint where they supplied one. Its output is the manuscript
+both durable contexts, the reference schema where the target surface has one, the author's constraint
+where they supplied one, and the surface the recommendation names. Its output is that surface's document
 embodying it.
 
 **Apply resolves its source by response-entry identity and reads the conversation as it stands at
@@ -742,73 +799,101 @@ invocation, not as it stood when the recommendation was made.** Intervening disc
 contradict an old recommendation, and the write process weighs that rather than replaying the
 recommendation against stale history. Apply creates no participant follow-up of its own.
 
-**The application's input is stable because the manuscript travels in the request, not because anything
-is locked.** An application reads the draft it was handed and returns the next state of it; an edit
-landing in between would leave a rewrite to be merged against prose it never saw, and no merge rule for
-semantic prose surgery is worth having. The text in the request cannot change under the call, so the
-room needs no lock and holds none — a draft write arriving mid-application is written, and changes
-nothing about what the model was given.
+**The application's input is stable because the target document travels in the request, not because
+anything is locked.** An application reads the document it was handed and returns the next state of
+it; an edit landing in between would leave a rewrite to be merged against text it never saw, and no
+merge rule for semantic surgery on a document is worth having. The text in the request cannot change
+under the call, so the room needs no lock and holds none — a write to that document arriving
+mid-application is written, and changes nothing about what the model was given.
 
-**The result is prose the client applies**, not a write the room performs. The room reads the draft from
-the request and returns the applied manuscript; nothing reaches disk until the author's own editor holds
-it.
+**The result is text the client applies**, not a write the room performs. The room reads the target
+document from the request and returns it embodying the recommendation; nothing reaches disk until the
+author's own surface holds it.
+
+**A replacement is provisional until the client confirms it was saved.** The room retains it — the
+document, the change computed from it, and a provisional identity — as the one pending application its
+room scope may hold, rather than writing anything durable yet. Confirming reads the target document as
+persisted and requires it to equal the replacement exactly before the change record and the entry naming
+it are written, the change first; a mismatch, an absent document, or an identity that is neither pending
+nor already committed refuses the confirmation and writes nothing. Confirming an identity already
+committed, with its change already on file, is answered as if it had just committed rather than refused —
+confirmation is the protocol closing out an application already decided, not a second author decision.
+
+**A confirmation that gets as far as the durable write and fails there ends the application rather than
+leaving it pending.** The write is what commits an application, so a scope still holding the replacement
+after that write failed holds one nothing can now reach or abandon. The pending state is dropped and the
+action finishes as failed, on the same terms as a refusal caught before any write was attempted.
+
+**A client releases its own document only once the room has answered that the scope is free.** Where a
+save, a confirmation or a retrieval fails, what closes out the application is abandoning it, and an
+abandonment that itself failed leaves the room still holding a pending replacement — so unlocking on the
+strength of having asked would invite an edit against a replacement the room is about to contradict. The
+surface stays held and states why.
 
 **The application changes only what embodying the recommendation and the constraint requires.** Stable
 input does not imply restrained output: a model asked to cut one sentence will otherwise renormalize
-punctuation, reflow paragraphs and revise prose nobody asked about.
+punctuation, reflow paragraphs and revise text nobody asked about.
 
 **The representation the model returns is an implementation choice** — revised Markdown, replacement
 ranges, or structured operations — and the author experience does not depend on it. What bounds it: the
-result is applied to the editor as a single transaction, and the application computes the
-before-and-after presented to the author from the manuscript states rather than trusting the model to
-describe its own edit. That before-and-after is the changed passages with a little prose around them and
-no positions of any kind — enough to show what happened, not enough to reapply it anywhere — and where
+result reaches its target surface as one atomic replacement — a single transaction where that surface is
+the document's editor, so it participates in the editor's own undo as one action — and the application
+computes the before-and-after presented to the author from the two states of that document rather than
+trusting the model to describe its own edit. That before-and-after is the changed passages with a little
+text around them and no positions of any kind — enough to show what happened, not enough to reapply it anywhere — and where
 the change is unbounded it is the statement that the piece was rewritten whole. That last case is a rule
 about what the file may hold, not about how much the surface may show: what it prevents is storing the
-prose either side of a whole-manuscript rewrite, which is a complete prior state of the story sitting on
+text either side of a whole-document rewrite, which is a complete prior state of that document sitting on
 disk for as long as the conversation lives.
 
-**An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, manuscript
-untouched, recommendation still applicable. With the timeout in the model layer, a model that never
-answers returns the piece to `idle` without the author acting.
+**An application is abandonable on the same terms as a dispatch.** In-flight call cancelled, the target
+document untouched, recommendation still applicable. With the timeout in the model layer, a model that
+never answers returns the piece to `idle` without the author acting.
 
-**An application that returned the manuscript unchanged is recorded as nothing.** No change file, no
-conversation entry, and the operation settles as ordinarily as any other: what the author would read
+**Abandoning a pending replacement is different only in what there is to undo.** No call is left to
+cancel — the model already answered — so abandoning simply clears the pending state and frees the scope.
+Whatever the client already installed or saved stays exactly as it is: Apply does not roll back the
+surface's own text, and the recommendation is still applicable because nothing was ever recorded against
+it.
+
+**An application that returned its target document unchanged is recorded as nothing.** No change file,
+no conversation entry, and the operation settles as ordinarily as any other: what the author would read
 from an entry is that a recommendation was applied, and nothing was.
 
 **Nothing is stored that would let an application be replayed.** A recommendation is interpreted afresh
-against whatever the manuscript is at the moment it is applied, which is what makes an old
+against whatever that document is at the moment it is applied, which is what makes an old
 recommendation applicable at all. **A failed application changes nothing** — no partial write, no
-half-applied manuscript, and the recommendation stays applicable.
-
-## Context capture
-
-**One author-triggered operation, independent of a dispatch or an application.** Its input is the draft,
-the current conversation whole, and both existing contexts, snapshotted as they stand when the author
-invokes it. The author keeps writing while it runs, and editing afterwards neither cancels it nor is
-reconciled against its proposals, which are advisory and individually approved.
-
-**One call is the normal case and is not a contract.** Where a single call would need a schema large
-enough to defeat constrained decoding, the operation may issue several sequential calls instead. Nothing
-in the interface encodes how many calls it took.
-
-**Only approved proposals are written**, as an ordinary atomic write to the destination context. Nothing
-is written on the author's behalf, and no proposal is retained after the review closes. Proposals exist
-for the life of the review and nowhere else, so a reload during it discards them and the author invokes
-the analysis again — which is cheaper than a durable queue of pending items, and is the one thing the
-product refuses to keep.
-
-**Each destination is its own write, and a review closes only once its writes have succeeded.** A review
-approving proposals against both contexts performs two writes with no transaction over them; where one
-fails, the review stays open with the failure stated and its proposals still approved, and retrying
-writes only the destination that failed. Otherwise the author closes a review believing they approved
-something that half exists.
+half-applied document, and the recommendation stays applicable. A replacement whose confirmation is
+refused changes nothing by the same rule: the change record and the entry naming it are written together
+or not at all.
 
 ## Transport
 
 **Server-sent events for conversation-action activity, plain POST for author actions.** One stream, for
 the open piece, outliving any single dispatch or Apply. Every event corresponds to an entry landing or to
 a frame around one.
+
+**The client opens that one connection per open piece and every surface observes it**, rather than a
+surface or a conversation opening a connection of its own. Switching which conversation a surface shows
+never reconnects the stream; a surface that starts observing after the piece connected is caught up to
+the activity the events already delivered rather than by a second, race-prone read from the server.
+
+**A surface whose activity is not yet known is held, not treated as idle.** Until the stream has
+delivered the snapshot the surface subscribed for, it starts nothing: an unknown room could already be
+working, and a client that guessed idle would offer the author an action the room is about to refuse.
+The platform reports a drop it will retry and an abandoned connection through the same event, so only
+the abandoned one is a failure the surface reports — a retryable drop leaves the surface held and still
+waiting, and the snapshot that arrives on reconnection releases it. Activity that arrives and cannot be
+read is terminal and the surface stays held until the piece is reopened, because nothing further from
+that stream can be trusted to describe what the room is doing.
+
+**Only one piece is open at a time, and opening one is server-authoritative.** A different piece that was
+open has its unfinished work abandoned, across all three of its room scopes, including author-context
+work whose evidence and cast came from it; opening the same piece again resumes it untouched. Work
+abandoned this way is discarded on the same terms as an author asking for it directly: landed entries
+stand, and no late result can reopen it. Nothing about in-flight work is read a second time, independently
+of whatever is subscribed to receive it next — the two happen as one uninterrupted step, so nothing can
+start or finish in the gap between them.
 
 **An event names a participant by its identity and never by its display name.** A name is roster data, it
 is the same for every dispatch, and putting it on every frame would make the stream a second place a
@@ -840,18 +925,21 @@ required, and are worth adding only if a simpler approach demonstrably fails.
 **What the piece reports about an action in flight is what the surface needs in order to draw it**: which
 conversation action it is, its identifier, the entry that caused it, and for a dispatch the audience it
 resolved to and each participant's activity so far. Landed entries are not part of this report: they are
-already durable, and the client reads them from the conversation itself rather than waiting on it. A
-capture in flight is reported the same way but independently, since one of each can be true at once.
+already durable, and the client reads them from the conversation itself rather than waiting on it.
 
-**A dropped connection during an application or a capture is an ordinary failure.** Those results reach
-the client on the response to the request that started them, so a connection that dropped lost the
-result: the state returns to what it was, the manuscript is editable, the recommendation stays applicable,
-and nothing reissues the call on the author's behalf. A local connection dropping is rare enough that a
-delivery mechanism built to survive it would cost more than the loss does.
+**An application survives a dropped connection because the room, not the client, holds it.** The room
+keeps the application in flight at its room scope, and a replacement it has generated is retrievable
+there by its provisional identity. So a client that reconnects learns the application is under way from
+the activity the piece reports, and where a replacement is already pending it retrieves that
+replacement and resumes installing and confirming it — the model is never called a second time to
+reach a result it has already produced. Where the model is still answering, the surface simply stays
+held until the room reports the call finished. Nothing reissues a call on the author's behalf, and a
+pending replacement is cleared only by process restart or an explicit abandonment — never by a
+timeout.
 
 **One channel per thing that can fail, so nothing is reported twice.** A participant's failure rides its
-own appended entry. An application's failure and a capture failure belong to the responses of the requests
-that attempted them. A failed write belongs to the save path. Invalid shipped data is a startup failure
+own appended entry. An application's failure belongs to the response of the request
+that attempted it. A failed write belongs to the save path. Invalid shipped data is a startup failure
 and never a room event.
 
 **The HTTP surface is a thin adapter with no logic of its own** — every route maps to one call on the room
@@ -875,11 +963,15 @@ which is a rule about the room's composition and belongs to the server that reso
 specialists that declare themselves on by default for the chosen mode, so a piece is creatable and
 writable with the runtime not even running.
 
-**Every model operation receives the manuscript as it currently stands**, carried in the request that
-starts it. The draft file remains the sole durable representation of the manuscript, and the room never
-reads it from disk to serve an operation. What this prevents is the room working from prose the author has
-already changed, and it is why model use does not depend on a write having succeeded: the author keeps
-writing through a failed save, and the room keeps seeing what they wrote.
+**Every model operation receives all three documents as the client currently holds them** — the draft,
+story context and author context alike, unsaved and save-failing text included — carried in the request
+that starts it, rather than any of the three read from disk. What this prevents is the room working from
+text the author has already changed, and it is why model use does not depend on a write having
+succeeded: the author keeps writing through a failed save, and the room keeps seeing what they wrote.
+
+**The client closes over that snapshot at the moment an author action or an Apply is submitted.** Work
+already under way keeps the documents, room scope and evidence it started with; a later edit or a later
+piece switch cannot retarget it.
 
 ## Local exposure
 
@@ -997,14 +1089,12 @@ implementation against a temporary directory, and a second implementation with n
 be a premature seam asserting nothing. A **room** boundary owns the operations the author starts, which is
 already the client's contract, so tests and the client cross the same surface.
 
-**The room owns the dispatch, the application and the capture, but not as one shared operation.** A dispatch
+**The room owns the dispatch and the application, but not as one shared operation.** A dispatch
 and an application share one state machine and one abandonment path, and a module each would leave two
 shallow modules agreeing about state neither owns — the shape that produces an
-application starting during a dispatch it should have refused. Capture is a third path through the same room,
-sharing the model seam with both but owning its own snapshot, activity and completion independently of that
-state machine. Keeping all three behind one room rather than splitting it into as many modules is also what
-keeps every route a one-line adapter, since a route that decided whether an operation may start would be a
-route with a decision in it.
+application starting during a dispatch it should have refused. Keeping both behind one room rather than
+splitting it into two modules is also what keeps every route a one-line adapter, since a route that
+decided whether an operation may start would be a route with a decision in it.
 
 **The shared type surface between server and client is deliberately not a seam.** It is a real contract — it
 is what makes the server's response shapes and the client's expectations one set of types rather than two that
@@ -1013,7 +1103,7 @@ and declaring it one would invite an adapter with nothing on the other side of i
 independence rather than substitutability: nothing in it may import from either side, which is a property of
 the import graph and is asserted there.
 
-Behind those, the dispatch loop, the application call, the capture call, the state machine, per-call
+Behind those, the dispatch loop, the application call, the state machine, per-call
 abort, the tolerant parser and the role registry are internal, with one implementation each.
 
 **The client's projection of conversation events is a pure reducer** — not a boundary, since it has one
@@ -1030,8 +1120,8 @@ what that call returns — a conforming value, or any of the failures the interf
 preparing state are declarable the same way, which is how a dispatch's progression through its calls is
 exercised, and how a composition gets judged against a state the interface can emit rather than only against
 the ones that are easy to produce. There is no shared library of default outputs: every fixture belongs to
-the test that needs it, and with no models assigned the manuscript opens and is writable while the room says
-it is unavailable.
+the test that needs it, and with no models assigned every surface's document opens and is writable while
+the room says it is unavailable.
 
 **The boundaries are the test surface**, and the rules stated in this document are the properties. What each
 boundary's assertions cover:
@@ -1039,7 +1129,7 @@ boundary's assertions cover:
 | Boundary | Its assertion territory |
 |---|---|
 | **context** | independence, the history policies, and the Story Editor's asymmetric input |
-| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment, and that no operation writes the manuscript |
+| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, and that no operation writes any surface's document |
 | **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
 | **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, no reasoning above the seam, and the adapter's serialization of independent submissions |
 | **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |

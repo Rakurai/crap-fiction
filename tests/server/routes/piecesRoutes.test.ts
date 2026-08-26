@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
+import type { ConversationScope } from '../../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/store/index.js'
 import { buildTestApp } from '../../support/harness.js'
 
@@ -18,12 +19,14 @@ const MODE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
   description: 'A short piece read in one sitting.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 const EPIC: ModeDescriptor = {
   id: 'epic',
   displayName: 'Epic',
   description: 'A piece read over several sittings.',
+  storyContextReference: 'Sections, each holding entries.',
 }
 
 const ROLES: readonly RoleDefinition[] = [
@@ -48,6 +51,10 @@ const ROLES: readonly RoleDefinition[] = [
 ]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
+
+function draftScope(workspaceDir: string, pieceId: string): ConversationScope {
+  return { kind: 'piece', workspaceDir, pieceId, surface: 'draft' }
+}
 
 describe('the piece routes', () => {
   let dataRoot: string
@@ -76,10 +83,10 @@ describe('the piece routes', () => {
     return { app, dir }
   }
 
-  it('carries an opened piece whole: its details, its draft, its cast with the roles named, and its conversations', async () => {
+  it('carries an opened piece whole, keyed by all three surfaces: its details, each surface\'s text, cast and conversations', async () => {
     const { app, dir } = await withPiece()
-    await app.request('/pieces/cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'Two small words.' }) })
-    await new ConversationEntryStore().append(dir, 'cups', 'c1', {
+    await app.request('/pieces/cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'Two small words.' }) })
+    await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', {
       id: 'e1',
       kind: 'authorMessage',
       text: 'does the opening earn its length',
@@ -97,18 +104,25 @@ describe('the piece routes', () => {
         title: 'Cups',
         mode: 'flash',
         status: 'drafting',
-        draft: 'Two small words.',
-        cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
-        conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
+        surfaces: {
+          draft: {
+            text: 'Two small words.',
+            referenceSchema: null,
+            cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
+            conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
+          },
+          storyContext: { text: '', referenceSchema: MODE.storyContextReference, cast: [], conversations: [] },
+          authorContext: { text: '', cast: [], conversations: [] },
+        },
       },
     })
   })
 
   it('carries a conversation the author asks for by id, with the entries it holds', async () => {
     const { app, dir } = await withPiece()
-    await new ConversationEntryStore().append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
 
-    const res = await app.request('/pieces/cups/conversations/c1')
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1')
 
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ success: true, data: { id: 'c1', entries: [{ id: 'e1', kind: 'authorMessage' }] } })
@@ -123,28 +137,32 @@ describe('the piece routes', () => {
     const listed = await app.request('/pieces')
     expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
 
-    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: [] }) })
-    expect(await patched.json()).toMatchObject({ success: true, data: { title: 'Cups', status: 'finished', cast: [{ id: 'shape', enabled: false }] } })
+    const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: { surface: 'draft', ids: [] } }) })
+    expect(await patched.json()).toMatchObject({
+      success: true,
+      data: { title: 'Cups', status: 'finished', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
+    })
 
-    const saved = await app.request('/pieces/the-cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'text' }) })
+    const saved = await app.request('/pieces/the-cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'text' }) })
     expect(await saved.json()).toEqual({ success: true, data: null })
 
-    const opened = await app.request('/pieces/the-cups/conversations', { method: 'POST' })
+    const opened = await app.request('/pieces/the-cups/surfaces/draft/conversations', { method: 'POST' })
     expect(await opened.json()).toMatchObject({ success: true, data: { id: expect.any(String) } })
   })
 
   it('deletes a conversation, and the piece stops reporting it', async () => {
     const { app, dir } = await withPiece()
+    const scope = draftScope(dir, 'cups')
     const store = new ConversationEntryStore()
-    await store.append(dir, 'cups', 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
-    await store.append(dir, 'cups', 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
-    await writeAppliedChange(dir, 'cups', { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
+    await store.append(dataRoot, scope, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
+    await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
+    await writeAppliedChange(dataRoot, scope, { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
 
-    const res = await app.request('/pieces/cups/conversations/c1', { method: 'DELETE' })
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1', { method: 'DELETE' })
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true, data: null })
-    expect((await (await app.request('/pieces/cups')).json()).data.conversations).toEqual([])
+    expect((await (await app.request('/pieces/cups')).json()).data.surfaces.draft.conversations).toEqual([])
   })
 
   /**
@@ -168,11 +186,11 @@ describe('the piece routes', () => {
     expect(absentPiece.status).toBe(404)
     expect(await absentPiece.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
 
-    const absentConversation = await app.request('/pieces/cups/conversations/never-written', { method: 'DELETE' })
+    const absentConversation = await app.request('/pieces/cups/surfaces/draft/conversations/never-written', { method: 'DELETE' })
     expect(absentConversation.status).toBe(404)
     expect(await absentConversation.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
 
-    const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: ['story-editor'] }) })
+    const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: { surface: 'draft', ids: ['story-editor'] } }) })
     expect(outsideCast.status).toBe(400)
     expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
 

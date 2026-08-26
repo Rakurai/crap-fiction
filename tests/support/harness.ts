@@ -7,10 +7,10 @@ import type { Fragment, PromptFragments } from '../../src/server/model/prompts.j
 import { callSites } from '../../src/server/model/callSites.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { DraftWriter } from '../../src/server/pieces.js'
+import { PieceDocumentWriter } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
-import { DraftStore } from '../../src/server/store/index.js'
+import { AuthorContextStore, DraftStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -24,6 +24,8 @@ export type AppSpec = Readonly<{
   runtimeStatus: RuntimeStatus | undefined
   /** A room the test drives itself. Omitted where the scenario asks the room for nothing. */
   room?: Room
+  /** The studio's one author-context reference. Defaulted where a scenario never reads it. */
+  authorContextReference?: string
 }>
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
@@ -64,6 +66,7 @@ function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: rea
     now: () => {
       throw new Error('this scenario opened no operation, so nothing should have read the clock')
     },
+    authorContextReference: UNREACHED,
   })
 }
 
@@ -83,11 +86,12 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     env,
     workspace,
     spec.modes,
-    new DraftWriter(new DraftStore()),
+    new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
     callSites(spec.roles),
     modelAccess,
     room,
     createLogger(env.logLevel),
+    spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
   )
   return { app, workspace }
 }

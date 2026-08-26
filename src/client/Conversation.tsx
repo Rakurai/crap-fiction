@@ -3,8 +3,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
-import type { ConversationActivitySnapshot, DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
+import type { AutosaveState } from './autosave.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
@@ -20,20 +22,20 @@ export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
 type ConversationProps = {
   readonly pieceId: string
+  readonly surface: SurfaceId
   readonly currentConversationId: string | null
-  readonly conversationActionInFlight: ConversationActivitySnapshot | null
-  readonly draft: string
-  readonly flushDraft: () => void
+  readonly documents: DocumentSnapshot
+  readonly flushDocument: () => Promise<AutosaveState>
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
   readonly handles: readonly HandleEntry[]
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
-  readonly onApplied?: (markdown: string) => void
-  readonly onApplyingChange?: (applying: { readonly participantName: string } | undefined) => void
+  /** The surface's one persistence writer: what an Apply installs its replacement through. */
+  readonly onApplied: (text: string) => Promise<AutosaveState>
+  readonly onApplyingChange?: (applying: { readonly participantName?: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
-  readonly onActionIdChange?: (action: { readonly conversationId: string; readonly actionId: string } | undefined) => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -41,6 +43,7 @@ const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to writ
 function ResponseActions({
   responseId,
   participantId,
+  participantName,
   outcome,
   disabled,
   onApply,
@@ -50,6 +53,7 @@ function ResponseActions({
 }: {
   readonly responseId: string
   readonly participantId: string
+  readonly participantName: string
   readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
@@ -91,7 +95,7 @@ function ResponseActions({
         : 'Reply, in your own words'
 
   return (
-    <div className={styles.actions}>
+    <div className={styles.actions} role="group" aria-label={`${participantName}'s answer`}>
       {outcome === 'applicableSuggestion' && (
         <button type="button" className={styles.applyButton} disabled={disabled} onClick={apply}>
           apply
@@ -280,6 +284,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
           <ResponseActions
             responseId={entry.id}
             participantId={entry.participantId}
+            participantName={displayName(entry.participantId)}
             outcome="failed"
             disabled={applyDisabled}
             onApply={onApply}
@@ -306,6 +311,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             <ResponseActions
               responseId={entry.id}
               participantId={entry.participantId}
+              participantName={displayName(entry.participantId)}
               outcome={entry.outcome}
               disabled={applyDisabled}
               onApply={onApply}
@@ -361,20 +367,19 @@ function DispatchFlight({
 
 export function Conversation({
   pieceId,
+  surface,
   currentConversationId,
-  conversationActionInFlight,
-  draft,
-  flushDraft,
+  documents,
+  flushDocument,
   room,
   displayName,
   handle,
   handles,
   runtime,
   clock,
-  onApplied = () => {},
+  onApplied,
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
-  onActionIdChange = () => {},
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -397,35 +402,23 @@ export function Conversation({
     textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
   }, [caretOffset])
 
-  const conversation = useConversation(pieceId, currentConversationId, conversationActionInFlight, flushDraft, () => draft, room)
+  const conversation = useConversation(pieceId, surface, currentConversationId, flushDocument, () => documents, room)
 
-  const initialApplying: ApplyingResponse | undefined = useMemo(
-    () => (conversationActionInFlight?.kind === 'apply' ? { responseId: conversationActionInFlight.sourceEntryId } : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
-
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, initialApplying)
+  const apply = useApply(pieceId, surface, conversation.conversationId, () => documents, onApplied, room, conversation.resumedApplying)
 
   useEffect(() => {
     onApplyingChange(
-      apply.applying === undefined
-        ? undefined
-        : { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) },
+      apply.applying !== undefined
+        ? { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) }
+        : conversation.applyingInRoom
+          ? {}
+          : undefined,
     )
-  }, [apply.applying, conversation.projection.entries, displayName, onApplyingChange])
+  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, displayName, onApplyingChange])
 
-  function abandonCurrentAction(): void {
-    conversation.abandon()
-    apply.clear()
+  async function abandonCurrentAction(): Promise<void> {
+    if (await conversation.abandon()) apply.clear()
   }
-
-  useEffect(() => {
-    const conversationId = conversation.conversationId
-    onActionIdChange(
-      conversation.actionId === undefined || conversationId === null ? undefined : { conversationId, actionId: conversation.actionId },
-    )
-  }, [conversation.actionId, conversation.conversationId, onActionIdChange])
 
   const applicationsByResponse = useMemo(() => {
     const map = new Map<string, ApplicationEntryView[]>()
@@ -499,7 +492,7 @@ export function Conversation({
     applyDisabled: roomBusy,
     applicationsFor,
     onApply: apply.apply,
-    onAbandonApply: abandonCurrentAction,
+    onAbandonApply: () => void abandonCurrentAction(),
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,
     onReply: reply,
@@ -513,7 +506,12 @@ export function Conversation({
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
         {conversation.projection.activity !== undefined && (
-          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} onAbandon={abandonCurrentAction} />
+          <DispatchFlight
+            activity={conversation.projection.activity}
+            displayName={displayName}
+            nowMs={nowMs}
+            onAbandon={() => void abandonCurrentAction()}
+          />
         )}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
@@ -534,13 +532,13 @@ export function Conversation({
           submit()
         }}
       >
-        <label className={styles.visuallyHidden} htmlFor="conversation-message">
+        <label className={styles.visuallyHidden} htmlFor={`conversation-message-${surface}`}>
           Message the room
         </label>
         <div className={styles.field}>
           {/* `value` carries the whole message; the store's own `inputValue` holds only the live `@token`. */}
           <Ariakit.Combobox
-            id="conversation-message"
+            id={`conversation-message-${surface}`}
             store={combobox}
             className={styles.input}
             value={message}

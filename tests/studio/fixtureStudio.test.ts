@@ -51,10 +51,13 @@ describe('the fixture studio', () => {
       body: JSON.stringify({ title: 'Cups', mode: 'flash' }),
     })
 
-    const res = await app.request('/pieces/cups/conversations/c1/dispatch', {
+    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1/dispatch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: 'does the opening earn its length', draft: 'The cups sat where she left them.' }),
+      body: JSON.stringify({
+        message: 'does the opening earn its length',
+        documents: { draft: 'The cups sat where she left them.', storyContext: '', authorContext: '' },
+      }),
     })
 
     expect(res.status).toBe(200)

@@ -4,5 +4,18 @@ export const surfaceIdSchema = z.enum(['draft', 'storyContext', 'authorContext']
 
 export type SurfaceId = z.infer<typeof surfaceIdSchema>
 
-// The only surface anything is worked through yet: every cast, dispatch and operation is the draft's.
-export const WORKED_SURFACE: SurfaceId = 'draft'
+export const pieceSurfaceIdSchema = z.enum(['draft', 'storyContext'])
+
+export type PieceSurfaceId = z.infer<typeof pieceSurfaceIdSchema>
+
+/** Every surface a piece opens with, in the order the studio presents them. */
+export const SURFACE_IDS: readonly SurfaceId[] = surfaceIdSchema.options
+
+/**
+ * The current client text of every surface's document, closed over at the moment an author
+ * action or an Apply is submitted — including unsaved text and text whose save is failing. The
+ * server composes every prompt from this rather than rereading a durable document.
+ */
+export const documentSnapshotSchema = z.object({ draft: z.string(), storyContext: z.string(), authorContext: z.string() }).readonly()
+
+export type DocumentSnapshot = z.infer<typeof documentSnapshotSchema>

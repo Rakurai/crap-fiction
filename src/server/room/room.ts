@@ -1,18 +1,13 @@
 import { nanoid } from 'nanoid'
-import type { AppliedChange } from '../../shared/appliedChange.js'
+import type { AppliedChange, AppliedChangeContent } from '../../shared/appliedChange.js'
+import { appliedChangeSchema } from '../../shared/appliedChange.js'
+import type { ApplyOutcome } from '../../shared/applyViews.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { Charter } from '../model/charter.js'
 import type { PromptFragments } from '../model/prompts.js'
-import type { CallResult, ModelAccess } from '../model/types.js'
+import type { ModelAccess } from '../model/types.js'
 import { applyResultSchema } from '../../shared/applyResult.js'
-import {
-  captureResultSchema,
-  type CaptureApproveOutcome,
-  type CaptureDestination,
-  type CaptureProposal,
-} from '../../shared/captureProposal.js'
-import type { CaptureSnapshot } from '../../shared/captureViews.js'
 import type {
   ApplicationEntry,
   AuthorMessageEntry,
@@ -22,57 +17,61 @@ import type {
 import {
   type ActionFinishedEvent,
   type ActionStartedEvent,
+  type ApplyPendingEvent,
   type ConversationActivitySnapshot,
   type ConversationErrorEvent,
   type ConversationFailureCode,
   type EntryAppendedEvent,
   type ParticipantActivityEvent,
+  type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
-import { durableContextSchema, type DurableContext } from '../../shared/durableContext.js'
+import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
+import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
 import {
   ConversationEntryStore,
+  readAppliedChanges,
+  readAuthorContext,
   readConversationEntries,
   readPiece,
   readStoryContext,
-  TolerantReadError,
-  writeAppliedChange,
+  writeApplication,
   writePieceCast,
-  writeStoryContext,
 } from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
-import { applyProposals, toCaptureProposals } from './capture.js'
 import { parseAddressing } from './addressing.js'
 import {
   assertSpecialistIndependence,
   compileApplyContext,
-  compileCaptureContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
-  renderCapturePrompt,
   renderPrompt,
   type ContextInput,
   type HistoryPolicy,
   type ParticipantEvidence,
 } from './context.js'
-import { WORKED_SURFACE } from '../../shared/surfaces.js'
-import type { AuthorContextStore, CompiledDurableContext, ReadDurableContext } from './durableContext.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import { specialistsFor, type RoomRoster } from './roster.js'
 import type { ModeDescriptor } from '../modes.js'
 
+function referenceSchemaFor(mode: ModeDescriptor, authorContextReference: string, surface: SurfaceId): string | undefined {
+  if (surface === 'draft') return undefined
+  return surface === 'storyContext' ? mode.storyContextReference : authorContextReference
+}
+
 export type RoomEvent =
   | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
+  | { readonly type: 'apply.pending'; readonly data: ApplyPendingEvent }
   | { readonly type: 'participant.activity'; readonly data: ParticipantActivityEvent }
   | { readonly type: 'entry.appended'; readonly data: EntryAppendedEvent }
   | { readonly type: 'action.finished'; readonly data: ActionFinishedEvent }
   | { readonly type: 'error'; readonly data: ConversationErrorEvent }
 
 export class RoomBusyError extends Error {
-  constructor(pieceId: string) {
-    super(`an operation is already in flight for "${pieceId}"`)
+  constructor(pieceId: string, surface: string) {
+    super(`an operation is already in flight for "${pieceId}" on its "${surface}" surface`)
     this.name = 'RoomBusyError'
   }
 }
@@ -81,6 +80,20 @@ export class RecommendationNotFoundError extends Error {
   constructor(pieceId: string, responseId: string) {
     super(`no applicable suggestion at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'RecommendationNotFoundError'
+  }
+}
+
+export class ApplicationNotPendingError extends Error {
+  constructor(pieceId: string, applicationId: string) {
+    super(`no pending or committed application "${applicationId}" for piece "${pieceId}"`)
+    this.name = 'ApplicationNotPendingError'
+  }
+}
+
+export class ApplicationDocumentNotSavedError extends Error {
+  constructor(pieceId: string, applicationId: string) {
+    super(`application "${applicationId}" for piece "${pieceId}" does not match the document as saved`)
+    this.name = 'ApplicationDocumentNotSavedError'
   }
 }
 
@@ -118,7 +131,7 @@ export type DispatchOpening =
 
 type ActiveDispatch = {
   readonly kind: 'dispatch'
-  readonly pieceId: string
+  readonly roomScope: RoomScope
   readonly conversationId: string
   readonly actionId: string
   readonly sourceEntryId: string
@@ -132,21 +145,28 @@ type RunningDispatch = ActiveDispatch & {
   readonly settlement: Promise<void>
 }
 
+/**
+ * A replacement the model returned, held until the client installs, saves and confirms it.
+ * `applicationId` is provisional identity: it becomes the durable application entry's id.
+ */
+type PendingReplacement = Readonly<{
+  applicationId: string
+  responseId: string
+  constraint: string | undefined
+  replacement: string
+  change: AppliedChange
+}>
+
 type ActiveApply = {
   readonly kind: 'apply'
-  readonly pieceId: string
+  readonly roomScope: RoomScope
+  readonly conversationScope: ConversationScope
   readonly conversationId: string
   readonly actionId: string
   readonly sourceEntryId: string
   readonly controller: AbortController
   readonly startedAt: number
-}
-
-type ActiveCapture = {
-  readonly pieceId: string
-  readonly conversationId: string
-  readonly controller: AbortController
-  readonly openedAt: number
+  readonly pending?: PendingReplacement
 }
 
 type ActiveOperation = RunningDispatch | ActiveApply
@@ -160,7 +180,7 @@ type DispatchPlan = Readonly<{
   eligibleAddressedOnly: readonly RoleDefinition[]
   storyEditorIncluded: boolean
   existingEntries: readonly ConversationEntry[]
-  draft: string
+  documents: DocumentSnapshot
   modeDescription: string
 }>
 
@@ -174,9 +194,8 @@ function findResponse(
 
 export class Room {
   readonly #modelAccess: ModelAccess
-  readonly #readDurableContext: ReadDurableContext
-  readonly #authorContextStore: AuthorContextStore
   readonly #entries: ConversationEntryStore
+  readonly #dataRoot: string
   readonly #logger: Logger
   readonly #now: Clock
   readonly #charter: Charter
@@ -185,17 +204,17 @@ export class Room {
   readonly #specialists: readonly RoleDefinition[]
   readonly #storyEditor: RoleDefinition
   readonly #addressedOnly: readonly RoleDefinition[]
-  readonly #modeDescriptions: ReadonlyMap<string, string>
+  readonly #modes: ReadonlyMap<string, ModeDescriptor>
+  readonly #authorContextReference: string
   readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
-  readonly #captures = new Map<string, ActiveCapture>()
-  #operation: ActiveOperation | undefined = undefined
+  readonly #operations = new Map<string, ActiveOperation>()
+  #currentPieceId: string | undefined
 
   constructor(
     modelAccess: ModelAccess,
-    readDurableContext: ReadDurableContext,
-    authorContextStore: AuthorContextStore,
     entries: ConversationEntryStore,
+    dataRoot: string,
     roster: RoomRoster,
     modes: readonly ModeDescriptor[],
     charter: Charter,
@@ -203,11 +222,11 @@ export class Room {
     policy: HistoryPolicy,
     logger: Logger,
     now: Clock,
+    authorContextReference: string,
   ) {
     this.#modelAccess = modelAccess
-    this.#readDurableContext = readDurableContext
-    this.#authorContextStore = authorContextStore
     this.#entries = entries
+    this.#dataRoot = dataRoot
     this.#logger = logger
     this.#now = now
     this.#charter = charter
@@ -216,7 +235,8 @@ export class Room {
     this.#specialists = roster.specialists
     this.#storyEditor = roster.storyEditor
     this.#addressedOnly = roster.addressedOnly
-    this.#modeDescriptions = new Map(modes.map((mode) => [mode.id, mode.description]))
+    this.#modes = new Map(modes.map((mode) => [mode.id, mode]))
+    this.#authorContextReference = authorContextReference
     this.#displayNames = new Map([...roster.specialists, roster.storyEditor, ...roster.addressedOnly].map((role) => [role.id, role.displayName]))
   }
 
@@ -228,10 +248,14 @@ export class Room {
     return this.#storyEditor
   }
 
+  #modeFor(modeId: string): ModeDescriptor {
+    const mode = this.#modes.get(modeId)
+    if (mode === undefined) throw new ModeNotFoundError(modeId)
+    return mode
+  }
+
   #modeDescriptionFor(modeId: string): string {
-    const description = this.#modeDescriptions.get(modeId)
-    if (description === undefined) throw new ModeNotFoundError(modeId)
-    return description
+    return this.#modeFor(modeId).description
   }
 
   subscribe(pieceId: string, listener: Listener): () => void {
@@ -241,16 +265,39 @@ export class Room {
     return () => set.delete(listener)
   }
 
+  /**
+   * Opens a piece as the server-authoritative transition it is: a different piece that was
+   * open has its unfinished work abandoned, across all three of its room scopes, before this
+   * piece becomes current; reconnecting to the piece already open resumes it untouched.
+   * Capturing the snapshot and registering the listener happen in the same synchronous step as
+   * this transition, with no `await` between them, so no event can land in the gap.
+   */
+  connect(pieceId: string, listener: Listener): Readonly<{ snapshot: RoomActivitySnapshot; unsubscribe: () => void }> {
+    if (this.#currentPieceId !== undefined && this.#currentPieceId !== pieceId) this.#abandonPiece(this.#currentPieceId)
+    this.#currentPieceId = pieceId
+
+    const at = (surface: SurfaceId): ConversationActivitySnapshot | null => this.activitySnapshot({ pieceId, surface }) ?? null
+    const snapshot: RoomActivitySnapshot = { draft: at('draft'), storyContext: at('storyContext'), authorContext: at('authorContext') }
+    const unsubscribe = this.subscribe(pieceId, listener)
+    return { snapshot, unsubscribe }
+  }
+
+  #abandonPiece(pieceId: string): void {
+    for (const operation of [...this.#operations.values()]) {
+      if (operation.roomScope.pieceId === pieceId) this.abandon(operation.roomScope, operation.actionId)
+    }
+  }
+
   #emit(pieceId: string, event: RoomEvent): void {
     for (const listener of this.#listeners.get(pieceId) ?? []) listener(event)
   }
 
-  #operationFor(pieceId: string): ActiveOperation | undefined {
-    return this.#operation?.pieceId === pieceId ? this.#operation : undefined
+  #operationFor(scope: RoomScope): ActiveOperation | undefined {
+    return this.#operations.get(roomScopeKey(scope))
   }
 
-  activitySnapshot(pieceId: string): ConversationActivitySnapshot | undefined {
-    const operation = this.#operationFor(pieceId)
+  activitySnapshot(scope: RoomScope): ConversationActivitySnapshot | undefined {
+    const operation = this.#operationFor(scope)
     if (operation === undefined) return undefined
     if (operation.kind === 'apply') {
       return {
@@ -259,6 +306,7 @@ export class Room {
         kind: 'apply',
         sourceEntryId: operation.sourceEntryId,
         startedAt: operation.startedAt,
+        applicationId: operation.pending?.applicationId,
       }
     }
     return {
@@ -272,39 +320,41 @@ export class Room {
     }
   }
 
-  captureSnapshot(pieceId: string): CaptureSnapshot | undefined {
-    const capture = this.#captures.get(pieceId)
-    return capture === undefined ? undefined : { conversationId: capture.conversationId, openedAt: capture.openedAt }
-  }
-
-  settlement(pieceId: string): Promise<void> | undefined {
-    const operation = this.#operationFor(pieceId)
+  settlement(scope: RoomScope): Promise<void> | undefined {
+    const operation = this.#operationFor(scope)
     return operation?.kind === 'dispatch' ? operation.settlement : undefined
   }
 
-  abandon(pieceId: string, actionId: string): void {
-    const operation = this.#operationFor(pieceId)
+  abandon(scope: RoomScope, actionId: string): void {
+    const operation = this.#operationFor(scope)
     if (operation === undefined || operation.actionId !== actionId) return
     operation.controller.abort()
-    this.#operation = undefined
+    this.#operations.delete(roomScopeKey(scope))
+    // A pending Apply has no async work left for the abort signal to interrupt — the model call
+    // already settled — so abandoning it is the only thing that will ever close out its action.
+    if (operation.kind === 'apply' && operation.pending !== undefined) {
+      this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome: 'abandoned', surface: scope.surface } })
+    }
   }
 
   async dispatch(
     workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
     conversationId: string,
     opening: DispatchOpening,
-    draft: string,
+    documents: DocumentSnapshot,
   ): Promise<{ conversationId: string; actionId: string }> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    const pieceId = roomScope.pieceId
+    const holder = this.#operationFor(roomScope)
+    if (holder !== undefined) throw new RoomBusyError(pieceId, roomScope.surface)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const existingEntries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+    const existingEntries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
     const modeDescription = this.#modeDescriptionFor(piece.metadata.mode)
-    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, WORKED_SURFACE)
+    const modeSpecialists = specialistsFor(this.#specialists, piece.metadata.mode, roomScope.surface)
     const roster = [...modeSpecialists, this.#storyEditor, ...this.#addressedOnly]
 
     let addressedIds: readonly string[]
@@ -338,13 +388,14 @@ export class Room {
       }
     }
 
+    const enabledCast = piece.metadata.cast[roomScope.surface]
     const eligibleSpecialists =
       addressedIds.length === 0
-        ? modeSpecialists.filter((role) => piece.metadata.cast.includes(role.id))
+        ? modeSpecialists.filter((role) => enabledCast.includes(role.id))
         : modeSpecialists.filter((role) => addressedIds.includes(role.id))
     const eligibleAddressedOnly = this.#addressedOnly.filter((role) => addressedIds.includes(role.id))
 
-    const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !piece.metadata.cast.includes(id))
+    const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !enabledCast.includes(id))
     if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#storyEditor.id)
@@ -359,7 +410,7 @@ export class Room {
 
     const dispatchState: ActiveDispatch = {
       kind: 'dispatch',
-      pieceId,
+      roomScope,
       conversationId,
       actionId,
       sourceEntryId: causeEntry.id,
@@ -378,14 +429,15 @@ export class Room {
       eligibleAddressedOnly,
       storyEditorIncluded,
       existingEntries,
-      draft,
+      documents,
       modeDescription,
     }
     const cause = causeEntry
+    const key = roomScopeKey(roomScope)
 
     const written = (async () => {
-      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, [...piece.metadata.cast, ...brought])
-      await this.#entries.append(workspaceDir, pieceId, conversationId, cause)
+      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, roomScope.surface, [...enabledCast, ...brought])
+      await this.#entries.append(this.#dataRoot, conversationScope, conversationId, cause)
     })()
 
     const settlement = written
@@ -393,60 +445,60 @@ export class Room {
         () => {
           this.#emit(pieceId, {
             type: 'action.started',
-            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience },
+            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience, surface: roomScope.surface },
           })
-          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause } })
-          return this.#run(workspaceDir, pieceId, conversationId, plan, dispatchState).catch((err: unknown) => {
-            this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
+          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause, surface: roomScope.surface } })
+          return this.#run(roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
+            this.#fail(pieceId, roomScope.surface, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
           })
         },
         () => {},
       )
       .finally(() => {
-        if (this.#operation?.actionId === actionId) this.#operation = undefined
+        if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
       })
-    this.#operation = { ...dispatchState, settlement }
+    this.#operations.set(key, { ...dispatchState, settlement })
 
     await written
     return { conversationId, actionId }
   }
 
-  #fail(pieceId: string, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+  #fail(pieceId: string, surface: RoomScope['surface'], actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
     this.#logger.error({ pieceId, actionId, code, err: cause }, 'conversation action failed')
-    this.#emit(pieceId, { type: 'error', data: { code, message } })
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed' } })
+    this.#emit(pieceId, { type: 'error', data: { code, message, surface } })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface } })
   }
 
   async #run(
-    workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
+    conversationScope: ConversationScope,
     conversationId: string,
     plan: DispatchPlan,
     operation: ActiveDispatch,
   ): Promise<void> {
-    const { causeEntry, message, ask, addressedIds, eligibleSpecialists, eligibleAddressedOnly, storyEditorIncluded, existingEntries, draft, modeDescription } =
-      plan
+    const pieceId = roomScope.pieceId
+    const {
+      causeEntry,
+      message,
+      ask,
+      addressedIds,
+      eligibleSpecialists,
+      eligibleAddressedOnly,
+      storyEditorIncluded,
+      existingEntries,
+      documents,
+      modeDescription,
+    } = plan
     const { actionId, controller } = operation
     const signal = controller.signal
-
-    let durableContext: CompiledDurableContext
-    try {
-      durableContext = this.#readDurableContext(workspaceDir, pieceId)
-    } catch (err) {
-      if (err instanceof TolerantReadError) {
-        this.#fail(pieceId, actionId, 'CONTEXT_UNREADABLE', err.message, err)
-        return
-      }
-      throw err
-    }
 
     const shared = {
       message,
       ask,
-      authorContext: durableContext.authorContext,
-      storyContext: durableContext.storyContext,
-      draft,
-      surface: WORKED_SURFACE,
+      authorContext: documents.authorContext,
+      storyContext: documents.storyContext,
+      draft: documents.draft,
+      surface: roomScope.surface,
       entries: existingEntries,
       policy: this.#policy,
       modeDescription,
@@ -460,7 +512,7 @@ export class Room {
 
     const onState = (participantId: string, state: 'preparing' | 'working'): void => {
       operation.states.set(participantId, state)
-      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
+      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, surface: roomScope.surface } })
     }
 
     const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
@@ -477,7 +529,7 @@ export class Room {
     const reportFailureOnce = (message: string, err: unknown): void => {
       if (failed) return
       failed = true
-      this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+      this.#fail(pieceId, roomScope.surface, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
@@ -493,12 +545,12 @@ export class Room {
       if (failed) return
 
       try {
-        await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+        await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
       } catch (err) {
         reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
         return
       }
-      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
 
       const gathered = evidenceFrom(outcome, call.role.displayName)
       if (gathered !== undefined) evidence.push(gathered)
@@ -520,157 +572,203 @@ export class Room {
           abandoned = true
         } else {
           try {
-            await this.#entries.append(workspaceDir, pieceId, conversationId, outcome.entry)
+            await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
           } catch (err) {
             reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
           }
-          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
         }
       }
     }
 
     if (!failed) {
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled' } })
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled', surface: roomScope.surface } })
       this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
     }
   }
 
+  /**
+   * Starts an Apply: a no-change result settles on the spot, a replacement is retained as a
+   * pending application and its scope stays busy until {@link confirmApply} or {@link abandon}
+   * closes it out. Model, installation, save and confirmation failures all unlock the same way —
+   * only {@link confirmApply}'s own failure paths land here too, by way of the pending state this
+   * method leaves behind.
+   */
   async apply(
     workspaceDir: string,
-    pieceId: string,
+    roomScope: RoomScope,
     conversationId: string,
     responseId: string,
     constraint: string | undefined,
-    draft: string,
-  ): Promise<{ actionId: string; result: CallResult<{ manuscript: string; change: AppliedChange | undefined; entryId: string | undefined }> }> {
-    const holder = this.#operation
-    if (holder !== undefined) throw new RoomBusyError(holder.pieceId)
+    documents: DocumentSnapshot,
+  ): Promise<{ actionId: string; outcome: ApplyOutcome }> {
+    const pieceId = roomScope.pieceId
+    const holder = this.#operationFor(roomScope)
+    if (holder !== undefined) throw new RoomBusyError(pieceId, roomScope.surface)
 
     const piece = readPiece(workspaceDir, pieceId)
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
-    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries ?? []
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+    const entries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
     const response = findResponse(entries, responseId)
     if (response === undefined || response.outcome !== 'applicableSuggestion') throw new RecommendationNotFoundError(pieceId, responseId)
 
-    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
-
+    const target = documents[roomScope.surface]
     const actionId = nanoid()
     const controller = new AbortController()
-    this.#operation = { kind: 'apply', pieceId, conversationId, actionId, sourceEntryId: responseId, controller, startedAt: this.#now() }
+    const startedAt = this.#now()
+    const key = roomScopeKey(roomScope)
+    this.#operations.set(key, { kind: 'apply', roomScope, conversationScope, conversationId, actionId, sourceEntryId: responseId, controller, startedAt })
     this.#emit(pieceId, {
       type: 'action.started',
-      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt: this.#operation.startedAt },
+      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt, surface: roomScope.surface },
     })
 
+    const closeOut = (outcome: 'settled' | 'abandoned' | 'failed'): void => {
+      if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome, surface: roomScope.surface } })
+    }
+
     try {
+      const mode = this.#modeFor(piece.metadata.mode)
       const context = compileApplyContext({
-        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
+        modeDescription: mode.description,
         recommendationClaim: response.claim,
         recommendationNote: response.note,
         constraint,
-        authorContext: durableContext.authorContext,
-        storyContext: durableContext.storyContext,
-        draft,
-        surface: WORKED_SURFACE,
+        authorContext: documents.authorContext,
+        storyContext: documents.storyContext,
+        draft: documents.draft,
+        surface: roomScope.surface,
+        referenceSchema: referenceSchemaFor(mode, this.#authorContextReference, roomScope.surface),
         entries,
         participants: this.#displayNames,
       })
       const prompt = renderApplyPrompt(context, this.#fragments)
       const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
       if (result.outcome !== 'value') {
-        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: result.outcome === 'abandoned' ? 'abandoned' : 'failed' } })
-        return { actionId, result }
-      }
-
-      const { manuscript } = result.value
-      if (manuscript === draft) {
-        this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
-        return { actionId, result: { outcome: 'value', value: { manuscript, change: undefined, entryId: undefined } } }
-      }
-
-      const changeId = nanoid()
-      const change: AppliedChange = { id: changeId, content: computeAppliedChangeContent(draft, manuscript) }
-      await writeAppliedChange(workspaceDir, pieceId, change)
-      const application: ApplicationEntry = { id: nanoid(), kind: 'application', responseId, changeId, constraint }
-      await this.#entries.append(workspaceDir, pieceId, conversationId, application)
-      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: change.content } } })
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
-      return { actionId, result: { outcome: 'value', value: { manuscript, change, entryId: application.id } } }
-    } finally {
-      if (this.#operation?.actionId === actionId) this.#operation = undefined
-    }
-  }
-
-  async capture(
-    workspaceDir: string,
-    pieceId: string,
-    conversationId: string,
-    draft: string,
-  ): Promise<CallResult<{ proposals: readonly CaptureProposal[] }>> {
-    if (this.#captures.has(pieceId)) throw new RoomBusyError(pieceId)
-
-    const piece = readPiece(workspaceDir, pieceId)
-    if (piece === undefined) throw new PieceNotFoundError(pieceId)
-
-    const entries = readConversationEntries(workspaceDir, pieceId, conversationId)?.entries
-    const durableContext = this.#readDurableContext(workspaceDir, pieceId)
-
-    const controller = new AbortController()
-    this.#captures.set(pieceId, { pieceId, conversationId, controller, openedAt: this.#now() })
-
-    try {
-      const context = compileCaptureContext({
-        modeDescription: this.#modeDescriptionFor(piece.metadata.mode),
-        authorContext: durableContext.authorContext,
-        storyContext: durableContext.storyContext,
-        draft,
-        surface: WORKED_SURFACE,
-        entries,
-        participants: this.#displayNames,
-      })
-      const prompt = renderCapturePrompt(context, this.#fragments)
-      const result = await this.#modelAccess.call('capture', prompt, captureResultSchema, controller.signal)
-      if (result.outcome !== 'value') return result
-
-      return { outcome: 'value', value: { proposals: toCaptureProposals(result.value.proposals) } }
-    } finally {
-      this.#captures.delete(pieceId)
-    }
-  }
-
-  async approveCapture(workspaceDir: string, pieceId: string, approved: readonly CaptureProposal[]): Promise<CaptureApproveOutcome> {
-    const piece = readPiece(workspaceDir, pieceId)
-    if (piece === undefined) throw new PieceNotFoundError(pieceId)
-
-    const byDestination = new Map<CaptureDestination, CaptureProposal[]>()
-    for (const proposal of approved) {
-      const forDestination = byDestination.get(proposal.destination)
-      if (forDestination === undefined) byDestination.set(proposal.destination, [proposal])
-      else forDestination.push(proposal)
-    }
-
-    const written: CaptureDestination[] = []
-    const failures: { destination: CaptureDestination; message: string }[] = []
-
-    for (const destination of ['authorContext', 'storyContext'] as const) {
-      const proposals = byDestination.get(destination)
-      if (proposals === undefined) continue
-
-      try {
-        if (destination === 'authorContext') {
-          const next = applyProposals(this.#authorContextStore.read(), proposals)
-          await this.#authorContextStore.write(next)
-        } else {
-          const current: DurableContext = readStoryContext(workspaceDir, pieceId, durableContextSchema) ?? {}
-          await writeStoryContext(workspaceDir, pieceId, applyProposals(current, proposals))
+        closeOut(result.outcome === 'abandoned' ? 'abandoned' : 'failed')
+        return {
+          actionId,
+          outcome:
+            result.outcome === 'abandoned'
+              ? { outcome: 'abandoned', actionId }
+              : { outcome: 'failed', actionId, reason: result.reason, returned: result.returned },
         }
-        written.push(destination)
-      } catch (err) {
-        failures.push({ destination, message: err instanceof Error ? err.message : 'the write failed' })
       }
+
+      const { replacement } = result.value
+      if (replacement === target) {
+        closeOut('settled')
+        return { actionId, outcome: { outcome: 'noChange', actionId } }
+      }
+
+      const pending: PendingReplacement = {
+        applicationId: nanoid(),
+        responseId,
+        constraint,
+        replacement,
+        change: { id: nanoid(), content: computeAppliedChangeContent(target, replacement) },
+      }
+      const current = this.#operations.get(key)
+      if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
+      this.#emit(pieceId, {
+        type: 'apply.pending',
+        data: {
+          actionId,
+          conversationId,
+          applicationId: pending.applicationId,
+          sourceEntryId: responseId,
+          surface: roomScope.surface,
+        },
+      })
+      return { actionId, outcome: { outcome: 'pending', actionId, applicationId: pending.applicationId, replacement } }
+    } catch (err) {
+      closeOut('failed')
+      throw err
+    }
+  }
+
+  /**
+   * The generated document a pending Apply is holding, by the provisional identity its own
+   * `activity.snapshot` reported — what a reconnecting client resumes installation from, without
+   * a further model call. Answers only while that identity is still the scope's pending Apply;
+   * an already-committed application is read from the durable conversation instead.
+   */
+  pendingReplacement(roomScope: RoomScope, conversationId: string, applicationId: string): string {
+    const operation = this.#operationFor(roomScope)
+    if (operation?.kind !== 'apply' || operation.conversationId !== conversationId || operation.pending?.applicationId !== applicationId) {
+      throw new ApplicationNotPendingError(roomScope.pieceId, applicationId)
+    }
+    return operation.pending.replacement
+  }
+
+  /**
+   * Commits a pending Apply once its replacement is confirmed saved. Re-confirming an identity
+   * that already committed, with its change already on file, is a no-op rather than a refusal —
+   * confirmation is protocol, not a second author decision.
+   */
+  async confirmApply(
+    workspaceDir: string,
+    roomScope: RoomScope,
+    conversationId: string,
+    applicationId: string,
+  ): Promise<{ entryId: string; change: AppliedChangeContent }> {
+    const pieceId = roomScope.pieceId
+    const key = roomScopeKey(roomScope)
+    const operation = this.#operationFor(roomScope)
+    const conversationScope = conversationScopeFor(workspaceDir, roomScope)
+
+    if (operation?.kind !== 'apply' || operation.pending?.applicationId !== applicationId) {
+      const existing = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries.find(
+        (entry): entry is ApplicationEntry => entry.kind === 'application' && entry.id === applicationId,
+      )
+      if (existing === undefined) throw new ApplicationNotPendingError(pieceId, applicationId)
+      const change = readAppliedChanges(this.#dataRoot, conversationScope, appliedChangeSchema).find(
+        (candidate) => candidate.id === existing.changeId,
+      )
+      if (change === undefined) throw new ApplicationNotPendingError(pieceId, applicationId)
+      return { entryId: existing.id, change: change.content }
     }
 
-    return { written, failures }
+    const { pending, actionId } = operation
+    const target = this.#readTargetText(workspaceDir, pieceId, roomScope.surface)
+    if (target !== pending.replacement) {
+      this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
+      throw new ApplicationDocumentNotSavedError(pieceId, applicationId)
+    }
+
+    const application: ApplicationEntry = {
+      id: pending.applicationId,
+      kind: 'application',
+      responseId: pending.responseId,
+      changeId: pending.change.id,
+      constraint: pending.constraint,
+    }
+    try {
+      await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
+    } catch (err) {
+      // The durable write is what commits an Apply, so a failed one ends the operation rather than
+      // leaving the scope holding a replacement no author can now reach or abandon.
+      this.#operations.delete(key)
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
+      throw err
+    }
+    this.#emit(pieceId, {
+      type: 'entry.appended',
+      data: { actionId, entry: { ...application, change: pending.change.content }, surface: roomScope.surface },
+    })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled', surface: roomScope.surface } })
+    this.#operations.delete(key)
+    return { entryId: application.id, change: pending.change.content }
+  }
+
+  /** The document Apply targets, read as it stands persisted — never the client's in-memory copy. */
+  #readTargetText(workspaceDir: string, pieceId: string, surface: RoomScope['surface']): string {
+    if (surface === 'draft') return readPiece(workspaceDir, pieceId)?.draft?.text ?? ''
+    if (surface === 'storyContext') return readStoryContext(workspaceDir, pieceId) ?? ''
+    return readAuthorContext(this.#dataRoot) ?? ''
   }
 }

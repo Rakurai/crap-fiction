@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { control, manuscript, openPiece } from './studio.js'
+import { composer, control, manuscript, openPiece } from './studio.js'
 
 const OPENING = 'The cups sat where she had left them.'
 
@@ -11,7 +11,7 @@ test('the send control keeps its box while the room holds it, and Abandon is dra
   await page.keyboard.type(OPENING)
 
   const send = control(page, 'send')
-  await page.getByLabel('Message the room').fill('what isn’t working about the opening')
+  await composer(page).fill('what isn’t working about the opening')
   await expect(send).toBeEnabled()
   const offered = await send.boundingBox()
 

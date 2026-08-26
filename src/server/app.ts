@@ -3,9 +3,9 @@ import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import type { StudioEnv } from './env.js'
 import type { Logger } from './logger.js'
-import { captureProposalSchema } from '../shared/captureProposal.js'
 import { fail, ok } from '../shared/envelope.js'
 import { pieceStatusSchema } from '../shared/pieceViews.js'
+import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
@@ -18,10 +18,10 @@ import {
   ConversationNotFoundError,
   createPiece,
   deleteConversation,
-  type DraftWriter,
   getConversation,
   getPiece,
   listPieces,
+  type PieceDocumentWriter,
   PieceNotFoundError,
   startConversation,
   UnknownCastMemberError,
@@ -29,40 +29,48 @@ import {
   updatePiece,
 } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
-import { applyOutcome, captureOutcome } from './room/outcomes.js'
-import { CommentaryNotFoundError, ParticipantNotFoundError, RecommendationNotFoundError, RoomBusyError, type Room } from './room/room.js'
+import {
+  ApplicationDocumentNotSavedError,
+  ApplicationNotPendingError,
+  CommentaryNotFoundError,
+  ParticipantNotFoundError,
+  RecommendationNotFoundError,
+  RoomBusyError,
+  type Room,
+} from './room/room.js'
+import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
 import { TolerantReadError } from './store/index.js'
-import { validateJson } from './validate.js'
+import { validateJson, validateParam } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
 const putThemeSchema = z.object({ theme: themeSchema })
-const putDraftSchema = z.object({ draft: z.string() })
+const putSurfaceDocumentSchema = z.object({ text: z.string() })
 const putAssignmentSchema = z.object({ model: z.string().min(1) })
 const postApplySchema = z.object({
   responseId: z.string().min(1),
   constraint: z.string().min(1).optional(),
-  draft: z.string(),
+  documents: documentSnapshotSchema,
 })
-const postCaptureSchema = z.object({ conversationId: z.string().min(1), draft: z.string() })
-const postCaptureApproveSchema = z.object({ approved: z.array(captureProposalSchema) })
 const patchPieceSchema = z.object({
   title: z.string().min(1).optional(),
   status: pieceStatusSchema.optional(),
-  cast: z.array(z.string().min(1)).optional(),
+  cast: z.object({ surface: surfaceIdSchema, ids: z.array(z.string().min(1)) }).optional(),
 })
+const surfaceParamSchema = z.object({ surface: surfaceIdSchema })
 
 export function createApp(
   env: StudioEnv,
   workspace: WorkspaceRegistry,
   modes: readonly ModeDescriptor[],
-  draftWriter: DraftWriter,
+  documentWriter: PieceDocumentWriter,
   sites: readonly CallSiteDescriptor[],
   modelAccess: ModelAccess,
   room: Room,
   logger: Logger,
+  authorContextReference: string,
 ): Hono {
   const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]
   const app = new Hono()
@@ -96,7 +104,7 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(workspace.require(), id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
@@ -105,55 +113,60 @@ export function createApp(
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(workspaceDir, id, room.activitySnapshot(id) ?? null, room.captureSnapshot(id) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
   })
 
-  app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
-    const { draft } = c.req.valid('json')
-    await draftWriter.save(workspace.require(), c.req.param('id'), draft)
+  const param = validateParam(surfaceParamSchema, logger)
+
+  app.put('/pieces/:id/surfaces/:surface/document', param, body(putSurfaceDocumentSchema), async (c) => {
+    const { text } = c.req.valid('json')
+    await documentWriter.save(workspace.require(), c.req.param('id'), c.req.valid('param').surface, text)
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations', (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations', param, (c) => {
     return c.json(ok(startConversation(workspace.require(), c.req.param('id'))))
   })
 
-  app.get('/pieces/:id/conversations/:cid', (c) => {
-    return c.json(ok(getConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))))
+  app.get('/pieces/:id/surfaces/:surface/conversations/:cid', param, (c) => {
+    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
   })
 
-  app.delete('/pieces/:id/conversations/:cid', async (c) => {
-    await deleteConversation(workspace.require(), c.req.param('id'), c.req.param('cid'))
+  app.delete('/pieces/:id/surfaces/:surface/conversations/:cid', param, async (c) => {
+    await deleteConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))
     return c.json(ok(null))
   })
 
-  app.post('/pieces/:id/conversations/:cid/dispatch', body(dispatchRequestSchema), async (c) => {
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/dispatch', param, body(dispatchRequestSchema), async (c) => {
     const request = c.req.valid('json')
-    const result = await room.dispatch(workspace.require(), c.req.param('id'), c.req.param('cid'), dispatchOpening(request), request.draft)
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    const result = await room.dispatch(workspace.require(), scope, c.req.param('cid'), dispatchOpening(request), request.documents)
     return c.json(ok(result))
   })
 
-  app.post('/pieces/:id/conversations/:cid/apply', body(postApplySchema), async (c) => {
-    const { responseId, constraint, draft } = c.req.valid('json')
-    const { actionId, result } = await room.apply(workspace.require(), c.req.param('id'), c.req.param('cid'), responseId, constraint, draft)
-    return c.json(ok(applyOutcome(actionId, result)))
-  })
-
-  app.post('/pieces/:id/capture', body(postCaptureSchema), async (c) => {
-    const { conversationId, draft } = c.req.valid('json')
-    const result = await room.capture(workspace.require(), c.req.param('id'), conversationId, draft)
-    return c.json(ok(captureOutcome(result)))
-  })
-
-  app.post('/pieces/:id/capture/approve', body(postCaptureApproveSchema), async (c) => {
-    const { approved } = c.req.valid('json')
-    const outcome = await room.approveCapture(workspace.require(), c.req.param('id'), approved)
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/apply', param, body(postApplySchema), async (c) => {
+    const { responseId, constraint, documents } = c.req.valid('json')
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    const { outcome } = await room.apply(workspace.require(), scope, c.req.param('cid'), responseId, constraint, documents)
     return c.json(ok(outcome))
   })
 
-  app.post('/pieces/:id/conversations/:cid/actions/:actionId/abandon', (c) => {
+  app.get('/pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId', param, (c) => {
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    const replacement = room.pendingReplacement(scope, c.req.param('cid'), c.req.param('applicationId'))
+    return c.json(ok({ replacement }))
+  })
+
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm', param, async (c) => {
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    const confirmation = await room.confirmApply(workspace.require(), scope, c.req.param('cid'), c.req.param('applicationId'))
+    return c.json(ok(confirmation))
+  })
+
+  app.post('/pieces/:id/surfaces/:surface/conversations/:cid/actions/:actionId/abandon', param, (c) => {
     workspace.require()
-    room.abandon(c.req.param('id'), c.req.param('actionId'))
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    room.abandon(scope, c.req.param('actionId'))
     return c.json(ok(null))
   })
 
@@ -161,7 +174,8 @@ export function createApp(
     const pieceId = c.req.param('id')
     return streamSSE(c, async (stream) => {
       const events = sseStream(stream)
-      const unsubscribe = room.subscribe(pieceId, (event) => events.write(event.type, event.data))
+      const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
+      events.write('activity.snapshot', snapshot)
       await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
       unsubscribe()
       await events.drain()
@@ -208,6 +222,8 @@ export function createApp(
     if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
     if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
     if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
+    if (err instanceof ApplicationNotPendingError) return refused('APPLICATION_NOT_PENDING', 404)
+    if (err instanceof ApplicationDocumentNotSavedError) return refused('APPLICATION_DOCUMENT_NOT_SAVED', 409)
     if (err instanceof CommentaryNotFoundError) return refused('COMMENTARY_NOT_FOUND', 404)
     if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
     if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)

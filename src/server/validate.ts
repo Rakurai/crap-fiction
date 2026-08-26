@@ -12,3 +12,12 @@ export function validateJson<T extends z.ZodType>(schema: T, logger: Logger) {
     }
   })
 }
+
+export function validateParam<T extends z.ZodType>(schema: T, logger: Logger) {
+  return zValidator('param', schema, (result, c) => {
+    if (!result.success) {
+      logger.warn({ code: 'INVALID_REQUEST', method: c.req.method, path: c.req.path }, 'request refused')
+      return c.json(fail('INVALID_REQUEST', firstSchemaIssue(result.error).message), 400)
+    }
+  })
+}

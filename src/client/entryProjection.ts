@@ -2,6 +2,7 @@ import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type {
   ActionFinishedEvent,
   ActionStartedEvent,
+  ApplyPendingEvent,
   ConversationErrorEvent,
   DispatchActivitySnapshot,
   EntryAppendedEvent,
@@ -10,6 +11,7 @@ import type {
 
 export type RoomEvent =
   | Readonly<{ type: 'action.started'; data: ActionStartedEvent }>
+  | Readonly<{ type: 'apply.pending'; data: ApplyPendingEvent }>
   | Readonly<{ type: 'participant.activity'; data: ParticipantActivityEvent }>
   | Readonly<{ type: 'entry.appended'; data: EntryAppendedEvent }>
   | Readonly<{ type: 'action.finished'; data: ActionFinishedEvent }>
@@ -22,7 +24,7 @@ export type ConversationProjection = Readonly<{
 
 export const EMPTY_PROJECTION: ConversationProjection = { entries: [], activity: undefined }
 
-function isParticipantOutcome(
+export function isParticipantOutcome(
   entry: ConversationEntryView,
 ): entry is Extract<ConversationEntryView, { kind: 'participantResponse' | 'participantNoComment' | 'participantFailure' }> {
   return entry.kind === 'participantResponse' || entry.kind === 'participantNoComment' || entry.kind === 'participantFailure'
@@ -55,6 +57,8 @@ export function projectEvent(projection: ConversationProjection, event: RoomEven
       if (activity === undefined || activity.actionId !== event.data.actionId) return projection
       return { ...projection, activity: { ...activity, states: { ...activity.states, [event.data.participantId]: event.data.state } } }
     }
+    case 'apply.pending':
+      return projection
     case 'entry.appended': {
       const next = appendEntry(projection, event.data.entry)
       const activity = next.activity

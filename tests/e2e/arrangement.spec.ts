@@ -15,7 +15,7 @@ test('prose typed into the manuscript is the prose found there after a reload', 
   const prose = 'First light of the day, and the cups sat where she left them.'
 
   const written = page.waitForResponse(
-    (response) => response.request().method() === 'PUT' && response.url().endsWith('/draft') && response.ok(),
+    (response) => response.request().method() === 'PUT' && response.url().endsWith('/surfaces/draft/document') && response.ok(),
   )
   await page.getByRole('textbox', { name: 'Manuscript' }).fill(prose)
   await written

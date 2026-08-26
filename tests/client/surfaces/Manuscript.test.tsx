@@ -16,7 +16,8 @@ const DEFAULT_PROPS = {
   onClose: vi.fn(),
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
-  onOpenCapture: vi.fn(),
+  onSwitchToStoryContext: vi.fn(),
+  onSwitchToAuthorContext: vi.fn(),
   lifecycle: {
     status: 'drafting' as const,
     retitling: false,
@@ -31,7 +32,7 @@ const DEFAULT_PROPS = {
 
 function Harness(props: typeof DEFAULT_PROPS) {
   const manuscript = useManuscript(props.draft)
-  const autosave = useAutosave(props.pieceId, manuscript.markdown, (text) => saveDraft(props.pieceId, text))
+  const autosave = useAutosave(manuscript.markdown, (text) => saveDraft(props.pieceId, text))
 
   return (
     <Manuscript
@@ -40,9 +41,11 @@ function Harness(props: typeof DEFAULT_PROPS) {
       onClose={props.onClose}
       manuscript={manuscript}
       autosave={autosave}
+      leaveBlocked={autosave.state.failed}
       onOpenRoom={props.onOpenRoom}
       onOpenConversations={props.onOpenConversations}
-      onOpenCapture={props.onOpenCapture}
+      onSwitchToStoryContext={props.onSwitchToStoryContext}
+      onSwitchToAuthorContext={props.onSwitchToAuthorContext}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />
@@ -140,16 +143,13 @@ describe('the piece status', () => {
 describe('the surfaces the manuscript opens onto', () => {
   afterEach(cleanup)
 
-  it('reaches the room and the capture in one action each, knowing nothing beyond that each was reached', () => {
+  it('reaches the room in one action, knowing nothing beyond that it was reached', () => {
     const onOpenRoom = vi.fn()
-    const onOpenCapture = vi.fn()
-    renderManuscript({ onOpenRoom, onOpenCapture })
+    renderManuscript({ onOpenRoom })
 
     fireEvent.click(screen.getByRole('button', { name: 'room' }))
-    fireEvent.click(screen.getByRole('button', { name: 'capture context' }))
 
     expect(onOpenRoom).toHaveBeenCalledTimes(1)
-    expect(onOpenCapture).toHaveBeenCalledTimes(1)
   })
 })
 
