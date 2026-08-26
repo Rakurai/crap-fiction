@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import { applyConfirmationSchema, applyOutcomeSchema, type ApplyConfirmation, type ApplyOutcome } from '../shared/applyViews.js'
+import {
+  applyConfirmationSchema,
+  applyOutcomeSchema,
+  pendingApplySchema,
+  type ApplyConfirmation,
+  type ApplyOutcome,
+  type PendingApply,
+} from '../shared/applyViews.js'
 import { entryConversationViewSchema, type EntryConversationView } from '../shared/conversationEntryViews.js'
 import {
   actionFinishedEventSchema,
@@ -111,6 +118,24 @@ export function confirmApplication(
   )
 }
 
+/**
+ * The generated document a pending Apply is holding, by the provisional identity its `activity.snapshot`
+ * reported — what a reconnecting client resumes installation from, without asking the model again.
+ */
+export function retrievePendingApply(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+  applicationId: string,
+  signal?: AbortSignal,
+): Promise<RequestResult<PendingApply>> {
+  return requestJson(
+    `${surfacePath(pieceId, surface)}/conversations/${encodeURIComponent(conversationId)}/apply/${encodeURIComponent(applicationId)}`,
+    pendingApplySchema,
+    { signal: signal ?? null },
+  )
+}
+
 export function abandonOperation(
   pieceId: string,
   surface: SurfaceId,
@@ -147,23 +172,32 @@ export function subscribeToRoom(
     })
   }
 
-  const snapshot = new Promise<RoomActivitySnapshot>((resolve) => {
+  // Failure to learn the room's activity is never an idle snapshot: a malformed frame or a
+  // connection that never delivers one rejects, so a caller cannot mistake "unknown" for "idle"
+  // by treating this promise's resolution as the only outcome.
+  const snapshot = new Promise<RoomActivitySnapshot>((resolve, reject) => {
     source.addEventListener(
       'activity.snapshot',
       (event) => {
         if (!(event instanceof MessageEvent)) {
-          resolve(EMPTY_ROOM_ACTIVITY)
+          reject(new Error('the room’s activity arrived as something this client cannot read'))
           return
         }
         const frame: unknown = event.data
         const parsed = typeof frame === 'string' ? roomActivitySnapshotSchema.safeParse(readJson(frame)) : { success: false as const }
         if (!parsed.success) {
-          onMalformedFrame('malformed "activity.snapshot" event from the studio')
-          resolve(EMPTY_ROOM_ACTIVITY)
+          const message = 'malformed "activity.snapshot" event from the studio'
+          onMalformedFrame(message)
+          reject(new Error(message))
           return
         }
         resolve(parsed.data)
       },
+      { once: true },
+    )
+    source.addEventListener(
+      'error',
+      () => reject(new Error('the room’s activity could not be learned — the connection to the studio failed')),
       { once: true },
     )
   })

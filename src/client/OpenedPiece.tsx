@@ -21,6 +21,7 @@ import {
   createConversation,
   dispatch,
   fetchConversation,
+  retrievePendingApply,
   subscribeToRoom,
 } from './roomClient.js'
 import { type AuthorContextSelection, type LiveAction } from './useConversationSession.js'
@@ -115,6 +116,7 @@ function Surfaces({
     abandonOperation,
     applyRecommendation,
     confirmApplication,
+    retrievePendingApply,
     saveDocument: saveSurfaceDocument,
   }
 

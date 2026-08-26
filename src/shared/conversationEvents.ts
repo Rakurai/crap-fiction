@@ -73,6 +73,8 @@ export const applyActivitySnapshotSchema = z.object({
   kind: z.literal('apply'),
   sourceEntryId: z.string().min(1),
   startedAt: z.number().int().positive(),
+  /** Present once the model has answered: the provisional identity a reconnecting client resumes by. */
+  applicationId: z.string().min(1).optional(),
 })
 
 export type ApplyActivitySnapshot = z.infer<typeof applyActivitySnapshotSchema>

@@ -528,6 +528,54 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toMatchObject({ kind: 'apply' })
   })
 
+  it("the activity snapshot names the pending application's own identity once the model has answered, and carries no document", async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const { outcome } = await room.apply(
+      workspaceDir,
+      scope(pieceId),
+      'c1',
+      responseId(pieceId),
+      undefined,
+      documents('The cups sat where she left them, twice.'),
+    )
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+
+    const snapshot = room.activitySnapshot(scope(pieceId))
+    expect(snapshot).toMatchObject({ kind: 'apply', applicationId: outcome.applicationId })
+    expect(snapshot).not.toHaveProperty('manuscript')
+  })
+
+  it('retrieves the pending replacement by its provisional identity, and refuses an identity that is not this scope’s pending Apply', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them.' } } },
+    })
+
+    const { outcome } = await room.apply(
+      workspaceDir,
+      scope(pieceId),
+      'c1',
+      responseId(pieceId),
+      undefined,
+      documents('The cups sat where she left them, twice.'),
+    )
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+
+    expect(room.pendingReplacement(scope(pieceId), 'c1', outcome.applicationId)).toBe('The cups sat where she left them.')
+    expect(() => room.pendingReplacement(scope(pieceId), 'c1', 'no-such-application')).toThrowError(ApplicationNotPendingError)
+
+    await new DraftStore().write(workspaceDir, pieceId, outcome.manuscript)
+    await room.confirmApply(workspaceDir, scope(pieceId), 'c1', outcome.applicationId)
+
+    // Committed rather than pending: the identity now names a durable application, not this
+    // retrieval, which answers only the scope's own in-memory pending state.
+    expect(() => room.pendingReplacement(scope(pieceId), 'c1', outcome.applicationId)).toThrowError(ApplicationNotPendingError)
+  })
+
   it("carries the recommendation, the author's constraint and the draft verbatim, beside the full current conversation including discussion after the recommendation", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room: laterRoom } = buildRoom(dataRoot, {

@@ -13,6 +13,7 @@ function roomHolding(): RoomAdapters {
     abandonOperation: () => Promise.resolve({ outcome: 'value', value: null }),
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
     confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e1', change: { kind: 'rewrittenWhole' as const } } }),
+    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { manuscript: 'unused' } }),
     saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
   }
 }

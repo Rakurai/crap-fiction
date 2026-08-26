@@ -71,6 +71,20 @@ describe('createPieceStream', () => {
     await expect(subscription.snapshot).resolves.toMatchObject({ draft: { actionId: 'a1' } })
   })
 
+  it('propagates a snapshot that failed to arrive to every subscriber rather than substituting an empty one', async () => {
+    let rejectSnapshot: (err: unknown) => void = () => {}
+    const subscribeToRoom: typeof subscribeToRoomFn = () => ({
+      snapshot: new Promise((_resolve, reject) => (rejectSnapshot = reject)),
+      unsubscribe: () => {},
+    })
+    const stream = createPieceStream('the-lighthouse', subscribeToRoom)
+
+    const subscription = stream.subscribeToRoom('the-lighthouse', () => {}, () => {})
+    rejectSnapshot(new Error('malformed "activity.snapshot" event from the studio'))
+
+    await expect(subscription.snapshot).rejects.toThrow('malformed "activity.snapshot" event from the studio')
+  })
+
   it('delivers a live event to every current listener, and stops delivering to one that unsubscribed', () => {
     const fake = fakeSubscribe()
     const stream = createPieceStream('the-lighthouse', fake.subscribeToRoom)

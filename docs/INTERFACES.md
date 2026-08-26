@@ -63,6 +63,11 @@ POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply
                                                    current text of all three documents; settles a
                                                    no-change result on the spot, or answers with a
                                                    pending replacement and its provisional identity
+GET    /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId
+                                                   the generated document a pending Apply is holding,
+                                                   by the provisional identity its activity snapshot
+                                                   named — what a reconnecting client resumes
+                                                   installation from, without a further model call
 POST   /pieces/:id/surfaces/:surface/conversations/:cid/apply/:applicationId/confirm
                                                    the provisional identity a pending replacement was
                                                    given, confirmed once the client has saved it
@@ -104,6 +109,12 @@ The set is closed.
 | `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
 | `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
 | `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
+
+Where the action the snapshot names for a room scope is an Apply already answered by the model, the
+snapshot additionally names the pending replacement's own provisional identity. It never carries the
+generated document itself — that is discovered by identity here and retrieved separately, by the
+route above that names an application id, so a reconnecting client resumes installation and
+confirmation without asking the model again.
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the envelope is the shape of a reply to a request, and a frame on a stream is not one.

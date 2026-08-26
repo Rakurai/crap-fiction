@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   abandonOperation: vi.fn(),
   applyRecommendation: vi.fn(),
   confirmApplication: vi.fn(),
+  retrievePendingApply: vi.fn(),
   fetchCallSites: vi.fn(),
   fetchRuntimeStatus: vi.fn(),
 }))
@@ -35,6 +36,7 @@ vi.mock('../../../src/client/roomClient.js', () => ({
   abandonOperation: mocks.abandonOperation,
   applyRecommendation: mocks.applyRecommendation,
   confirmApplication: mocks.confirmApplication,
+  retrievePendingApply: mocks.retrievePendingApply,
   EMPTY_ROOM_ACTIVITY: { draft: null, storyContext: null, authorContext: null },
 }))
 

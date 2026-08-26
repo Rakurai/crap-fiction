@@ -11,12 +11,23 @@ import type {
   DispatchOpening,
   dispatch as dispatchFn,
   fetchConversation as fetchConversationFn,
+  retrievePendingApply as retrievePendingApplyFn,
   subscribeToRoom as subscribeToRoomFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
 import type { saveSurfaceDocument as saveSurfaceDocumentFn } from './piecesClient.js'
 
 const UNSENT = 'the message was not sent'
+
+const ACTIVITY_UNLEARNABLE = 'this surface could not learn what the room is doing, and stays locked until it is reopened'
+
+/**
+ * The Apply this surface's activity reported already in flight when its stream connected.
+ * `applicationId` is present only once the model has answered and a replacement is pending
+ * confirmation — the one case a reconnecting client can resume installation and confirmation for;
+ * absent it, the model call itself is still running and there is nothing yet to retrieve.
+ */
+export type ResumedApply = Readonly<{ actionId: string; responseId: string; applicationId: string | undefined }>
 
 export type ConversationViewModel = Readonly<{
   projection: ConversationProjection
@@ -29,7 +40,7 @@ export type ConversationViewModel = Readonly<{
   conversationId: string | null
   actionId: string | undefined
   /** The Apply this conversation was mid-flight on when its stream connected, if any. */
-  resumedApplying: Readonly<{ responseId: string }> | undefined
+  resumedApplying: ResumedApply | undefined
 }>
 
 export type RoomAdapters = Readonly<{
@@ -40,6 +51,7 @@ export type RoomAdapters = Readonly<{
   abandonOperation: typeof abandonOperationFn
   applyRecommendation: typeof applyRecommendationFn
   confirmApplication: typeof confirmApplicationFn
+  retrievePendingApply: typeof retrievePendingApplyFn
   saveDocument: typeof saveSurfaceDocumentFn
 }>
 
@@ -57,7 +69,7 @@ export function useConversation(
   const [actionId, setActionId] = useState<string | undefined>(undefined)
   const actionIdRef = useRef(actionId)
   const [error, setError] = useState<string | undefined>(undefined)
-  const [resumedApplying, setResumedApplying] = useState<Readonly<{ responseId: string }> | undefined>(undefined)
+  const [resumedApplying, setResumedApplying] = useState<ResumedApply | undefined>(undefined)
   const conversationIdRef = useRef<string | null>(initialConversationId)
   // Held rather than read from the prop: this hook mints an id on a fresh conversation's first
   // dispatch and reports it upward, and depending on the prop would rebuild the event stream in the
@@ -112,19 +124,32 @@ export function useConversation(
     // The action in flight for this surface, if any, only belongs to this conversation when its
     // identity matches: this surface admits one operation at a time, but it may belong to a
     // conversation other than the one this hook opened.
-    void snapshot.then((activity) => {
-      if (!active) return
-      const surfaceActivity = activity[surface]
-      if (surfaceActivity === null || surfaceActivity.conversationId !== openedWithConversationId) return
-      actionIdRef.current = surfaceActivity.actionId
-      setActionId(surfaceActivity.actionId)
-      setBusy(true)
-      if (surfaceActivity.kind === 'dispatch') {
-        setProjection((prev) => ({ ...prev, activity: surfaceActivity }))
-      } else {
-        setResumedApplying({ responseId: surfaceActivity.sourceEntryId })
-      }
-    })
+    void snapshot
+      .then((activity) => {
+        if (!active) return
+        const surfaceActivity = activity[surface]
+        if (surfaceActivity === null || surfaceActivity.conversationId !== openedWithConversationId) return
+        actionIdRef.current = surfaceActivity.actionId
+        setActionId(surfaceActivity.actionId)
+        setBusy(true)
+        if (surfaceActivity.kind === 'dispatch') {
+          setProjection((prev) => ({ ...prev, activity: surfaceActivity }))
+        } else {
+          setResumedApplying({
+            actionId: surfaceActivity.actionId,
+            responseId: surfaceActivity.sourceEntryId,
+            applicationId: surfaceActivity.applicationId,
+          })
+        }
+      })
+      // Failing to learn what this surface's room scope is doing is an error state, never idle:
+      // it locks the controls a genuine busy state would, rather than leaving them free on the
+      // unproven assumption that nothing is in flight.
+      .catch(() => {
+        if (!active) return
+        setBusy(true)
+        setError(ACTIVITY_UNLEARNABLE)
+      })
 
     return () => {
       active = false

@@ -404,6 +404,12 @@ so nothing about this state may compose as one.
 **One participant unavailable and the rest of the room fine.** Its failure is stated as its own and
 the conversation settles around it; nothing presents the room as down, because it isn't.
 
+**Could not learn what this surface is doing.** A malformed or unreachable stream never reads as an
+idle room: the composer and every response action stay disabled, and the failure is stated in words
+distinct from an ordinary busy state or from the room being unreachable — the author knows the
+studio could not tell them, not that it told them nothing was happening. Reopening the piece is the
+recovery; nothing here retries or polls on the author's behalf.
+
 ## Guardrails
 
 **Nothing on screen rates the work or the author**, and no measure of how much a participant

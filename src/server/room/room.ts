@@ -304,6 +304,7 @@ export class Room {
         kind: 'apply',
         sourceEntryId: operation.sourceEntryId,
         startedAt: operation.startedAt,
+        applicationId: operation.pending?.applicationId,
       }
     }
     return {
@@ -675,6 +676,20 @@ export class Room {
       closeOut('failed')
       throw err
     }
+  }
+
+  /**
+   * The generated document a pending Apply is holding, by the provisional identity its own
+   * `activity.snapshot` reported — what a reconnecting client resumes installation from, without
+   * a further model call. Answers only while that identity is still the scope's pending Apply;
+   * an already-committed application is read from the durable conversation instead.
+   */
+  pendingReplacement(roomScope: RoomScope, conversationId: string, applicationId: string): string {
+    const operation = this.#operationFor(roomScope)
+    if (operation?.kind !== 'apply' || operation.conversationId !== conversationId || operation.pending?.applicationId !== applicationId) {
+      throw new ApplicationNotPendingError(roomScope.pieceId, applicationId)
+    }
+    return operation.pending.replacement
   }
 
   /**

@@ -6,6 +6,7 @@ import type { ConversationActivitySnapshot, RoomActivitySnapshot } from '../../.
 import { Conversation } from '../../../src/client/Conversation.js'
 import type { RoomEvent } from '../../../src/client/entryProjection.js'
 import type { RequestResult } from '../../../src/client/request.js'
+import type { AutosaveState } from '../../../src/client/autosave.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 
 const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
@@ -33,6 +34,7 @@ function roomHolding(
     abandonOperation,
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
     confirmApplication: () => Promise.resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } }),
+    retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { manuscript: 'unused' } }),
     saveDocument: () => Promise.resolve({ outcome: 'value', value: null }),
   }
 }
@@ -525,5 +527,28 @@ describe('conversation activity, truthfully', () => {
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     expect(await screen.findByText('APPLYING')).toBeTruthy()
+  })
+
+  it('reconnect: a pending Apply resumes installation and confirmation from the retrieved replacement, calling no model', async () => {
+    const retrievePendingApply = vi.fn(() => Promise.resolve({ outcome: 'value' as const, value: { manuscript: 'resumed text' } }))
+    const confirmApplication = vi.fn(() =>
+      Promise.resolve({ outcome: 'value' as const, value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' as const } } }),
+    )
+    const onApplied = vi.fn((): Promise<AutosaveState> => Promise.resolve({ failed: false }))
+    const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
+      actionId: 'a1',
+      conversationId: 'c1',
+      kind: 'apply',
+      sourceEntryId: 'e1',
+      startedAt: 1_700_000_000_000,
+      applicationId: 'app1',
+    })
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: { ...room, retrievePendingApply, confirmApplication }, onApplied })
+
+    await waitFor(() => expect(onApplied).toHaveBeenCalledWith('resumed text'))
+    expect(retrievePendingApply).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    await waitFor(() => expect(screen.queryByText('APPLYING')).toBeNull())
   })
 })

@@ -212,6 +212,30 @@ describe('the room over HTTP', () => {
     })
   })
 
+  it('retrieves the pending replacement by its provisional identity, so a reconnecting client resumes without a further model call, and refuses an unknown identity', async () => {
+    const { app, modelAccess, room } = await withPiece({
+      shape: RECOMMENDATION,
+      apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } }, held: true },
+    })
+    const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
+
+    const applying = app.request('/pieces/cups/surfaces/draft/conversations/c1/apply', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ responseId, documents: DOCUMENTS }),
+    })
+    modelAccess.release('apply')
+    const { data: applied } = await (await applying).json()
+
+    const retrieved = await app.request(`/pieces/cups/surfaces/draft/conversations/c1/apply/${applied.applicationId}`)
+    expect(retrieved.status).toBe(200)
+    expect(await retrieved.json()).toMatchObject({ success: true, data: { manuscript: applied.manuscript } })
+
+    const unknown = await app.request('/pieces/cups/surfaces/draft/conversations/c1/apply/no-such-application')
+    expect(unknown.status).toBe(404)
+    expect(await unknown.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
+  })
+
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved before the client has saved the replacement', async () => {
     const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
