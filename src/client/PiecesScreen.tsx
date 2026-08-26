@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CallSitesScreen } from './CallSitesScreen.js'
-import { NewPieceForm } from './NewPieceForm.js'
+import { NewPieceForm, offeredModes } from './NewPieceForm.js'
 import { OpenedPiece } from './OpenedPiece.js'
 import { PieceList } from './PieceList.js'
 import styles from './PiecesScreen.module.css'
@@ -22,6 +22,7 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
   // selected across a piece switch. `undefined` until the author has picked one this session —
   // until then, each opened piece falls back to whichever global conversation it last opened with.
   const [authorContextConversationId, setAuthorContextConversationId] = useState<string | null | undefined>(undefined)
+  const modes = pieces.status === 'ready' ? offeredModes(pieces.modes) : undefined
 
   if (openedId !== undefined) {
     return (
@@ -70,16 +71,18 @@ export function PiecesScreen({ workspace }: PiecesScreenProps) {
               {pieces.message}
             </p>
           )}
-          <div className={styles.creating}>
-            <NewPieceForm
-              submitting={pieces.status === 'ready' && pieces.creating}
-              error={pieces.status === 'ready' ? pieces.createError : undefined}
-              modes={pieces.status === 'ready' ? pieces.modes : []}
-              onSubmit={(title, mode) => {
-                if (pieces.status === 'ready') pieces.create(title, mode)
-              }}
-            />
-          </div>
+          {/* A listing that failed carries no mode to create in, and a create control that cannot
+              create is worse than an absent one, so the form is absent until there is one. */}
+          {pieces.status === 'ready' && modes !== undefined && (
+            <div className={styles.creating}>
+              <NewPieceForm
+                submitting={pieces.creating}
+                error={pieces.createError}
+                modes={modes}
+                onSubmit={pieces.create}
+              />
+            </div>
+          )}
           <p className={styles.workspace} title={workspace}>
             {workspace}
           </p>
