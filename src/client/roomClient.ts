@@ -7,7 +7,9 @@ import {
   conversationErrorEventSchema,
   entryAppendedEventSchema,
   participantActivityEventSchema,
+  roomActivitySnapshotSchema,
   type ConversationErrorEvent,
+  type RoomActivitySnapshot,
 } from '../shared/conversationEvents.js'
 import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
@@ -108,11 +110,13 @@ export function abandonOperation(
   )
 }
 
+const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
+
 export function subscribeToRoom(
   pieceId: string,
   onEvent: (event: RoomEvent) => void,
   onMalformedFrame: (message: string) => void,
-): () => void {
+): Readonly<{ snapshot: Promise<RoomActivitySnapshot>; unsubscribe: () => void }> {
   const source = new EventSource(`/pieces/${encodeURIComponent(pieceId)}/events`)
 
   function listen<T>(name: string, schema: z.ZodType<T>, wrap: (data: T) => RoomEvent): void {
@@ -128,11 +132,32 @@ export function subscribeToRoom(
     })
   }
 
+  const snapshot = new Promise<RoomActivitySnapshot>((resolve) => {
+    source.addEventListener(
+      'activity.snapshot',
+      (event) => {
+        if (!(event instanceof MessageEvent)) {
+          resolve(EMPTY_ROOM_ACTIVITY)
+          return
+        }
+        const frame: unknown = event.data
+        const parsed = typeof frame === 'string' ? roomActivitySnapshotSchema.safeParse(readJson(frame)) : { success: false as const }
+        if (!parsed.success) {
+          onMalformedFrame('malformed "activity.snapshot" event from the studio')
+          resolve(EMPTY_ROOM_ACTIVITY)
+          return
+        }
+        resolve(parsed.data)
+      },
+      { once: true },
+    )
+  })
+
   listen('action.started', actionStartedEventSchema, (data) => ({ type: 'action.started', data }))
   listen('participant.activity', participantActivityEventSchema, (data) => ({ type: 'participant.activity', data }))
   listen('entry.appended', entryAppendedEventSchema, (data) => ({ type: 'entry.appended', data }))
   listen('action.finished', actionFinishedEventSchema, (data) => ({ type: 'action.finished', data }))
   listen('error', conversationErrorEventSchema, (data: ConversationErrorEvent) => ({ type: 'error', data }))
 
-  return () => source.close()
+  return { snapshot, unsubscribe: () => source.close() }
 }

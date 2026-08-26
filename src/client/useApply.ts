@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -34,6 +34,12 @@ export function useApply(
   const { applyRecommendation, confirmApplication, saveDraft, abandonOperation } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(initialApplying)
   const [error, setError] = useState<string | undefined>(undefined)
+
+  // `initialApplying` can arrive after mount — the room reports it once the piece's event stream
+  // connects, not synchronously with this hook's own render.
+  useEffect(() => {
+    if (initialApplying !== undefined) setApplying((current) => current ?? initialApplying)
+  }, [initialApplying])
 
   function apply(responseId: string, constraint: string | undefined): void {
     if (applying !== undefined || conversationId === null) return

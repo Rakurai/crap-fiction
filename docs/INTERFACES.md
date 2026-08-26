@@ -42,9 +42,10 @@ GET    /modes                                      every loaded mode's id and di
 GET    /pieces                                     title, mode, status, length, modified
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
-GET    /pieces/:id                                 metadata, draft, story context, conversation index,
-                                                   the room (the cast and the Story Editor), and the
-                                                   conversation action in flight if there is one
+GET    /pieces/:id                                 metadata and the Story Editor, plus each of the
+                                                   three surfaces' text, its reference schema where it
+                                                   has one, conversation index, current conversation,
+                                                   and roster with enabled state
 PATCH  /pieces/:id                                 title, status, enabled cast
 PUT    /pieces/:id/draft
 GET    /pieces/:id/conversations/:cid              the durable entries, each application joined to
@@ -81,20 +82,24 @@ and only the room is unavailable.
 
 ## The event stream
 
-Server-sent events, one stream for the open piece. The set is closed.
+Server-sent events, one stream for the open piece, covering all three of its room scopes together.
+The set is closed.
 
 | Event | Carries |
 |---|---|
-| `action.started` | The action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
-| `participant.activity` | Action, participant, and whether it is having its model prepared or working |
-| `entry.appended` | Action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
-| `action.finished` | Action, and how it ended — settled, abandoned, or failed |
-| `error` | A room failure belonging to no participant, in terms the author can act on |
+| `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes — delivered once, atomically with the subscription, before any other frame |
+| `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
+| `participant.activity` | The room scope, action, participant, and whether it is having its model prepared or working |
+| `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
+| `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
+| `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
 
 An `error` frame carries the same code and message a failed request carries, and carries them
 unwrapped: the envelope is the shape of a reply to a request, and a frame on a stream is not one.
 Reusing the two fields is what keeps one failure from having two vocabularies depending on which
 channel it arrived by.
+
+Connecting to a piece's stream is what opens it.
 
 ## The model seam
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { conversationEntryViewSchema } from './conversationEntryViews.js'
+import { surfaceIdSchema } from './surfaces.js'
 
 export const actionKindSchema = z.enum(['dispatch', 'apply'])
 
@@ -10,6 +11,7 @@ const startedFields = {
   conversationId: z.string().min(1),
   sourceEntryId: z.string().min(1),
   startedAt: z.number().int().positive(),
+  surface: surfaceIdSchema,
 }
 
 export const dispatchStartedEventSchema = z.object({ ...startedFields, kind: z.literal('dispatch'), audience: z.array(z.string().min(1)).readonly() })
@@ -24,6 +26,7 @@ export const participantActivityEventSchema = z.object({
   actionId: z.string().min(1),
   participantId: z.string().min(1),
   state: z.enum(['preparing', 'working']),
+  surface: surfaceIdSchema,
 })
 
 export type ParticipantActivityEvent = z.infer<typeof participantActivityEventSchema>
@@ -31,6 +34,7 @@ export type ParticipantActivityEvent = z.infer<typeof participantActivityEventSc
 export const entryAppendedEventSchema = z.object({
   actionId: z.string().min(1),
   entry: conversationEntryViewSchema,
+  surface: surfaceIdSchema,
 })
 
 export type EntryAppendedEvent = z.infer<typeof entryAppendedEventSchema>
@@ -38,6 +42,7 @@ export type EntryAppendedEvent = z.infer<typeof entryAppendedEventSchema>
 export const actionFinishedEventSchema = z.object({
   actionId: z.string().min(1),
   outcome: z.enum(['settled', 'abandoned', 'failed']),
+  surface: surfaceIdSchema,
 })
 
 export type ActionFinishedEvent = z.infer<typeof actionFinishedEventSchema>
@@ -46,7 +51,7 @@ export const conversationFailureCodeSchema = z.enum(['CONVERSATION_NOT_WRITTEN',
 
 export type ConversationFailureCode = z.infer<typeof conversationFailureCodeSchema>
 
-export const conversationErrorEventSchema = z.object({ code: conversationFailureCodeSchema, message: z.string() })
+export const conversationErrorEventSchema = z.object({ code: conversationFailureCodeSchema, message: z.string(), surface: surfaceIdSchema })
 
 export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
 
@@ -78,3 +83,18 @@ export const conversationActivitySnapshotSchema = z.discriminatedUnion('kind', [
 ])
 
 export type ConversationActivitySnapshot = z.infer<typeof conversationActivitySnapshotSchema>
+
+/**
+ * What connecting to a piece's event stream delivers before any live frame: the action in
+ * flight, if there is one, at each of the piece's three room scopes. Delivered atomically with
+ * the subscription itself, so no action can start or finish in the gap between them.
+ */
+export const roomActivitySnapshotSchema = z
+  .object({
+    draft: conversationActivitySnapshotSchema.nullable(),
+    storyContext: conversationActivitySnapshotSchema.nullable(),
+    authorContext: conversationActivitySnapshotSchema.nullable(),
+  })
+  .readonly()
+
+export type RoomActivitySnapshot = z.infer<typeof roomActivitySnapshotSchema>

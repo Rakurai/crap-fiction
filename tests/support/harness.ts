@@ -24,6 +24,8 @@ export type AppSpec = Readonly<{
   runtimeStatus: RuntimeStatus | undefined
   /** A room the test drives itself. Omitted where the scenario asks the room for nothing. */
   room?: Room
+  /** The studio's one author-context reference. Defaulted where a scenario never reads it. */
+  authorContextReference?: string
 }>
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
@@ -88,6 +90,7 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     modelAccess,
     room,
     createLogger(env.logLevel),
+    spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
   )
   return { app, workspace }
 }

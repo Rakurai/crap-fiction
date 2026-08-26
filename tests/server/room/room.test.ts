@@ -794,3 +794,82 @@ describe('Room.dispatch — an action the author opened from a particular respon
     expect(request).toMatchObject({ target: 'shape', respondingTo: firstResponse.id, clarification: 'what would you cut' })
   })
 })
+
+describe('Room.connect', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(() => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-room-connect-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('captures the action in flight, if any, at each of the three room scopes atomically with the subscription, before any live event can arrive', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+    })
+
+    const { actionId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+
+    const events: RoomEvent[] = []
+    const { snapshot, unsubscribe } = room.connect(piece.id, (event) => events.push(event))
+
+    expect(snapshot.draft).toMatchObject({ actionId, kind: 'dispatch' })
+    expect(snapshot.storyContext).toBeNull()
+    expect(snapshot.authorContext).toBeNull()
+    // Nothing arrived on the listener between capturing the snapshot and registering it.
+    expect(events).toEqual([])
+
+    unsubscribe()
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settlementOf(room, piece.id)
+  })
+
+  it("abandons a different piece's unfinished work across all three of its room scopes on opening this one, and resumes a piece's own work untouched on reconnecting to it", async () => {
+    const first = await createPiece(workspaceDir, 'Cups', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const second = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, [fixtureMode], fixtureSpecialists)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
+    })
+
+    room.connect(first.id, () => {})
+    await room.dispatch(workspaceDir, scope(first.id), 'c1', { kind: 'message', text: 'a message' }, 'draft text')
+    const authorContextScope: RoomScope = { pieceId: first.id, surface: 'authorContext' }
+    await room.dispatch(workspaceDir, authorContextScope, 'c2', { kind: 'message', text: 'a durable note' }, 'draft text')
+    const draftSettled = settlementOfScope(room, scope(first.id))
+    const authorContextSettled = settlementOfScope(room, authorContextScope)
+
+    // Opening a different piece is the transition: the first piece's work, on both the scopes
+    // it was running, is abandoned — including the author-context scope, which still names the
+    // first piece even though its conversation lives in the global namespace.
+    room.connect(second.id, () => {})
+
+    expect(room.activitySnapshot(scope(first.id))).toBeUndefined()
+    expect(room.activitySnapshot(authorContextScope)).toBeUndefined()
+    await draftSettled
+    await authorContextSettled
+
+    const secondScope = scope(second.id)
+    const secondDispatch = await room.dispatch(workspaceDir, secondScope, 'c1', { kind: 'message', text: 'another message' }, 'draft text')
+    // Reconnecting to the piece already open resumes it: its own in-flight work stands.
+    room.connect(second.id, () => {})
+    expect(room.activitySnapshot(secondScope)).toMatchObject({ actionId: secondDispatch.actionId })
+
+    adapter.release('shape')
+    adapter.release('compression')
+    adapter.release('story-editor')
+    await settlementOf(room, second.id)
+  })
+})

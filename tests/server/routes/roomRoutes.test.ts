@@ -5,7 +5,9 @@ import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../../src/server/modes.js'
+import type { RoomScope } from '../../../src/server/scope.js'
 import { SHIPPED_HISTORY_POLICY } from '../../../src/server/room/context.js'
+import type { Room } from '../../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../../support/modelAdapter.js'
 import { buildTestApp } from '../../support/harness.js'
 import { buildTestRoom } from '../../support/room.js'
@@ -14,12 +16,14 @@ import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFix
 /**
  * What the room does with a dispatch or an application belongs to
  * `room/room.test.ts`. These tests own the adapter over it: the act each request body
- * names, the outcome each answer is translated to, the in-flight views a reload reads,
- * and the envelope each stated refusal arrives in.
+ * names, the outcome each answer is translated to, and the envelope each stated refusal
+ * arrives in.
  *
  * A scenario that needs a call still running holds it at the fixture adapter and
- * releases it, rather than racing a timer; a scenario that needs one finished watches
- * the piece through the same route the author's studio watches it through.
+ * releases it, rather than racing a timer; a scenario that needs one finished watches the
+ * scope's own activity, since the piece route no longer carries it — the author's studio
+ * watches that same fact through the event stream, which `room/room.test.ts` and
+ * `studio/devServerStreaming.test.ts` cover at the wire.
  */
 
 const MODE: ModeDescriptor = {
@@ -59,9 +63,11 @@ describe('the room over HTTP', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
+  const draftScope: RoomScope = { pieceId: 'cups', surface: 'draft' }
+
   async function withPiece(
     behaviors: Readonly<Record<string, FixtureBehavior>>,
-  ): Promise<{ app: Hono; modelAccess: FixtureModelAdapter }> {
+  ): Promise<{ app: Hono; modelAccess: FixtureModelAdapter; room: Room }> {
     const modelAccess = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, {
       modes: [MODE],
@@ -76,7 +82,7 @@ describe('the room over HTTP', () => {
 
     await workspace.set('my-writing')
     await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', mode: 'flash' }) })
-    return { app, modelAccess }
+    return { app, modelAccess, room }
   }
 
   async function dispatch(app: Hono, conversationId: string, body: Record<string, unknown>): Promise<Response> {
@@ -95,19 +101,20 @@ describe('the room over HTTP', () => {
     return await (await app.request(`/pieces/cups/conversations/${conversationId}`)).json()
   }
 
-  /** Watched through the route the author's studio watches, rather than through the room. */
-  async function untilIdle(app: Hono): Promise<void> {
-    for (let attempt = 0; attempt < 500; attempt += 1) {
-      if ((await piece(app)).data.conversationActionInFlight === null) return
+  /** Watched at the scope the author's studio watches through the event stream's snapshot. */
+  async function untilIdle(room: Room): Promise<void> {
+    const deadline = Date.now() + 5_000
+    while (Date.now() < deadline) {
+      if (room.activitySnapshot(draftScope) === undefined) return
       await new Promise((resolve) => setImmediate(resolve))
     }
-    throw new Error('the piece still reports a conversation action in flight')
+    throw new Error('the room still reports a conversation action in flight')
   }
 
   /** The id of the response a settled dispatch produced, which later acts name. */
-  async function respondedTo(app: Hono, body: Record<string, unknown>): Promise<string> {
+  async function respondedTo(app: Hono, room: Room, body: Record<string, unknown>): Promise<string> {
     await dispatch(app, 'c1', body)
-    await untilIdle(app)
+    await untilIdle(room)
     const response = (await conversation(app, 'c1')).data.entries.find((entry: { kind: string }) => entry.kind === 'participantResponse')
     if (response === undefined) throw new Error('the dispatch appended no participant response')
     return response.id
@@ -126,34 +133,34 @@ describe('the room over HTTP', () => {
   })
 
   /**
-   * The three acts a dispatch body can name, and the one in-flight view a reload reads while
-   * any of them runs: the first is held so that view is observable, and released so the acts
-   * behind it can open in turn.
+   * The three acts a dispatch body can name, and the one in-flight view the room itself holds
+   * while any of them runs: the first is held so that view is observable, and released so the
+   * acts behind it can open in turn.
    */
   it('opens the act each request body names — a message to the room, a reply to one participant, or a concrete change asked of a response — reporting the one in flight with the audience it resolved', async () => {
-    const { app, modelAccess } = await withPiece({ shape: { ...COMMENTARY, held: true }, 'story-editor': COMMENTARY })
+    const { app, modelAccess, room } = await withPiece({ shape: { ...COMMENTARY, held: true }, 'story-editor': COMMENTARY })
 
     const opened = await dispatch(app, 'c1', { message: 'a message' })
     const { conversationId, actionId } = (await opened.json()).data
     expect(opened.status).toBe(200)
     expect(typeof actionId).toBe('string')
 
-    const inFlight = (await piece(app)).data.conversationActionInFlight
+    const inFlight = room.activitySnapshot(draftScope)
     expect(inFlight).toMatchObject({ kind: 'dispatch', actionId })
-    expect(inFlight.audience).toContain('shape')
+    expect(inFlight?.kind === 'dispatch' && inFlight.audience).toContain('shape')
 
     modelAccess.release('shape')
-    await untilIdle(app)
-    expect((await piece(app)).data.currentConversationId).toBe(conversationId)
+    await untilIdle(room)
+    expect((await piece(app)).data.surfaces.draft.currentConversationId).toBe(conversationId)
 
     const opening: readonly { kind: string; id: string }[] = (await conversation(app, 'c1')).data.entries
     const responseId = opening.find((entry) => entry.kind === 'participantResponse')?.id
     if (responseId === undefined) throw new Error('the dispatch appended no participant response')
 
     await dispatch(app, 'c1', { target: 'shape', message: 'say more, @story-editor' })
-    await untilIdle(app)
+    await untilIdle(room)
     await dispatch(app, 'c1', { respondingTo: responseId, clarification: 'be specific' })
-    await untilIdle(app)
+    await untilIdle(room)
 
     const entries: readonly { kind: string; text?: string }[] = (await conversation(app, 'c1')).data.entries
     expect(entries.find((entry) => entry.kind === 'authorMessage' && entry.text === 'a message')).toBeDefined()
@@ -163,11 +170,11 @@ describe('the room over HTTP', () => {
   })
 
   it('reports an application in flight naming the response it came from, then answers with a pending manuscript that becomes the change on that response once confirmed', async () => {
-    const { app, modelAccess } = await withPiece({
+    const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
       apply: { result: { outcome: 'value', value: { manuscript: 'The cups sat where she left them, revised.' } }, held: true },
     })
-    const responseId = await respondedTo(app, { target: 'shape', message: 'a direct question' })
+    const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
     const applying = app.request('/pieces/cups/conversations/c1/apply', {
       method: 'POST',
@@ -176,14 +183,14 @@ describe('the room over HTTP', () => {
     })
     await new Promise((resolve) => setImmediate(resolve))
 
-    expect((await piece(app)).data.conversationActionInFlight).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
+    expect(room.activitySnapshot(draftScope)).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
 
     modelAccess.release('apply')
     const { data: applied } = await (await applying).json()
     expect(applied).toMatchObject({ outcome: 'pending', manuscript: 'The cups sat where she left them, revised.' })
 
     // Still busy: pending, not settled, until the client installs, saves and confirms it.
-    expect((await piece(app)).data.conversationActionInFlight).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
+    expect(room.activitySnapshot(draftScope)).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
 
     await app.request('/pieces/cups/draft', {
       method: 'PUT',
@@ -194,7 +201,7 @@ describe('the room over HTTP', () => {
     expect(confirming.status).toBe(200)
     const { data: confirmed } = await confirming.json()
 
-    expect((await piece(app)).data.conversationActionInFlight).toBeNull()
+    expect(room.activitySnapshot(draftScope)).toBeUndefined()
     const entries: readonly { kind: string }[] = (await conversation(app, 'c1')).data.entries
     expect(entries.find((entry) => entry.kind === 'application')).toMatchObject({
       id: confirmed.entryId,
@@ -204,11 +211,11 @@ describe('the room over HTTP', () => {
   })
 
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved before the client has saved the replacement', async () => {
-    const { app, modelAccess } = await withPiece({
+    const { app, modelAccess, room } = await withPiece({
       shape: RECOMMENDATION,
       apply: { result: { outcome: 'value', value: { manuscript: 'revised' } }, held: true },
     })
-    const responseId = await respondedTo(app, { target: 'shape', message: 'a direct question' })
+    const responseId = await respondedTo(app, room, { target: 'shape', message: 'a direct question' })
 
     const applying = app.request('/pieces/cups/conversations/c1/apply', {
       method: 'POST',
@@ -229,16 +236,16 @@ describe('the room over HTTP', () => {
 
   /** The act that reaches no model at all, and so answers within the request that opened it. */
   it('accepts abandoning an action nothing is running without complaint', async () => {
-    const { app } = await withPiece({})
+    const { app, room } = await withPiece({})
 
     const abandoned = await app.request('/pieces/cups/conversations/c1/actions/no-such-action/abandon', { method: 'POST' })
 
     expect(abandoned.status).toBe(200)
-    expect((await piece(app)).data.conversationActionInFlight).toBeNull()
+    expect(room.activitySnapshot(draftScope)).toBeUndefined()
   })
 
   it('states each of the room\'s refusals in the envelope', async () => {
-    const { app, modelAccess } = await withPiece({ shape: { ...COMMENTARY, held: true }, 'story-editor': COMMENTARY })
+    const { app, modelAccess, room } = await withPiece({ shape: { ...COMMENTARY, held: true }, 'story-editor': COMMENTARY })
     await dispatch(app, 'c1', { message: 'a message' })
 
     const busy = await dispatch(app, 'c1', { message: 'another message' })
@@ -246,7 +253,7 @@ describe('the room over HTTP', () => {
     expect(await busy.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
 
     modelAccess.release('shape')
-    await untilIdle(app)
+    await untilIdle(room)
 
     const unknownParticipant = await dispatch(app, 'c1', { target: 'no-such-participant', message: 'a reply' })
     expect(unknownParticipant.status).toBe(404)

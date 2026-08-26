@@ -88,7 +88,10 @@ describe('a dispatch\'s events through the dev server', () => {
     }
     await reader.cancel()
 
-    expect(names[0]).toBe('action.started')
+    // The snapshot frame lands atomically with the subscription, before any live frame — here,
+    // an empty one, since nothing was in flight yet when the stream connected.
+    expect(names[0]).toBe('activity.snapshot')
+    expect(names[1]).toBe('action.started')
     expect(names).toContain('entry.appended')
     expect(names.at(-1)).toBe('action.finished')
   }, 30_000)

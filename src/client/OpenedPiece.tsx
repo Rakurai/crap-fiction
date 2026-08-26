@@ -67,13 +67,13 @@ function Surfaces({
   readonly conversations: ConversationsProps
   readonly onClose: () => void
 }) {
-  const manuscript = useManuscript(piece.draft)
+  const manuscript = useManuscript(piece.surfaces.draft.text)
   const autosave = useAutosave(piece.id, manuscript.markdown, saveDraft)
   const roster = useRoster(fetchCallSites)
   const [probe] = useLoaded(fetchRuntimeStatus, [])
   const [panel, setPanel] = useState<'none' | 'room' | 'conversations'>('none')
   const [applying, setApplying] = useState<{ readonly participantName: string } | undefined>(undefined)
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.currentConversationId)
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(piece.surfaces.draft.currentConversationId)
   // Keyed on this rather than on `activeConversationId`, which `Conversation` reports back when it
   // mints one on a first dispatch: remounting on that report would tear the dispatch down mid-flight.
   const [session, setSession] = useState(0)
@@ -122,11 +122,6 @@ function Surfaces({
           key={session}
           pieceId={piece.id}
           currentConversationId={activeConversationId}
-          conversationActionInFlight={
-            piece.conversationActionInFlight !== null && piece.conversationActionInFlight.conversationId === activeConversationId
-              ? piece.conversationActionInFlight
-              : null
-          }
           draft={manuscript.markdown}
           flushDraft={autosave.flush}
           room={{ createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation, applyRecommendation, confirmApplication, saveDraft }}
@@ -186,7 +181,7 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
       <Surfaces
         piece={piece.piece}
         room={{
-          cast: piece.piece.cast,
+          cast: piece.piece.surfaces.draft.cast,
           storyEditor: piece.piece.storyEditor,
           toggling: piece.castToggling,
           error: piece.castError,
@@ -202,7 +197,7 @@ export function OpenedPiece({ id, onClose }: OpenedPieceProps) {
           onSetStatus: piece.setStatus,
         }}
         conversations={{
-          conversations: piece.piece.conversations,
+          conversations: piece.piece.surfaces.draft.conversations,
           onRefresh: piece.refreshConversations,
           deletingId: piece.deletingConversationId,
           error: piece.conversationsError,

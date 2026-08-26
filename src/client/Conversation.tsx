@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { AppliedChangeContent } from '../shared/appliedChange.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
-import type { ConversationActivitySnapshot, DispatchActivitySnapshot } from '../shared/conversationEvents.js'
+import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import { countWords } from '../shared/storyLength.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
@@ -21,7 +21,6 @@ export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 type ConversationProps = {
   readonly pieceId: string
   readonly currentConversationId: string | null
-  readonly conversationActionInFlight: ConversationActivitySnapshot | null
   readonly draft: string
   readonly flushDraft: () => void
   readonly room: RoomAdapters
@@ -362,7 +361,6 @@ function DispatchFlight({
 export function Conversation({
   pieceId,
   currentConversationId,
-  conversationActionInFlight,
   draft,
   flushDraft,
   room,
@@ -397,15 +395,9 @@ export function Conversation({
     textareaRef.current?.setSelectionRange(caretOffset, caretOffset)
   }, [caretOffset])
 
-  const conversation = useConversation(pieceId, currentConversationId, conversationActionInFlight, flushDraft, () => draft, room)
+  const conversation = useConversation(pieceId, currentConversationId, flushDraft, () => draft, room)
 
-  const initialApplying: ApplyingResponse | undefined = useMemo(
-    () => (conversationActionInFlight?.kind === 'apply' ? { responseId: conversationActionInFlight.sourceEntryId } : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
-
-  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, initialApplying)
+  const apply = useApply(pieceId, conversation.conversationId, () => draft, onApplied, room, conversation.resumedApplying)
 
   useEffect(() => {
     onApplyingChange(

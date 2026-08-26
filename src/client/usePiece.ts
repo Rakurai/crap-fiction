@@ -43,10 +43,12 @@ export function usePiece(id: string): PieceViewModel {
     (memberId: string) => {
       if (state.kind !== 'ready') return
       const piece = state.value
-      const target = piece.cast.find((member) => member.id === memberId)
+      const target = piece.surfaces.draft.cast.find((member) => member.id === memberId)
       if (target === undefined) return
 
-      const nextEnabled = piece.cast.filter((member) => (member.id === memberId ? !member.enabled : member.enabled)).map((member) => member.id)
+      const nextEnabled = piece.surfaces.draft.cast
+        .filter((member) => (member.id === memberId ? !member.enabled : member.enabled))
+        .map((member) => member.id)
 
       setCastToggling(memberId)
       setCastError(undefined)
@@ -118,8 +120,8 @@ export function usePiece(id: string): PieceViewModel {
           setConversationsError(failureMessage(result))
           return undefined
         }
-        const remaining = piece.conversations.filter((c) => c.id !== conversationId)
-        setState({ kind: 'ready', value: { ...piece, conversations: remaining } })
+        const remaining = piece.surfaces.draft.conversations.filter((c) => c.id !== conversationId)
+        setState({ kind: 'ready', value: { ...piece, surfaces: { ...piece.surfaces, draft: { ...piece.surfaces.draft, conversations: remaining } } } })
         return remaining
       })
     },

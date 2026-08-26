@@ -22,7 +22,9 @@ import {
   type ConversationFailureCode,
   type EntryAppendedEvent,
   type ParticipantActivityEvent,
+  type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
+import { SURFACE_IDS } from '../../shared/surfaces.js'
 import { PieceNotFoundError } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
@@ -200,6 +202,7 @@ export class Room {
   readonly #displayNames: ReadonlyMap<string, string>
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
+  #currentPieceId: string | undefined
 
   constructor(
     modelAccess: ModelAccess,
@@ -251,6 +254,29 @@ export class Room {
     return () => set.delete(listener)
   }
 
+  /**
+   * Opens a piece as the server-authoritative transition it is: a different piece that was
+   * open has its unfinished work abandoned, across all three of its room scopes, before this
+   * piece becomes current; reconnecting to the piece already open resumes it untouched.
+   * Capturing the snapshot and registering the listener happen in the same synchronous step as
+   * this transition, with no `await` between them, so no event can land in the gap.
+   */
+  connect(pieceId: string, listener: Listener): Readonly<{ snapshot: RoomActivitySnapshot; unsubscribe: () => void }> {
+    if (this.#currentPieceId !== undefined && this.#currentPieceId !== pieceId) this.#abandonPiece(this.#currentPieceId)
+    this.#currentPieceId = pieceId
+
+    const [draft, storyContext, authorContext] = SURFACE_IDS.map((surface) => this.activitySnapshot({ pieceId, surface }) ?? null)
+    const snapshot: RoomActivitySnapshot = { draft: draft ?? null, storyContext: storyContext ?? null, authorContext: authorContext ?? null }
+    const unsubscribe = this.subscribe(pieceId, listener)
+    return { snapshot, unsubscribe }
+  }
+
+  #abandonPiece(pieceId: string): void {
+    for (const operation of [...this.#operations.values()]) {
+      if (operation.roomScope.pieceId === pieceId) this.abandon(operation.roomScope, operation.actionId)
+    }
+  }
+
   #emit(pieceId: string, event: RoomEvent): void {
     for (const listener of this.#listeners.get(pieceId) ?? []) listener(event)
   }
@@ -295,7 +321,7 @@ export class Room {
     // A pending Apply has no async work left for the abort signal to interrupt — the model call
     // already settled — so abandoning it is the only thing that will ever close out its action.
     if (operation.kind === 'apply' && operation.pending !== undefined) {
-      this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome: 'abandoned' } })
+      this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome: 'abandoned', surface: scope.surface } })
     }
   }
 
@@ -407,11 +433,11 @@ export class Room {
         () => {
           this.#emit(pieceId, {
             type: 'action.started',
-            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience },
+            data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience, surface: roomScope.surface },
           })
-          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause } })
+          this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause, surface: roomScope.surface } })
           return this.#run(workspaceDir, roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
-            this.#fail(pieceId, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
+            this.#fail(pieceId, roomScope.surface, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
           })
         },
         () => {},
@@ -425,10 +451,10 @@ export class Room {
     return { conversationId, actionId }
   }
 
-  #fail(pieceId: string, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+  #fail(pieceId: string, surface: RoomScope['surface'], actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
     this.#logger.error({ pieceId, actionId, code, err: cause }, 'conversation action failed')
-    this.#emit(pieceId, { type: 'error', data: { code, message } })
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed' } })
+    this.#emit(pieceId, { type: 'error', data: { code, message, surface } })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface } })
   }
 
   async #run(
@@ -467,7 +493,7 @@ export class Room {
 
     const onState = (participantId: string, state: 'preparing' | 'working'): void => {
       operation.states.set(participantId, state)
-      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state } })
+      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, surface: roomScope.surface } })
     }
 
     const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
@@ -484,7 +510,7 @@ export class Room {
     const reportFailureOnce = (message: string, err: unknown): void => {
       if (failed) return
       failed = true
-      this.#fail(pieceId, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+      this.#fail(pieceId, roomScope.surface, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
@@ -505,7 +531,7 @@ export class Room {
         reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
         return
       }
-      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+      this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
 
       const gathered = evidenceFrom(outcome, call.role.displayName)
       if (gathered !== undefined) evidence.push(gathered)
@@ -531,13 +557,13 @@ export class Room {
           } catch (err) {
             reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
           }
-          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry } })
+          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
         }
       }
     }
 
     if (!failed) {
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled' } })
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled', surface: roomScope.surface } })
       this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
     }
   }
@@ -578,12 +604,12 @@ export class Room {
     this.#operations.set(key, { kind: 'apply', roomScope, conversationScope, conversationId, actionId, sourceEntryId: responseId, controller, startedAt })
     this.#emit(pieceId, {
       type: 'action.started',
-      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt },
+      data: { actionId, conversationId, kind: 'apply', sourceEntryId: responseId, startedAt, surface: roomScope.surface },
     })
 
     const closeOut = (outcome: 'settled' | 'abandoned' | 'failed'): void => {
       if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome } })
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome, surface: roomScope.surface } })
     }
 
     try {
@@ -667,7 +693,7 @@ export class Room {
     const target = this.#readTargetText(workspaceDir, pieceId, roomScope.surface)
     if (target !== pending.replacement) {
       this.#operations.delete(key)
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed' } })
+      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
       throw new ApplicationDocumentNotSavedError(pieceId, applicationId)
     }
 
@@ -679,8 +705,11 @@ export class Room {
       constraint: pending.constraint,
     }
     await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
-    this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: { ...application, change: pending.change.content } } })
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled' } })
+    this.#emit(pieceId, {
+      type: 'entry.appended',
+      data: { actionId, entry: { ...application, change: pending.change.content }, surface: roomScope.surface },
+    })
+    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled', surface: roomScope.surface } })
     this.#operations.delete(key)
     return { entryId: application.id, change: pending.change.content }
   }

@@ -3,14 +3,13 @@ import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { ConversationActivitySnapshot } from '../shared/conversationEvents.js'
-import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary } from '../shared/pieceViews.js'
+import type { CastMemberView, PieceDetail, PieceStatus, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
-import type { PieceSurfaceId, SurfaceId } from '../shared/surfaces.js'
+import { SURFACE_IDS, type PieceSurfaceId, type SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
 import type { ModeDescriptor } from './modes.js'
 import { defaultCastFor, specialistsFor } from './room/roster.js'
-import type { ConversationScope } from './scope.js'
+import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
   conversationActivity,
   deleteAppliedChange,
@@ -19,6 +18,7 @@ import {
   pieceExists,
   pieceIds,
   readAppliedChanges,
+  readAuthorContext,
   readConversationEntries,
   readPiece,
   readStoryContext,
@@ -29,11 +29,15 @@ import {
   type StoredPiece,
 } from './store/index.js'
 
-/** The surface every route in this module reaches: the other two are not yet exposed to the author. */
+/** The surface every act that changes a piece's own cast reaches; the other two hold their own. */
 const OPENED_SURFACE: PieceSurfaceId = 'draft'
 
 function draftScope(workspaceDir: string, pieceId: string): ConversationScope {
   return { kind: 'piece', workspaceDir, pieceId, surface: OPENED_SURFACE }
+}
+
+function surfaceScope(workspaceDir: string, pieceId: string, surface: SurfaceId): ConversationScope {
+  return conversationScopeFor(workspaceDir, { pieceId, surface })
 }
 
 export class PieceNotFoundError extends Error {
@@ -92,8 +96,13 @@ function castView(specialists: readonly RoleDefinition[], enabled: readonly stri
   }))
 }
 
-export function listConversations(dataRoot: string, workspaceDir: string, pieceId: string): readonly ConversationSummary[] {
-  const scope = draftScope(workspaceDir, pieceId)
+export function listConversations(
+  dataRoot: string,
+  workspaceDir: string,
+  pieceId: string,
+  surface: SurfaceId = OPENED_SURFACE,
+): readonly ConversationSummary[] {
+  const scope = surfaceScope(workspaceDir, pieceId, surface)
   return conversationActivity(dataRoot, scope)
     .map(({ id, modifiedMs }) => {
       const conversation = readConversationEntries(dataRoot, scope, id)
@@ -141,24 +150,54 @@ export function listPieces(workspaceDir: string): readonly PieceSummary[] {
   return pieces.sort((a, b) => b.modified - a.modified)
 }
 
+function surfaceText(workspaceDir: string, dataRoot: string, id: string, piece: StoredPiece, surface: SurfaceId): string {
+  if (surface === 'draft') return piece.draft?.text ?? ''
+  if (surface === 'storyContext') return readStoryContext(workspaceDir, id) ?? ''
+  return readAuthorContext(dataRoot) ?? ''
+}
+
+function surfaceReferenceSchema(piece: StoredPiece, surface: SurfaceId, modes: readonly ModeDescriptor[], authorContextReference: string): string | null {
+  if (surface === 'draft') return null
+  if (surface === 'storyContext') return modes.find((mode) => mode.id === piece.metadata.mode)?.storyContextReference ?? ''
+  return authorContextReference
+}
+
+function surfaceDetail(
+  dataRoot: string,
+  workspaceDir: string,
+  id: string,
+  piece: StoredPiece,
+  specialists: readonly RoleDefinition[],
+  modes: readonly ModeDescriptor[],
+  authorContextReference: string,
+  surface: SurfaceId,
+): SurfaceDetail {
+  const available = specialistsFor(specialists, piece.metadata.mode, surface)
+  return {
+    text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
+    referenceSchema: surfaceReferenceSchema(piece, surface, modes, authorContextReference),
+    currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
+    conversations: listConversations(dataRoot, workspaceDir, id, surface),
+    cast: castView(available, piece.metadata.cast[surface]),
+  }
+}
+
 export function getPiece(
   dataRoot: string,
   workspaceDir: string,
   id: string,
-  conversationActionInFlight: ConversationActivitySnapshot | null,
   specialists: readonly RoleDefinition[],
   storyEditor: RoleDefinition,
+  modes: readonly ModeDescriptor[],
+  authorContextReference: string,
 ): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, OPENED_SURFACE)
+  const surfaces = Object.fromEntries(
+    SURFACE_IDS.map((surface) => [surface, surfaceDetail(dataRoot, workspaceDir, id, piece, specialists, modes, authorContextReference, surface)]),
+  ) as PieceDetail['surfaces']
   return {
     ...summarize(id, piece),
-    draft: piece.draft?.text ?? '',
-    storyContext: readStoryContext(workspaceDir, id) ?? '',
-    currentConversationId: mostRecentConversationId(dataRoot, draftScope(workspaceDir, id)) ?? null,
-    conversations: listConversations(dataRoot, workspaceDir, id),
-    conversationActionInFlight,
-    cast: castView(available, piece.metadata.cast[OPENED_SURFACE]),
+    surfaces,
     storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
   }
 }

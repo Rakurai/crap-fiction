@@ -43,7 +43,7 @@ import { TolerantReadError } from './store/index.js'
 import { validateJson } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
 
-/** The one surface the HTTP interface reaches today; the other two are addressable behind it already. */
+/** The surface a dispatch, an Apply and a cast change reach; the other two hold their own room scope already. */
 const OPENED_SURFACE = 'draft'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
@@ -71,6 +71,7 @@ export function createApp(
   modelAccess: ModelAccess,
   room: Room,
   logger: Logger,
+  authorContextReference: string,
 ): Hono {
   const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]
   const app = new Hono()
@@ -104,18 +105,16 @@ export function createApp(
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    const scope: RoomScope = { pieceId: id, surface: OPENED_SURFACE }
-    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.activitySnapshot(scope) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
     const id = c.req.param('id')
     const workspaceDir = workspace.require()
-    const scope: RoomScope = { pieceId: id, surface: OPENED_SURFACE }
 
     await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
 
-    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.activitySnapshot(scope) ?? null, room.specialists(), room.storyEditor())))
+    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), modes, authorContextReference)))
   })
 
   app.put('/pieces/:id/draft', body(putDraftSchema), async (c) => {
@@ -168,7 +167,8 @@ export function createApp(
     const pieceId = c.req.param('id')
     return streamSSE(c, async (stream) => {
       const events = sseStream(stream)
-      const unsubscribe = room.subscribe(pieceId, (event) => events.write(event.type, event.data))
+      const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
+      events.write('activity.snapshot', snapshot)
       await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
       unsubscribe()
       await events.drain()

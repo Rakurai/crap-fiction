@@ -59,6 +59,8 @@ const specialists: readonly RoleDefinition[] = [
   },
 ]
 
+const AUTHOR_CONTEXT_REFERENCE = 'Notes about the author that generalize beyond any single piece.'
+
 const storyEditor: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
@@ -95,9 +97,9 @@ describe('pieces', () => {
 
   it("writes all three surfaces' derived casts in one metadata write", async () => {
     const piece = await createPiece(workspaceDir, 'The Cups', flash.id, [flash], specialists)
-    const opened = getPiece(dataRoot, workspaceDir, piece.id, null, specialists, storyEditor)
+    const opened = getPiece(dataRoot, workspaceDir, piece.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
 
-    expect(opened.cast.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
+    expect(opened.surfaces.draft.cast.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
     // Neither specialist declares availability for the other two surfaces, so both are empty — but present.
     await setPieceCast(workspaceDir, piece.id, specialists, 'storyContext', [])
     await setPieceCast(workspaceDir, piece.id, specialists, 'authorContext', [])
@@ -106,7 +108,7 @@ describe('pieces', () => {
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
     const piece = await createPiece(workspaceDir, 'A Long Way', epic.id, [flash, epic], specialists)
     expect(piece.mode).toBe('epic')
-    expect(getPiece(dataRoot, workspaceDir, piece.id, null, specialists, storyEditor).mode).toBe('epic')
+    expect(getPiece(dataRoot, workspaceDir, piece.id, specialists, storyEditor, [flash, epic], AUTHOR_CONTEXT_REFERENCE).mode).toBe('epic')
 
     await expect(createPiece(workspaceDir, 'Nope', 'novella', [flash, epic], specialists)).rejects.toThrowError(UnknownModeError)
   })
@@ -151,18 +153,18 @@ describe('pieces', () => {
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
-    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+    const cast = [
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
+    ]
     expect(opened).toEqual({
       ...created,
-      draft: '',
-      storyContext: '',
-      currentConversationId: null,
-      conversations: [],
-      conversationActionInFlight: null,
-      cast: [
-        { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
-        { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
-      ],
+      surfaces: {
+        draft: { text: '', referenceSchema: null, currentConversationId: null, conversations: [], cast },
+        storyContext: { text: '', referenceSchema: flash.storyContextReference, currentConversationId: null, conversations: [], cast: [] },
+        authorContext: { text: '', referenceSchema: AUTHOR_CONTEXT_REFERENCE, currentConversationId: null, conversations: [], cast: [] },
+      },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it' },
     })
   })
@@ -173,9 +175,17 @@ describe('pieces', () => {
     const storyContextText = '# notes\nPremise: two cups, one left behind\nPoint of view: close third, past tense\n'
     writeFileSync(path.join(workspaceDir, created.id, 'story-context.yaml'), storyContextText, 'utf8')
 
-    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
-    expect(opened.draft).toBe('Two small words.')
-    expect(opened.storyContext).toBe(storyContextText)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+    expect(opened.surfaces.draft.text).toBe('Two small words.')
+    expect(opened.surfaces.storyContext.text).toBe(storyContextText)
+  })
+
+  it("opens a piece's author-context surface reading the data root's global document, with the studio's reference schema", async () => {
+    const created = await createPiece(workspaceDir, 'Cups', flash.id, [flash], specialists)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+    expect(opened.surfaces.authorContext.referenceSchema).toBe(AUTHOR_CONTEXT_REFERENCE)
+    expect(opened.surfaces.storyContext.referenceSchema).toBe(flash.storyContextReference)
+    expect(opened.surfaces.draft.referenceSchema).toBeNull()
   })
 
   /**
@@ -185,7 +195,7 @@ describe('pieces', () => {
    */
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
-      expect(() => getPiece(dataRoot, workspaceDir, id, null, specialists, storyEditor)).toThrowError(PieceNotFoundError)
+      expect(() => getPiece(dataRoot, workspaceDir, id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)).toThrowError(PieceNotFoundError)
       await expect(setPieceCast(workspaceDir, id, specialists, 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
       await expect(new DraftWriter(new DraftStore()).save(workspaceDir, id, 'text')).rejects.toThrowError(PieceNotFoundError)
@@ -216,7 +226,7 @@ describe('setPieceCast', () => {
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
     ])
-    expect(getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor).cast).toEqual(disabled)
+    expect(getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE).surfaces.draft.cast).toEqual(disabled)
 
     const reEnabled = await setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
@@ -236,8 +246,8 @@ describe('setPieceCast', () => {
     await setPieceCast(workspaceDir, created.id, specialists, 'draft', ['shape'])
     await setPieceCast(workspaceDir, created.id, specialists, 'storyContext', [])
 
-    const opened = getPiece(dataRoot, workspaceDir, created.id, null, specialists, storyEditor)
-    expect(opened.cast.find((member) => member.id === 'shape')?.enabled).toBe(true)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE)
+    expect(opened.surfaces.draft.cast.find((member) => member.id === 'shape')?.enabled).toBe(true)
   })
 })
 
@@ -261,7 +271,7 @@ describe('updatePieceDetails', () => {
     const summary = await updatePieceDetails(workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash', status: 'drafting' })
-    expect(getPiece(dataRoot, workspaceDir, 'cups', null, specialists, storyEditor).title).toBe('The Cups')
+    expect(getPiece(dataRoot, workspaceDir, 'cups', specialists, storyEditor, [flash], AUTHOR_CONTEXT_REFERENCE).title).toBe('The Cups')
   })
 
   it('marks a piece finished or abandoned, with no transition it refuses', async () => {

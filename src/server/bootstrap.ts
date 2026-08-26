@@ -49,7 +49,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
   const logger = createLogger(env.logLevel)
   logger.info({ port: env.port }, 'studio starting')
   const workspace = WorkspaceRegistry.openAt(env.dataRoot)
-  const { modes, charter, fragments, sites, roster } = loadShippedContent(CONTENT_ROOT)
+  const { modes, charter, fragments, sites, roster, authorContextReference } = loadShippedContent(CONTENT_ROOT)
   const draftWriter = new DraftWriter(new DraftStore())
   const modelAccess = makeModelAccess(env, logger)
   const room = new Room(
@@ -65,5 +65,5 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, logger: Logger) => M
     logger,
     Date.now,
   )
-  return { app: createApp(env, workspace, modes, draftWriter, sites, modelAccess, room, logger) }
+  return { app: createApp(env, workspace, modes, draftWriter, sites, modelAccess, room, logger, authorContextReference) }
 }

@@ -830,6 +830,14 @@ or not at all.
 the open piece, outliving any single dispatch or Apply. Every event corresponds to an entry landing or to
 a frame around one.
 
+**Only one piece is open at a time, and opening one is server-authoritative.** A different piece that was
+open has its unfinished work abandoned, across all three of its room scopes, including author-context
+work whose evidence and cast came from it; opening the same piece again resumes it untouched. Work
+abandoned this way is discarded on the same terms as an author asking for it directly: landed entries
+stand, and no late result can reopen it. Nothing about in-flight work is read a second time, independently
+of whatever is subscribed to receive it next — the two happen as one uninterrupted step, so nothing can
+start or finish in the gap between them.
+
 **An event names a participant by its identity and never by its display name.** A name is roster data, it
 is the same for every dispatch, and putting it on every frame would make the stream a second place a
 participant's name is stated — one that would go stale the moment a participant was edited and

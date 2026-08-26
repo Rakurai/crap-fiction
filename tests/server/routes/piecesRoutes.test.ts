@@ -83,7 +83,7 @@ describe('the piece routes', () => {
     return { app, dir }
   }
 
-  it('carries an opened piece whole: its details, its draft, its cast with the roles named, and its conversations', async () => {
+  it('carries an opened piece whole, keyed by all three surfaces: its details, each surface\'s text, cast and conversations', async () => {
     const { app, dir } = await withPiece()
     await app.request('/pieces/cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'Two small words.' }) })
     await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', {
@@ -104,9 +104,16 @@ describe('the piece routes', () => {
         title: 'Cups',
         mode: 'flash',
         status: 'drafting',
-        draft: 'Two small words.',
-        cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
-        conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
+        surfaces: {
+          draft: {
+            text: 'Two small words.',
+            referenceSchema: null,
+            cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
+            conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
+          },
+          storyContext: { text: '', referenceSchema: MODE.storyContextReference, cast: [], conversations: [] },
+          authorContext: { text: '', cast: [], conversations: [] },
+        },
       },
     })
   })
@@ -131,7 +138,10 @@ describe('the piece routes', () => {
     expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
 
     const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', status: 'finished', cast: [] }) })
-    expect(await patched.json()).toMatchObject({ success: true, data: { title: 'Cups', status: 'finished', cast: [{ id: 'shape', enabled: false }] } })
+    expect(await patched.json()).toMatchObject({
+      success: true,
+      data: { title: 'Cups', status: 'finished', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
+    })
 
     const saved = await app.request('/pieces/the-cups/draft', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ draft: 'text' }) })
     expect(await saved.json()).toEqual({ success: true, data: null })
@@ -152,7 +162,7 @@ describe('the piece routes', () => {
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true, data: null })
-    expect((await (await app.request('/pieces/cups')).json()).data.conversations).toEqual([])
+    expect((await (await app.request('/pieces/cups')).json()).data.surfaces.draft.conversations).toEqual([])
   })
 
   /**
