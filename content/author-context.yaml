@@ -1,16 +1,30 @@
-# Author context reference
-
-Guidance for what your author context can hold — not a form to fill in, and nothing here is
-enforced. Organize it however reads best; the shape below is a starting point, not a
-requirement.
-
-An author context document is a set of freely named **sections** — a heading you choose, such as
-"Voice" or "Recurring preferences" or "Things I'm tired of reading in my own work" — each holding
-one or more **entries**: a short passage of prose noting one fact, preference, or standing
-instruction. An entry can be added, revised, replaced with a new entry, or removed outright as
-your sense of your own practice develops; nothing about the document tracks that history, so
-write your current understanding, not a log of how it changed.
-
-Unlike a piece's story context, this document generalizes across everything you write: sentence
-rhythm you favor, structural habits you keep falling into, feedback you've heard before and don't
-need repeated.
+# This is model guidance, not a validator for the author's document. Author context contains only
+# truths the author has approved; it does not distinguish declarations from inferred hypotheses.
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Author context
+description: >-
+  Durable, author-approved understanding that generalizes across pieces. A choice that works for
+  one story is not thereby an author-level truth.
+type: object
+properties:
+  preferences:
+    type: array
+    description: Recurring choices, likes, dislikes, and defaults across the author's work.
+    items:
+      type: string
+  tendencies:
+    type: array
+    description: Recurring habits or patterns the room should account for, desirable or otherwise.
+    items:
+      type: string
+  collaboration:
+    type: array
+    description: How the author wants participants to question, challenge, explain, or recommend.
+    items:
+      type: string
+  notes:
+    type: array
+    description: Durable truths that do not yet earn a narrower category.
+    items:
+      type: string
+additionalProperties: true

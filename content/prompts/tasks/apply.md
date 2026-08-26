@@ -4,6 +4,7 @@ variables:
 ---
 ## What to do
 
-Revise the {{targetDocument}} so that it embodies the recommendation below, honoring the author's
-constraint where one is given. Change only what embodying the recommendation and the constraint
-requires — nothing else about it. Return the {{targetDocument}} whole.
+Revise the target document so that it embodies the recommendation below, honoring the author's
+constraint where one is given. Change only what the recommendation and constraint require. Preserve
+comments, unfamiliar fields, and unrelated text exactly where possible. For now, return the complete
+target document rather than a patch.

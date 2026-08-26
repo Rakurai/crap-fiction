@@ -1,15 +1,82 @@
-# Story context reference
-
-Guidance for what this piece's story context can hold — not a form to fill in, and nothing here
-is enforced. Organize it however reads best; the shape below is a starting point, not a
-requirement.
-
-A story context document is a set of freely named **sections** — a heading you choose, such as
-"Characters" or "Setting" or "Where this is going" — each holding one or more **entries**: a
-short passage of prose noting one fact, decision, or intention. An entry can be added, revised,
-replaced with a new entry, or removed outright as the piece develops; nothing about the document
-tracks that history, so write the current understanding, not a log of how it changed.
-
-At flash length, a light touch serves better than a full cast bible: a line on who the piece is
-about, a line on where and when it happens, and a line on the turn it is building toward is
-often the whole of it.
+# This is model guidance, not a validator for the author's document. Every top-level section is
+# optional, and unfamiliar sections or fields remain valid author-owned material.
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Flash story context
+description: >-
+  A sparse planning record for a roughly 500–1,500-word story. Record only understanding the
+  author has chosen to preserve; do not populate fields merely because the schema names them.
+type: object
+properties:
+  premise:
+    type: string
+    description: The central situation or pressure of the story, stated briefly.
+  intent:
+    type: string
+    description: >-
+      What the author is reaching for, including an intended reader effect where that matters.
+  facts:
+    type: array
+    description: Story-world truths, whether or not the reader or every character knows them.
+    items:
+      type: string
+  characters:
+    type: array
+    description: Character state needed to make consequential behavior intelligible.
+    items:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The character's identifying name in this context.
+        wants:
+          type: string
+          description: What the character is trying to obtain, preserve, avoid, or decide.
+        knows:
+          type: string
+          description: Knowledge or belief that materially shapes the character's choices.
+        pressure:
+          type: string
+          description: Stakes, obstacles, vulnerability, or other pressure acting on the character.
+      additionalProperties: true
+  beats:
+    type: array
+    description: Ordered units of the telling; these are not mandatory slots in a beat sheet.
+    items:
+      type: object
+      required:
+        - happens
+        - change
+      properties:
+        happens:
+          type: string
+          description: What occurs in this unit of the telling.
+        change:
+          type: string
+          description: >-
+            What becomes meaningfully different in situation, possibility, relationship,
+            commitment, knowledge, power, stakes, or direction. Deliberate stasis may say so.
+        reader_state:
+          type: string
+          description: >-
+            What the reader now knows, assumes, suspects, expects, or still needs resolved,
+            including any intended revision of an earlier understanding.
+        telling:
+          type: string
+          description: Access, ordering, distance, withholding, or emphasis that matters here.
+      additionalProperties: true
+  constraints:
+    type: array
+    description: Choices, boundaries, promises, or possibilities the story should preserve.
+    items:
+      type: string
+  voice:
+    type: string
+    description: Point of view, tense, register, and expressive qualities the prose should hold.
+  notes:
+    type: array
+    description: Durable understanding that matters but does not yet earn another section.
+    items:
+      type: string
+additionalProperties: true
