@@ -1,7 +1,6 @@
 .wrapper {
   position: relative;
   flex: 1 1 760px;
-  max-width: 760px;
   min-width: 440px;
   min-height: 0;
   display: flex;

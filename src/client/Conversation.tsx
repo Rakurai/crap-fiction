@@ -560,7 +560,6 @@ export function Conversation({
               <textarea
                 ref={textareaRef}
                 rows={2}
-                placeholder="what isn’t working about the ending"
                 onPointerDown={combobox.hide}
                 onChange={(event) => {
                   const textarea = event.target
