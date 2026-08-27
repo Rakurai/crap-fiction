@@ -6,7 +6,6 @@ import type { LifecycleProps } from './pieceLifecycle.js'
 import type { ApplyingHold } from './useConversationSession.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 
-/** The surfaces this component draws: a plain text document beside a reference schema. */
 export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
 
 const LABEL: Readonly<Record<ContextSurfaceId, string>> = {

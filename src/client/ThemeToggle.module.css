@@ -1,4 +1,3 @@
-/* One control with two segments, so the two faces read as one exclusive choice. */
 .group {
   display: flex;
   flex: none;

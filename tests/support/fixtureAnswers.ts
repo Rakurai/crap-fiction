@@ -26,9 +26,7 @@ export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
   economy: commentary('a reading from the fixture model implementation', CALL_MS),
   // Slow, so a draft dispatch is still in flight while a journey acts elsewhere in the studio.
   reader: commentary('a reading from the fixture model implementation', SLOW_CALL_MS),
-  // The only participant a context surface has, so its answer is what a context Apply acts on.
   'story-editor': applicableSuggestion(EDITOR_SUGGESTION_CLAIM, 'an answer from the fixture model implementation', CALL_MS),
-  // Reached only by being addressed, whether the author typed the mention or the composer's own control did.
   interview: commentary(INTERVIEWER_QUESTION, CALL_MS),
   apply: { result: { outcome: 'value', value: { replacement: APPLIED_TEXT } }, delayMs: 4 * CALL_MS },
 }

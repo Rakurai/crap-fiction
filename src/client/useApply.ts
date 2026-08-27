@@ -55,20 +55,11 @@ export function useApply(
     if (message !== undefined) setError(message)
   }
 
-  // A save, confirmation or retrieval failure leaves the server's pending Apply sitting at its room
-  // scope; abandoning it through the surface's one operation owner is what frees that scope and
-  // closes out the action, same as the author doing so by hand. The document is released only once
-  // the room has answered that it is free: an abandonment that failed leaves the room still holding
-  // the Apply, and unlocking here would invite an edit the room's own pending replacement is about
-  // to contradict.
   async function stopAndAbandon(cid: string, actionId: string, message: string | undefined): Promise<void> {
     if (!(await abandonAction(cid, actionId, message))) return
     stop(message)
   }
 
-  // Shared by a fresh Apply's 'pending' outcome and a resumed one's retrieved result: install
-  // through the surface's one persistence owner, then confirm only once that write has durably
-  // settled — the model is never called again to reach this point.
   async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string): Promise<void> {
     const saved = await install(replacement)
     if (saved.failed) {
@@ -84,11 +75,6 @@ export function useApply(
     stop(undefined)
   }
 
-  // `resumed` can arrive after mount — the room reports it once the piece's event stream
-  // connects, not synchronously with this hook's own render. Its `applicationId` is present only
-  // once the model has already answered and left a replacement pending; while it is still
-  // calling, there is nothing yet to retrieve and this surface simply stays busy until either the
-  // room reports the call finished or the author abandons it.
   useEffect(() => {
     if (resumed === undefined || conversationId === null) return
     if (startedHere.current) return

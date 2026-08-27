@@ -109,7 +109,6 @@
   opacity: 0.5;
 }
 
-/* Identity is the handle the author addresses, which is also how the addressing gets learned. */
 .identity {
   display: flex;
   align-items: baseline;
@@ -144,7 +143,6 @@
   text-wrap: pretty;
 }
 
-/* A conforming claim can still be fifteen lines. Four is the ceiling; the rest discloses. */
 .claimClamped {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -269,8 +267,6 @@
   letter-spacing: 0.07em;
 }
 
-/* A disclosure states a fact about what is hidden, so it is in the facts register rather than
- * in the control language — but it is still something a hand has to hit. */
 .changeToggle {
   background: none;
   border: none;
@@ -296,7 +292,6 @@
   gap: 4px;
 }
 
-/* Withdrawn is the quoted, struck ground; what stands now stands as prose. */
 .changeBefore {
   font: 400 13.5px/1.55 var(--font-prose);
   color: var(--ink3);

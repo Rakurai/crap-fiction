@@ -124,7 +124,6 @@ describe('pieces', () => {
     const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([flash]))
 
     expect(opened.surfaces.draft.cast.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
-    // Neither specialist declares availability for the other two surfaces, so both are empty — but present.
     await setPieceCast(workspaceDir, piece.id, catalogFor([flash]), 'storyContext', [])
     await setPieceCast(workspaceDir, piece.id, catalogFor([flash]), 'authorContext', [])
   })
@@ -279,11 +278,6 @@ describe('pieces', () => {
     expect(openedFromSecond.surfaces.authorContext.cast.find((member) => member.id === 'archivist')?.enabled).toBe(false)
   })
 
-  /**
-   * One claim, held by every entry point: a piece is resolved before anything is read or
-   * written, so neither a piece that is absent nor an id reaching past the workspace can
-   * make one appear.
-   */
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
       expect(() => getPiece(dataRoot, workspaceDir, id, catalogFor([flash]))).toThrowError(PieceNotFoundError)
@@ -486,7 +480,6 @@ describe('listConversations', () => {
     expect(listConversations(dataRoot, workspaceDir, piece.id, 'draft')).toEqual([])
   })
 
-  // Which entry the opening words come from belongs to `shared/conversationEntries.test.ts`.
   it("carries the conversation's opening words onto the summary", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', flash.id, catalogFor([flash]))
     await new ConversationEntryStore().append(dataRoot, { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }, 'c1', {

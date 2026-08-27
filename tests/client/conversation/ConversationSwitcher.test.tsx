@@ -43,11 +43,6 @@ function armFor(opening: string): HTMLElement {
 describe('the conversation listing', () => {
   afterEach(cleanup)
 
-  /**
-   * One claim over both kinds of row: a conversation is named by the author's own opening
-   * words where it has them, and by a fact about the machine — never the room's words —
-   * where it holds no author message at all.
-   */
   it("names each conversation by the author's own opening words, or by a fact about the machine where there are none", () => {
     renderSwitcher(undefined)
 
@@ -55,7 +50,6 @@ describe('the conversation listing', () => {
     expect(screen.getByText('ASKED FOR A CONCRETE CHANGE')).toBeTruthy()
   })
 
-  /** The listing is opened from a transcript, so it says which conversation that transcript is. */
   it('holds the conversation presently open as the current one', () => {
     renderSwitcher(undefined, {}, 'c2')
 
@@ -78,10 +72,6 @@ describe('the conversation listing', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  /**
-   * Losing a conversation is the one irreversible act on this surface, so it is asked for on
-   * the row it would delete and confirmed on that row — never a single click in the scan path.
-   */
   it('deletes no conversation until the row it names is asked and then confirmed, and can be kept instead', () => {
     const onDelete = vi.fn()
     renderSwitcher(undefined, { onDelete })

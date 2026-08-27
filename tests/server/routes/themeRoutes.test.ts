@@ -5,12 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { MODE_FIXTURE, ROLES_FIXTURE } from '../../support/roomFixtures.js'
 
-/**
- * That a settings section is written without disturbing its neighbours belongs to the
- * store, which states it through its own reads. These tests own the route: the null a
- * never-chosen theme is reported as, and the closed set the request grammar admits.
- */
-
 describe('the theme routes', () => {
   let dataRoot: string
 

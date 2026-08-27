@@ -21,12 +21,10 @@ function activitySnapshot(actionId: string): DispatchActivitySnapshot {
   return { actionId, conversationId: 'c1', kind: 'dispatch', sourceEntryId: 'e0', audience: ['shape'], states: {}, startedAt: STARTED_AT }
 }
 
-/** An abandonment the studio grants. */
 function letsGo(): RoomAdapters['abandonOperation'] {
   return vi.fn(() => Promise.resolve<RequestResult<null>>({ outcome: 'value', value: null }))
 }
 
-/** Adapters whose conversation is on disk and whose room reports the activity the scenario stated. */
 function roomReporting(snapshot: Promise<RoomActivitySnapshot>): RoomAdapters {
   return roomAdapters({ fetchConversation: conversationOnDisk('c1', []), subscribeToRoom: roomStream(snapshot).subscribeToRoom })
 }
@@ -100,8 +98,6 @@ describe('merging the conversation on disk with the one being streamed', () => {
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
-    // Learning the snapshot is what could have released the surface: before it, every surface is
-    // held anyway.
     await act(async () => {})
 
     expect(result.current.busy).toBe(true)

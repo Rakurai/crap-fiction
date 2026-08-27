@@ -38,7 +38,6 @@
   padding: 0;
 }
 
-/* Wide enough that the craft vocabulary reads as sentences rather than as three words a line. */
 .item {
   padding: 13px 0;
   border-top: 1px solid var(--rule);

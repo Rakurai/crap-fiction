@@ -29,13 +29,6 @@ function participantFrontmatter(
   return `---\n${lines.join('\n')}\n---\n${persona}\n`
 }
 
-/**
- * A real content root, less its modes and participants, which this rebuilds as a synthetic
- * two-mode package: `flash` gives `shape` the draft and `reader` the story context, `epic` gives
- * `shape` the story context and leaves `reader` out of it, and `archivist` answers only when
- * addressed, in neither mode's default cast. `interviewer` declares the function the loader
- * insists exactly one participant fills.
- */
 function buildFixtureRoot(): string {
   const root = mkdtempSync(path.join(tmpdir(), 'studio-catalog-fixture-'))
   cpSync(CONTENT_ROOT, root, { recursive: true })

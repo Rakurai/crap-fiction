@@ -176,7 +176,6 @@ export class DraftStore {
   }
 }
 
-/** Story context's own writer, serialized independently of the draft's so neither write waits on the other. */
 export class StoryContextStore {
   readonly #lock = new Mutex()
 
@@ -185,7 +184,6 @@ export class StoryContextStore {
   }
 }
 
-/** Author context's own writer: global, so serialized independently of any piece's own documents. */
 export class AuthorContextStore {
   readonly #lock = new Mutex()
 
@@ -203,7 +201,6 @@ export async function writePieceDetails(
   id: string,
   patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>,
 ): Promise<void> {
-  // An `undefined` entry is still a key `setPaths` writes, blanking a field the caller did not name.
   const values: Record<string, unknown> = {}
   if (patch.title !== undefined) values.title = patch.title
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
@@ -211,12 +208,6 @@ export async function writePieceDetails(
 
 type ScopedNamespace = 'conversations' | 'changes'
 
-/**
- * A conversation scope's own directory: under the piece and its surface, or under the data
- * root's global author-context namespace. The two read/write variants differ only in how they
- * treat an escaping or absent piece — the same asymmetry `pieceDirectory` and
- * `resolveWithinRoot` already carry for every other piece-relative artifact.
- */
 function namespaceDirectoryForRead(dataRoot: string, scope: ConversationScope, namespace: ScopedNamespace): string | undefined {
   if (scope.kind === 'global') return path.join(dataRoot, 'author-context', namespace)
   const pieceDir = pieceDirectory(scope.workspaceDir, scope.pieceId)
@@ -264,7 +255,6 @@ export function readConversationEntries(dataRoot: string, scope: ConversationSco
 export class ConversationEntryStore {
   readonly #lock = new Mutex()
 
-  /** Appending an entry whose id is already on file is a no-op: retrying a write is safe. */
   async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
     const dir = namespaceDirectoryForWrite(dataRoot, scope, 'conversations')
     const file = conversationFile(dir, conversationId)

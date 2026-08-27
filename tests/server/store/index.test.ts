@@ -74,11 +74,6 @@ describe('the settings file', () => {
   })
 })
 
-/**
- * The reader is tolerant of what a hand editing an author does, and intolerant of what
- * would leave the studio guessing. Each claim below is the reader's, not any one file's,
- * so it is stated once over the readers that share it rather than once per file.
- */
 describe('the tolerant reader', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -141,11 +136,6 @@ describe('the tolerant reader', () => {
   })
 })
 
-/**
- * One claim, held at every path the store resolves: nothing is read from or written to a
- * location outside the root it was given. A read answers with a declared absence and a
- * write refuses, because a read has an absence to report and a write does not.
- */
 describe('path containment', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -278,10 +268,6 @@ describe('the context documents', () => {
     expect(readStoryContext(workspaceDir, 'cups')).toBeUndefined()
   })
 
-  /**
-   * Opaque text: whatever the author wrote, including comments and presentation a parser would
-   * discard, reads back exactly as written because nothing in the path parses it.
-   */
   it('saves and reads back either context byte-identical, comments, presentation and all', async () => {
     const authorText = '# author notes\nVoice:\n  - wry and close\nnot: [valid yaml\n'
     const storyText = '# what this is about\nPremise:   two cups, one left behind\n'
@@ -387,7 +373,6 @@ describe('a conversation', () => {
     expect(existsSync(path.join(dataRoot, 'author-context', 'conversations', 'c1.json'))).toBe(true)
     expect(existsSync(path.join(workspaceDir, 'cups', 'conversations'))).toBe(false)
 
-    // A second workspace under the same data root reaches the identical global conversation.
     const otherWorkspace = path.join(dataRoot, 'another-workspace')
     mkdirSync(otherWorkspace, { recursive: true })
     expect(readConversationEntries(dataRoot, globalScope, 'c1')).toEqual({ id: 'c1', entries: [authorMessage] })

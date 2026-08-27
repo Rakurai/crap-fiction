@@ -29,10 +29,6 @@ describe('requestJson', () => {
     expect(await requestJson('/x', payload)).toEqual({ outcome: 'refused', code: 'NOPE', message: 'no can do' })
   })
 
-  /**
-   * One claim over every unreadable answer, whatever it is unreadable about: none of them is
-   * a refusal, because a refusal is a decision and this is the absence of one.
-   */
   it('does not call an answer it cannot read a refusal, whether the payload, the envelope or the body itself is the part it cannot read', async () => {
     stubFetchOnce({ success: true, data: { title: 42 } })
     const mismatchedPayload = await requestJson('/x', payload)

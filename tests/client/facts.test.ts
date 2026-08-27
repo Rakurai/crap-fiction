@@ -15,11 +15,6 @@ describe('the facts register', () => {
     expect(facts(modeName('flash'), wordCount(912))).toBe('FLASH · 912 WORDS')
   })
 
-  /**
-   * Whether the day count or the week count reads better at a given distance is
-   * `date-fns`'s decision, not the register's. What the register owns is the one rung
-   * above it: the current calendar day is said as a day, never as an hour count.
-   */
   it('says the calendar day it is handed as today, whatever hour of it, and anything earlier by its distance', () => {
     expect(whenChanged(NOW, clock)).toBe('TODAY')
     expect(whenChanged(new Date(2026, 7, 23, 6, 0).getTime(), clock)).toBe('TODAY')

@@ -25,12 +25,6 @@ const INTERVIEWER = { handle: 'interview', displayName: 'Interviewer', descripti
 
 const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
 
-/**
- * What every rendered conversation reaches: the stream it subscribes to, the file it reads, and
- * the acts its controls open. An Apply answers `noChange`, so that clicking apply is the author's
- * act and nothing more — a scenario turning on what the model made of it states that itself, and
- * one reaching further into the Apply protocol states that too.
- */
 function roomHolding(
   entries: readonly ConversationEntryView[],
   abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
@@ -109,7 +103,6 @@ describe('a landed response in the conversation', () => {
     expect(claim.contains(note)).toBe(false)
     expect(note.contains(claim)).toBe(false)
 
-    // Identity is carried on the handle the author would address, with the display name secondary.
     const block = blockContaining('The ending arrives before the fear does.').textContent
     expect(block).toContain('@reader')
     expect(block).toContain('Reader Experience')
@@ -240,11 +233,6 @@ describe('the applied change, shown on its originating response', () => {
     expect(screen.queryByText('the old line')).toBeNull()
   })
 
-  /**
-   * A change with no passages to show is stated rather than disclosed, whether because it
-   * rewrote the whole manuscript or because the file naming it is gone. The application
-   * itself still stands either way.
-   */
   it('states a change with nothing to disclose, offering no toggle, and still shows the application when the change file is gone', async () => {
     const rewritten = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: rewritten.room })
@@ -384,7 +372,6 @@ describe('asking for a concrete change', () => {
       expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: undefined }, DOCUMENTS),
     )
 
-    // A fresh surface: the first dispatch leaves this one busy until the room reports back.
     cleanup()
     renderConversation([RESPONSE_WITH_COMMENTARY], { room })
 
@@ -412,8 +399,6 @@ describe('asking for a concrete change', () => {
 describe('one response-local field shared by every action on the response', () => {
   afterEach(cleanup)
 
-  // That there is one field per response, labelled for the actions that response carries, is
-  // stated by the labels the tests above and below reach for.
   it('carries text left in the shared field as the constraint when Apply is chosen', async () => {
     const applyRecommendation = vi.fn(() =>
       Promise.resolve({
@@ -446,8 +431,6 @@ describe('handle completion at the composer', () => {
     expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
   })
 
-  // Where a sigil counts as beginning a mention at all is the shared `@handle` grammar's
-  // claim, held at `client/mentionTrigger.test.ts`, not this surface's.
   it('completes the token into the message, and closes the offer', async () => {
     renderConversation([RESPONSE_WITH_COMMENTARY])
 
@@ -504,11 +487,6 @@ describe('conversation activity, truthfully', () => {
     expect(await screen.findByText('APPLYING')).toBeTruthy()
   })
 
-  /**
-   * That a resumed Apply retrieves its replacement, installs it and confirms it without a model
-   * is `useApply.test.ts`'s claim. What the conversation owns is the release: the surface stops
-   * showing an Apply in flight once the resumption it inherited has finished.
-   */
   it('reconnect: releases the surface once the Apply it resumed has been confirmed', async () => {
     const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
       actionId: 'a1',

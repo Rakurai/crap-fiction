@@ -8,30 +8,15 @@ export type AutosaveState =
 export type SaveDocument = (text: string) => Promise<RequestResult<null>>
 
 export type AutosaveController = Readonly<{
-  /** An ordinary edit: debounced, and never awaited by the caller. */
   update: (text: string) => void
-  /** Writes whatever is currently dirty now, or resolves with the current state if nothing is. */
   flush: () => Promise<AutosaveState>
-  /** Installs and writes this exact text now, superseding any debounce in flight. */
   install: (text: string) => Promise<AutosaveState>
-  /** Marks the controller as observed by a mounted surface. */
   activate: () => void
-  /**
-   * Retires the controller: its debounce is cancelled and a write still in flight reports to nobody.
-   * It starts nothing — durably saving what the author last typed belongs to the flush that leaving
-   * the piece performs, where the outcome is somebody's to read.
-   */
   dispose: () => void
 }>
 
 const DEBOUNCE_MS = 1000
 
-/**
- * The one writer of a surface's document. Every write — an ordinary debounced edit, a flush, or
- * installing an Apply result — goes through `latest`/`dirty` and the single `attempt` chain below,
- * so at most one write is ever in flight and a later one always carries whatever is dirty behind
- * it, the same guarantee for every caller rather than one kept by the debounce path alone.
- */
 export function createAutosaveController(
   initialText: string,
   save: SaveDocument,

@@ -29,7 +29,6 @@ export function ConversationSwitcher({
   onDelete,
   onClose,
 }: ConversationSwitcherProps) {
-  // Deleting a conversation is asked for on the row it would delete, and confirmed there.
   const [arming, setArming] = useState<string | undefined>(undefined)
 
   return (

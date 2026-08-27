@@ -8,11 +8,6 @@ const runtimeStatus = { reachable: true, models: [] } as const
 const prompt = { durable: 'durable', perCall: 'per-call' }
 
 describe('the fixture model implementation, as a substitute for the seam', () => {
-  /**
-   * The substitute's whole worth is that an outcome a test scripts is the outcome the room
-   * sees — including the two the real adapter derives rather than is handed: a value that
-   * does not conform, and a named failure.
-   */
   it("relays every scripted outcome as the seam would — a value through the caller's own schema, one that does not conform as nonconforming carrying what it was, and a failure as its own reason", async () => {
     const conforming = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
     expect(await conforming.call('shape', prompt, schema, new AbortController().signal)).toEqual({
@@ -31,11 +26,6 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     expect(await failing.call('shape', prompt, schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
   })
 
-  /**
-   * One claim about how a script plays out over time: whatever states it names arrive in
-   * order and before the outcome settles, and an abandonment interrupting that is abandoned
-   * rather than a failure.
-   */
   it('delivers scripted states in order ahead of the settled outcome, and resolves cancellation as abandoned rather than as a failure', async () => {
     const adapter = FixtureModelAdapter.uniform(
       { result: { outcome: 'value', value: { claim: 'x' } }, states: ['preparing', 'working'] },

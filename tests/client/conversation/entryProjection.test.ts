@@ -78,10 +78,6 @@ describe('projectEvent', () => {
     expect(projection.activity).toBeUndefined()
   })
 
-  /**
-   * One claim over every event the projection sees: an event belonging to something other
-   * than the dispatch it is currently tracking cannot move it.
-   */
   it('ignores an event that is not this dispatch — an apply, or an activity or a finish naming another action', () => {
     const apply = projectEvent(EMPTY_PROJECTION, {
       type: 'action.started',
@@ -98,11 +94,6 @@ describe('projectEvent', () => {
     expect(projection.activity?.actionId).toBe('a1')
   })
 
-  /**
-   * What an abandoned dispatch leaves behind: whatever landed before it stands, and nothing
-   * arriving late for it can put the room back to work — a finish is the end of that action,
-   * not a pause in it.
-   */
   it('keeps the entries an abandoned dispatch accepted, and lets no late activity of its own reopen it', () => {
     let projection = projectEvent(EMPTY_PROJECTION, started('a1'))
     projection = projectEvent(projection, appended(response('e1', 'shape', 'e0')))

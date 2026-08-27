@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { firstSchemaIssue } from './schemaIssue.js'
 import { isAbsoluteLocation, isExistingDirectory } from './store/index.js'
 
-/** The whole of the studio's environment: nothing outside this set is read. */
 export const STUDIO_VARIABLES = [
   'STUDIO_DATA_ROOT',
   'STUDIO_PORT',

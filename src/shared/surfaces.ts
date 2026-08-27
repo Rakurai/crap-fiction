@@ -8,7 +8,6 @@ export const pieceSurfaceIdSchema = z.enum(['draft', 'storyContext'])
 
 export type PieceSurfaceId = z.infer<typeof pieceSurfaceIdSchema>
 
-/** Every surface a piece opens with, in the order the studio presents them. */
 export const SURFACE_IDS: readonly SurfaceId[] = surfaceIdSchema.options
 
 /**

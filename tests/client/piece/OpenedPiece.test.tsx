@@ -53,11 +53,6 @@ function conversationEntries(conversationId: string) {
 const SAVED: RequestResult<null> = { outcome: 'value', value: null }
 const NO_SWITCH_REQUEST: PieceSwitchRequest = { targetId: undefined, onSettled: () => {} }
 
-/**
- * The studio a piece is opened in: the piece itself, the conversations each surface opens with,
- * and a stream the test delivers events on. What a scenario states about the room replaces what
- * is stated here; everything the room is never asked for stays unreachable.
- */
 function studio(room: Partial<RoomAdapters> = {}) {
   const stream = roomStream(onTheDraft(null))
   const saveDocument = vi.fn(() => Promise.resolve(SAVED))
@@ -144,7 +139,6 @@ function switchToAuthorContext(): void {
   fireEvent.click(screen.getByRole('button', { name: 'author' }))
 }
 
-/** The composer belonging to whichever surface is currently visible — role queries alone exclude the hidden one. */
 function activeComposer(): HTMLTextAreaElement {
   const send = screen.getByRole('button', { name: 'send' })
   const form = send.closest('form')
@@ -156,8 +150,6 @@ describe('switching between the draft and story context surfaces', () => {
   it("preserves each surface's own text, conversation selection and composer state across a switch away and back", async () => {
     await renderOpened(studio())
 
-    // Select the conversation the piece did not open with, then compose against it, without
-    // sending: switching conversations is its own fresh session, but switching surfaces is not.
     fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
     fireEvent.click(await screen.findByRole('button', { name: /^try a different opening/ }))
     await screen.findByText('opened as d2', { selector: 'p' })
@@ -168,7 +160,6 @@ describe('switching between the draft and story context surfaces', () => {
 
     switchToStoryContext()
     await screen.findByLabelText('Story context')
-    // A fresh surface is showing: nothing of draft's composer state leaked into it.
     expect(activeComposer().value).toBe('')
 
     switchToDraft()

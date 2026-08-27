@@ -1,10 +1,3 @@
-/*
- * The three things a control does, and what each one looks like. A control that changes how
- * the author sees what is already on screen is quiet; a control that opens a surface or acts
- * on a response is a pill; a control the author commits something with carries weight. The
- * accent is the author's own act of commitment and belongs to one control per screen.
- */
-
 .view {
   font: 500 10.5px/1 var(--font-ui);
   color: var(--ink2);

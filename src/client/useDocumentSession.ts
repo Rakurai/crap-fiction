@@ -3,12 +3,6 @@ import type { AutosaveState, SaveDocument } from './autosave.js'
 import { useAutosave, type AutosaveViewModel } from './useAutosave.js'
 import { useManuscript, type ManuscriptViewModel } from './useManuscript.js'
 
-/**
- * What an editing surface needs from its document whichever body renders it: the current text, the
- * state of its persistence, and installing a replacement. `install` is the only path Apply may
- * install through — it updates the surface's own state and hands the exact text to the autosave
- * controller, the surface's one persistence writer, resolving once that write has durably settled.
- */
 type PersistedDocument = Readonly<{
   text: string
   autosave: AutosaveViewModel

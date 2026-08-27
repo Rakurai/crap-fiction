@@ -38,7 +38,6 @@ describe('a dispatch\'s events through the dev server', () => {
   afterEach(async () => {
     await server.close()
     rmSync(dataRoot, { recursive: true, force: true })
-    // The environment belongs to the process, not to this file: leave it as it was found.
     for (const name of STUDIO_VARIABLES) {
       const previous = restoreEnv[name]
       if (previous === undefined) delete process.env[name]
@@ -87,8 +86,6 @@ describe('a dispatch\'s events through the dev server', () => {
     }
     await reader.cancel()
 
-    // The snapshot frame lands atomically with the subscription, before any live frame — here,
-    // an empty one, since nothing was in flight yet when the stream connected.
     expect(names[0]).toBe('activity.snapshot')
     expect(names[1]).toBe('action.started')
     expect(names).toContain('entry.appended')

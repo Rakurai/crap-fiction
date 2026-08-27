@@ -30,7 +30,6 @@ function offered(): readonly string[] {
 describe('choosing a model for a call site', () => {
   afterEach(cleanup)
 
-  /** Each entry says who it is, in the handle the author addresses, and what the model there is for. */
   it('names the group and every entry in it, and needs no repeated label to say what the control chooses', () => {
     render(<CallSiteList heading="The room" sites={UNASSIGNED} known={KNOWN} assigning={undefined} saved={undefined} onAssign={vi.fn()} />)
 

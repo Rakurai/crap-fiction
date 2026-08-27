@@ -5,7 +5,6 @@ import type { RequestResult } from '../../../src/client/request.js'
 import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { useSurfaceCast } from '../../../src/client/useSurfaceCast.js'
 
-/** Only the piece update this hook makes is stated; asking the studio for the piece is not. */
 function adapters(updatePiece: PieceAdapters['updatePiece']): PieceAdapters {
   return {
     fetchPiece: vi.fn(() => {

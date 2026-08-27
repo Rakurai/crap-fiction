@@ -65,7 +65,6 @@ describe('createAutosaveController', () => {
     save.mockResolvedValueOnce(refused('disk unhappy'))
     save.mockResolvedValueOnce(WROTE)
     const onStateChange = vi.fn()
-    // The clock moves while the write is out, so a stamp taken at scheduling time would differ.
     let reading = FAILED_AT_MS - 4000
     const controller = createAutosaveController('', save, onStateChange, () => reading, 1000)
 
@@ -110,7 +109,6 @@ describe('createAutosaveController', () => {
 
     controller.update('unsaved')
     const flushed = controller.flush()
-    // Immediately: no debounce interval has elapsed.
     expect(save).toHaveBeenCalledWith('unsaved')
     expect(onStateChange).not.toHaveBeenCalled()
 
@@ -144,13 +142,10 @@ describe('createAutosaveController', () => {
     controller.update('a stray keystroke')
     const installed = controller.install('the applied text')
 
-    // Immediately: install does not wait for the debounce interval, and it writes exactly what
-    // was installed rather than whatever the debounced edit left behind.
     expect(save).toHaveBeenCalledOnce()
     expect(save).toHaveBeenCalledWith('the applied text')
     expect(await installed).toEqual({ failed: false })
 
-    // The debounced edit is superseded: nothing further is written once the timer would have fired.
     vi.advanceTimersByTime(2000)
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1))
   })

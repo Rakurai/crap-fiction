@@ -39,7 +39,6 @@ describe('the runtime URL the adapter is constructed with', () => {
     expect(() => new LMStudioAdapter('ws://localhost:1234', assigned, silent)).not.toThrow()
     expect(() => new LMStudioAdapter('wss://studio.local:1234', assigned, silent)).not.toThrow()
 
-    // The plausible wrong scheme, and a value that is no URL at all.
     expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(/must be ws or wss, not http/)
     expect(() => new LMStudioAdapter('http://localhost:1234', assigned, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
     expect(() => new LMStudioAdapter('localhost:1234', assigned, silent)).toThrowError(ModelRuntimeUrlError)
@@ -113,7 +112,6 @@ describe('LMStudioAdapter.call', () => {
 
     expect(result).toEqual({ outcome: 'failed', reason: 'unreachable' })
     expect(modelFn).toHaveBeenCalledTimes(3)
-    // Nothing of the vendor's own diagnostic travels with it.
     expect(Object.keys(result)).toEqual(['outcome', 'reason'])
   })
 

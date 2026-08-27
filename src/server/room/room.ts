@@ -132,10 +132,6 @@ type RunningDispatch = ActiveDispatch & {
   readonly settlement: Promise<void>
 }
 
-/**
- * A replacement the model returned, held until the client installs, saves and confirms it.
- * `applicationId` is provisional identity: it becomes the durable application entry's id.
- */
 type PendingReplacement = Readonly<{
   applicationId: string
   responseId: string
@@ -169,7 +165,6 @@ type DispatchPlan = Readonly<{
   existingEntries: readonly ConversationEntry[]
   documents: DocumentSnapshot
   modeDescription: string
-  /** The reference the declared Interviewer receives on this surface, and no other participant does. */
   interviewerReference: string | undefined
 }>
 
@@ -220,9 +215,6 @@ export class Room {
   }
 
   /**
-   * Opens a piece as the server-authoritative transition it is: a different piece that was
-   * open has its unfinished work abandoned, across all three of its room scopes, before this
-   * piece becomes current; reconnecting to the piece already open resumes it untouched.
    * Capturing the snapshot and registering the listener happen in the same synchronous step as
    * this transition, with no `await` between them, so no event can land in the gap.
    */
@@ -597,13 +589,6 @@ export class Room {
     }
   }
 
-  /**
-   * Starts an Apply: a no-change result settles on the spot, a replacement is retained as a
-   * pending application and its scope stays busy until {@link confirmApply} or {@link abandon}
-   * closes it out. Model, installation, save and confirmation failures all unlock the same way —
-   * only {@link confirmApply}'s own failure paths land here too, by way of the pending state this
-   * method leaves behind.
-   */
   async apply(
     workspaceDir: string,
     roomScope: RoomScope,
@@ -698,12 +683,6 @@ export class Room {
     }
   }
 
-  /**
-   * The generated document a pending Apply is holding, by the provisional identity its own
-   * `activity.snapshot` reported — what a reconnecting client resumes installation from, without
-   * a further model call. Answers only while that identity is still the scope's pending Apply;
-   * an already-committed application is read from the durable conversation instead.
-   */
   pendingReplacement(roomScope: RoomScope, conversationId: string, applicationId: string): string {
     const operation = this.#operationFor(roomScope)
     if (operation?.kind !== 'apply' || operation.conversationId !== conversationId || operation.pending?.applicationId !== applicationId) {
@@ -712,11 +691,6 @@ export class Room {
     return operation.pending.replacement
   }
 
-  /**
-   * Commits a pending Apply once its replacement is confirmed saved. Re-confirming an identity
-   * that already committed, with its change already on file, is a no-op rather than a refusal —
-   * confirmation is protocol, not a second author decision.
-   */
   async confirmApply(
     workspaceDir: string,
     roomScope: RoomScope,
@@ -756,8 +730,6 @@ export class Room {
     try {
       await writeApplication(this.#dataRoot, conversationScope, conversationId, this.#entries, pending.change, application)
     } catch (err) {
-      // The durable write is what commits an Apply, so a failed one ends the operation rather than
-      // leaving the scope holding a replacement no author can now reach or abandon.
       this.#finish(roomScope, actionId, 'failed')
       throw err
     }

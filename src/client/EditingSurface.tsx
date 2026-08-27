@@ -18,7 +18,6 @@ import type { PieceAdapters } from './usePiece.js'
 import { useSurfaceCast } from './useSurfaceCast.js'
 import { useSurfaceConversations } from './useSurfaceConversations.js'
 
-/** The surface identity travels with its body so its document and room state cannot disagree. */
 export type SurfaceBodyConfig =
   | Readonly<{ kind: 'prose'; surface: 'draft'; location: string }>
   | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; location: string; referenceSchema: string | null }>
@@ -30,7 +29,6 @@ type EditingSurfaceProps = {
   readonly body: SurfaceBodyConfig
   readonly initialText: string
   readonly initialConversationId: string | null
-  /** Given only for author context: its selection is global, outlasting the piece that is open. */
   readonly conversationSelection?: AuthorContextSelection | undefined
   readonly initialCast: readonly CastMemberView[]
   readonly initialConversations: readonly ConversationSummary[]
@@ -47,7 +45,6 @@ type EditingSurfaceProps = {
   readonly onOpenModels: () => void
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
-  /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
   readonly onFlushRegister: (surface: SurfaceId, flush: () => Promise<AutosaveState>) => void
   readonly documents: DocumentSnapshot
 }
@@ -61,14 +58,6 @@ type MountedDocument =
   | Readonly<ProseBody & { session: ProseSession }>
   | Readonly<PlainTextBody & { session: PlainTextSession }>
 
-/**
- * One editing surface, mounted once per surface `OpenedPiece` opens. It owns its document session and
- * persistence, its cast, its conversations, its Apply and abandonment, and reports upward only its
- * current text and whether its own save is failing.
- *
- * Which body draws the document decides which document session the surface has, so the two are
- * chosen together, once, at a mount that never switches from one to the other.
- */
 export function EditingSurface({ body, initialText, ...mounted }: EditingSurfaceProps) {
   return body.kind === 'prose' ? (
     <ProseEditingSurface {...mounted} initialText={initialText} body={body} />

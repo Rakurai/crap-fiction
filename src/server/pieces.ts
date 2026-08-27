@@ -214,11 +214,6 @@ export async function updatePieceDetails(
   return summarize(id, requirePiece(workspaceDir, id))
 }
 
-/**
- * What an author may change about a piece in one act. Which of them arrived, and so which
- * writes it takes, is this module's decision rather than the route's: a change naming nothing is
- * a change, and it writes nothing.
- */
 export type PieceChanges = Readonly<{
   title?: string | undefined
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
@@ -280,7 +275,6 @@ export async function deleteConversation(
   await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
-/** Every document's own writer, each serialized independently of the others. */
 export class PieceDocumentWriter {
   readonly #draft: DraftStore
   readonly #storyContext: StoryContextStore

@@ -42,7 +42,6 @@ describe('loadPromptFragments', () => {
     writeSection('addressed', [], 'you were addressed directly')
     writeSection('authorContext', ['authorContext'], '{{authorContext}}')
     writeSection('storyContext', ['storyContext'], '{{storyContext}}')
-    // sections/manuscript.md is deliberately left unwritten.
 
     expect(() => loadPromptFragments(contentRoot)).toThrowError(ShippedDataError)
     expect(() => loadPromptFragments(contentRoot)).toThrowError(/sections[/\\]manuscript\.md/)

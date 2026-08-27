@@ -23,7 +23,6 @@ describe('the fixture studio', () => {
 
   afterAll(() => {
     rmSync(dataRoot, { recursive: true, force: true })
-    // The environment belongs to the process, not to this file: leave it as it was found.
     for (const name of STUDIO_VARIABLES) {
       const previous = restoreEnv[name]
       if (previous === undefined) delete process.env[name]

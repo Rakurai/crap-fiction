@@ -13,7 +13,6 @@ export const MODE_FIXTURE: ModeDescriptor = {
 
 export const INTERVIEWER_INVOCATION_FIXTURE = 'ask me a clarifying question'
 
-/** A role set is only loadable with the interviewer function declared exactly once, so every fixture roster carries this. */
 export const INTERVIEWER_FIXTURE: RoleDefinition = {
   id: 'interview',
   handle: 'interview',

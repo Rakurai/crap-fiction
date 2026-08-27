@@ -22,20 +22,12 @@ const identity = {
   mark: z.string().length(2, 'must be exactly two characters'),
 }
 
-/**
- * The closed set of product roles a participant may declare itself to fill. A function is meaning the
- * application acts on, so its name is product vocabulary; which participant declares it is content.
- */
 export const INTERVIEWER_FUNCTION = 'interviewer' as const
 
 export const PARTICIPANT_FUNCTIONS = [INTERVIEWER_FUNCTION] as const
 
 export type ParticipantFunction = (typeof PARTICIPANT_FUNCTIONS)[number]
 
-/**
- * Declared as one value rather than a name beside an optional message, so a function without its
- * invocation is a shape the content cannot express.
- */
 const declaredFunctionSchema = z.strictObject({
   name: z.enum(PARTICIPANT_FUNCTIONS),
   invocation: z.string().min(1),

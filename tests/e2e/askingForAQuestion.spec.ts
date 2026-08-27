@@ -29,7 +29,6 @@ test('the composer asks for a question on every surface, and the same words can 
   await control(page, 'author').click()
   await askForAQuestion(page)
 
-  // The control composes a message, so the mention it sends is one the composer offers on its own.
   await control(page, 'draft').click()
   await composer(page).fill('@int')
   await page.getByRole('option', { name: 'Interviewer' }).click()

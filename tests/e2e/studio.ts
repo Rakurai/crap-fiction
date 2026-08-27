@@ -2,8 +2,6 @@ import { expect, type Locator, type Page } from '@playwright/test'
 
 const WORKSPACE = 'my-writing'
 
-// Exact: Playwright matches a role's name as a substring, and the piece's own title sits in
-// the top bar as a button beside the view controls.
 export function control(page: Page, name: string): Locator {
   return page.getByRole('button', { name, exact: true })
 }
@@ -45,7 +43,6 @@ export async function openPieces(page: Page): Promise<void> {
   await expect(control(page, 'new piece')).toBeVisible()
 }
 
-/** One answer's controls: a transcript draws the same ones under every answer it holds. */
 export function answerOf(page: Page, participantName: string): Locator {
   return page.getByRole('group', { name: `${participantName}'s answer` })
 }

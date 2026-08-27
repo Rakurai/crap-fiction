@@ -36,7 +36,6 @@
   padding: 7px 9px;
 }
 
-/* Starting a piece is the author's own act of commitment on this screen, and the only one. */
 .submit {
   composes: author from './controls.module.css';
   white-space: nowrap;

@@ -201,7 +201,6 @@ function fixedSection(fragment: Fragment): string {
   return renderFragment(fragment, {})
 }
 
-/** What a task instruction calls the document it targets, so an Apply or a reading task names the surface it was actually issued for. */
 const TARGET_DOCUMENT: Readonly<Record<SurfaceId, string>> = {
   draft: 'manuscript',
   storyContext: 'story context',

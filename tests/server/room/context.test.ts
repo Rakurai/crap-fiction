@@ -202,7 +202,6 @@ describe('compiling a context', () => {
       draft: MANUSCRIPT,
     })
 
-    // Nothing is invented for what the author never wrote.
     const bare = compileSpecialistContext(contextInput({ role: shape }))
     expect(bare.authorContext).toBeUndefined()
     expect(bare.storyContext).toBeUndefined()
@@ -228,7 +227,6 @@ describe('compiling a context', () => {
     ])
     expect(compileApplyContext(applyContextInput({ entries: entriesWithApplication })).history).toEqual(WHOLE_CONVERSATION_WITH_APPLICATION)
 
-    // The change file's name reaches nowhere the history can leak it into a prompt.
     const rendered = wholeOf(
       renderApplyPrompt(compileApplyContext(applyContextInput({ entries: entriesWithApplication })), fragments),
     )
@@ -357,8 +355,6 @@ describe('rendering a prompt', () => {
     expect(prompt).toContain('FIXTURE_READINGS_HEADING')
     expect(prompt).toContain('the third line carries nothing')
 
-    // A dispatch every specialist declined reaches here as no evidence at all, so the generalist
-    // reads the story with no account of who spoke — not an empty heading standing for the silence.
     const withNothing = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [])
     expect(wholeOf(renderPrompt(withNothing, fragments, charter))).not.toContain('FIXTURE_READINGS_HEADING')
   })
@@ -400,7 +396,6 @@ describe('rendering a prompt', () => {
     )
     expect(wholeOf(renderPrompt(unclarified, fragments, charter))).not.toContain('FIXTURE_CLARIFICATION_HEADING')
 
-    // An ordinary call carries neither section.
     const ordinary = wholeOf(renderPrompt(bareSpecialist, fragments, charter))
     expect(ordinary).not.toContain('FIXTURE_READING_HEADING')
     expect(ordinary).not.toContain('FIXTURE_MESSAGE_HEADING')
@@ -455,8 +450,6 @@ describe('the task instruction names the surface it was compiled for', () => {
       for (const other of SURFACES) {
         if (other !== surface) expect(prompt).not.toContain(`${marker} ${TARGET_DOCUMENT_LABEL[other]}`)
       }
-      // The manuscript reaches every surface's call as evidence — what the directive above fixes is
-      // which document the call is being asked to act on, not which ones it gets to read.
       expect(prompt).toContain(MANUSCRIPT)
     })
   })

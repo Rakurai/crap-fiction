@@ -119,10 +119,6 @@ export function confirmApplication(
   )
 }
 
-/**
- * The generated document a pending Apply is holding, by the provisional identity its `activity.snapshot`
- * reported — what a reconnecting client resumes installation from, without asking the model again.
- */
 export function retrievePendingApply(
   pieceId: string,
   surface: SurfaceId,
@@ -173,9 +169,6 @@ export function subscribeToRoom(
     })
   }
 
-  // Resolving is the only way to say "idle": a malformed frame, or a transport that has given up
-  // reconnecting, rejects instead, and a transport still retrying leaves this pending — so a caller
-  // reading only resolution can never mistake "unknown" for "nothing in flight".
   const snapshot = new Promise<RoomActivitySnapshot>((resolve, reject) => {
     source.addEventListener(
       'activity.snapshot',

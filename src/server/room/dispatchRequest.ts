@@ -2,11 +2,6 @@ import { z } from 'zod'
 import { documentSnapshotSchema } from '../../shared/surfaces.js'
 import type { DispatchOpening } from './room.js'
 
-/**
- * The three shapes a dispatch request may arrive in, and which act each one names. The route
- * validates and forwards; deciding that a body carrying `respondingTo` is an ask, and one
- * carrying `target` a reply to one participant, is the room's own reading of its request.
- */
 export const dispatchRequestSchema = z.union([
   z.strictObject({ message: z.string().min(1), documents: documentSnapshotSchema }),
   z.strictObject({ target: z.string().min(1), message: z.string().min(1), documents: documentSnapshotSchema }),

@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { abandonOperation, subscribeToRoom } from '../../../src/client/roomClient.js'
 
-/**
- * A harness standing in for the platform `EventSource`: it supplies nothing the real one
- * would not (no default frames, no auto-reconnect), only a way for a test to drive the
- * listeners `subscribeToRoom` registers and to reach the instance it constructed.
- */
 class FakeEventSource {
   static instances: FakeEventSource[] = []
   readonly listeners = new Map<string, Set<(event: Event) => void>>()
@@ -32,7 +27,6 @@ class FakeEventSource {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
   }
 
-  /** The one `error` event the platform uses for both a drop it will retry and an abandoned connection. */
   failWith(readyState: number): void {
     this.readyState = readyState
     this.emit('error', new Event('error'))
@@ -45,7 +39,6 @@ function firstFakeSource(): FakeEventSource {
   return source
 }
 
-/** Reacts to the signal it was actually given, the same as a real request would. */
 function stubFetchRespectingSignal() {
   const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
     const signal = init?.signal

@@ -20,22 +20,13 @@ import { buildTestRoom } from './room.js'
 export type AppSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
-  /** Scripted, never defaulted: a test that never asks for it passes `undefined`. */
   runtimeStatus: RuntimeStatus | undefined
-  /** A room the test drives itself, or `idleRoom` where the scenario asks the room for nothing. */
   room: Room
-  /** The studio's one author-context reference, or `UNREACHED_REFERENCE` where nothing reads it. */
   authorContextReference: string
 }>
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
 
-/**
- * Every value only a prompt or a dispatch could read is left unusable rather than
- * plausible, so a scenario that reaches one fails at the reach instead of passing on
- * harness data. The roster comes from the mode and roles the test itself stated,
- * because the routes report it.
- */
 const UNREACHED = 'unreached: no prompt is rendered in this scenario'
 
 const UNREACHED_CHARTER: Charter = UNREACHED
@@ -55,10 +46,8 @@ function unreachedFragments(): PromptFragments {
   }
 }
 
-/** The author-context reference for a scenario that renders no prompt and reads no reference. */
 export const UNREACHED_REFERENCE = UNREACHED
 
-/** A room that can answer nothing, for a scenario that opens no operation through it. */
 export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {
     modes,

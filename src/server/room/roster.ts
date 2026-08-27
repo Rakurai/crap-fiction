@@ -15,7 +15,6 @@ export class InterviewerNotInRosterError extends Error {
   }
 }
 
-/** The declared Interviewer as its callers need it: the participant, and the words its affordance sends. */
 export type Interviewer = Readonly<{
   role: RoleDefinition
   invocation: string
@@ -39,7 +38,7 @@ export function resolveRoster(roles: readonly RoleDefinition[]): RoomRoster {
   const addressedOnly = roles.filter((role) => role.eligibility === 'addressed-only')
 
   // Unreachable for loaded content on the same terms: the loader refuses a set that does not declare
-  // the function exactly once. Reading the invocation here is what keeps every caller from renarrowing.
+  // the function exactly once.
   const declared = addressedOnly.find((role) => role.function?.name === INTERVIEWER_FUNCTION)
   const invocation = declared?.function?.invocation
   if (declared === undefined || invocation === undefined) throw new InterviewerNotInRosterError()

@@ -23,7 +23,6 @@ function adapters(overrides: Partial<ApplyAdapters> = {}): ApplyAdapters {
   }
 }
 
-/** The surface's operation owner, which an Apply asks to abandon rather than asking the room itself. */
 function owner(released = true): ConversationViewModel['abandonAction'] {
   return vi.fn(() => Promise.resolve(released))
 }

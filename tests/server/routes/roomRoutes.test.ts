@@ -13,19 +13,6 @@ import { buildTestApp } from '../../support/harness.js'
 import { buildTestRoom } from '../../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../../support/roomFixtures.js'
 
-/**
- * What the room does with a dispatch or an application belongs to
- * `room/room.test.ts`. These tests own the adapter over it: the act each request body
- * names, the outcome each answer is translated to, and the envelope each stated refusal
- * arrives in.
- *
- * A scenario that needs a call still running holds it at the fixture adapter and
- * releases it, rather than racing a timer; a scenario that needs one finished watches the
- * scope's own activity, since the piece route no longer carries it — the author's studio
- * watches that same fact through the event stream, which `room/room.test.ts` and
- * `studio/devServerStreaming.test.ts` cover at the wire.
- */
-
 const MODE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
@@ -124,17 +111,12 @@ describe('the room over HTTP', () => {
     return await (await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}`)).json()
   }
 
-  /**
-   * Waits on the settlement the room itself hands out, so nothing here races a clock, then reads
-   * the same in-flight view the author's studio reads to confirm the scope came back to rest.
-   */
   async function untilIdle(room: Room): Promise<void> {
     await room.settlement(draftScope)
     const inFlight = room.activitySnapshot(draftScope)
     if (inFlight !== undefined) throw new Error(`the room still reports a ${inFlight.kind} in flight`)
   }
 
-  /** The id of the response a settled dispatch produced, which later acts name. */
   async function respondedTo(app: Hono, room: Room, conversationId: string, body: Record<string, unknown>): Promise<string> {
     await dispatch(app, conversationId, body)
     await untilIdle(room)
@@ -155,11 +137,6 @@ describe('the room over HTTP', () => {
     expect(await unopened.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
   })
 
-  /**
-   * The three acts a dispatch body can name, and the one in-flight view the room itself holds
-   * while any of them runs: the first is held so that view is observable, and released so the
-   * acts behind it can open in turn.
-   */
   it('opens the act each request body names — a message to the room, a reply to one participant, or a concrete change asked of a response — reporting the one in flight with the audience it resolved', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({ shape: { ...COMMENTARY, held: true }, 'story-editor': COMMENTARY })
 
@@ -214,7 +191,6 @@ describe('the room over HTTP', () => {
     const { data: applied } = await (await applying).json()
     expect(applied).toMatchObject({ outcome: 'pending', replacement: 'The cups sat where she left them, revised.' })
 
-    // Still busy: pending, not settled, until the client installs, saves and confirms it.
     expect(room.activitySnapshot(draftScope)).toMatchObject({ kind: 'apply', sourceEntryId: responseId })
 
     await app.request('/pieces/cups/surfaces/draft/document', {
@@ -235,11 +211,6 @@ describe('the room over HTTP', () => {
     })
   })
 
-  /**
-   * The routes a reconnecting client reads its pending replacement back from and confirms it
-   * through. Which replacements are pending, and what confirming one before the save requires,
-   * are the room's own claims at `room/room.test.ts`.
-   */
   it('answers the pending replacement to a client asking for it by its provisional identity, and states the room\'s refusal of a confirmation the save has not caught up with', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({
       shape: RECOMMENDATION,
@@ -264,7 +235,6 @@ describe('the room over HTTP', () => {
     expect(await unsaved.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_DOCUMENT_NOT_SAVED' } })
   })
 
-  /** The act that reaches no model at all, and so answers within the request that opened it. */
   it('accepts abandoning an action nothing is running without complaint', async () => {
     const { app, room } = await withPiece({})
 

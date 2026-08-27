@@ -1,9 +1,3 @@
-/*
- * A surface stays mounted while another is shown: its own pane never leaves the layout, it only
- * stops rendering. `display: contents` lets its manuscript-or-textarea and its conversation take
- * the row's own flex slots as though this wrapper were not there; `[hidden]` overrides that to
- * remove it from layout, the focus order and the accessibility tree together.
- */
 .surfacePane {
   display: contents;
 }

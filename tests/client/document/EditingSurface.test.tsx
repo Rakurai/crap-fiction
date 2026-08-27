@@ -6,14 +6,12 @@ import { EditingSurface } from '../../../src/client/EditingSurface.js'
 import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { conversationOnDisk, onTheDraft, roomAdapters } from '../../support/roomAdapters.js'
 
-/** Nothing here asks the studio about the piece itself, so a scenario that does fails at the reach. */
 function unreached(name: string) {
   return vi.fn(() => {
     throw new Error(`unreached: no scenario here asks the studio to ${name}`)
   })
 }
 
-/** A room that answers what mounting a surface reaches, and refuses everything a scenario has not. */
 function roomHolding(): RoomAdapters {
   return roomAdapters({
     subscribeToRoom: () => ({ snapshot: onTheDraft(null), unsubscribe: () => {} }),

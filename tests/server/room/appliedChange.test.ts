@@ -13,7 +13,6 @@ describe('computeAppliedChangeContent', () => {
     expect(content.passages).toHaveLength(1)
     expect(content.passages[0]?.before).toContain('Ruth stood looking at them for a while.')
     expect(content.passages[0]?.after).not.toContain('Ruth stood')
-    // The prose either side of the cut is context, not part of the change.
     expect(content.passages[0]?.before).toContain('upside down on a towel.')
     expect(content.passages[0]?.after).toContain('upside down on a towel.')
 
@@ -27,10 +26,6 @@ describe('computeAppliedChangeContent', () => {
     expect(twoPlaces.passages).toHaveLength(2)
   })
 
-  /**
-   * There is nothing to show either side of a change that kept nothing, whether it replaced
-   * the prose that was there or arrived where there was none.
-   */
   it('reports a whole rewrite where a change kept no prose on either side, including a draft that was empty', () => {
     const replaced = computeAppliedChangeContent(
       'On the kitchen table: two cups, rinsed and set upside down on a towel.',

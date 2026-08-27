@@ -7,19 +7,12 @@ import { deleteConversation } from './roomClient.js'
 
 export type SurfaceConversationsViewModel = Readonly<{
   listed: readonly ConversationSummary[]
-  /** The conversation whose deletion is in flight, so its own row can say so. */
   deletingId: string | undefined
   error: string | undefined
   refresh: () => void
-  /** Resolves with what is left to switch to, or nothing at all if the deletion failed. */
   remove: (conversationId: string) => Promise<readonly ConversationSummary[] | undefined>
 }>
 
-/**
- * One surface's own conversations: the list it offers to switch between, and deleting one. Every
- * conversation here belongs to this surface's conversation scope, so re-reading the piece takes only
- * this surface's list from it and leaves what another surface is showing alone.
- */
 export function useSurfaceConversations(pieceId: string, surface: SurfaceId, initialListed: readonly ConversationSummary[]): SurfaceConversationsViewModel {
   const [listed, setListed] = useState(initialListed)
   const [deletingId, setDeletingId] = useState<string | undefined>(undefined)

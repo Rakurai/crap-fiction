@@ -49,7 +49,6 @@
   margin: 16px 0 0;
 }
 
-/* Where the pieces are kept is a fact about the machine, and reads as one. */
 .workspace {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);

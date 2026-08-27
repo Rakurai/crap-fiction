@@ -115,7 +115,6 @@ const fixtureCatalog: ShippedContentCatalog = ShippedContentCatalog.assemble({
   authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
 })
 
-/** Everything a room turns on except the seam under test, which each caller supplies. */
 function roomSpecWith(modelAccess: ModelAccess) {
   return {
     modes: [fixtureMode],
@@ -139,7 +138,6 @@ function scope(pieceId: string): RoomScope {
   return { pieceId, surface: 'draft' }
 }
 
-/** The closed snapshot a dispatch or an Apply carries; most scenarios care only about the draft. */
 function documents(draft: string, overrides: Partial<DocumentSnapshot> = {}): DocumentSnapshot {
   return { draft, storyContext: '', authorContext: '', ...overrides }
 }
@@ -215,7 +213,6 @@ describe('Room.dispatch', () => {
 
   it("an unaddressed dispatch reads nothing for addressing and calls the enabled cast, never a specialist the piece's mode does not offer", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    // Only a hand-edited piece.yaml can name an unavailable specialist; the pieces module refuses to.
     await writePieceCast(workspaceDir, piece.id, 'draft', ['shape', 'compression', 'interiority'])
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
@@ -248,7 +245,6 @@ describe('Room.dispatch', () => {
 
   it('reaches a compiled prompt exactly as submitted, comments and malformed YAML alike, since story context is opaque text — and never as reread from disk', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    // Written to disk to prove it is not what reaches the prompt: the submitted snapshot is.
     await writeStoryContext(workspaceDir, piece.id, 'stale text nobody submitted')
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -421,10 +417,8 @@ describe('Room.dispatch', () => {
 
     expect(adapter.promptFor('story-editor')).toContain('FIXTURE_ADDRESSED_HEADING')
 
-    // Neither decliner reaches the readings section, so there is no section at all.
     expect(adapter.promptFor('story-editor')).not.toContain('FIXTURE_READINGS_HEADING')
 
-    // Declining was never on offer, so the attempt comes back as a call that did not answer.
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment').map((entry) => entry.participantId)).toEqual(['shape', 'compression'])
     expect(landed.filter((entry) => entry.kind === 'participantFailure').map((entry) => entry.participantId)).toEqual(['story-editor'])
@@ -730,8 +724,6 @@ describe('Room.apply', () => {
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('Two cups.'))
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
 
-    // Which spelling that is belongs to the document module; that the room hands the manuscript
-    // through it rather than pending whatever came back is this level's claim.
     expect(outcome.replacement).not.toBe(modelWrote)
     expect(outcome.replacement).toBe(canonicalMarkdown(modelWrote))
     await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
@@ -793,8 +785,6 @@ describe('Room.apply', () => {
     await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
     await room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)
 
-    // Committed rather than pending: the identity now names a durable application, not this
-    // retrieval, which answers only the scope's own in-memory pending state.
     expect(() => room.pendingReplacement(scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)).toThrowError(ApplicationNotPendingError)
   })
 
@@ -808,7 +798,6 @@ describe('Room.apply', () => {
     await dispatch(laterRoom, workspaceDir, scope(pieceId), 'c1', { kind: 'message', text: 'a later, unrelated question' }, documents('draft text'))
     await settlementOf(laterRoom, pieceId)
 
-    // Written to disk to prove it is not what reaches the prompt: the submitted snapshot is.
     await writeStoryContext(workspaceDir, pieceId, 'stale story context nobody submitted')
     await writeAuthorContext(dataRoot, 'stale author context nobody submitted')
 
@@ -845,10 +834,6 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
-  /**
-   * One conversation-action state per room scope: a piece's surface stays busy until its
-   * dispatch or application settles, and neither act starts a second one at that same scope.
-   */
   it('admits one dispatch or application at a time per room scope, and names the piece and surface holding it', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room, adapter } = buildRoom(dataRoot, {
@@ -857,7 +842,6 @@ describe('Room.apply', () => {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
     })
 
-    // Two dispatches issued in the same tick for the same scope: only the first ever opens.
     const [first, second] = await Promise.allSettled([
       dispatch(room, workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'first' }, documents('draft text')),
       dispatch(room, workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'second' }, documents('draft text')),
@@ -868,7 +852,6 @@ describe('Room.apply', () => {
     expect(entries(dataRoot, workspaceDir, pieceId, 'c2')).toMatchObject([{ kind: 'authorMessage', text: 'first' }])
     const settled = settlementOf(room, pieceId)
 
-    // The same scope also refuses an application while its dispatch is in flight.
     await expect(room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft'))).rejects.toThrowError(RoomBusyError)
 
     adapter.release('shape')
@@ -876,7 +859,6 @@ describe('Room.apply', () => {
     adapter.release('story-editor')
     await settled
 
-    // And the other way round: an application in flight refuses a second dispatch at its own scope.
     const { room: applyRoom, adapter: applyAdapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
     })
@@ -893,8 +875,6 @@ describe('Room.apply', () => {
   it("gates only its own room scope: the same piece's other surface, and a different piece's draft, each accept a dispatch while one scope is busy", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const other = await createPiece(workspaceDir, 'Kettle', fixtureMode.id, fixtureCatalog)
-    // Addressed at a distinct, addressed-only participant so its held call cannot collide with the
-    // busy scope's own held calls to `shape` and `compression` at the fixture adapter's one gate per site.
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -905,9 +885,6 @@ describe('Room.apply', () => {
     await dispatch(room, workspaceDir, scope(pieceId), 'c2', { kind: 'message', text: 'busy on draft' }, documents('draft text'))
     const draftSettled = settlementOf(room, pieceId)
 
-    // The same piece's story-context surface is a different room scope, and accepts a dispatch of its
-    // own rather than being refused as busy. Nothing is available there, so this calls only the Story
-    // Editor — not yet submitted for the busy draft scope, so its held call cannot collide either.
     const storyContextScope: RoomScope = { pieceId, surface: 'storyContext' }
     const { actionId: storyContextActionId } = await dispatch(room,
       workspaceDir,
@@ -918,7 +895,6 @@ describe('Room.apply', () => {
     )
     expect(room.activitySnapshot(storyContextScope)).toBeDefined()
 
-    // And a different piece's draft surface, a different scope again, accepts one too.
     const { actionId: otherActionId } = await dispatch(room,
       workspaceDir,
       scope(other.id),
@@ -928,8 +904,6 @@ describe('Room.apply', () => {
     )
     expect(room.activitySnapshot(scope(other.id))).toBeDefined()
 
-    // Neither newly accepted scope waited on the busy one, which is the property under test; abandon
-    // them rather than releasing their held call twice over.
     room.abandon(storyContextScope, storyContextActionId)
     room.abandon(scope(other.id), otherActionId)
 
@@ -942,7 +916,6 @@ describe('Room.apply', () => {
   it('leaves the recommendation applicable, and the draft as it was, where the application did not settle', async () => {
     const { pieceId } = await pieceWithRecommendation()
 
-    // Abandoned mid-call.
     const { room, adapter } = buildRoom(dataRoot, {
       apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
     })
@@ -956,14 +929,12 @@ describe('Room.apply', () => {
     await expect(applying).resolves.toMatchObject({ outcome: { outcome: 'abandoned' } })
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
 
-    // Failed outright.
     const { room: failing } = buildRoom(dataRoot, { apply: { result: { outcome: 'failed', reason: 'unconfigured' } } })
     const { outcome } = await failing.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
     expect(outcome).toMatchObject({ outcome: 'failed', reason: 'unconfigured' })
     expect(failing.activitySnapshot(scope(pieceId))).toBeUndefined()
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
 
-    // The recommendation still stands at its identity, so a later application opens pending again.
     adapter.release('apply')
     const retried = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
     if (retried.outcome.outcome !== 'pending') throw new Error('expected the retried application to be pending')
@@ -1037,7 +1008,6 @@ describe('Room.apply', () => {
 
     await expect(room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), 'no-such-application')).rejects.toThrowError(ApplicationNotPendingError)
 
-    // The pending application's own identity, but the draft was never saved to match it.
     await expect(room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)).rejects.toThrowError(
       ApplicationDocumentNotSavedError,
     )
@@ -1103,8 +1073,6 @@ describe('Room.apply', () => {
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
     expect(outcome.replacement).toBe('Premise: two cups, one chipped.')
 
-    // The document verbatim, its own reference schema, the story-context framing, and the
-    // generic preserve-instruction — never the draft as what is being rewritten.
     expect(adapter.promptFor('apply')).toContain('Premise: two cups.')
     expect(adapter.promptFor('apply')).toContain(fixtureMode.storyContextReference)
     expect(adapter.promptFor('apply')).toContain('FIXTURE_STORY_CONTEXT_SURFACE')
@@ -1152,10 +1120,6 @@ describe('Room.dispatch — an action the author opened from a particular respon
     expect(landed[0]).toMatchObject({ kind: 'authorMessage', audience: ['shape'], text: 'say more about that, @compression' })
   })
 
-  /**
-   * One claim over both acts: an act naming something the conversation does not hold is
-   * refused before an action opens, rather than opened against nobody.
-   */
   it('refuses an act naming a participant or a response that is not there, opening no action either way', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room } = buildRoom(dataRoot, {})
@@ -1235,7 +1199,6 @@ describe('Room.connect', () => {
     expect(snapshot.draft).toMatchObject({ actionId, kind: 'dispatch' })
     expect(snapshot.storyContext).toBeNull()
     expect(snapshot.authorContext).toBeNull()
-    // Nothing arrived on the listener between capturing the snapshot and registering it.
     expect(events).toEqual([])
 
     unsubscribe()
@@ -1261,9 +1224,6 @@ describe('Room.connect', () => {
     const draftSettled = settlementOfScope(room, scope(first.id))
     const authorContextSettled = settlementOfScope(room, authorContextScope)
 
-    // Opening a different piece is the transition: the first piece's work, on both the scopes
-    // it was running, is abandoned — including the author-context scope, which still names the
-    // first piece even though its conversation lives in the global namespace.
     room.connect(second.id, () => {})
 
     expect(room.activitySnapshot(scope(first.id))).toBeUndefined()
@@ -1273,7 +1233,6 @@ describe('Room.connect', () => {
 
     const secondScope = scope(second.id)
     const secondDispatch = await dispatch(room, workspaceDir, secondScope, 'c1', { kind: 'message', text: 'another message' }, documents('draft text'))
-    // Reconnecting to the piece already open resumes it: its own in-flight work stands.
     room.connect(second.id, () => {})
     expect(room.activitySnapshot(secondScope)).toMatchObject({ actionId: secondDispatch.actionId })
 

@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { completeMention, mentionQuery } from '../../../src/client/mentionTrigger.js'
 
-// Where a sigil counts as opening a mention at all is the shared `@handle` grammar's claim, held
-// at `shared/handle.test.ts`; the one mid-word case below is this module's seam onto it.
-
 describe('mentionQuery', () => {
   it('finds the token being typed as it stands, at the start of the message or after whitespace, including the empty one right after the sigil', () => {
     expect(mentionQuery('@sh', 3)).toEqual({ sigilIndex: 0, token: 'sh' })
     expect(mentionQuery('hi @sh', 6)).toEqual({ sigilIndex: 3, token: 'sh' })
-    // As it stands: the caret is mid-token, and what follows it is not being offered on yet.
     expect(mentionQuery('@shape', 3)).toEqual({ sigilIndex: 0, token: 'sh' })
     expect(mentionQuery('@', 1)).toEqual({ sigilIndex: 0, token: '' })
   })

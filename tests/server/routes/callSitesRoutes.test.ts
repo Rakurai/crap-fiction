@@ -8,12 +8,6 @@ import type { RuntimeStatus } from '../../../src/shared/runtimeStatus.js'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
-/**
- * Which assignment a write reaches, and that it leaves the others alone, belongs to
- * `model/assignments.test.ts`. These tests own the routes: the composed view, and the
- * two answers a runtime the author cannot reach arrives as.
- */
-
 const MODE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',

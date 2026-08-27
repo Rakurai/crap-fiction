@@ -45,10 +45,6 @@ describe('applied changes', () => {
     expect(changes).toEqual(expect.arrayContaining([cutSentence, REWRITE]))
   })
 
-  /**
-   * A change is held on its own, so a deletion reaches exactly the one named — and a name
-   * nothing is held under is nothing to report, not a failure.
-   */
   it('deletes the one change its id names and no other, and reports nothing wrong for a change not there', async () => {
     await writeAppliedChange(dataRoot, scope, cutSentence)
     await writeAppliedChange(dataRoot, scope, REWRITE)

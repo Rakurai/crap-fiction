@@ -13,7 +13,6 @@ const validEnv = {
   STUDIO_LOG_LEVEL: 'info',
 }
 
-/** One wrong value per variable, each wrong in the way that variable can be wrong. */
 const WRONG = {
   STUDIO_DATA_ROOT: 'relative/path',
   STUDIO_PORT: 'not-a-number',
@@ -31,10 +30,6 @@ describe('loadEnv', () => {
     })
   })
 
-  /**
-   * Supplying no default and naming what is missing are one claim: an empty environment
-   * crashes naming every variable at once, rather than starting on values nobody chose.
-   */
   it('supplies no default for any variable, naming every one of them when the environment is empty', () => {
     expect(() => loadEnv({})).toThrowError(
       /STUDIO_DATA_ROOT.*STUDIO_PORT.*STUDIO_MODEL_RUNTIME_URL.*STUDIO_LOG_LEVEL/s,

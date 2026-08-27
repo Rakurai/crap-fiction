@@ -152,7 +152,6 @@ describe('the manuscript while a save is failing', () => {
     await settle()
 
     expect(screen.getByRole('status').textContent).toContain('Nothing has been discarded — keep writing.')
-    // The refusal is a statement, not a question: nothing is asked and nothing is offered.
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('status').textContent).not.toMatch(/discard\?|are you sure|confirm/i)
     expect(screen.getByRole('status').textContent).not.toMatch(/retry/i)

@@ -130,7 +130,6 @@ describe('usePieceStream', () => {
       return createElement(Surface, { subscribe: usePieceStream('the-lighthouse', subscribeToRoom) })
     }
 
-    // StrictMode: the mount React discards is the one that would leave a closed event source behind.
     render(createElement(StrictMode, null, createElement(Piece, null)))
 
     const live = sources.filter((source) => !source.closed)

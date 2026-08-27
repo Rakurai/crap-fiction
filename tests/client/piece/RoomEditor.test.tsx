@@ -18,10 +18,6 @@ const STORY_EDITOR: StoryEditorView = {
 describe('editing the room', () => {
   afterEach(cleanup)
 
-  /**
-   * The control on each row says what clicking it would do, and the row says how it presently
-   * sits — which is also what makes a toggle in flight legible: only that row goes quiet.
-   */
   it('lists every specialist by handle with its role description and the act available on it, disabling only the row a toggle is in flight for', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
@@ -39,7 +35,6 @@ describe('editing the room', () => {
     expect(screen.getByRole('button', { name: 'enable' }).hasAttribute('disabled')).toBe(false)
   })
 
-  /** The room is the cast and the Story Editor, so the panel is not a list the Story Editor is missing from. */
   it('holds the Story Editor as a member nothing can be done to', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 

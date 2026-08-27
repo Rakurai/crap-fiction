@@ -6,17 +6,11 @@ import type { PieceAdapters } from './usePiece.js'
 
 export type SurfaceCastViewModel = Readonly<{
   members: readonly CastMemberView[]
-  /** The member whose enablement is in flight, so its own control can say so. */
   toggling: string | undefined
   error: string | undefined
   toggle: (memberId: string) => void
 }>
 
-/**
- * One surface's cast: who is in the room for it, which member is being brought in or sent away, and
- * what went wrong if that request failed. A cast is per surface, so the roster the studio answers
- * with is read back for this surface alone — another surface's cast is untouched by it.
- */
 export function useSurfaceCast(
   pieceId: string,
   surface: SurfaceId,

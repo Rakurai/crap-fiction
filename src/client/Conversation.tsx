@@ -36,11 +36,9 @@ type ConversationProps = {
   readonly room: RoomAdapters
   readonly identify: (participantId: string) => ParticipantIdentity
   readonly handles: readonly HandleEntry[]
-  /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
   readonly interviewer: InterviewerView
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
-  /** The surface's one persistence writer: what an Apply installs its replacement through. */
   readonly onApplied: (text: string) => Promise<AutosaveState>
   readonly onApplyingChange: (applying: ApplyingHold | undefined) => void
   readonly onConversationIdChange: (conversationId: string) => void
@@ -259,11 +257,6 @@ function IdentityLine({ identity, status }: { readonly identity: ParticipantIden
   )
 }
 
-/**
- * A conforming claim is not a short one, so the column's scannability cannot depend on the
- * participant's restraint: the claim has a ceiling and the rest is one action away. Nothing is
- * rewritten, nothing moves to the note, and the ceiling only shows itself where it is reached.
- */
 function Claim({ text }: { readonly text: string }) {
   const [open, setOpen] = useState(false)
   const [beyondTheCeiling, setBeyondTheCeiling] = useState(false)
@@ -546,7 +539,6 @@ export function Conversation({
     conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
   }
 
-  // The message an author could have typed by hand, sent and recorded on the same terms as any other.
   function askTheInterviewer(): void {
     if (roomBusy) return
     conversation.sendMessage(`@${interviewer.handle} ${interviewer.invocation}`)
@@ -660,7 +652,6 @@ export function Conversation({
           Message the room
         </label>
         <div className={styles.field}>
-          {/* `value` carries the whole message; the store's own `inputValue` holds only the live `@token`. */}
           <Ariakit.Combobox
             id={`conversation-message-${surface}`}
             store={combobox}

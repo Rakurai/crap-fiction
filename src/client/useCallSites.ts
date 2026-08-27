@@ -11,7 +11,6 @@ export type CallSiteAdapters = Readonly<{
   assignModel: typeof assignModelFn
 }>
 
-/** How long the acknowledgement of a written assignment stands before it goes away again. */
 const SAVED_STANDS_MS = 2600
 
 export type CallSitesViewModel =
@@ -19,7 +18,6 @@ export type CallSitesViewModel =
   | { readonly status: 'error'; readonly message: string }
   | {
       readonly status: 'ready'
-      /** The room's participants, and the operations the studio calls a model from itself. */
       readonly room: readonly CallSiteAssignmentView[]
       readonly operations: readonly CallSiteAssignmentView[]
       readonly runtime: RuntimeStatus | undefined

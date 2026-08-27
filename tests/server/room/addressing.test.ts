@@ -37,9 +37,6 @@ const editor: RoleDefinition = {
 }
 const participants = [shape, compression, editor]
 
-// Where a sigil counts as opening a mention at all is the shared `@handle` grammar's claim, held
-// at `shared/handle.test.ts`; the one email-shaped case below is this module's seam onto it.
-
 describe('parseAddressing', () => {
   it('addresses every participant a message names, by full handle or by prefix, in the order named, whatever the case and only once each', () => {
     expect(parseAddressing('@shape does the opening earn its length', participants)).toEqual([shape])
@@ -48,10 +45,6 @@ describe('parseAddressing', () => {
     expect(parseAddressing('@shape, really, @shape', participants)).toEqual([shape])
   })
 
-  /**
-   * A token matching no handle, or more than one, is ignored and stays ordinary text — as does a
-   * sigil that opened no mention, and a message holding none at all.
-   */
   it('addresses nobody from a token matching no handle or more than one, from a sigil that opened nothing, or from a message with none', () => {
     const ambiguous = [shape, { ...compression, id: 'shade', handle: 'shade' }]
 

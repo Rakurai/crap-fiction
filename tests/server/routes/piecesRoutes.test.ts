@@ -9,13 +9,6 @@ import { ConversationEntryStore, writeAppliedChange } from '../../../src/server/
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../../support/roomFixtures.js'
 
-/**
- * What a piece is and how it changes belongs to `pieces.test.ts`, which states it in
- * the studio's own vocabulary. These tests own only what the adapter adds: the paths,
- * the request grammar, the view the routes serialize, and the envelope each stated
- * failure arrives in.
- */
-
 const MODE: ModeDescriptor = {
   id: 'flash',
   displayName: 'Flash',
@@ -176,12 +169,6 @@ describe('the piece routes', () => {
     expect((await (await app.request('/pieces/cups')).json()).data.surfaces.draft.conversations).toEqual([])
   })
 
-  /**
-   * Which refusals the studio states at all belongs to `pieces.test.ts` and
-   * `store/index.test.ts`. What the adapter owns is the translation: each stated refusal
-   * reaching the author as a named code at the status that refusal warrants, never as an
-   * unhandled collapse.
-   */
   it('translates every refusal the studio states into a named code at its own status', async () => {
     const unconfigured = await studio().app.request('/pieces')
     expect(unconfigured.status).toBe(400)

@@ -2,10 +2,8 @@ import { useState, type FormEvent } from 'react'
 import type { ModeSummary } from '../shared/modeViews.js'
 import styles from './NewPieceForm.module.css'
 
-/** The modes a piece can be created in, at least one, so the form always has one to submit. */
 export type OfferedModes = readonly [ModeSummary, ...ModeSummary[]]
 
-/** `undefined` where nothing is offered, which is the form's own absent case rather than an empty form. */
 export function offeredModes(modes: readonly ModeSummary[]): OfferedModes | undefined {
   const [first, ...rest] = modes
   return first === undefined ? undefined : [first, ...rest]

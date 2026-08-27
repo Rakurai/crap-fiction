@@ -10,7 +10,6 @@ import { Room } from '../../src/server/room/room.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { ConversationEntryStore } from '../../src/server/store/index.js'
 
-/** Every value a Room's behaviour turns on, stated by the test rather than assumed here. */
 export type RoomSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]

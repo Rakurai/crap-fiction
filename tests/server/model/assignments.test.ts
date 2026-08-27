@@ -29,7 +29,6 @@ describe('assignments', () => {
 
     await setAssignment(dataRoot, sites, 'shape', 'llama-3')
     await setAssignment(dataRoot, sites, 'story-editor', 'qwen-14b')
-    // Reassigning one site is the same read, and reaches no other site.
     await setAssignment(dataRoot, sites, 'shape', 'llama-3-70b')
 
     expect(getAssignment(dataRoot, 'shape')).toBe('llama-3-70b')

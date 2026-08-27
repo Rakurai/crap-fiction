@@ -19,7 +19,6 @@ import { useRoster } from './useRoster.js'
 
 export type { AuthorContextSelection } from './useConversationSession.js'
 
-/** What the studio can be asked about the call sites a piece's chrome reports. */
 export type CallSiteAdapters = Readonly<{
   fetchCallSites: typeof fetchCallSitesFn
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
@@ -35,7 +34,6 @@ type OpenedPieceProps = {
   readonly pieceAdapters: PieceAdapters
   readonly room: RoomAdapters
   readonly callSites: CallSiteAdapters
-  /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onOpenPieces: () => void
   readonly onOpenModels: () => void
@@ -48,12 +46,6 @@ function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfi
   return { kind: 'plainText', surface, location: piece.surfaces[surface].location, referenceSchema: piece.surfaces[surface].referenceSchema }
 }
 
-/**
- * The shell over one open piece: piece-level chrome and close, the one event connection every
- * surface observes, and the document-snapshot registry each surface's own text feeds. Everything
- * specific to one surface — its document, its conversation, its cast, its Apply — belongs to the
- * `EditingSurface` mounted for it, not here.
- */
 function Surfaces({
   piece,
   lifecycle,
@@ -79,8 +71,6 @@ function Surfaces({
 }) {
   const roster = useRoster(callSites.fetchCallSites)
   const [probe] = useLoaded(callSites.fetchRuntimeStatus, [])
-  // One event source for the whole opened piece: every surface's conversation subscribes through
-  // this rather than reconnecting the stream when the author switches which surface it shows.
   const pieceStream = usePieceStream(piece.id, room.subscribeToRoom)
   const registry = useDocumentSnapshotRegistry({
     draft: piece.surfaces.draft.text,
@@ -93,12 +83,8 @@ function Surfaces({
   const [closing, setClosing] = useState(false)
   const flushersRef = useRef<BySurface<() => Promise<AutosaveState>>>({})
 
-  // Whether leaving the piece is refused — any surface's own failed save, not only the visible
-  // one's — or a close already under way, so a repeated request cannot start a second one.
   const leaveBlocked = closing || SURFACE_IDS.some((surface) => saveFailed[surface] === true)
 
-  // Stable across renders, and shared by every mounted surface, so a surface reporting its own
-  // state upward never itself becomes the reason the shell — and every other surface — re-renders.
   const handleSaveFailedChange = useCallback((surface: SurfaceId, failed: boolean) => {
     setSaveFailed((current) => (current[surface] === failed ? current : { ...current, [surface]: failed }))
   }, [])
@@ -106,7 +92,6 @@ function Surfaces({
     flushersRef.current = { ...flushersRef.current, [surface]: flush }
   }, [])
 
-  // Each surface subscribes through the one connection this shell holds, not its own.
   const surfaceRoom: RoomAdapters = { ...room, subscribeToRoom: pieceStream }
 
   useEffect(() => {

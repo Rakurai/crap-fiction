@@ -91,7 +91,6 @@ export const applyActivitySnapshotSchema = z.object({
   kind: z.literal('apply'),
   sourceEntryId: z.string().min(1),
   startedAt: z.number().int().positive(),
-  /** Present once the model has answered: the provisional identity a reconnecting client resumes by. */
   applicationId: z.string().min(1).optional(),
 })
 
@@ -104,11 +103,6 @@ export const conversationActivitySnapshotSchema = z.discriminatedUnion('kind', [
 
 export type ConversationActivitySnapshot = z.infer<typeof conversationActivitySnapshotSchema>
 
-/**
- * What connecting to a piece's event stream delivers before any live frame: the action in
- * flight, if there is one, at each of the piece's three room scopes. Delivered atomically with
- * the subscription itself, so no action can start or finish in the gap between them.
- */
 export const roomActivitySnapshotSchema = z
   .object({
     draft: conversationActivitySnapshotSchema.nullable(),

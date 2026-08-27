@@ -8,11 +8,6 @@ const roles: readonly RoleDefinition[] = [
 ]
 
 describe('callSites', () => {
-  /**
-   * The list holds two kinds of site, and what tells them apart is the handle: a participant is
-   * somebody in the room and is addressed by one, while an operation is a place a model is called
-   * from and has none. Both say what the model there is for, because both are chosen the same way.
-   */
   it('lists every participant by its handle, followed by the operation call site, which says what it is for', () => {
     const sites = callSites(roles)
 
