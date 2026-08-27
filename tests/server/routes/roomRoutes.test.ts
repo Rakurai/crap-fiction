@@ -166,7 +166,6 @@ describe('the room over HTTP', () => {
 
     const entries: readonly { kind: string; text?: string }[] = (await conversation(app, conversationId)).data.entries
     expect(entries.find((entry) => entry.kind === 'authorMessage' && entry.text === 'a message')).toBeDefined()
-    // Addressed by the act it was sent as, never by the handle left in the words.
     expect(entries.find((entry) => entry.text === 'say more, @story-editor')).toMatchObject({ audience: ['shape'] })
     expect(entries.find((entry) => entry.kind === 'concreteChangeRequest')).toMatchObject({ respondingTo: responseId, clarification: 'be specific' })
   })

@@ -229,9 +229,6 @@ export function useConversation(
         if (!active || event.data.surface !== surface) return
         update({ type: 'event', event })
       },
-      // A frame this client cannot read is reported and otherwise passed over. Only the snapshot's
-      // own failure locks the surface, and it says so where it is awaited: a malformed frame of any
-      // other kind leaves what the room is doing already learned.
       (message) => {
         if (active) update({ type: 'reported', message })
       },

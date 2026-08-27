@@ -571,8 +571,6 @@ export class Room {
       if (signal.aborted) {
         abandoned = true
       } else {
-        // Reaching here is itself the decision that the Story Editor speaks: an addressed dispatch
-        // has already excluded it unless it was named, so every call it does receive owes an answer.
         const storyEditor = this.#catalog.roster.storyEditor
         const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, true), evidence), this.#catalog.fragments, this.#catalog.charter)
         onState(storyEditor.id, 'waiting')
