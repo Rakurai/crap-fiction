@@ -215,11 +215,6 @@
   color: var(--ink2);
 }
 
-.abandon {
-  composes: surface from './controls.module.css';
-  flex: none;
-}
-
 .apply {
   display: flex;
   align-items: center;

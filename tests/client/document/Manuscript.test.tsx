@@ -21,7 +21,7 @@ const DEFAULT_PROPS = {
     retitleError: undefined as string | undefined,
     onRetitle: vi.fn(),
   },
-  applying: undefined as { readonly participantName: string } | undefined,
+  applying: undefined as { readonly participantName?: string; readonly abandon: () => void } | undefined,
 }
 
 function Harness(props: typeof DEFAULT_PROPS) {
@@ -141,7 +141,7 @@ describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 
   it('holds the source read-only naming the response holding it, and is editable again with no trace the instant it settles', () => {
-    const { rerender } = renderManuscript({ applying: { participantName: 'Compression' } })
+    const { rerender } = renderManuscript({ applying: { participantName: 'Compression', abandon: vi.fn() } })
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)

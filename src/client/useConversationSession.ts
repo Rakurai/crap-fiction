@@ -19,7 +19,7 @@ export function useConversationSession(initialConversationId: string | null, glo
   const [localConversationId, setLocalConversationId] = useState<string | null>(initialConversationId)
   const activeConversationId = global === undefined ? localConversationId : global.value === undefined ? initialConversationId : global.value
   const [session, setSession] = useState(0)
-  const [applying, setApplying] = useState<Readonly<{ participantName?: string }> | undefined>(undefined)
+  const [applying, setApplying] = useState<Readonly<{ participantName?: string; abandon: () => void }> | undefined>(undefined)
 
   const setActiveConversationId = global === undefined ? setLocalConversationId : global.onChange
 

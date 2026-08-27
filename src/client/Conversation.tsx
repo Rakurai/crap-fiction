@@ -41,7 +41,7 @@ type ConversationProps = {
   readonly clock: Clock
   /** The surface's one persistence writer: what an Apply installs its replacement through. */
   readonly onApplied: (text: string) => Promise<AutosaveState>
-  readonly onApplyingChange?: (applying: { readonly participantName?: string } | undefined) => void
+  readonly onApplyingChange?: (applying: { readonly participantName?: string; readonly abandon: () => void } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
@@ -129,13 +129,10 @@ function ResponseActions({
   )
 }
 
-function ApplyingFlight({ onAbandon }: { readonly onAbandon: () => void }) {
+function ApplyingFlight() {
   return (
     <div className={styles.apply}>
       <span className={styles.applyingFacts}>APPLYING</span>
-      <button type="button" className={styles.abandon} onClick={onAbandon}>
-        abandon
-      </button>
     </div>
   )
 }
@@ -216,7 +213,6 @@ type EntryActions = Readonly<{
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
   onApply: (responseId: string, constraint: string | undefined) => void
-  onAbandonApply: () => void
   onAskAboutChange: () => void
   onReplyEmpty: (participantId: string) => void
   onReply: (participantId: string, message: string) => void
@@ -283,7 +279,6 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     applyDisabled,
     applicationsFor,
     onApply,
-    onAbandonApply,
     onAskAboutChange,
     onReplyEmpty,
     onReply,
@@ -361,7 +356,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
           ))}
           {applyingThis ? (
-            <ApplyingFlight onAbandon={onAbandonApply} />
+            <ApplyingFlight />
           ) : (
             <ResponseActions
               responseId={entry.id}
@@ -391,21 +386,16 @@ function DispatchFlight({
   activity,
   displayName,
   nowMs,
-  onAbandon,
 }: {
   readonly activity: DispatchActivitySnapshot
   readonly displayName: (participantId: string) => string
   readonly nowMs: number
-  readonly onAbandon: () => void
 }) {
   const active = Object.keys(activity.states)
   return (
     <div className={styles.flightWrapper}>
       <div className={styles.flight}>
         <span className={styles.activityFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
-        <button type="button" className={styles.abandon} onClick={onAbandon}>
-          abandon
-        </button>
       </div>
       {active.length > 0 && (
         <ul className={styles.progress}>
@@ -469,9 +459,12 @@ export function Conversation({
   useEffect(() => {
     onApplyingChange(
       apply.applying !== undefined
-        ? { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) }
+        ? {
+            participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName),
+            abandon: () => void abandonCurrentAction(),
+          }
         : conversation.applyingInRoom
-          ? {}
+          ? { abandon: () => void abandonCurrentAction() }
           : undefined,
     )
   }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, displayName, onApplyingChange])
@@ -501,6 +494,12 @@ export function Conversation({
 
   const nowMs = useNow(conversation.projection.activity !== undefined, clock)
   const roomBusy = conversation.busy || apply.applying !== undefined
+  // A dispatch — a message, a reply, or a concrete-change request — is what turns the send
+  // control into stop; an Apply holds the document instead, and abandoning it is the held
+  // banner's control. `activity` is set only once a dispatch is confirmed under way, so the
+  // control never relabels itself during the moment the surface is still learning what, if
+  // anything, the room already has in flight.
+  const conversationActionInFlight = conversation.projection.activity !== undefined
   const opening = openingWords(conversation.projection.entries)
 
   function askAboutChange(): void {
@@ -561,7 +560,6 @@ export function Conversation({
     applyDisabled: roomBusy,
     applicationsFor,
     onApply: apply.apply,
-    onAbandonApply: () => void abandonCurrentAction(),
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,
     onReply: reply,
@@ -587,12 +585,7 @@ export function Conversation({
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
         {conversation.projection.activity !== undefined && (
-          <DispatchFlight
-            activity={conversation.projection.activity}
-            displayName={displayName}
-            nowMs={nowMs}
-            onAbandon={() => void abandonCurrentAction()}
-          />
+          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} />
         )}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
@@ -609,6 +602,14 @@ export function Conversation({
       <form
         className={styles.composer}
         onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+        onKeyDown={(event) => {
+          // Placed on the form rather than the textarea itself: the mention combobox's own
+          // handling of Enter runs on the textarea during the same bubble phase, and only by
+          // running after it here does `defaultPrevented` already say whether it claimed the key.
+          if (event.key !== 'Enter' || event.shiftKey || event.defaultPrevented) return
           event.preventDefault()
           submit()
         }}
@@ -663,9 +664,15 @@ export function Conversation({
         <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
           ask me
         </button>
-        <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-          send
-        </button>
+        {conversationActionInFlight ? (
+          <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
+            stop
+          </button>
+        ) : (
+          <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
+            send
+          </button>
+        )}
       </form>
     </div>
   )

@@ -442,6 +442,32 @@ describe('handle completion at the composer', () => {
   })
 })
 
+describe('sending from the keyboard', () => {
+  afterEach(cleanup)
+
+  it('sends on Enter, leaves Shift+Enter for a newline, and does nothing while the send control is disabled', async () => {
+    const dispatch = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding([]), dispatch }
+
+    renderConversation([], { room })
+
+    const composer = await screen.findByLabelText('Message the room')
+
+    fireEvent.keyDown(composer, { key: 'Enter' })
+    expect(dispatch).not.toHaveBeenCalled()
+
+    fireEvent.change(composer, { target: { value: 'a message' } })
+
+    expect(fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })).toBe(true)
+    expect(dispatch).not.toHaveBeenCalled()
+
+    expect(fireEvent.keyDown(composer, { key: 'Enter' })).toBe(false)
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { message: 'a message' }, DOCUMENTS))
+  })
+})
+
 describe('conversation activity, truthfully', () => {
   afterEach(cleanup)
 
@@ -458,14 +484,13 @@ describe('conversation activity, truthfully', () => {
     },
   }
 
-  it('offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
+  it('draws an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
     const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
     stream(STARTED)
 
-    expect(await screen.findByRole('button', { name: 'abandon' })).toBeTruthy()
-    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
+    expect(await screen.findByText(/ACTIVE/)).toBeTruthy()
     expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 
@@ -485,66 +510,6 @@ describe('conversation activity, truthfully', () => {
 
     expect(screen.getByText('Shape is thinking.')).toBeTruthy()
     expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
-  })
-
-  it('disables send while busy without relabelling it', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    const send = (await screen.findByRole('button', { name: 'send' })) as HTMLButtonElement
-    const composer = await screen.findByLabelText('Message the room')
-    fireEvent.change(composer, { target: { value: 'a message' } })
-    expect(send.disabled).toBe(false)
-
-    stream(STARTED)
-
-    await waitFor(() => expect(send.disabled).toBe(true))
-    expect(send.textContent).toBe('send')
-  })
-
-  /**
-   * That the controls stay held until the studio answers is `useConversation.test.ts`'s claim.
-   * What the conversation owns is the offer: while an action is in flight there is a control to
-   * abandon it, and clicking it names that action and no other.
-   */
-  it('offers the action in flight to be abandoned, by its own identity', async () => {
-    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
-    const { room, stream } = roomStreaming([], abandonOperation)
-    renderConversation([], { room })
-
-    await screen.findByLabelText('Message the room')
-    stream(STARTED)
-
-    fireEvent.click(await screen.findByRole('button', { name: 'abandon' }))
-
-    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
-  })
-
-  /**
-   * What an abandoned dispatch leaves on the page. Which events can still move the projection
-   * afterwards is `entryProjection.test.ts`'s claim; what this owns is that the author is left
-   * reading the response rather than a room still apparently at work.
-   */
-  it('leaves the response an abandoned dispatch landed on the page, with nothing still shown as in flight', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({
-      type: 'entry.appended',
-      data: {
-        actionId: 'a1',
-        entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' },
-        surface: 'draft',
-      },
-    })
-    await screen.findByText('It holds.')
-
-    fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull())
-
-    expect(screen.getByText('It holds.')).toBeTruthy()
-    expect(screen.queryByText(/is thinking/)).toBeNull()
   })
 
   it("reconnect: an apply already in flight for a response shows its flight from the stream's own snapshot alone, no new event required", async () => {

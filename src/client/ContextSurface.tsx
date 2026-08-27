@@ -24,7 +24,7 @@ type ContextSurfaceProps = {
   readonly autosave: AutosaveViewModel
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName?: string } | undefined
+  readonly applying: { readonly participantName?: string; readonly abandon: () => void } | undefined
 }
 
 export function ContextSurface({
@@ -65,6 +65,9 @@ export function ContextSurface({
           <span className={styles.applyingBannerWords}>
             {applying.participantName === undefined ? 'Held while a change is applied.' : `Held while ${applying.participantName}'s change is applied.`}
           </span>
+          <button type="button" className={styles.applyingBannerAbandon} onClick={applying.abandon}>
+            abandon
+          </button>
         </div>
       )}
 
