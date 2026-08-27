@@ -53,7 +53,8 @@ export function DocumentHeader({ onOpenPieces, onOpenModels, title, lifecycle, l
             <button
               key={id}
               type="button"
-              className={id === surface ? `${styles.switcherOption} ${styles.switcherOptionActive}` : styles.switcherOption}
+              className={styles.switcherOption}
+              aria-current={id === surface}
               onClick={() => onSwitchTo(id)}
             >
               {SURFACE_CONTROL_LABEL[id]}

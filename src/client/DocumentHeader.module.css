@@ -66,15 +66,10 @@
 }
 
 .switcherOption {
-  font: 500 10.5px/1 var(--font-ui);
-  background: none;
-  color: var(--ink3);
-  border: none;
-  padding: 7px 10px;
-  cursor: pointer;
+  composes: segment from './controls.module.css';
 }
 
-.switcherOptionActive {
+.switcherOption[aria-current='true'] {
   background: var(--tint);
   color: var(--ink);
 }
