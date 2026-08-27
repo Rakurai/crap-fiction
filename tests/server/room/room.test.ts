@@ -337,7 +337,7 @@ describe('Room.dispatch', () => {
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
-  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from waiting through preparing into working', async () => {
+  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from called through preparing into working', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
@@ -355,7 +355,7 @@ describe('Room.dispatch', () => {
 
     for (const participantId of ['shape', 'compression', 'story-editor']) {
       const own = activity.filter((event) => event.participantId === participantId)
-      expect(own.map((event) => event.state)).toEqual(['waiting', 'preparing', 'working'])
+      expect(own.map((event) => event.state)).toEqual(['called', 'preparing', 'working'])
       expect(own.every((event) => event.startedAt === 1_700_000_000_000)).toBe(true)
     }
   })

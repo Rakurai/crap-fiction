@@ -928,7 +928,7 @@ identities.
 **Nothing in the event set is a queue: there is no waiting count and no place in an order**, for a
 specialist or for the Story Editor. A started action's resolved audience is a durable fact about what the
 dispatch will call, and naming those participants from it asserts nothing beyond that fact. What a client
-may not do is read a stage out of it that the model layer has not reported, or an order the room never
+may not do is read a stage out of it that has not been reported, or an order the room never
 promised. Each call's progress is reported for that call alone, and the moment it was submitted is part of
 what is reported, so elapsed time is a number the server stated rather than one the client began counting.
 

@@ -136,8 +136,10 @@ becomes the one that stops it — the chat convention the author already knows, 
 the document was never touched, so the only thing there is to stop is the waiting.
 
 **Every participant the action addressed has its own line from the instant it opens.** The line
-carries that participant's identity and where its call has got to: waiting to be called, having its
-model prepared, or working. It resolves when that participant's own response lands, independently of
+carries that participant's identity and where its call has got to: waiting to be called, called,
+having its model prepared, or working. A participant still waiting to be called shows no elapsed
+time, because there is no call yet to time, and each of the other three carries one. It resolves
+when that participant's own response lands, independently of
 every other, because the room calls them independently and may call them at once. The Story Editor's
 line waits on the specialist readings it reads, which is a fact about what it does rather than a
 place held open for it.
@@ -447,7 +449,7 @@ and are decided almost never.
 **These are the normal case.** Local models are slow, uneven and frequently wrong, so every
 composition here must be judged in these conditions before it is believed.
 
-**Nothing back yet.** Each addressed participant's line states that its call is waiting, before any
+**Nothing back yet.** Each addressed participant's line states where its call has got to, before any
 of them has anything to show. Nothing is attributed to one that has not answered, and none is shown
 its turn in a queue.
 

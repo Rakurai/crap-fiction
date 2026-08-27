@@ -536,7 +536,7 @@ export class Room {
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
-      onState(call.role.id, 'waiting')
+      onState(call.role.id, 'called')
       const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
         onState(call.role.id, state),
       )
@@ -573,7 +573,7 @@ export class Room {
       } else {
         const storyEditor = this.#catalog.roster.storyEditor
         const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, true), evidence), this.#catalog.fragments, this.#catalog.charter)
-        onState(storyEditor.id, 'waiting')
+        onState(storyEditor.id, 'called')
         const outcome = await callParticipant(storyEditor, prompt, causeEntry.id, true, this.#modelAccess, signal, (state) =>
           onState(storyEditor.id, state),
         )
