@@ -1,6 +1,6 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AppliedChangeContent } from '../shared/appliedChange.js'
+import type { AppliedChangeContent, ChangedPassage } from '../shared/appliedChange.js'
 import { openingWords } from '../shared/conversationEntries.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
@@ -9,12 +9,13 @@ import type { InterviewerView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
-import { elapsed, facts, machineWords, messageWhen, wordCount } from './facts.js'
+import { isChangeDisclosed, setChangeDisclosed } from './appliedChangeDisclosure.js'
+import { elapsed, facts, machineWords, messageWhen, passageCount, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { Mark } from './Mark.js'
 import { isParticipantOutcome } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
-import { useApply, type ApplyingResponse } from './useApply.js'
+import { useApply, type ApplySettlement, type ApplyingResponse } from './useApply.js'
 import { useNow } from './useNow.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
 
@@ -64,7 +65,7 @@ function ResponseActions({
   readonly responseId: string
   readonly participantId: string
   readonly participantName: string
-  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
+  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed' | 'applied'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void
@@ -138,16 +139,31 @@ function ApplyingFlight() {
   )
 }
 
+function changeSummary(passages: readonly ChangedPassage[]): string {
+  const words = passages.reduce((sum, passage) => sum + countWords(passage.after), 0)
+  return passages.length > 1
+    ? facts(machineWords('applied'), wordCount(words), passageCount(passages.length))
+    : facts(machineWords('applied'), wordCount(words))
+}
+
 function AppliedChangeView({
+  id,
   content,
+  freshlyStreamed,
   askDisabled,
   onAskAboutChange,
 }: {
+  readonly id: string
   readonly content: AppliedChangeContent | undefined
+  readonly freshlyStreamed: boolean
   readonly askDisabled: boolean
   readonly onAskAboutChange: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => freshlyStreamed || isChangeDisclosed(id))
+
+  useEffect(() => {
+    setChangeDisclosed(id, open)
+  }, [id, open])
 
   return (
     <div className={styles.change}>
@@ -158,7 +174,7 @@ function AppliedChangeView({
       ) : (
         <>
           <button type="button" className={styles.changeToggle} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
-            {facts(machineWords('applied'), wordCount(content.passages.reduce((sum, passage) => sum + countWords(passage.after), 0)))}
+            {changeSummary(content.passages)}
           </button>
           {open && (
             <div className={styles.changeDiff}>
@@ -218,6 +234,8 @@ type EntryActions = Readonly<{
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
+  freshApplicationIds: ReadonlySet<string>
+  settlement: ApplySettlement | undefined
   onApply: (responseId: string, constraint: string | undefined) => void
   onAskAboutChange: () => void
   onReplyEmpty: (participantId: string) => void
@@ -236,7 +254,7 @@ function ParticipantIdentity({
   readonly handle: string | undefined
   readonly mark: string | null
   readonly ordinal: number | null
-  readonly status?: string
+  readonly status?: string | undefined
 }) {
   return (
     <div className={styles.identity}>
@@ -293,6 +311,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     applying,
     applyDisabled,
     applicationsFor,
+    freshApplicationIds,
+    settlement,
     onApply,
     onAskAboutChange,
     onReplyEmpty,
@@ -358,6 +378,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'participantResponse': {
       const applyingThis = applying?.responseId === entry.id
       const applications = applicationsFor(entry.id)
+      const applied = applications.length > 0
+      const responseSettlement = applied ? undefined : settlement?.responseId === entry.id ? settlement : undefined
       return (
         <div className={styles.participant}>
           <ParticipantIdentity
@@ -365,11 +387,29 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             handle={handle(entry.participantId)}
             mark={mark(entry.participantId)}
             ordinal={ordinal(entry.participantId)}
+            status={
+              responseSettlement === undefined
+                ? undefined
+                : machineWords(responseSettlement.kind === 'failed' ? 'application failed' : 'application abandoned')
+            }
           />
           <Claim text={entry.claim} />
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
+          {responseSettlement?.kind === 'failed' && (
+            <>
+              <p className={styles.failed}>the application did not settle — {machineWords(responseSettlement.reason)}</p>
+              {responseSettlement.returned !== undefined && <p className={styles.returned}>{responseSettlement.returned}</p>}
+            </>
+          )}
           {applications.map((application) => (
-            <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+            <AppliedChangeView
+              key={application.id}
+              id={application.id}
+              content={application.change}
+              freshlyStreamed={freshApplicationIds.has(application.id)}
+              askDisabled={applyDisabled}
+              onAskAboutChange={onAskAboutChange}
+            />
           ))}
           {applyingThis ? (
             <ApplyingFlight />
@@ -378,7 +418,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
               responseId={entry.id}
               participantId={entry.participantId}
               participantName={displayName(entry.participantId)}
-              outcome={entry.outcome}
+              outcome={applied ? 'applied' : entry.outcome}
               disabled={applyDisabled}
               onApply={onApply}
               onAsk={onAsk}
@@ -594,6 +634,8 @@ export function Conversation({
     applying: apply.applying,
     applyDisabled: roomBusy,
     applicationsFor,
+    freshApplicationIds: conversation.projection.freshApplicationIds,
+    settlement: apply.settlement,
     onApply: apply.apply,
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,

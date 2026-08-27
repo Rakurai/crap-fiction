@@ -175,7 +175,6 @@ describe('the applied change, shown on its originating response', () => {
     const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
     expect(screen.getByText('the old line')).toBeTruthy()
     expect(screen.getByText('the new line')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy()
 
     fireEvent.click(toggle)
 

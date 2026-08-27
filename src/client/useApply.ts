@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AutosaveState } from './autosave.js'
+import type { FailureReason } from '../shared/modelResult.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
   abandonOperation as abandonOperationFn,
@@ -19,9 +20,16 @@ export type ApplyAdapters = Readonly<{
 
 export type ApplyingResponse = Readonly<{ responseId: string }>
 
+/** Which of the two the author needs told apart when deciding whether to try again. */
+export type ApplySettlement = Readonly<
+  | { readonly kind: 'failed'; readonly responseId: string; readonly reason: FailureReason; readonly returned: string | undefined }
+  | { readonly kind: 'abandoned'; readonly responseId: string }
+>
+
 export type ApplyViewModel = Readonly<{
   applying: ApplyingResponse | undefined
   error: string | undefined
+  settlement: ApplySettlement | undefined
   apply: (responseId: string, constraint: string | undefined) => void
   clear: () => void
 }>
@@ -38,6 +46,7 @@ export function useApply(
   const { applyRecommendation, confirmApplication, abandonOperation, retrievePendingApply } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(resumed !== undefined ? { responseId: resumed.responseId } : undefined)
   const [error, setError] = useState<string | undefined>(undefined)
+  const [settlement, setSettlement] = useState<ApplySettlement | undefined>(undefined)
   const startedHere = useRef(false)
   const resumingApplication = useRef<string | undefined>(undefined)
 
@@ -125,6 +134,7 @@ export function useApply(
     const cid = conversationId
     startedHere.current = true
     setError(undefined)
+    setSettlement(undefined)
     setApplying({ responseId })
 
     async function run(): Promise<void> {
@@ -135,12 +145,18 @@ export function useApply(
       }
 
       const outcome = result.value
-      if (outcome.outcome === 'noChange' || outcome.outcome === 'abandoned') {
+      if (outcome.outcome === 'noChange') {
+        stop(undefined)
+        return
+      }
+      if (outcome.outcome === 'abandoned') {
+        setSettlement({ kind: 'abandoned', responseId })
         stop(undefined)
         return
       }
       if (outcome.outcome === 'failed') {
-        stop(`the application did not settle — ${outcome.reason}`)
+        setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
+        stop(undefined)
         return
       }
 
@@ -152,10 +168,14 @@ export function useApply(
     })
   }
 
+  // The author's own act of stopping an Apply in flight, distinct from the model reporting one of
+  // its own outcomes above: what the document is left in is identical, but this one stamps
+  // "abandoned" rather than "failed" because the author did it rather than the machine breaking.
   function clear(): void {
+    if (applying !== undefined) setSettlement({ kind: 'abandoned', responseId: applying.responseId })
     startedHere.current = false
     setApplying(undefined)
   }
 
-  return { applying, error, apply, clear }
+  return { applying, error, settlement, apply, clear }
 }

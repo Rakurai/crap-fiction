@@ -13,6 +13,10 @@ export function wordCount(length: number): string {
   return `${words.format(length)} ${length === 1 ? 'WORD' : 'WORDS'}`
 }
 
+export function passageCount(count: number): string {
+  return `${words.format(count)} ${count === 1 ? 'PASSAGE' : 'PASSAGES'}`
+}
+
 export function modeName(mode: string): string {
   return mode.toUpperCase()
 }
