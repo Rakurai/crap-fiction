@@ -21,7 +21,7 @@ export type ManuscriptViewModel = {
   readonly showRendered: () => void
   readonly showSource: () => void
   readonly showReading: () => void
-  readonly applyRecommendation: (markdown: string) => void
+  readonly applyRecommendation: (markdown: string) => () => void
 }
 
 function applySourceText(editor: Editor, text: string) {
@@ -108,12 +108,18 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   }, [editor, view, sourceText, captureScrollRatio])
 
   const applyRecommendation = useCallback(
-    (text: string) => {
-      if (editor === null) return
+    (text: string): (() => void) => {
+      if (editor === null) return () => {}
+      const previousSourceText = sourceText
+      const wasSourceView = view === 'source'
       applyRecommendationText(editor, text)
-      if (view === 'source') setSourceText(text)
+      if (wasSourceView) setSourceText(text)
+      return () => {
+        editor.commands.undo()
+        if (wasSourceView) setSourceText(previousSourceText)
+      }
     },
-    [editor, view],
+    [editor, view, sourceText],
   )
 
   return {

@@ -17,9 +17,11 @@ export function useProseSession(initialText: string, save: SaveDocument): ProseS
   const manuscript = useManuscript(initialText)
   const autosave = useAutosave(manuscript.markdown, save)
   const install = useCallback(
-    (text: string) => {
-      manuscript.applyRecommendation(text)
-      return autosave.install(text)
+    async (text: string) => {
+      const restore = manuscript.applyRecommendation(text)
+      const result = await autosave.install(text)
+      if (result.failed) restore()
+      return result
     },
     [manuscript.applyRecommendation, autosave.install],
   )
@@ -30,11 +32,14 @@ export function usePlainTextSession(initialText: string, save: SaveDocument): Pl
   const [text, setText] = useState(initialText)
   const autosave = useAutosave(text, save)
   const install = useCallback(
-    (next: string) => {
+    async (next: string) => {
+      const previous = text
       setText(next)
-      return autosave.install(next)
+      const result = await autosave.install(next)
+      if (result.failed) setText(previous)
+      return result
     },
-    [autosave.install],
+    [text, autosave.install],
   )
   return { text, setText, autosave, install }
 }
