@@ -72,17 +72,23 @@ describe('resolving who is in the room', () => {
   })
 })
 
-describe("assigning cast ordinals from the full roster's load order", () => {
-  it('gives every cast participant its position among the loaded roles, unmoved by which mode-and-surface view filters it out', () => {
+describe("assigning mark ordinals from the roster's load order", () => {
+  it('gives every participant its position among the loaded roles, unmoved by which mode-and-surface view filters it out', () => {
     const roster = resolveRoster([SHAPE, COMPRESSION, EDITOR, TOOLSMITH, INTERVIEWER_FIXTURE])
 
-    expect(roster.specialistOrdinals.get('shape')).toBe(0)
-    expect(roster.specialistOrdinals.get('compression')).toBe(1)
+    expect(roster.markOrdinals.get('shape')).toBe(0)
+    expect(roster.markOrdinals.get('compression')).toBe(1)
 
-    // Shape is unavailable for the authorContext surface, so this view excludes it — but that
-    // does not shift compression's recorded ordinal to fill the gap.
     expect(specialistsFor(roster.specialists, 'flash', 'authorContext').map((role) => role.id)).toEqual(['compression'])
-    expect(roster.specialistOrdinals.get('compression')).toBe(1)
+    expect(roster.markOrdinals.get('compression')).toBe(1)
+  })
+
+  it('leaves the Story Editor alone without an ordinal, so no other participant can take the treatment that absence selects', () => {
+    const roster = resolveRoster([SHAPE, COMPRESSION, EDITOR, TOOLSMITH, INTERVIEWER_FIXTURE])
+
+    expect(roster.markOrdinals.has(EDITOR.id)).toBe(false)
+    expect(roster.markOrdinals.get(TOOLSMITH.id)).toBe(2)
+    expect(roster.markOrdinals.get(INTERVIEWER_FIXTURE.id)).toBe(3)
   })
 })
 

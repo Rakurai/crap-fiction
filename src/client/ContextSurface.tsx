@@ -3,14 +3,15 @@ import styles from './ContextSurface.module.css'
 import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, timeOfDay } from './facts.js'
 import type { LifecycleProps } from './pieceLifecycle.js'
+import type { ApplyingHold } from './useConversationSession.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 
 /** The surfaces this component draws: a plain text document beside a reference schema. */
 export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
 
-const DOCUMENT: Readonly<Record<ContextSurfaceId, { readonly label: string; readonly file: string }>> = {
-  storyContext: { label: 'Story context', file: 'story-context.yaml' },
-  authorContext: { label: 'Author context', file: 'author-context.yaml' },
+const LABEL: Readonly<Record<ContextSurfaceId, string>> = {
+  storyContext: 'Story context',
+  authorContext: 'Author context',
 }
 
 type ContextSurfaceProps = {
@@ -19,12 +20,13 @@ type ContextSurfaceProps = {
   readonly onOpenPieces: () => void
   readonly onOpenModels: () => void
   readonly text: string
+  readonly location: string
   readonly onChange: (text: string) => void
   readonly referenceSchema: string | null
   readonly autosave: AutosaveViewModel
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName?: string; readonly abandon: () => void } | undefined
+  readonly applying: ApplyingHold | undefined
 }
 
 export function ContextSurface({
@@ -33,6 +35,7 @@ export function ContextSurface({
   onOpenPieces,
   onOpenModels,
   text,
+  location,
   onChange,
   referenceSchema,
   autosave,
@@ -40,7 +43,6 @@ export function ContextSurface({
   lifecycle,
   applying,
 }: ContextSurfaceProps) {
-  const { label, file } = DOCUMENT[surface]
 
   return (
     <div className={styles.wrapper}>
@@ -73,9 +75,9 @@ export function ContextSurface({
 
       <div className={styles.scroll}>
         <div className={styles.measure}>
-          <div className={styles.contextFacts}>{facts(machineWords(label), file)}</div>
+          <div className={styles.contextFacts}>{facts(machineWords(LABEL[surface]), location)}</div>
           <textarea
-            aria-label={label}
+            aria-label={LABEL[surface]}
             className={styles.text}
             value={text}
             disabled={applying !== undefined}
@@ -95,7 +97,7 @@ export function ContextSurface({
         <div className={styles.saveFailed}>
           <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            The last write to {file} failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            The last write to {location} failed. Nothing has been discarded — keep writing. Leaving for another piece is
             unavailable while “{title}” is unsaved.
           </p>
           <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>

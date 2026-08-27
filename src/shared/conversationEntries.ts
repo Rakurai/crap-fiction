@@ -19,6 +19,7 @@ export const concreteChangeRequestEntrySchema = z.object({
   target: z.string().min(1),
   respondingTo: z.string().min(1),
   clarification: z.string().min(1).optional(),
+  atMs: z.number().optional(),
 })
 
 export type ConcreteChangeRequestEntry = z.infer<typeof concreteChangeRequestEntrySchema>

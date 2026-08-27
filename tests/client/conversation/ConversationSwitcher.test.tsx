@@ -97,10 +97,6 @@ describe('the conversation listing', () => {
     expect(onDelete).toHaveBeenCalledWith('c1')
   })
 
-  /**
-   * Arming lives in component state, not a CSS hover reveal, so a decision the author already
-   * made cannot be taken back by the pointer merely drifting off the row.
-   */
   it('keeps an armed row armed once the pointer leaves it', () => {
     renderSwitcher(undefined)
 

@@ -1,4 +1,4 @@
-import { INTERVIEWER_FUNCTION, type RoleDefinition } from '../model/roles.js'
+import { INTERVIEWER_FUNCTION, markOrdinals, type RoleDefinition } from '../model/roles.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 
 export class GeneralistNotInRosterError extends Error {
@@ -23,8 +23,7 @@ export type Interviewer = Readonly<{
 
 export type RoomRoster = Readonly<{
   specialists: readonly RoleDefinition[]
-  /** Every cast participant's stable position in the full roster's load order, round-robin colour assignment's basis. */
-  specialistOrdinals: ReadonlyMap<string, number>
+  markOrdinals: ReadonlyMap<string, number>
   storyEditor: RoleDefinition
   addressedOnly: readonly RoleDefinition[]
   interviewer: Interviewer
@@ -32,7 +31,6 @@ export type RoomRoster = Readonly<{
 
 export function resolveRoster(roles: readonly RoleDefinition[]): RoomRoster {
   const specialists = roles.filter((role) => role.eligibility === 'cast')
-  const specialistOrdinals = new Map(specialists.map((role, ordinal) => [role.id, ordinal]))
 
   // Unreachable for loaded content: the loader refuses a set that does not declare exactly one generalist.
   const storyEditor = roles.find((role) => role.eligibility === 'generalist')
@@ -46,7 +44,7 @@ export function resolveRoster(roles: readonly RoleDefinition[]): RoomRoster {
   const invocation = declared?.function?.invocation
   if (declared === undefined || invocation === undefined) throw new InterviewerNotInRosterError()
 
-  return { specialists, specialistOrdinals, storyEditor, addressedOnly, interviewer: { role: declared, invocation } }
+  return { specialists, markOrdinals: markOrdinals(roles), storyEditor, addressedOnly, interviewer: { role: declared, invocation } }
 }
 
 export function specialistsFor(specialists: readonly RoleDefinition[], modeId: string, surface: SurfaceId): readonly RoleDefinition[] {

@@ -1,7 +1,7 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AppliedChangeContent, ChangedPassage } from '../shared/appliedChange.js'
-import { openingWords } from '../shared/conversationEntries.js'
+import { conversationName } from './conversationNaming.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
@@ -17,6 +17,8 @@ import { isParticipantOutcome } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplySettlement, type ApplyingResponse } from './useApply.js'
 import { useNow } from './useNow.js'
+import type { ApplyingHold } from './useConversationSession.js'
+import type { ParticipantIdentity } from './useRoster.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
 
 const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
@@ -32,10 +34,7 @@ type ConversationProps = {
   readonly documents: DocumentSnapshot
   readonly flushDocument: () => Promise<AutosaveState>
   readonly room: RoomAdapters
-  readonly displayName: (participantId: string) => string
-  readonly handle: (participantId: string) => string | undefined
-  readonly mark: (participantId: string) => string | null
-  readonly ordinal: (participantId: string) => number | null
+  readonly identify: (participantId: string) => ParticipantIdentity
   readonly handles: readonly HandleEntry[]
   /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
   readonly interviewer: InterviewerView
@@ -43,8 +42,8 @@ type ConversationProps = {
   readonly clock: Clock
   /** The surface's one persistence writer: what an Apply installs its replacement through. */
   readonly onApplied: (text: string) => Promise<AutosaveState>
-  readonly onApplyingChange?: (applying: { readonly participantName?: string; readonly abandon: () => void } | undefined) => void
-  readonly onConversationIdChange?: (conversationId: string) => void
+  readonly onApplyingChange: (applying: ApplyingHold | undefined) => void
+  readonly onConversationIdChange: (conversationId: string) => void
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
 }
@@ -117,7 +116,7 @@ function ResponseActions({
           ask for a concrete change
         </button>
       )}
-      <button type="button" className={styles.actionButton} disabled={withText && disabled} onClick={reply}>
+      <button type="button" className={styles.actionButton} disabled={disabled} onClick={reply}>
         reply
       </button>
       <input
@@ -218,18 +217,19 @@ function askedText(name: string): string {
   return `${name} was asked for a concrete change.`
 }
 
-function participantNameFor(entries: readonly ConversationEntryView[], responseId: string, displayName: (id: string) => string): string {
+function participantNameFor(
+  entries: readonly ConversationEntryView[],
+  responseId: string,
+  identify: (id: string) => ParticipantIdentity,
+): string {
   const entry = entries.find((candidate) => candidate.id === responseId)
-  return displayName(entry?.kind === 'participantResponse' ? entry.participantId : responseId)
+  return identify(entry?.kind === 'participantResponse' ? entry.participantId : responseId).displayName
 }
 
 const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
 
 type EntryActions = Readonly<{
-  displayName: (id: string) => string
-  handle: (id: string) => string | undefined
-  mark: (id: string) => string | null
-  ordinal: (id: string) => number | null
+  identify: (id: string) => ParticipantIdentity
   clock: Clock
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
@@ -243,24 +243,12 @@ type EntryActions = Readonly<{
   onAsk: (responseId: string, clarification: string | undefined) => void
 }>
 
-function ParticipantIdentity({
-  name,
-  handle,
-  mark,
-  ordinal,
-  status,
-}: {
-  readonly name: string
-  readonly handle: string | undefined
-  readonly mark: string | null
-  readonly ordinal: number | null
-  readonly status?: string | undefined
-}) {
+function IdentityLine({ identity, status }: { readonly identity: ParticipantIdentity; readonly status?: string | undefined }) {
   return (
     <div className={styles.identity}>
-      <Mark mark={mark} ordinal={ordinal} />
-      {handle !== undefined && <span className={styles.handle}>@{handle}</span>}
-      <span className={styles.name}>{name}</span>
+      <Mark mark={identity.mark} ordinal={identity.ordinal} />
+      {identity.handle !== undefined && <span className={styles.handle}>@{identity.handle}</span>}
+      <span className={styles.name}>{identity.displayName}</span>
       {status !== undefined && (
         <>
           <span className={styles.identitySpacer} />
@@ -303,10 +291,7 @@ function Claim({ text }: { readonly text: string }) {
 
 function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
   const {
-    displayName,
-    handle,
-    mark,
-    ordinal,
+    identify,
     clock,
     applying,
     applyDisabled,
@@ -326,7 +311,9 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
         <>
           <p className={styles.message}>{entry.text}</p>
           {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
-          {entry.brought.length > 0 && <RoomChanged names={entry.brought.map(displayName)} castSize={entry.castSize} />}
+          {entry.brought.length > 0 && (
+            <RoomChanged names={entry.brought.map((participantId) => identify(participantId).displayName)} castSize={entry.castSize} />
+          )}
         </>
       )
     case 'concreteChangeRequest':
@@ -334,38 +321,30 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
         <>
           <div className={styles.asked}>
             <span className={styles.askedFacts}>{machineWords('asked')}</span>
-            <span className={styles.askedWords}>{askedText(displayName(entry.target))}</span>
+            <span className={styles.askedWords}>{askedText(identify(entry.target).displayName)}</span>
           </div>
           {entry.clarification !== undefined && <p className={styles.message}>{entry.clarification}</p>}
+          {entry.clarification !== undefined && entry.atMs !== undefined && (
+            <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>
+          )}
         </>
       )
     case 'participantNoComment':
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity
-            name={displayName(entry.participantId)}
-            handle={handle(entry.participantId)}
-            mark={mark(entry.participantId)}
-            ordinal={ordinal(entry.participantId)}
-            status={machineWords('nothing to add')}
-          />
+          <IdentityLine identity={identify(entry.participantId)} status={machineWords('nothing to add')} />
         </div>
       )
     case 'participantFailure':
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity
-            name={displayName(entry.participantId)}
-            handle={handle(entry.participantId)}
-            mark={mark(entry.participantId)}
-            ordinal={ordinal(entry.participantId)}
-          />
+          <IdentityLine identity={identify(entry.participantId)} />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
           <ResponseActions
             responseId={entry.id}
             participantId={entry.participantId}
-            participantName={displayName(entry.participantId)}
+            participantName={identify(entry.participantId).displayName}
             outcome="failed"
             disabled={applyDisabled}
             onApply={onApply}
@@ -382,11 +361,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       const responseSettlement = applied ? undefined : settlement?.responseId === entry.id ? settlement : undefined
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity
-            name={displayName(entry.participantId)}
-            handle={handle(entry.participantId)}
-            mark={mark(entry.participantId)}
-            ordinal={ordinal(entry.participantId)}
+          <IdentityLine
+            identity={identify(entry.participantId)}
             status={
               responseSettlement === undefined
                 ? undefined
@@ -417,7 +393,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             <ResponseActions
               responseId={entry.id}
               participantId={entry.participantId}
-              participantName={displayName(entry.participantId)}
+              participantName={identify(entry.participantId).displayName}
               outcome={applied ? 'applied' : entry.outcome}
               disabled={applyDisabled}
               onApply={onApply}
@@ -445,30 +421,18 @@ function participantStatus(state: DispatchActivitySnapshot['states'][string] | u
 
 function ParticipantFlightLine({
   participantId,
-  displayName,
-  handle,
-  mark,
-  ordinal,
+  identify,
   state,
   nowMs,
 }: {
   readonly participantId: string
-  readonly displayName: (participantId: string) => string
-  readonly handle: (participantId: string) => string | undefined
-  readonly mark: (participantId: string) => string | null
-  readonly ordinal: (participantId: string) => number | null
+  readonly identify: (participantId: string) => ParticipantIdentity
   readonly state: DispatchActivitySnapshot['states'][string] | undefined
   readonly nowMs: number
 }) {
   return (
     <div className={`${styles.participant} ${styles.pending}`}>
-      <ParticipantIdentity
-        name={displayName(participantId)}
-        handle={handle(participantId)}
-        mark={mark(participantId)}
-        ordinal={ordinal(participantId)}
-        status={participantStatus(state, nowMs)}
-      />
+      <IdentityLine identity={identify(participantId)} status={participantStatus(state, nowMs)} />
     </div>
   )
 }
@@ -480,17 +444,14 @@ export function Conversation({
   documents,
   flushDocument,
   room,
-  displayName,
-  handle,
-  mark,
-  ordinal,
+  identify,
   handles,
   interviewer,
   runtime,
   clock,
   onApplied,
-  onApplyingChange = () => {},
-  onConversationIdChange = () => {},
+  onApplyingChange,
+  onConversationIdChange,
   onOpenRoom,
   onOpenConversations,
 }: ConversationProps) {
@@ -523,14 +484,14 @@ export function Conversation({
     onApplyingChange(
       apply.applying !== undefined
         ? {
-            participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName),
+            participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, identify),
             abandon: () => void abandonCurrentAction(),
           }
         : conversation.applyingInRoom
           ? { abandon: () => void abandonCurrentAction() }
           : undefined,
     )
-  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, displayName, onApplyingChange])
+  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, identify, onApplyingChange])
 
   async function abandonCurrentAction(): Promise<void> {
     if (await conversation.abandon()) apply.clear()
@@ -568,13 +529,8 @@ export function Conversation({
     return activity.audience.filter((participantId) => !answered.has(participantId))
   }, [activity, conversation.projection.entries])
   const roomBusy = conversation.busy || apply.applying !== undefined
-  // A dispatch — a message, a reply, or a concrete-change request — is what turns the send
-  // control into stop; an Apply holds the document instead, and abandoning it is the held
-  // banner's control. `activity` is set only once a dispatch is confirmed under way, so the
-  // control never relabels itself during the moment the surface is still learning what, if
-  // anything, the room already has in flight.
   const conversationActionInFlight = activity !== undefined
-  const opening = openingWords(conversation.projection.entries)
+  const opening = conversationName(conversation.projection.entries)
 
   function askAboutChange(): void {
     if (roomBusy) return
@@ -588,7 +544,7 @@ export function Conversation({
   }
 
   function replyEmpty(participantId: string): void {
-    const participantHandle = handle(participantId)
+    const participantHandle = identify(participantId).handle
     if (participantHandle === undefined) return
     const prefix = `@${participantHandle} `
     const next = message.startsWith(prefix) ? message : `${prefix}${message}`
@@ -626,10 +582,7 @@ export function Conversation({
   }
 
   const actions: EntryActions = {
-    displayName,
-    handle,
-    mark,
-    ordinal,
+    identify,
     clock,
     applying: apply.applying,
     applyDisabled: roomBusy,
@@ -665,10 +618,7 @@ export function Conversation({
           <ParticipantFlightLine
             key={participantId}
             participantId={participantId}
-            displayName={displayName}
-            handle={handle}
-            mark={mark}
-            ordinal={ordinal}
+            identify={identify}
             state={activity?.states[participantId]}
             nowMs={nowMs}
           />
@@ -692,9 +642,6 @@ export function Conversation({
           submit()
         }}
         onKeyDown={(event) => {
-          // Placed on the form rather than the textarea itself: the mention combobox's own
-          // handling of Enter runs on the textarea during the same bubble phase, and only by
-          // running after it here does `defaultPrevented` already say whether it claimed the key.
           if (event.key !== 'Enter' || event.shiftKey || event.defaultPrevented) return
           event.preventDefault()
           submit()

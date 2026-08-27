@@ -112,7 +112,9 @@
 
 /* The top bar's height, added back as padding: the first line stays where the author left it. */
 .readingScroll {
+  box-sizing: border-box;
   padding-top: 90px;
+  margin-inline: auto;
 }
 
 .measure {

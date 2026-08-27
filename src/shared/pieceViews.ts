@@ -49,6 +49,7 @@ export type InterviewerView = z.infer<typeof interviewerViewSchema>
 export const surfaceDetailSchema = z
   .object({
     text: z.string(),
+    location: z.string().min(1),
     referenceSchema: z.string().nullable(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),

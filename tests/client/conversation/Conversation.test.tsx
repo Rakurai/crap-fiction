@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApplicationEntryView, ConversationEntryView } from '../../../src/shared/conversationEntryViews.js'
@@ -54,15 +54,14 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       documents={DOCUMENTS}
       flushDocument={() => Promise.resolve({ failed: false })}
       room={roomHolding(entries)}
-      displayName={(id) => NAMES[id] ?? id}
-      handle={(id) => HANDLE_BY_ID[id]}
-      mark={() => null}
-      ordinal={() => null}
+      identify={(id) => ({ displayName: NAMES[id] ?? id, handle: HANDLE_BY_ID[id], mark: null, ordinal: null })}
       handles={HANDLES}
       interviewer={INTERVIEWER}
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
       onApplied={() => Promise.resolve({ failed: false })}
+      onApplyingChange={() => {}}
+      onConversationIdChange={() => {}}
       onOpenRoom={() => {}}
       onOpenConversations={() => {}}
       {...extra}
@@ -116,6 +115,21 @@ describe('a landed response in the conversation', () => {
     expect(block).toContain('Reader Experience')
   })
 
+  it('states a no-comment outcome as one line under the participant that read, carrying nothing to act on', async () => {
+    renderConversation([
+      { id: 'e1', kind: 'participantNoComment', participantId: 'shape', causeId: 'e0' },
+      { id: 'e2', kind: 'participantResponse', participantId: 'editor', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' },
+    ])
+
+    await screen.findByText('It holds.')
+
+    const declined = blockContaining('NOTHING TO ADD')
+    expect(declined.textContent).toContain('@shape')
+    expect(declined.textContent).toContain('Shape')
+    expect(within(declined).queryByRole('button')).toBeNull()
+    expect(within(declined).queryByRole('textbox')).toBeNull()
+  })
+
   it("states a failed call in the machine's register under the participant that did not answer, with whatever came back where anything did", async () => {
     renderConversation([
       { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'e0', reason: 'timeout' },
@@ -142,6 +156,51 @@ describe('a room that cannot be reached', () => {
 
     await screen.findByText('It holds.')
     expect(screen.queryByText('ROOM UNAVAILABLE')).toBeNull()
+  })
+})
+
+describe('a specialist the addressing brought into the room', () => {
+  afterEach(cleanup)
+
+  it('says which one, beside the message that brought it in — and says nothing where addressing changed nothing', async () => {
+    renderConversation([
+      { id: 'e1', kind: 'authorMessage', text: '@reader is this scene too long', audience: ['reader'], brought: ['reader'] },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
+    ])
+
+    await screen.findByText('It runs long.')
+
+    expect(screen.getByText('ROOM CHANGED')).toBeTruthy()
+    expect(screen.getByText('Reader Experience was addressed and is now in the room.')).toBeTruthy()
+
+    cleanup()
+    renderConversation([RESPONSE_WITH_COMMENTARY])
+
+    await screen.findByText('It holds.')
+    expect(screen.queryByText('ROOM CHANGED')).toBeNull()
+  })
+
+  it('counts the room the addressing left behind, in the singular where it holds one specialist', async () => {
+    renderConversation([
+      { id: 'e1', kind: 'authorMessage', text: '@reader and @shape', audience: ['reader', 'shape'], brought: ['reader', 'shape'], castSize: 4 },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
+    ])
+
+    await screen.findByText('It runs long.')
+    expect(
+      screen.getByText('Reader Experience, Shape were addressed and are now in the room. The room holds 4 specialists.'),
+    ).toBeTruthy()
+
+    cleanup()
+    renderConversation([
+      { id: 'e1', kind: 'authorMessage', text: '@reader alone', audience: ['reader'], brought: ['reader'], castSize: 1 },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
+    ])
+
+    await screen.findByText('It runs long.')
+    expect(
+      screen.getByText('Reader Experience was addressed and is now in the room. The room holds 1 specialist.'),
+    ).toBeTruthy()
   })
 })
 

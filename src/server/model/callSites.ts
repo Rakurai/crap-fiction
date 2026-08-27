@@ -1,5 +1,5 @@
 import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
-import type { RoleDefinition } from './roles.js'
+import { markOrdinals, type RoleDefinition } from './roles.js'
 
 export const APPLY_CALL_SITE = 'apply'
 
@@ -53,7 +53,7 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
     }
   }
 
-  const specialistIds = roles.filter((role) => role.eligibility === 'cast').map((role) => role.id)
+  const ordinals = markOrdinals(roles)
 
   return [
     ...roles.map((role) => ({
@@ -62,7 +62,7 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
       displayName: role.displayName,
       description: role.description,
       mark: role.mark,
-      ordinal: role.eligibility === 'cast' ? specialistIds.indexOf(role.id) : null,
+      ordinal: ordinals.get(role.id) ?? null,
     })),
     ...OPERATIONS,
   ]

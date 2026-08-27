@@ -22,13 +22,13 @@ function roomHolding(): RoomAdapters {
   })
 }
 
-const ROSTER = { settled: true, displayName: (id: string) => id, handle: () => undefined, mark: () => null, ordinal: () => null }
+const ROSTER = { settled: true, identify: (id: string) => ({ displayName: id, handle: undefined, mark: null, ordinal: null }) }
 
 const BASE_PROPS = {
   pieceId: 'the-lighthouse',
   title: 'The Lighthouse',
   mode: 'flash',
-  body: { kind: 'prose', surface: 'draft' } as const,
+  body: { kind: 'prose', surface: 'draft', location: 'draft.md' } as const,
   initialText: 'First light.',
   initialConversationId: null,
   initialCast: [],
@@ -76,7 +76,7 @@ describe('a surface mounted on its own, with no other transport standing in for 
     render(
       <EditingSurface
         {...BASE_PROPS}
-        body={{ kind: 'plainText', surface: 'storyContext', referenceSchema: 'Sections, each holding entries.' }}
+        body={{ kind: 'plainText', surface: 'storyContext', location: 'story-context.yaml', referenceSchema: 'Sections, each holding entries.' }}
         initialText="Premise: two cups, one left behind."
       />,
     )

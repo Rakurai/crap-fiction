@@ -5,7 +5,6 @@ import styles from './PieceList.module.css'
 type PieceListProps = {
   readonly pieces: readonly PieceSummary[]
   readonly openedId: string | undefined
-  /** Whether opening a different piece is refused by the one currently open. Never refuses the open piece's own row. */
   readonly leaveBlocked: boolean
   readonly onOpen: (id: string) => void
 }

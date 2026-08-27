@@ -185,9 +185,23 @@ describe('pieces', () => {
     expect(opened).toEqual({
       ...created,
       surfaces: {
-        draft: { text: '', referenceSchema: null, currentConversationId: null, conversations: [], cast },
-        storyContext: { text: '', referenceSchema: flash.storyContextReference, currentConversationId: null, conversations: [], cast: [] },
-        authorContext: { text: '', referenceSchema: AUTHOR_CONTEXT_REFERENCE_FIXTURE, currentConversationId: null, conversations: [], cast: [] },
+        draft: { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], cast },
+        storyContext: {
+          text: '',
+          location: 'story-context.yaml',
+          referenceSchema: flash.storyContextReference,
+          currentConversationId: null,
+          conversations: [],
+          cast: [],
+        },
+        authorContext: {
+          text: '',
+          location: 'config/author-context.yaml',
+          referenceSchema: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
+          currentConversationId: null,
+          conversations: [],
+          cast: [],
+        },
       },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
       interviewer: {

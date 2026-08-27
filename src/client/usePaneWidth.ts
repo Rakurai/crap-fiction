@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-/** Nothing yields until the pane has actually been measured. */
 const UNMEASURED_WIDTH = Number.POSITIVE_INFINITY
 
 export function usePaneWidth<T extends HTMLElement>(): readonly [RefObject<T | null>, number] {
@@ -9,7 +8,7 @@ export function usePaneWidth<T extends HTMLElement>(): readonly [RefObject<T | n
 
   useEffect(() => {
     const el = ref.current
-    if (el === null || typeof ResizeObserver === 'undefined') return
+    if (el === null) return
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry !== undefined) setWidth(Math.round(entry.contentRect.width))

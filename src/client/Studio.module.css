@@ -5,23 +5,3 @@
   display: flex;
 }
 
-.pair {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  background: var(--bg);
-}
-
-.documentPane {
-  flex: 1 1 760px;
-  min-width: 440px;
-  background: var(--prose);
-}
-
-.conversationPane {
-  flex: 0 1 520px;
-  width: 520px;
-  min-width: 340px;
-  background: var(--paper);
-  border-left: 1px solid var(--rule);
-}

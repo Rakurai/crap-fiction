@@ -20,7 +20,6 @@ export type ApplyAdapters = Readonly<{
 
 export type ApplyingResponse = Readonly<{ responseId: string }>
 
-/** Which of the two the author needs told apart when deciding whether to try again. */
 export type ApplySettlement = Readonly<
   | { readonly kind: 'failed'; readonly responseId: string; readonly reason: FailureReason; readonly returned: string | undefined }
   | { readonly kind: 'abandoned'; readonly responseId: string }
@@ -168,9 +167,6 @@ export function useApply(
     })
   }
 
-  // The author's own act of stopping an Apply in flight, distinct from the model reporting one of
-  // its own outcomes above: what the document is left in is identical, but this one stamps
-  // "abandoned" rather than "failed" because the author did it rather than the machine breaking.
   function clear(): void {
     if (applying !== undefined) setSettlement({ kind: 'abandoned', responseId: applying.responseId })
     startedHere.current = false

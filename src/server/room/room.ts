@@ -340,6 +340,7 @@ export class Room {
         target: response.participantId,
         respondingTo: opening.respondingTo,
         clarification: opening.clarification,
+        atMs: startedAt,
       }
     }
 

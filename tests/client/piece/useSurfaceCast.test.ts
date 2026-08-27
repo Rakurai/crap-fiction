@@ -23,7 +23,7 @@ const SHAPE = member('shape', false)
 const READER = member('reader', false)
 
 function surface(cast: readonly CastMemberView[]): SurfaceDetail {
-  return { text: '', referenceSchema: null, currentConversationId: null, conversations: [], cast }
+  return { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], cast }
 }
 
 function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail> {

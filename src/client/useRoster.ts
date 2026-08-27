@@ -1,12 +1,16 @@
 import type { fetchCallSites as fetchCallSitesFn } from './callSitesClient.js'
 import { useLoaded } from './load.js'
 
+export type ParticipantIdentity = Readonly<{
+  displayName: string
+  handle: string | undefined
+  mark: string | null
+  ordinal: number | null
+}>
+
 export type RosterViewModel = Readonly<{
   settled: boolean
-  displayName: (participantId: string) => string
-  handle: (participantId: string) => string | undefined
-  mark: (participantId: string) => string | null
-  ordinal: (participantId: string) => number | null
+  identify: (participantId: string) => ParticipantIdentity
 }>
 
 export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewModel {
@@ -15,9 +19,14 @@ export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewMo
 
   return {
     settled: sites.kind !== 'loading',
-    displayName: (participantId) => named.find((site) => site.site === participantId)?.displayName ?? participantId,
-    handle: (participantId) => named.find((site) => site.site === participantId)?.handle ?? undefined,
-    mark: (participantId) => named.find((site) => site.site === participantId)?.mark ?? null,
-    ordinal: (participantId) => named.find((site) => site.site === participantId)?.ordinal ?? null,
+    identify: (participantId) => {
+      const site = named.find((candidate) => candidate.site === participantId)
+      return {
+        displayName: site?.displayName ?? participantId,
+        handle: site?.handle ?? undefined,
+        mark: site?.mark ?? null,
+        ordinal: site?.ordinal ?? null,
+      }
+    },
   }
 }

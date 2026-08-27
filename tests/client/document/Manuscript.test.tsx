@@ -34,6 +34,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       mode={props.mode}
       onOpenPieces={props.onOpenPieces}
       onOpenModels={props.onOpenModels}
+      location="draft.md"
       manuscript={manuscript}
       autosave={autosave}
       onSwitchTo={props.onSwitchTo}
@@ -143,11 +144,6 @@ describe('the manuscript while a save is failing', () => {
     vi.useRealTimers()
   })
 
-  /**
-   * That a standing failure is what blocks switching to another piece is `closePiece.test.ts`'s
-   * claim, and that it blocks from any surface is `OpenedPiece.test.tsx`'s. What the manuscript
-   * owns is the register the failure is stated in, and that it is gone the moment a write succeeds.
-   */
   it('says what the machine said, as a statement asking nothing, and takes it back once a write succeeds', async () => {
     saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
     renderManuscript({ draft: 'First light.' })

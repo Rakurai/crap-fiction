@@ -20,11 +20,6 @@ export type RoomEvent =
 export type ConversationProjection = Readonly<{
   entries: readonly ConversationEntryView[]
   activity: DispatchActivitySnapshot | undefined
-  /**
-   * Application entries appended while this projection was live, as against ones a conversation
-   * fetch loaded as history — the distinction a disclosure needs to open only on the author's own
-   * act of applying, never on a reload finding the same entry already on file.
-   */
   freshApplicationIds: ReadonlySet<string>
 }>
 

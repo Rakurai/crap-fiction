@@ -1,12 +1,14 @@
 import { EditorContent } from '@tiptap/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { SurfaceId } from '../shared/surfaces.js'
 import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
+import type { ApplyingHold } from './useConversationSession.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
+import { usePaneWidth } from './usePaneWidth.js'
 
 type ManuscriptProps = {
   readonly title: string
@@ -14,10 +16,11 @@ type ManuscriptProps = {
   readonly onOpenPieces: () => void
   readonly onOpenModels: () => void
   readonly manuscript: ManuscriptViewModel
+  readonly location: string
   readonly autosave: AutosaveViewModel
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName?: string; readonly abandon: () => void } | undefined
+  readonly applying: ApplyingHold | undefined
 }
 
 export function Manuscript({
@@ -26,12 +29,19 @@ export function Manuscript({
   onOpenPieces,
   onOpenModels,
   manuscript,
+  location,
   autosave,
   onSwitchTo,
   lifecycle,
   applying,
 }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
+  const [paneRef, paneWidth] = usePaneWidth<HTMLDivElement>()
+  const [widthBesideConversation, setWidthBesideConversation] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (!reading && Number.isFinite(paneWidth)) setWidthBesideConversation(paneWidth)
+  }, [reading, paneWidth])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -47,7 +57,7 @@ export function Manuscript({
   }, [manuscript.editor, reading, applying])
 
   return (
-    <div className={styles.wrapper}>
+    <div ref={paneRef} className={styles.wrapper}>
       {!reading && (
         <DocumentHeader
           onOpenPieces={onOpenPieces}
@@ -71,7 +81,7 @@ export function Manuscript({
         </p>
       )}
 
-      {!reading && applying !== undefined && (
+      {applying !== undefined && (
         <div className={styles.applyingBanner}>
           <span className={styles.applyingBannerFacts}>READ-ONLY</span>
           <span className={styles.applyingBannerWords}>
@@ -86,6 +96,7 @@ export function Manuscript({
       <div
         ref={manuscript.containerRef}
         className={reading ? `${styles.scroll} ${styles.readingScroll}` : styles.scroll}
+        style={reading && widthBesideConversation !== undefined ? { maxWidth: widthBesideConversation } : undefined}
       >
         <div className={styles.measure}>
           {reading && <h1 className={styles.readingTitle}>{title}</h1>}
@@ -111,7 +122,7 @@ export function Manuscript({
         <div className={styles.saveFailed}>
           <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            The last write to draft.md failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            The last write to {location} failed. Nothing has been discarded — keep writing. Leaving for another piece is
             unavailable while “{title}” is unsaved.
           </p>
           <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>

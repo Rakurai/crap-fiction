@@ -1,14 +1,20 @@
+import { z } from 'zod'
+
 const STORAGE_KEY = 'crap-fiction.disclosedApplications'
+
+const disclosedSchema = z.array(z.string().min(1)).readonly()
 
 function readDisclosed(): ReadonlySet<string> {
   const raw = sessionStorage.getItem(STORAGE_KEY)
-  return new Set(raw === null ? [] : (JSON.parse(raw) as readonly string[]))
+  if (raw === null) return new Set()
+  try {
+    const parsed = disclosedSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? new Set(parsed.data) : new Set()
+  } catch {
+    return new Set()
+  }
 }
 
-/**
- * Whether an applied change's before-and-after is disclosed, surviving a reload: an application
- * id is unique for life, so a stale "open" entry from an earlier applied change never resurfaces.
- */
 export function isChangeDisclosed(applicationId: string): boolean {
   return readDisclosed().has(applicationId)
 }

@@ -63,6 +63,10 @@ export type RoleDefinition = Readonly<{
   function: DeclaredFunction | undefined
 }>
 
+export function markOrdinals(roles: readonly RoleDefinition[]): ReadonlyMap<string, number> {
+  return new Map(roles.filter((role) => role.eligibility !== 'generalist').map((role, ordinal) => [role.id, ordinal]))
+}
+
 export class GeneralistCardinalityError extends Error {
   constructor(found: readonly string[]) {
     const where = found.length > 0 ? ` (${found.join(', ')})` : ''

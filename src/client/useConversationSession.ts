@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+export type ApplyingHold = Readonly<{ participantName?: string; abandon: () => void }>
+
 /** The author context's conversation selection: global client state, so a piece switch never resets it. */
 export type AuthorContextSelection = Readonly<{ value: string | null | undefined; onChange: (conversationId: string | null) => void }>
 
@@ -19,7 +21,7 @@ export function useConversationSession(initialConversationId: string | null, glo
   const [localConversationId, setLocalConversationId] = useState<string | null>(initialConversationId)
   const activeConversationId = global === undefined ? localConversationId : global.value === undefined ? initialConversationId : global.value
   const [session, setSession] = useState(0)
-  const [applying, setApplying] = useState<Readonly<{ participantName?: string; abandon: () => void }> | undefined>(undefined)
+  const [applying, setApplying] = useState<ApplyingHold | undefined>(undefined)
 
   const setActiveConversationId = global === undefined ? setLocalConversationId : global.onChange
 

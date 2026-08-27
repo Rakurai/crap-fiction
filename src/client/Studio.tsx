@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { assignModel, fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import { EmptyPair } from './EmptyPair.js'
 import { ModelsWindow } from './ModelsWindow.js'
 import { OpenedPiece, type CallSiteAdapters } from './OpenedPiece.js'
 import { fetchPiece, saveSurfaceDocument, updatePiece } from './piecesClient.js'
@@ -25,8 +26,6 @@ type StudioProps = {
   readonly workspace: string
 }
 
-// The studio's own transports, wired where the piece the author opened is chosen, so nothing
-// inside an open piece reaches for one itself.
 const PIECE_ADAPTERS: PieceAdapters = { fetchPiece, updatePiece }
 const CALL_SITE_ADAPTERS: CallSiteAdapters = { fetchCallSites, fetchRuntimeStatus }
 const ROOM_ADAPTERS: RoomAdapters = {
@@ -41,11 +40,6 @@ const ROOM_ADAPTERS: RoomAdapters = {
   saveDocument: saveSurfaceDocument,
 }
 
-/**
- * The studio pair — the document and its conversation — is the only thing this ever renders in
- * place of another: no piece open draws both panes empty, and the pieces window arrives over
- * whichever of those is current, on its own ground, leaving without disturbing either.
- */
 export function Studio({ workspace }: StudioProps) {
   const theme = useTheme()
   const callSites = useCallSites({ fetchCallSites, fetchRuntimeStatus, assignModel })
@@ -56,9 +50,6 @@ export function Studio({ workspace }: StudioProps) {
   const [showModels, setShowModels] = useState(false)
   const [switchTargetId, setSwitchTargetId] = useState<string | undefined>(undefined)
   const [leaveBlocked, setLeaveBlocked] = useState(false)
-  // Outlives any one opened piece, so the author-context conversation the author is in stays
-  // selected across a piece switch. `undefined` until the author has picked one this session —
-  // until then, each opened piece falls back to whichever global conversation it last opened with.
   const [authorContextConversationId, setAuthorContextConversationId] = useState<string | null | undefined>(undefined)
 
   const openPieces = useCallback(() => {
@@ -93,10 +84,7 @@ export function Studio({ workspace }: StudioProps) {
   return (
     <div className={styles.studio}>
       {openedId === undefined ? (
-        <div className={styles.pair}>
-          <div className={styles.documentPane} />
-          <div className={styles.conversationPane} />
-        </div>
+        <EmptyPair state={{ kind: 'empty' }} />
       ) : (
         <OpenedPiece
           id={openedId}

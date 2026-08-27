@@ -21,6 +21,7 @@ import {
   readConversationEntries,
   readPiece,
   readStoryContext,
+  SURFACE_LOCATIONS,
   writePieceCast,
   writePieceDetails,
   writePieceMetadata,
@@ -156,10 +157,11 @@ function surfaceDetail(
   const available = catalog.specialistsFor(piece.metadata.mode, surface)
   return {
     text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
+    location: SURFACE_LOCATIONS[surface],
     referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
-    cast: castView(available, piece.metadata.cast[surface], catalog.specialistOrdinals),
+    cast: castView(available, piece.metadata.cast[surface], catalog.markOrdinals),
   }
 }
 
@@ -199,7 +201,7 @@ export async function setPieceCast(
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
   await writePieceCast(workspaceDir, id, surface, cast)
-  return castView(available, cast, catalog.specialistOrdinals)
+  return castView(available, cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(

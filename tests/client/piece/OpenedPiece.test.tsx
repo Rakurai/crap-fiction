@@ -15,6 +15,7 @@ const PIECE: PieceDetail = {
   modified: 1_700_000_000_000,
   surfaces: {
     draft: {
+      location: 'draft.md',
       text: 'First light of the day.',
       referenceSchema: null,
       currentConversationId: 'd1',
@@ -25,6 +26,7 @@ const PIECE: PieceDetail = {
       cast: [],
     },
     storyContext: {
+      location: 'story-context.yaml',
       text: 'Premise: two cups, one left behind.',
       referenceSchema: 'Sections, each holding entries.',
       currentConversationId: null,
@@ -32,6 +34,7 @@ const PIECE: PieceDetail = {
       cast: [],
     },
     authorContext: {
+      location: 'config/author-context.yaml',
       text: '',
       referenceSchema: 'What this test calls the author-context reference; the studio\'s own wording is the server\'s.',
       currentConversationId: null,
@@ -201,10 +204,8 @@ describe('a failed save on one document', () => {
     fireEvent.change(screen.getByLabelText('Story context'), { target: { value: 'Premise: two cups, one chipped.' } })
     await settle()
 
-    // Story context's own write succeeded, so only draft's document carries a failure notice.
     expect(screen.getAllByText('EACCES: PERMISSION DENIED')).toHaveLength(1)
     expect((screen.getByLabelText('Story context') as HTMLTextAreaElement).value).toBe('Premise: two cups, one chipped.')
-    // Draft's failure still blocks a switch, from whichever surface is showing.
     expect(onLeaveBlockedChange).toHaveBeenLastCalledWith(true)
 
     switchToDraft()

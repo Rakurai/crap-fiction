@@ -57,7 +57,6 @@
   gap: 18px;
 }
 
-/* The author's own words: marked as theirs by a bracketing rule, not by faintness. */
 .message {
   font: 400 13.5px/1.6 var(--font-prose);
   color: var(--ink);
@@ -138,7 +137,6 @@
   color: var(--ink2);
 }
 
-/* A specialist's claim is prose, and any sentence arguing about prose belongs beside it. */
 .claim {
   font: 400 15px/1.55 var(--font-prose);
   color: var(--ink);
@@ -171,7 +169,6 @@
   color: var(--ink2);
 }
 
-/* A specialist's note is the studio's own elaboration, not the prose it is judging. */
 .note {
   font: 400 13px/1.6 var(--font-ui);
   color: var(--ink2);

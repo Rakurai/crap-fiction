@@ -23,10 +23,10 @@ test('the composer asks for a question on every surface, and the same words can 
 
   await askForAQuestion(page)
 
-  await control(page, 'story context').click()
+  await control(page, 'story').click()
   await askForAQuestion(page)
 
-  await control(page, 'author context').click()
+  await control(page, 'author').click()
   await askForAQuestion(page)
 
   // The control composes a message, so the mention it sends is one the composer offers on its own.

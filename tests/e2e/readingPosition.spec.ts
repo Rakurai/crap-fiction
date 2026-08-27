@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { control, manuscript, openPiece, writeThroughSource } from './studio.js'
+import { manuscript, openPiece, paneControl, writeThroughSource } from './studio.js'
 
 const LONG_MANUSCRIPT = Array.from(
   { length: 40 },
@@ -39,11 +39,32 @@ test('the reading view keeps the place the author was reading, and gives it back
     return Math.abs((await readingRatio(page)) - before)
   }
 
-  await control(page, 'reading').click()
-  await expect(control(page, 'reading')).toBeHidden()
+  await paneControl(page, 'reading', 'read').click()
+  await expect(paneControl(page, 'reading', 'read')).toBeHidden()
   await expect.poll(drift).toBeLessThan(TOLERANCE)
 
   await page.keyboard.press('Escape')
-  await expect(control(page, 'reading')).toBeVisible()
+  await expect(paneControl(page, 'reading', 'read')).toBeVisible()
   await expect.poll(drift).toBeLessThan(TOLERANCE)
+})
+
+const MEASURE_CEILING = 620
+
+const WINDOW_WHERE_THE_PANE_IS_UNDER_THE_MEASURE_CEILING = { width: 1100, height: 720 }
+
+test('the reading view holds the measure the prose was already set to, so no line breaks anywhere else', async ({ page }) => {
+  await page.setViewportSize(WINDOW_WHERE_THE_PANE_IS_UNDER_THE_MEASURE_CEILING)
+  await openPiece(page, 'Reading Measure')
+
+  const editor = manuscript(page)
+  await editor.click()
+  await page.keyboard.type(LONG_MANUSCRIPT.slice(0, 400))
+
+  const beside = await editor.evaluate((node) => node.clientWidth)
+  expect(beside).toBeLessThan(MEASURE_CEILING)
+
+  await paneControl(page, 'reading', 'read').click()
+  await expect(paneControl(page, 'reading', 'read')).toBeHidden()
+
+  expect(await editor.evaluate((node) => node.clientWidth)).toBe(beside)
 })

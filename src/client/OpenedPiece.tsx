@@ -7,6 +7,7 @@ import type { fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRun
 import { closePiece } from './closePiece.js'
 import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
 import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
+import { EmptyPair } from './EmptyPair.js'
 import { useLoaded } from './load.js'
 import styles from './OpenedPiece.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
@@ -24,11 +25,6 @@ export type CallSiteAdapters = Readonly<{
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
 }>
 
-/**
- * A request, from the pieces window, to leave this piece for another. `targetId` changes each time
- * the author asks; `onSettled` is called once with whether the request was blocked, after every
- * surface's document has been flushed and waited on.
- */
 export type PieceSwitchRequest = Readonly<{
   targetId: string | undefined
   onSettled: (blocked: boolean) => void
@@ -48,8 +44,8 @@ type OpenedPieceProps = {
 }
 
 function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfig {
-  if (surface === 'draft') return { kind: 'prose', surface }
-  return { kind: 'plainText', surface, referenceSchema: piece.surfaces[surface].referenceSchema }
+  if (surface === 'draft') return { kind: 'prose', surface, location: piece.surfaces[surface].location }
+  return { kind: 'plainText', surface, location: piece.surfaces[surface].location, referenceSchema: piece.surfaces[surface].referenceSchema }
 }
 
 /**
@@ -117,10 +113,6 @@ function Surfaces({
     onLeaveBlockedChange(leaveBlocked)
   }, [leaveBlocked, onLeaveBlockedChange])
 
-  // Switching to another piece is a coordinated lifecycle rather than an unmount cleanup: every
-  // surface's document is flushed and awaited first, because a failed write is the one thing that
-  // keeps this piece open. `closing` folds into `leaveBlocked` for as long as this is waiting, so a
-  // second request cannot start while one is already in flight.
   const targetId = switchRequest.targetId
   useEffect(() => {
     if (targetId === undefined) return
@@ -184,8 +176,6 @@ export function OpenedPiece({
 }: OpenedPieceProps) {
   const piece = usePiece(id, pieceAdapters)
 
-  // Nothing here has a document to flush, so a piece still loading or failed to load never blocks
-  // a switch, and never has anything to report as blocking one.
   useEffect(() => {
     if (piece.status === 'ready') return
     onLeaveBlockedChange(false)
@@ -213,17 +203,5 @@ export function OpenedPiece({
     )
   }
 
-  return (
-    <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={onOpenPieces}>
-        ‹ pieces
-      </button>
-      {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}
-      {piece.status === 'error' && (
-        <p className={styles.error} role="alert">
-          {piece.message}
-        </p>
-      )}
-    </div>
-  )
+  return <EmptyPair state={piece.status === 'error' ? { kind: 'failed', message: piece.message } : { kind: 'opening' }} />
 }

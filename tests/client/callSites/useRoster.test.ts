@@ -20,9 +20,8 @@ describe('useRoster', () => {
 
     await waitFor(() => expect(result.current.settled).toBe(true))
 
-    expect(result.current.displayName('shape')).toBe('Shape')
-    expect(result.current.handle('shape')).toBe('shape')
-    expect(result.current.handle('apply')).toBeUndefined()
-    expect(result.current.displayName('retired')).toBe('retired')
+    expect(result.current.identify('shape')).toEqual({ displayName: 'Shape', handle: 'shape', mark: 'SH', ordinal: 0 })
+    expect(result.current.identify('apply')).toEqual({ displayName: 'Apply', handle: undefined, mark: null, ordinal: null })
+    expect(result.current.identify('retired')).toEqual({ displayName: 'retired', handle: undefined, mark: null, ordinal: null })
   })
 })
