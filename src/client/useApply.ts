@@ -47,10 +47,20 @@ export function useApply(
   const [settlement, setSettlement] = useState<ApplySettlement | undefined>(undefined)
   const startedHere = useRef(false)
   const resumingApplication = useRef<string | undefined>(undefined)
+  const mounted = useRef(true)
+  const applyController = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => {
+    return () => {
+      mounted.current = false
+      applyController.current?.abort()
+    }
+  }, [])
 
   function stop(message: string | undefined): void {
     startedHere.current = false
     resumingApplication.current = undefined
+    if (!mounted.current) return
     setApplying(undefined)
     if (message !== undefined) setError(message)
   }
@@ -60,14 +70,14 @@ export function useApply(
     stop(message)
   }
 
-  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string): Promise<void> {
+  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string, signal: AbortSignal): Promise<void> {
     const saved = await install(replacement)
     if (saved.failed) {
       await stopAndAbandon(cid, actionId, saved.message)
       return
     }
 
-    const confirmed = await confirmApplication(pieceId, surface, cid, applicationId)
+    const confirmed = await confirmApplication(pieceId, surface, cid, applicationId, signal)
     if (confirmed.outcome !== 'value') {
       await stopAndAbandon(cid, actionId, failureMessage(confirmed))
       return
@@ -87,15 +97,16 @@ export function useApply(
     resumingApplication.current = applicationId
 
     let active = true
+    const controller = new AbortController()
 
     async function resume(): Promise<void> {
-      const result = await retrievePendingApply(pieceId, surface, cid, applicationId)
+      const result = await retrievePendingApply(pieceId, surface, cid, applicationId, controller.signal)
       if (!active) return
       if (result.outcome !== 'value') {
         await stopAndAbandon(cid, actionId, failureMessage(result))
         return
       }
-      await installAndConfirm(cid, actionId, applicationId, result.value.replacement)
+      await installAndConfirm(cid, actionId, applicationId, result.value.replacement, controller.signal)
     }
 
     void resume().catch((err: unknown) => {
@@ -105,6 +116,7 @@ export function useApply(
 
     return () => {
       active = false
+      controller.abort()
       if (resumingApplication.current === applicationId) resumingApplication.current = undefined
     }
   }, [resumed, conversationId])
@@ -116,9 +128,11 @@ export function useApply(
     setError(undefined)
     setSettlement(undefined)
     setApplying({ responseId })
+    const controller = new AbortController()
+    applyController.current = controller
 
     async function run(): Promise<void> {
-      const result = await applyRecommendation(pieceId, surface, cid, responseId, getDocuments(), constraint)
+      const result = await applyRecommendation(pieceId, surface, cid, responseId, getDocuments(), constraint, controller.signal)
       if (result.outcome !== 'value') {
         stop(failureMessage(result))
         return
@@ -130,17 +144,17 @@ export function useApply(
         return
       }
       if (outcome.outcome === 'abandoned') {
-        setSettlement({ kind: 'abandoned', responseId })
+        if (mounted.current) setSettlement({ kind: 'abandoned', responseId })
         stop(undefined)
         return
       }
       if (outcome.outcome === 'failed') {
-        setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
+        if (mounted.current) setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
         stop(undefined)
         return
       }
 
-      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement)
+      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement, controller.signal)
     }
 
     void run().catch((err: unknown) => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import type { assignModel as assignModelFn, fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRuntimeStatusFn } from './callSitesClient.js'
@@ -35,6 +35,9 @@ export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
   const [assigning, setAssigning] = useState<string | undefined>(undefined)
   const [saved, setSaved] = useState<string | undefined>(undefined)
   const [assignError, setAssignError] = useState<string | undefined>(undefined)
+  const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   useEffect(() => {
     if (saved === undefined) return
@@ -43,9 +46,14 @@ export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
   }, [saved])
 
   const assign = useCallback((site: string, model: string) => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setAssigning(site)
     setAssignError(undefined)
-    void assignModel(site, model).then((result) => {
+    void assignModel(site, model, controller.signal).then((result) => {
+      if (controllerRef.current !== controller) return
+      controllerRef.current = undefined
       setAssigning(undefined)
       if (result.outcome === 'value') {
         const { assignment } = result.value

@@ -107,7 +107,7 @@ describe('merging the conversation on disk with the one being streamed', () => {
       await result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1', expect.any(AbortSignal))
     expect(result.current.busy).toBe(false)
     expect(result.current.applyingInRoom).toBe(false)
   })
@@ -210,7 +210,7 @@ describe('abandoning an operation', () => {
       result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1', expect.any(AbortSignal))
 
     const idle = roomAsked(null, letsGo())
     const { result: nothingInFlight } = renderHook(() => useConversation('the-lighthouse', 'draft', null, NOOP_FLUSH, () => DOCUMENTS, idle))
@@ -263,7 +263,7 @@ describe('abandoning an operation', () => {
       await result.current.abandon()
     })
 
-    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1')
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1', expect.any(AbortSignal))
     expect(result.current.applyingInRoom).toBe(false)
     expect(result.current.busy).toBe(false)
   })

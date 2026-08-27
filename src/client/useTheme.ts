@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Theme } from '../shared/theme.js'
 import { useLoaded } from './load.js'
 import { failureMessage } from './request.js'
@@ -14,6 +14,9 @@ export type ThemeViewModel = {
 export function useTheme(): ThemeViewModel {
   const [load, setLoad] = useLoaded(fetchTheme, [])
   const [chooseError, setChooseError] = useState<string | undefined>(undefined)
+  const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   const theme = load.kind === 'ready' ? load.value.theme : undefined
 
@@ -27,8 +30,13 @@ export function useTheme(): ThemeViewModel {
   }, [theme])
 
   const choose = useCallback((next: Theme) => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setChooseError(undefined)
-    void chooseTheme(next).then((result) => {
+    void chooseTheme(next, controller.signal).then((result) => {
+      if (controllerRef.current !== controller) return
+      controllerRef.current = undefined
       if (result.outcome === 'value') {
         setLoad({ kind: 'ready', value: { theme: result.value.theme } })
         return

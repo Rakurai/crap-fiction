@@ -43,7 +43,7 @@ describe('installing a pending Apply result', () => {
 
     expect(install).toHaveBeenCalledOnce()
     expect(install).toHaveBeenCalledWith('the applied text')
-    expect(room.confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(room.confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1', expect.any(AbortSignal))
     expect(abandonAction).not.toHaveBeenCalled()
     await waitFor(() => expect(result.current.applying).toBeUndefined())
     expect(result.current.error).toBeUndefined()
@@ -112,10 +112,10 @@ describe('resuming a pending Apply the room reported already in flight on reconn
     expect(result.current.applying).toEqual({ responseId: 'e1' })
     await waitFor(() => expect(room.confirmApplication).toHaveBeenCalled())
 
-    expect(room.retrievePendingApply).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(room.retrievePendingApply).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1', expect.any(AbortSignal))
     expect(room.applyRecommendation).not.toHaveBeenCalled()
     expect(install).toHaveBeenCalledWith('the resumed text')
-    expect(room.confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1')
+    expect(room.confirmApplication).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'app1', expect.any(AbortSignal))
     await waitFor(() => expect(result.current.applying).toBeUndefined())
     expect(result.current.error).toBeUndefined()
   })

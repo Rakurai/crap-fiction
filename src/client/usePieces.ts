@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModeSummary } from '../shared/modeViews.js'
 import type { PieceSummary } from '../shared/pieceViews.js'
 import { useLoaded } from './load.js'
@@ -23,11 +23,19 @@ export function usePieces(refreshKey?: unknown): PiecesViewModel {
   const [modes] = useLoaded(fetchModes, [])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | undefined>(undefined)
+  const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   const create = useCallback((title: string, mode: string) => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setCreating(true)
     setCreateError(undefined)
-    void createPiece(title, mode).then((result) => {
+    void createPiece(title, mode, controller.signal).then((result) => {
+      if (controllerRef.current !== controller) return
+      controllerRef.current = undefined
       setCreating(false)
       if (result.outcome === 'value') {
         const piece = result.value

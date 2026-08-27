@@ -193,6 +193,15 @@ export function useConversation(
     error: undefined,
   })
   const abandoningRef = useRef(false)
+  const mounted = useRef(true)
+  const actionController = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => {
+    return () => {
+      mounted.current = false
+      actionController.current?.abort()
+    }
+  }, [])
   // Held rather than read from the prop: this hook mints an id on a fresh conversation's first
   // dispatch and reports it upward, and depending on the prop would rebuild the event stream in the
   // moment that dispatch is opening. The author switching is a remount, not a changed prop.
@@ -200,9 +209,10 @@ export function useConversation(
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
 
     if (openedWithConversationId !== null) {
-      void fetchConversation(pieceId, surface, openedWithConversationId).then((result) => {
+      void fetchConversation(pieceId, surface, openedWithConversationId, controller.signal).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
           update({ type: 'entriesRead', entries: result.value.entries })
@@ -239,6 +249,7 @@ export function useConversation(
 
     return () => {
       active = false
+      controller.abort()
       unsubscribe()
     }
   }, [pieceId, surface, openedWithConversationId])
@@ -249,11 +260,14 @@ export function useConversation(
     if (roomBusy) return
     void flushDocument()
     update({ type: 'opening' })
+    const controller = new AbortController()
+    actionController.current = controller
 
     async function run(): Promise<void> {
       let conversationId = state.mine
       if (conversationId === null) {
-        const created = await createConversation(pieceId, surface)
+        const created = await createConversation(pieceId, surface, controller.signal)
+        if (!mounted.current) return
         if (created.outcome !== 'value') {
           update({ type: 'stopped', message: failureMessage(created) })
           return
@@ -262,11 +276,13 @@ export function useConversation(
         update({ type: 'minted', conversationId })
       }
 
-      const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments())
+      const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments(), controller.signal)
+      if (!mounted.current) return
       if (result.outcome !== 'value') update({ type: 'stopped', message: failureMessage(result) })
     }
 
     void run().catch((err: unknown) => {
+      if (!mounted.current) return
       update({ type: 'stopped', message: err instanceof Error ? err.message : UNSENT })
     })
   }
@@ -286,8 +302,11 @@ export function useConversation(
   async function abandonAction(conversationId: string, actionId: string, after: string | undefined): Promise<boolean> {
     if (abandoningRef.current) return false
     abandoningRef.current = true
-    const result = await abandonOperation(pieceId, surface, conversationId, actionId)
+    const controller = new AbortController()
+    actionController.current = controller
+    const result = await abandonOperation(pieceId, surface, conversationId, actionId, controller.signal)
     abandoningRef.current = false
+    if (!mounted.current) return false
     const unfreed = failureMessage(result)
     if (unfreed !== undefined) {
       update({ type: 'reported', message: after === undefined ? unfreed : `${after} — ${unfreed}` })

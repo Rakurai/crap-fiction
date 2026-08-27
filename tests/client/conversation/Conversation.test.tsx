@@ -274,6 +274,7 @@ describe('the applied change, shown on its originating response', () => {
         'c1',
         { message: 'Take a look at the change I just made and tell me what you think.' },
         DOCUMENTS,
+        expect.any(AbortSignal),
       ),
     )
   })
@@ -295,6 +296,7 @@ describe('the applied change, shown on its originating response', () => {
         'c1',
         { message: `@${INTERVIEWER.handle} ${INTERVIEWER.invocation}` },
         DOCUMENTS,
+        expect.any(AbortSignal),
       ),
     )
   })
@@ -335,7 +337,7 @@ describe('replying to a response', () => {
     fireEvent.click(screen.getByRole('button', { name: 'reply' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { target: 'shape', message: 'say more about that' }, DOCUMENTS),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { target: 'shape', message: 'say more about that' }, DOCUMENTS, expect.any(AbortSignal)),
     )
     expect((field as HTMLInputElement).value).toBe('')
 
@@ -369,7 +371,7 @@ describe('asking for a concrete change', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'ask for a concrete change' }))
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: undefined }, DOCUMENTS),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: undefined }, DOCUMENTS, expect.any(AbortSignal)),
     )
 
     cleanup()
@@ -380,7 +382,7 @@ describe('asking for a concrete change', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ask for a concrete change' }))
 
     await waitFor(() =>
-      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, DOCUMENTS),
+      expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { respondingTo: 'e0', clarification: 'what would you cut' }, DOCUMENTS, expect.any(AbortSignal)),
     )
   })
 
@@ -414,7 +416,7 @@ describe('one response-local field shared by every action on the response', () =
     fireEvent.change(field, { target: { value: 'keep the last line' } })
     fireEvent.click(screen.getByRole('button', { name: 'apply' }))
 
-    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, 'keep the last line'))
+    await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, 'keep the last line', expect.any(AbortSignal)))
   })
 })
 
@@ -467,7 +469,7 @@ describe('sending from the keyboard', () => {
     expect(dispatch).not.toHaveBeenCalled()
 
     expect(fireEvent.keyDown(composer, { key: 'Enter' })).toBe(false)
-    await waitFor(() => expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { message: 'a message' }, DOCUMENTS))
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { message: 'a message' }, DOCUMENTS, expect.any(AbortSignal)))
   })
 })
 

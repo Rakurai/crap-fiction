@@ -14,8 +14,10 @@ export function useLoaded<T>(
 
   useEffect(() => {
     const controller = new AbortController()
+    let active = true
     setState({ kind: 'loading' })
     void load(controller.signal).then((result) => {
+      if (!active) return
       if (result.outcome === 'value') {
         setState({ kind: 'ready', value: result.value })
         return
@@ -23,7 +25,10 @@ export function useLoaded<T>(
       const message = failureMessage(result)
       if (message !== undefined) setState({ kind: 'error', message })
     })
-    return () => controller.abort()
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, deps)
 
   return [state, setState]
