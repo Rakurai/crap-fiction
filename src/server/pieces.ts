@@ -276,6 +276,27 @@ export async function deleteConversation(
   await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
+export class PieceStore {
+  readonly #dataRoot: string
+
+  constructor(dataRoot: string) {
+    this.#dataRoot = dataRoot
+  }
+
+  detail(workspaceDir: string, id: string, catalog: ShippedContentCatalog): PieceDetail {
+    return getPiece(this.#dataRoot, workspaceDir, id, catalog)
+  }
+
+  conversation(workspaceDir: string, pieceId: string, surface: SurfaceId, conversationId: string): EntryConversationView {
+    return getConversation(this.#dataRoot, workspaceDir, pieceId, surface, conversationId)
+  }
+
+  async update(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<PieceDetail> {
+    await updatePiece(workspaceDir, id, catalog, changes)
+    return this.detail(workspaceDir, id, catalog)
+  }
+}
+
 export class PieceDocumentWriter {
   readonly #draft: DraftStore
   readonly #storyContext: StoryContextStore

@@ -1,12 +1,14 @@
 import type { Hono } from 'hono'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
+import { InterfaceTheme } from '../../src/server/interfaceTheme.js'
 import { createLogger } from '../../src/server/logger.js'
+import { CallSiteAssignments } from '../../src/server/model/assignments.js'
 import type { Charter } from '../../src/server/model/charter.js'
 import type { Fragment, PromptFragments } from '../../src/server/model/prompts.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { PieceDocumentWriter } from '../../src/server/pieces.js'
+import { PieceDocumentWriter, PieceStore } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
@@ -86,6 +88,9 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     workspace,
     catalog,
     new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
+    new PieceStore(dataRoot),
+    new InterfaceTheme(dataRoot),
+    new CallSiteAssignments(dataRoot, catalog.callSites),
     modelAccess,
     spec.room,
     createLogger(env.logLevel),

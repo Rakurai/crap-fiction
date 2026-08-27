@@ -6,12 +6,11 @@ import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
 import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
-import { getTheme, setTheme } from './interfaceTheme.js'
-import { listAssignments, setAssignment } from './model/assignments.js'
-import { withAssignments } from './model/callSites.js'
+import type { InterfaceTheme } from './interfaceTheme.js'
+import type { CallSiteAssignments } from './model/assignments.js'
 import type { ModelAccess } from './model/types.js'
 import { originGuard } from './originGuard.js'
-import { createPiece, getConversation, getPiece, listPieces, type PieceDocumentWriter, updatePiece } from './pieces.js'
+import { createPiece, listPieces, type PieceDocumentWriter, type PieceStore } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
 import type { Room } from './room/room.js'
 import { RouteFailure, statusFor } from './routeFailure.js'
@@ -42,6 +41,9 @@ export function createApp(
   workspace: WorkspaceRegistry,
   catalog: ShippedContentCatalog,
   documentWriter: PieceDocumentWriter,
+  pieceStore: PieceStore,
+  interfaceTheme: InterfaceTheme,
+  callSiteAssignments: CallSiteAssignments,
   modelAccess: ModelAccess,
   room: Room,
   logger: Logger,
@@ -77,17 +79,12 @@ export function createApp(
   })
 
   app.get('/pieces/:id', (c) => {
-    const id = c.req.param('id')
-    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, catalog)))
+    return c.json(ok(pieceStore.detail(workspace.require(), c.req.param('id'), catalog)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
-    const id = c.req.param('id')
-    const workspaceDir = workspace.require()
-
-    await updatePiece(workspaceDir, id, catalog, c.req.valid('json'))
-
-    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, catalog)))
+    const detail = await pieceStore.update(workspace.require(), c.req.param('id'), catalog, c.req.valid('json'))
+    return c.json(ok(detail))
   })
 
   const param = validateParam(surfaceParamSchema, logger)
@@ -104,7 +101,7 @@ export function createApp(
   })
 
   app.get('/pieces/:id/surfaces/:surface/conversations/:cid', param, (c) => {
-    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
+    return c.json(ok(pieceStore.conversation(workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
   })
 
   app.delete('/pieces/:id/surfaces/:surface/conversations/:cid', param, async (c) => {
@@ -159,23 +156,23 @@ export function createApp(
   })
 
   app.get('/theme', (c) => {
-    return c.json(ok({ theme: getTheme(env.dataRoot) ?? null }))
+    return c.json(ok({ theme: interfaceTheme.get() ?? null }))
   })
 
   app.put('/theme', body(putThemeSchema), async (c) => {
     const { theme } = c.req.valid('json')
-    await setTheme(env.dataRoot, theme)
+    await interfaceTheme.set(theme)
     return c.json(ok({ theme }))
   })
 
   app.get('/call-sites', (c) => {
-    return c.json(ok(withAssignments(catalog.callSites, listAssignments(env.dataRoot))))
+    return c.json(ok(callSiteAssignments.list()))
   })
 
   app.put('/call-sites/:site/assignment', body(putAssignmentSchema), async (c) => {
     const site = c.req.param('site')
     const { model } = c.req.valid('json')
-    await setAssignment(env.dataRoot, catalog.callSites, site, model)
+    await callSiteAssignments.assign(site, model)
     return c.json(ok({ site, assignment: model }))
   })
 
