@@ -13,11 +13,6 @@
   background: var(--prose);
 }
 
-/* Reading holds the conversation's width so that entering it moves no line of prose. */
-.wrapperReading {
-  margin-right: 520px;
-}
-
 .title {
   font: 500 13px/1 var(--font-ui);
   color: var(--ink);
@@ -125,6 +120,12 @@
   max-width: 620px;
 }
 
+.readingTitle {
+  font: 500 27px/1.25 var(--font-prose);
+  color: var(--ink);
+  margin: 0 0 34px;
+}
+
 .wayBack {
   position: absolute;
   right: 26px;
@@ -136,12 +137,7 @@
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 8px 10px;
-  cursor: pointer;
   animation: dr-in .14s ease-out;
-}
-
-.wayBack:hover {
-  color: var(--ink2);
 }
 
 .source {

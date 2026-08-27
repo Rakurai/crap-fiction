@@ -1,5 +1,5 @@
 import { EditorContent } from '@tiptap/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import type { SurfaceId } from '../shared/surfaces.js'
 import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
@@ -20,9 +20,6 @@ type ManuscriptProps = {
   readonly applying: { readonly participantName?: string; readonly abandon: () => void } | undefined
 }
 
-/** How long the way out of the reading view stands after the author last moved the pointer. */
-const WAY_BACK_HOLDS_MS = 2400
-
 export function Manuscript({
   title,
   mode,
@@ -35,23 +32,6 @@ export function Manuscript({
   applying,
 }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
-  const [wayBackRevealed, setWayBackRevealed] = useState(false)
-  const wayBackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  // The reading view holds no chrome at rest. Moving the pointer is what asks for the way out,
-  // which is what a long piece entered near the top needs and a short one never has to see.
-  function revealTheWayBack(): void {
-    setWayBackRevealed(true)
-    if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
-    wayBackTimer.current = setTimeout(() => setWayBackRevealed(false), WAY_BACK_HOLDS_MS)
-  }
-
-  useEffect(() => {
-    setWayBackRevealed(false)
-    return () => {
-      if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
-    }
-  }, [manuscript.view])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -67,7 +47,7 @@ export function Manuscript({
   }, [manuscript.editor, reading, applying])
 
   return (
-    <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
+    <div className={styles.wrapper}>
       {!reading && (
         <DocumentHeader
           onOpenPieces={onOpenPieces}
@@ -106,9 +86,9 @@ export function Manuscript({
       <div
         ref={manuscript.containerRef}
         className={reading ? `${styles.scroll} ${styles.readingScroll}` : styles.scroll}
-        onPointerMove={reading ? revealTheWayBack : undefined}
       >
         <div className={styles.measure}>
+          {reading && <h1 className={styles.readingTitle}>{title}</h1>}
           {manuscript.view === 'source' ? (
             <textarea
               aria-label="Manuscript source"
@@ -125,11 +105,7 @@ export function Manuscript({
         </div>
       </div>
 
-      {reading && wayBackRevealed && (
-        <button type="button" className={styles.wayBack} onClick={manuscript.showRendered}>
-          {facts(machineWords('esc'), machineWords('return'))}
-        </button>
-      )}
+      {reading && <div className={styles.wayBack}>{facts(machineWords('esc'), machineWords('return'))}</div>}
 
       {!reading && autosave.state.failed && (
         <div className={styles.saveFailed}>

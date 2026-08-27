@@ -113,30 +113,6 @@ describe('the piece title', () => {
   })
 })
 
-describe('the reading view', () => {
-  afterEach(cleanup)
-
-  /**
-   * At rest the view is the prose and nothing else. The way out is not inside the column as
-   * though it were the story's last line: it arrives on the pointer, where the author's hand is,
-   * and it says the keystroke rather than replacing it.
-   */
-  it('holds no control at rest, offers one way back the moment the pointer moves, and is left by the keystroke that offer names', () => {
-    renderManuscript({ draft: 'First light.' })
-
-    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
-    expect(screen.queryAllByRole('button')).toEqual([])
-
-    fireEvent.pointerMove(screen.getByLabelText('Manuscript'))
-    const wayBack = screen.getAllByRole('button')
-    expect(wayBack).toHaveLength(1)
-    expect(wayBack[0]?.textContent).toContain('ESC')
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByRole('button', { name: 'PIECES' })).toBeTruthy()
-  })
-})
-
 describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 

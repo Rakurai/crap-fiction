@@ -73,6 +73,7 @@ export function ContextSurface({
 
       <div className={styles.scroll}>
         <div className={styles.measure}>
+          <div className={styles.contextFacts}>{facts(machineWords(label), file)}</div>
           <textarea
             aria-label={label}
             className={styles.text}

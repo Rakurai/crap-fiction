@@ -21,7 +21,7 @@
 .conversationPane {
   flex: 0 1 520px;
   width: 520px;
-  min-width: 420px;
+  min-width: 340px;
   background: var(--paper);
   border-left: 1px solid var(--rule);
 }
