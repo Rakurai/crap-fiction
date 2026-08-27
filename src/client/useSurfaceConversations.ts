@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import { fetchPiece } from './piecesClient.js'
 import { failureMessage } from './request.js'
 import { deleteConversation } from './roomClient.js'
+import { useWriteSerializer } from './useWriteSerializer.js'
 
 export type SurfaceConversationsViewModel = Readonly<{
   listed: readonly ConversationSummary[]
@@ -18,18 +19,7 @@ export function useSurfaceConversations(pieceId: string, surface: SurfaceId, ini
   const [deletingId, setDeletingId] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const listedRef = useRef(initialListed)
-  const deletionRevision = useRef(0)
-  const queue = useRef<Promise<void>>(Promise.resolve())
-  const inFlight = useRef<AbortController | undefined>(undefined)
-  const mounted = useRef(true)
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-      inFlight.current?.abort()
-    }
-  }, [])
+  const serializer = useWriteSerializer()
 
   function install(next: readonly ConversationSummary[]): void {
     listedRef.current = next
@@ -38,46 +28,34 @@ export function useSurfaceConversations(pieceId: string, surface: SurfaceId, ini
 
   const refresh = useCallback(() => {
     setError(undefined)
-    queue.current = queue.current.then(async () => {
-      if (!mounted.current) return
-      const controller = new AbortController()
-      inFlight.current = controller
-      const result = await fetchPiece(pieceId, controller.signal)
-      if (!mounted.current || controller.signal.aborted) return
-      inFlight.current = undefined
+    void serializer.run((signal) => fetchPiece(pieceId, signal)).then((result) => {
+      if (result === undefined) return
       if (result.outcome === 'value') {
         install(result.value.surfaces[surface].conversations)
         return
       }
       setError(failureMessage(result))
     })
-  }, [pieceId, surface])
+  }, [pieceId, surface, serializer])
 
   const remove = useCallback(
     (conversationId: string): Promise<readonly ConversationSummary[] | undefined> => {
-      const revision = ++deletionRevision.current
+      const revision = serializer.nextRevision()
       setDeletingId(conversationId)
       setError(undefined)
-      let remaining: readonly ConversationSummary[] | undefined
-      const operation = queue.current.then(async () => {
-        if (!mounted.current) return
-        const controller = new AbortController()
-        inFlight.current = controller
-        const result = await deleteConversation(pieceId, surface, conversationId, controller.signal)
-        if (!mounted.current || controller.signal.aborted) return
-        inFlight.current = undefined
-        if (revision === deletionRevision.current) setDeletingId(undefined)
+      return serializer.run((signal) => deleteConversation(pieceId, surface, conversationId, signal)).then((result) => {
+        if (result === undefined) return undefined
+        if (serializer.isCurrent(revision)) setDeletingId(undefined)
         if (result.outcome !== 'value') {
-          if (revision === deletionRevision.current) setError(failureMessage(result))
-          return
+          if (serializer.isCurrent(revision)) setError(failureMessage(result))
+          return undefined
         }
-        remaining = listedRef.current.filter((conversation) => conversation.id !== conversationId)
+        const remaining = listedRef.current.filter((conversation) => conversation.id !== conversationId)
         install(remaining)
+        return remaining
       })
-      queue.current = operation
-      return operation.then(() => remaining)
     },
-    [pieceId, surface],
+    [pieceId, surface, serializer],
   )
 
   return { listed, deletingId, error, refresh, remove }
