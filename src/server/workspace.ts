@@ -1,9 +1,10 @@
 import { z } from 'zod'
+import { RouteFailure } from './routeFailure.js'
 import { PathEscapesRootError, readSettingsSection, resolveWorkspaceDirectory, settingsFile, writeSettingsSection } from './store/index.js'
 
-export class WorkspaceOutsideRootError extends Error {
+export class WorkspaceOutsideRootError extends RouteFailure {
   constructor(dataRoot: string, candidate: string) {
-    super(`workspace directory "${candidate}" is not inside the data root "${dataRoot}"`)
+    super('WORKSPACE_OUTSIDE_ROOT', 'invalid', `workspace directory "${candidate}" is not inside the data root "${dataRoot}"`)
     this.name = 'WorkspaceOutsideRootError'
   }
 }
@@ -15,9 +16,9 @@ export class PersistedWorkspaceUnusableError extends Error {
   }
 }
 
-export class WorkspaceNotSetError extends Error {
+export class WorkspaceNotSetError extends RouteFailure {
   constructor() {
-    super('no workspace is configured')
+    super('WORKSPACE_NOT_SET', 'invalid', 'no workspace is configured')
     this.name = 'WorkspaceNotSetError'
   }
 }

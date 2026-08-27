@@ -5,10 +5,11 @@ import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
 import { firstSchemaIssue } from '../schemaIssue.js'
+import { RouteFailure } from '../routeFailure.js'
 
-export class TolerantReadError extends Error {
+export class TolerantReadError extends RouteFailure {
   constructor(file: string, entry: string, reason: string) {
-    super(`${file}: ${entry}: ${reason}`)
+    super('ARTIFACT_INVALID', 'internal', `${file}: ${entry}: ${reason}`)
     this.name = 'TolerantReadError'
   }
 }

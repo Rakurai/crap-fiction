@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -201,6 +201,13 @@ describe('the piece routes', () => {
     const unknownMode = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Nope', mode: 'novella' }) })
     expect(unknownMode.status).toBe(400)
     expect(await unknownMode.json()).toMatchObject({ success: false, error: { code: 'MODE_UNKNOWN' } })
+
+    const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-root-'))
+    symlinkSync(outside, path.join(dir, 'escaped'))
+    const escaped = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'escaped', mode: 'flash' }) })
+    expect(escaped.status).toBe(400)
+    expect(await escaped.json()).toMatchObject({ success: false, error: { code: 'PATH_ESCAPES_ROOT' } })
+    rmSync(outside, { recursive: true, force: true })
   })
 
   it('lists every loaded mode, and persists whichever the author chooses at creation', async () => {

@@ -1,4 +1,5 @@
 import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
+import { RouteFailure } from '../routeFailure.js'
 import { markOrdinals, type RoleDefinition } from './roles.js'
 
 export const APPLY_CALL_SITE = 'apply'
@@ -14,9 +15,9 @@ export class DuplicateCallSiteError extends Error {
   }
 }
 
-export class UnknownCallSiteError extends Error {
+export class UnknownCallSiteError extends RouteFailure {
   constructor(site: string) {
-    super(`no call site "${site}"`)
+    super('CALL_SITE_NOT_FOUND', 'not_found', `no call site "${site}"`)
     this.name = 'UnknownCallSiteError'
   }
 }

@@ -28,6 +28,7 @@ import {
 import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
 import { ConversationNotFoundError, deleteConversation, PieceNotFoundError, startConversation } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
+import { RouteFailure } from '../routeFailure.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
 import {
   ConversationEntryStore,
@@ -63,44 +64,44 @@ export type RoomEvent =
   | { readonly type: 'action.finished'; readonly data: ActionFinishedEvent }
   | { readonly type: 'error'; readonly data: ConversationErrorEvent }
 
-export class RoomBusyError extends Error {
+export class RoomBusyError extends RouteFailure {
   constructor(pieceId: string, surface: string) {
-    super(`an operation is already in flight for "${pieceId}" on its "${surface}" surface`)
+    super('ROOM_BUSY', 'conflict', `an operation is already in flight for "${pieceId}" on its "${surface}" surface`)
     this.name = 'RoomBusyError'
   }
 }
 
-export class RecommendationNotFoundError extends Error {
+export class RecommendationNotFoundError extends RouteFailure {
   constructor(pieceId: string, responseId: string) {
-    super(`no applicable suggestion at response "${responseId}" for piece "${pieceId}"`)
+    super('RECOMMENDATION_NOT_FOUND', 'not_found', `no applicable suggestion at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'RecommendationNotFoundError'
   }
 }
 
-export class ApplicationNotPendingError extends Error {
+export class ApplicationNotPendingError extends RouteFailure {
   constructor(pieceId: string, applicationId: string) {
-    super(`no pending or committed application "${applicationId}" for piece "${pieceId}"`)
+    super('APPLICATION_NOT_PENDING', 'not_found', `no pending or committed application "${applicationId}" for piece "${pieceId}"`)
     this.name = 'ApplicationNotPendingError'
   }
 }
 
-export class ApplicationDocumentNotSavedError extends Error {
+export class ApplicationDocumentNotSavedError extends RouteFailure {
   constructor(pieceId: string, applicationId: string) {
-    super(`application "${applicationId}" for piece "${pieceId}" does not match the document as saved`)
+    super('APPLICATION_DOCUMENT_NOT_SAVED', 'conflict', `application "${applicationId}" for piece "${pieceId}" does not match the document as saved`)
     this.name = 'ApplicationDocumentNotSavedError'
   }
 }
 
-export class CommentaryNotFoundError extends Error {
+export class CommentaryNotFoundError extends RouteFailure {
   constructor(pieceId: string, responseId: string) {
-    super(`no commentary at response "${responseId}" for piece "${pieceId}"`)
+    super('COMMENTARY_NOT_FOUND', 'not_found', `no commentary at response "${responseId}" for piece "${pieceId}"`)
     this.name = 'CommentaryNotFoundError'
   }
 }
 
-export class ParticipantNotFoundError extends Error {
+export class ParticipantNotFoundError extends RouteFailure {
   constructor(pieceId: string, participantId: string) {
-    super(`no participant "${participantId}" in the room for piece "${pieceId}"`)
+    super('PARTICIPANT_NOT_FOUND', 'not_found', `no participant "${participantId}" in the room for piece "${pieceId}"`)
     this.name = 'ParticipantNotFoundError'
   }
 }

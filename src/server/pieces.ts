@@ -7,6 +7,7 @@ import type { CastMemberView, PieceDetail, PieceSummary, SurfaceDetail } from '.
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
+import { RouteFailure } from './routeFailure.js'
 import type { ShippedContentCatalog } from './shippedContent.js'
 import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
@@ -35,23 +36,23 @@ function surfaceScope(workspaceDir: string, pieceId: string, surface: SurfaceId)
   return conversationScopeFor(workspaceDir, { pieceId, surface })
 }
 
-export class PieceNotFoundError extends Error {
+export class PieceNotFoundError extends RouteFailure {
   constructor(id: string) {
-    super(`no piece "${id}"`)
+    super('PIECE_NOT_FOUND', 'not_found', `no piece "${id}"`)
     this.name = 'PieceNotFoundError'
   }
 }
 
-export class ConversationNotFoundError extends Error {
+export class ConversationNotFoundError extends RouteFailure {
   constructor(pieceId: string, conversationId: string) {
-    super(`no conversation "${conversationId}" for piece "${pieceId}"`)
+    super('CONVERSATION_NOT_FOUND', 'not_found', `no conversation "${conversationId}" for piece "${pieceId}"`)
     this.name = 'ConversationNotFoundError'
   }
 }
 
-export class UnknownCastMemberError extends Error {
+export class UnknownCastMemberError extends RouteFailure {
   constructor(pieceId: string, memberId: string) {
-    super(`piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
+    super('CAST_MEMBER_UNKNOWN', 'invalid', `piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
     this.name = 'UnknownCastMemberError'
   }
 }

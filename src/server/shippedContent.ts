@@ -5,14 +5,15 @@ import { loadCharter, type Charter } from './model/charter.js'
 import { loadPromptFragments, type PromptFragments } from './model/prompts.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
+import { RouteFailure } from './routeFailure.js'
 import { defaultCastFor, resolveRoster, specialistsFor, type RoomRoster } from './room/roster.js'
 import { readShippedAuthorContextReference } from './store/index.js'
 
 export const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
 
-export class UnknownModeError extends Error {
+export class UnknownModeError extends RouteFailure {
   constructor(modeId: string) {
-    super(`no loaded mode "${modeId}"`)
+    super('MODE_UNKNOWN', 'invalid', `no loaded mode "${modeId}"`)
     this.name = 'UnknownModeError'
   }
 }

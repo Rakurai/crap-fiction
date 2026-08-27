@@ -8,36 +8,18 @@ import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
-import { UnknownCallSiteError, withAssignments } from './model/callSites.js'
+import { withAssignments } from './model/callSites.js'
 import type { ModelAccess } from './model/types.js'
 import { originGuard } from './originGuard.js'
-import {
-  ConversationNotFoundError,
-  createPiece,
-  getConversation,
-  getPiece,
-  listPieces,
-  type PieceDocumentWriter,
-  PieceNotFoundError,
-  UnknownCastMemberError,
-  updatePiece,
-} from './pieces.js'
+import { createPiece, getConversation, getPiece, listPieces, type PieceDocumentWriter, updatePiece } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
-import {
-  ApplicationDocumentNotSavedError,
-  ApplicationNotPendingError,
-  CommentaryNotFoundError,
-  ParticipantNotFoundError,
-  RecommendationNotFoundError,
-  RoomBusyError,
-  type Room,
-} from './room/room.js'
+import type { Room } from './room/room.js'
+import { RouteFailure, statusFor } from './routeFailure.js'
 import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
-import { UnknownModeError, type ShippedContentCatalog } from './shippedContent.js'
-import { TolerantReadError } from './store/index.js'
+import type { ShippedContentCatalog } from './shippedContent.js'
 import { validateJson, validateParam } from './validate.js'
-import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
+import type { WorkspaceRegistry } from './workspace.js'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
@@ -202,28 +184,13 @@ export function createApp(
   })
 
   app.onError((err, c) => {
-    const refused = (code: string, status: 400 | 404 | 409 | 500) => {
-      logger.warn({ code, method: c.req.method, path: c.req.path }, 'request refused')
-      return c.json(fail(code, err.message), status)
+    if (err instanceof RouteFailure) {
+      logger.warn({ code: err.code, method: c.req.method, path: c.req.path }, 'request refused')
+      return c.json(fail(err.code, err.message), statusFor(err))
     }
 
-    if (err instanceof WorkspaceNotSetError) return refused('WORKSPACE_NOT_SET', 400)
-    if (err instanceof WorkspaceOutsideRootError) return refused('WORKSPACE_OUTSIDE_ROOT', 400)
-    if (err instanceof UnknownCallSiteError) return refused('CALL_SITE_NOT_FOUND', 404)
-    if (err instanceof PieceNotFoundError) return refused('PIECE_NOT_FOUND', 404)
-    if (err instanceof UnknownCastMemberError) return refused('CAST_MEMBER_UNKNOWN', 400)
-    if (err instanceof UnknownModeError) return refused('MODE_UNKNOWN', 400)
-    if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
-    if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
-    if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
-    if (err instanceof ApplicationNotPendingError) return refused('APPLICATION_NOT_PENDING', 404)
-    if (err instanceof ApplicationDocumentNotSavedError) return refused('APPLICATION_DOCUMENT_NOT_SAVED', 409)
-    if (err instanceof CommentaryNotFoundError) return refused('COMMENTARY_NOT_FOUND', 404)
-    if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
-    if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)
-
     logger.error({ err, method: c.req.method, path: c.req.path }, 'request failed')
-    throw err
+    return c.json(fail('INTERNAL_ERROR', 'the studio failed to answer this request'), 500)
   })
 
   return app
