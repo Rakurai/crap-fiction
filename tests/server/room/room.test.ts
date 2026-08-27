@@ -237,25 +237,6 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).not.toContain('stale text nobody submitted')
   })
 
-  it('keeps a declined specialist out of the readings the story editor is compiled over, and holds the story editor to an answer once every specialist has declined', async () => {
-    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-    })
-
-    const { conversationId } = await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
-    await settlementOf(room, piece.id)
-
-    // Neither decliner reaches the story editor's readings section at all.
-    expect(adapter.promptFor('story-editor')).not.toContain('FIXTURE_READINGS_HEADING')
-
-    // With no substantive reading to weigh, the story editor owes an answer, so its own no-comment is rejected as nonconforming.
-    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
-    expect(landed.find((entry) => entry.kind === 'participantFailure' && entry.participantId === 'story-editor')).toMatchObject({ reason: 'nonconforming' })
-  })
-
   it("owns the dispatch's own collapse: a seam that throws instead of failing closes the action and is stated, not rethrown into nothing", async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const broken: ModelAccess = {
@@ -372,7 +353,7 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
-  it('owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
+  it('keeps a decliner out of its readings and owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -385,10 +366,14 @@ describe('Room.dispatch', () => {
 
     expect(adapter.promptFor('story-editor')).toContain('FIXTURE_ADDRESSED_HEADING')
 
+    // Neither decliner reaches the readings section, so there is no section at all.
+    expect(adapter.promptFor('story-editor')).not.toContain('FIXTURE_READINGS_HEADING')
+
     // Declining was never on offer, so the attempt comes back as a call that did not answer.
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment').map((entry) => entry.participantId)).toEqual(['shape', 'compression'])
     expect(landed.filter((entry) => entry.kind === 'participantFailure').map((entry) => entry.participantId)).toEqual(['story-editor'])
+    expect(landed.find((entry) => entry.kind === 'participantFailure')).toMatchObject({ reason: 'nonconforming' })
   })
 
   it('calls a named addressed-only participant alone, enrolling it in nothing and trailing it with no generalist call', async () => {
