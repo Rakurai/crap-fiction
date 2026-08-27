@@ -13,6 +13,7 @@ import { usePaneWidth } from './usePaneWidth.js'
 type ManuscriptProps = {
   readonly title: string
   readonly mode: string
+  readonly namesMode: boolean
   readonly onOpenPieces: () => void
   readonly onOpenModels: () => void
   readonly manuscript: ManuscriptViewModel
@@ -26,6 +27,7 @@ type ManuscriptProps = {
 export function Manuscript({
   title,
   mode,
+  namesMode,
   onOpenPieces,
   onOpenModels,
   manuscript,
@@ -64,7 +66,7 @@ export function Manuscript({
           onOpenModels={onOpenModels}
           title={title}
           lifecycle={lifecycle}
-          length={facts(modeName(mode), wordCount(manuscript.length))}
+          length={namesMode ? facts(modeName(mode), wordCount(manuscript.length)) : wordCount(manuscript.length)}
           surface="draft"
           onSwitchTo={onSwitchTo}
           draftControls={{

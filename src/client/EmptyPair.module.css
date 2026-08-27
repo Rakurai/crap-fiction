@@ -29,6 +29,10 @@
   composes: bar from './DocumentHeader.module.css';
 }
 
+.reopen {
+  composes: door from './DocumentHeader.module.css';
+}
+
 .status {
   font: 400 12.5px/1.6 var(--font-ui);
   color: var(--ink3);

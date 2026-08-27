@@ -31,6 +31,7 @@ export type PieceSwitchRequest = Readonly<{
 
 type OpenedPieceProps = {
   readonly id: string
+  readonly namesMode: boolean
   readonly pieceAdapters: PieceAdapters
   readonly room: RoomAdapters
   readonly callSites: CallSiteAdapters
@@ -48,6 +49,7 @@ function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfi
 
 function Surfaces({
   piece,
+  namesMode,
   lifecycle,
   room,
   pieceAdapters,
@@ -59,6 +61,7 @@ function Surfaces({
   switchRequest,
 }: {
   readonly piece: PieceDetail
+  readonly namesMode: boolean
   readonly lifecycle: LifecycleProps
   readonly room: RoomAdapters
   readonly pieceAdapters: PieceAdapters
@@ -121,6 +124,7 @@ function Surfaces({
           pieceId={piece.id}
           title={piece.title}
           mode={piece.mode}
+          namesMode={namesMode}
           body={bodyConfigFor(piece, surface)}
           initialText={piece.surfaces[surface].text}
           initialConversationId={piece.surfaces[surface].currentConversationId}
@@ -150,6 +154,7 @@ function Surfaces({
 
 export function OpenedPiece({
   id,
+  namesMode,
   pieceAdapters,
   room,
   callSites,
@@ -171,6 +176,7 @@ export function OpenedPiece({
     return (
       <Surfaces
         piece={piece.piece}
+        namesMode={namesMode}
         room={room}
         pieceAdapters={pieceAdapters}
         callSites={callSites}

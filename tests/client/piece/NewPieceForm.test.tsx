@@ -24,27 +24,39 @@ describe('creating a piece', () => {
     expect(screen.getByRole('button', { name: 'new piece' })).toBeTruthy()
   })
 
-  it('hands the title and the one loaded mode over, and puts the field away', () => {
+  it('hands the title and the one loaded mode over, stays open and populated until the result lands, surfaces a failure, and puts the field away only once creation succeeds', () => {
     const onSubmit = vi.fn()
-    render(<NewPieceForm submitting={false} error={undefined} modes={[FLASH]} onSubmit={onSubmit} />)
+    const { rerender } = render(<NewPieceForm submitting={false} error={undefined} modes={[FLASH]} onSubmit={onSubmit} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'new piece' }))
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'The flats at low water' } })
     fireEvent.click(screen.getByRole('button', { name: 'create' }))
 
     expect(onSubmit).toHaveBeenCalledWith('The flats at low water', 'flash')
+    rerender(<NewPieceForm submitting={true} error={undefined} modes={[FLASH]} onSubmit={onSubmit} />)
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('The flats at low water')
+
+    rerender(<NewPieceForm submitting={false} error="could not create the piece" modes={[FLASH]} onSubmit={onSubmit} />)
+    expect(screen.getByRole('alert').textContent).toBe('could not create the piece')
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('The flats at low water')
+
+    fireEvent.click(screen.getByRole('button', { name: 'create' }))
+    rerender(<NewPieceForm submitting={true} error={undefined} modes={[FLASH]} onSubmit={onSubmit} />)
+    rerender(<NewPieceForm submitting={false} error={undefined} modes={[FLASH]} onSubmit={onSubmit} />)
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('offers no mode picker for one loaded mode, and a picker defaulting to the first when several are loaded', () => {
+  it('offers no mode picker for one loaded mode, and requires a choice — submitting none — when several are loaded', () => {
     const onSubmit = vi.fn()
     render(<NewPieceForm submitting={false} error={undefined} modes={[FLASH, EPIC]} onSubmit={onSubmit} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'new piece' }))
-    expect((screen.getByLabelText('mode') as HTMLSelectElement).value).toBe('flash')
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'A long way home' } })
+    fireEvent.click(screen.getByRole('button', { name: 'create' }))
+
+    expect(onSubmit).not.toHaveBeenCalled()
 
     fireEvent.change(screen.getByLabelText('mode'), { target: { value: 'epic' } })
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'A long way home' } })
     fireEvent.click(screen.getByRole('button', { name: 'create' }))
 
     expect(onSubmit).toHaveBeenCalledWith('A long way home', 'epic')

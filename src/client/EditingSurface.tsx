@@ -26,6 +26,7 @@ type EditingSurfaceProps = {
   readonly pieceId: string
   readonly title: string
   readonly mode: string
+  readonly namesMode: boolean
   readonly body: SurfaceBodyConfig
   readonly initialText: string
   readonly initialConversationId: string | null
@@ -86,6 +87,7 @@ function MountedSurface({
   pieceId,
   title,
   mode,
+  namesMode,
   document,
   initialConversationId,
   conversationSelection,
@@ -151,6 +153,7 @@ function MountedSurface({
         <Manuscript
           title={title}
           mode={mode}
+          namesMode={namesMode}
           onOpenPieces={onOpenPieces}
           onOpenModels={onOpenModels}
           manuscript={document.session.manuscript}

@@ -26,6 +26,7 @@ const BASE_PROPS = {
   pieceId: 'the-lighthouse',
   title: 'The Lighthouse',
   mode: 'flash',
+  namesMode: true,
   body: { kind: 'prose', surface: 'draft', location: 'draft.md' } as const,
   initialText: 'First light.',
   initialConversationId: null,

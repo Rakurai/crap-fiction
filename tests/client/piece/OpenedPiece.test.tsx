@@ -106,6 +106,7 @@ function fullProps(
 ) {
   return {
     ...opened.props,
+    namesMode: true,
     onOpenPieces: vi.fn(),
     onOpenModels: vi.fn(),
     onLeaveBlockedChange: vi.fn(),

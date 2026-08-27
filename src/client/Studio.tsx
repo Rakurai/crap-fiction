@@ -84,10 +84,11 @@ export function Studio({ workspace }: StudioProps) {
   return (
     <div className={styles.studio}>
       {openedId === undefined ? (
-        <EmptyPair state={{ kind: 'empty' }} />
+        <EmptyPair state={{ kind: 'empty', onOpenPieces: openPieces }} />
       ) : (
         <OpenedPiece
           id={openedId}
+          namesMode={pieces.status === 'ready' && pieces.modes.length > 1}
           pieceAdapters={PIECE_ADAPTERS}
           room={ROOM_ADAPTERS}
           callSites={CALL_SITE_ADAPTERS}

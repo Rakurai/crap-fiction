@@ -12,6 +12,7 @@ const DEFAULT_PROPS = {
   pieceId: 'the-lighthouse',
   title: 'The Lighthouse',
   mode: 'flash',
+  namesMode: true,
   draft: 'First light of the day.',
   onOpenPieces: vi.fn(),
   onOpenModels: vi.fn(),
@@ -32,6 +33,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
     <Manuscript
       title={props.title}
       mode={props.mode}
+      namesMode={props.namesMode}
       onOpenPieces={props.onOpenPieces}
       onOpenModels={props.onOpenModels}
       location="draft.md"
@@ -64,10 +66,17 @@ async function settle() {
 describe('the piece header', () => {
   afterEach(cleanup)
 
-  it('states the mode and the length as one composed fact', () => {
+  it('states the mode and the length as one composed fact when more than one mode is loaded', () => {
     renderManuscript({ draft: 'First light of the day.' })
 
     expect(screen.getByText(facts(modeName('flash'), wordCount(5)))).toBeTruthy()
+  })
+
+  it('names no mode when only one is loaded', () => {
+    renderManuscript({ draft: 'First light of the day.', namesMode: false })
+
+    expect(screen.queryByText(facts(modeName('flash'), wordCount(5)))).toBeNull()
+    expect(screen.getByText(wordCount(5))).toBeTruthy()
   })
 })
 
