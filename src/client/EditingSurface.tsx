@@ -143,7 +143,7 @@ function MountedSurface({
     setPanel('conversations')
   }
 
-  const showConversation = roster.settled && !(document.kind === 'prose' && document.session.manuscript.view === 'reading')
+  const reading = document.kind === 'prose' && document.session.manuscript.view === 'reading'
 
   return (
     <div className={styles.surfacePane} hidden={!active} inert={!active}>
@@ -177,26 +177,28 @@ function MountedSurface({
           onReverseApplication={document.session.reverseApplication}
         />
       )}
-      {showConversation && (
-        <Conversation
-          key={conversation.session}
-          pieceId={pieceId}
-          surface={surface}
-          currentConversationId={conversation.activeConversationId}
-          documents={documents}
-          flushDocument={session.autosave.flush}
-          room={room}
-          identify={roster.identify}
-          handles={handles}
-          interviewer={interviewer}
-          runtime={runtime}
-          clock={Date.now}
-          onApplied={session.install}
-          onApplyingChange={conversation.setApplying}
-          onConversationIdChange={conversation.setActiveConversationId}
-          onOpenRoom={() => setPanel('room')}
-          onOpenConversations={openConversations}
-        />
+      {roster.settled && (
+        <div className={styles.surfacePane} hidden={reading} inert={reading}>
+          <Conversation
+            key={conversation.session}
+            pieceId={pieceId}
+            surface={surface}
+            currentConversationId={conversation.activeConversationId}
+            documents={documents}
+            flushDocument={session.autosave.flush}
+            room={room}
+            identify={roster.identify}
+            handles={handles}
+            interviewer={interviewer}
+            runtime={runtime}
+            clock={Date.now}
+            onApplied={session.install}
+            onApplyingChange={conversation.setApplying}
+            onConversationIdChange={conversation.setActiveConversationId}
+            onOpenRoom={() => setPanel('room')}
+            onOpenConversations={openConversations}
+          />
+        </div>
       )}
       {panel === 'room' && (
         <RoomEditor

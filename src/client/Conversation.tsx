@@ -642,11 +642,6 @@ export function Conversation({
           event.preventDefault()
           submit()
         }}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey || event.defaultPrevented) return
-          event.preventDefault()
-          submit()
-        }}
       >
         <label className={styles.visuallyHidden} htmlFor={`conversation-message-${surface}`}>
           Message the room
@@ -675,6 +670,10 @@ export function Conversation({
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') combobox.hide()
+                  if (event.key === 'Enter' && !event.shiftKey && !event.defaultPrevented) {
+                    event.preventDefault()
+                    submit()
+                  }
                 }}
               />
             }

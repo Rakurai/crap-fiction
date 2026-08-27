@@ -46,11 +46,11 @@ export function Manuscript({
   useEffect(() => {
     if (manuscript.view !== 'reading') return
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') manuscript.showRendered()
+      if (event.key === 'Escape') manuscript.leaveReading()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [manuscript.view, manuscript.showRendered])
+  }, [manuscript.view, manuscript.leaveReading])
 
   useEffect(() => {
     manuscript.editor?.setEditable(!reading && applying === undefined)

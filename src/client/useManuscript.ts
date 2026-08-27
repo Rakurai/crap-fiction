@@ -21,6 +21,7 @@ export type ManuscriptViewModel = {
   readonly showRendered: () => void
   readonly showSource: () => void
   readonly showReading: () => void
+  readonly leaveReading: () => void
   readonly applyRecommendation: (markdown: string) => () => void
 }
 
@@ -48,6 +49,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollRatio = useRef<number | null>(null)
+  const enteredReadingFrom = useRef<'rendered' | 'source'>('rendered')
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -103,9 +105,15 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     if (view === 'source') {
       applySourceText(editor, sourceText)
     }
+    enteredReadingFrom.current = view === 'source' ? 'source' : 'rendered'
     editor.setEditable(false)
     setView('reading')
   }, [editor, view, sourceText, captureScrollRatio])
+
+  const leaveReading = useCallback(() => {
+    if (enteredReadingFrom.current === 'source') showSource()
+    else showRendered()
+  }, [showSource, showRendered])
 
   const applyRecommendation = useCallback(
     (text: string): (() => void) => {
@@ -133,6 +141,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     showRendered,
     showSource,
     showReading,
+    leaveReading,
     applyRecommendation,
   }
 }

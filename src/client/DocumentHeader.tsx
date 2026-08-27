@@ -5,7 +5,6 @@ import type { LifecycleProps } from './pieceLifecycle.js'
 import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import { usePaneWidth } from './usePaneWidth.js'
 
-const LENGTH_THRESHOLD = 760
 const SHORT_LABEL_THRESHOLD = 640
 
 const SHORT_VIEW_LABEL: Readonly<Record<'source' | 'rendered', string>> = {
@@ -32,7 +31,6 @@ type DocumentHeaderProps = {
 
 export function DocumentHeader({ onOpenPieces, onOpenModels, title, lifecycle, length, surface, onSwitchTo, draftControls }: DocumentHeaderProps) {
   const [paneRef, paneWidth] = usePaneWidth<HTMLDivElement>()
-  const showLength = length !== undefined && paneWidth >= LENGTH_THRESHOLD
   const shortLabels = paneWidth < SHORT_LABEL_THRESHOLD
 
   return (
@@ -47,7 +45,7 @@ export function DocumentHeader({ onOpenPieces, onOpenModels, title, lifecycle, l
       </div>
       <span className={styles.rule} />
       <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
-      {showLength && <span className={styles.length}>{length}</span>}
+      {length !== undefined && <span className={styles.length}>{length}</span>}
       <span className={styles.spacer} />
       <div className={styles.controls}>
         <div className={styles.switcher}>

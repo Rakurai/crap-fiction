@@ -79,6 +79,24 @@ describe('useManuscript', () => {
     expect(result.current.sourceText).toBe('First line.\\\nSecond line.')
   })
 
+  it('leaves reading for whichever view it was entered from', () => {
+    const { result } = renderHook(() => useManuscript('First paragraph.'))
+
+    act(() => result.current.showSource())
+    act(() => result.current.setSourceText('First paragraph. Second paragraph.'))
+    act(() => result.current.showReading())
+    expect(result.current.view).toBe('reading')
+
+    act(() => result.current.leaveReading())
+    expect(result.current.view).toBe('source')
+    expect(result.current.sourceText).toBe('First paragraph. Second paragraph.')
+
+    act(() => result.current.showRendered())
+    act(() => result.current.showReading())
+    act(() => result.current.leaveReading())
+    expect(result.current.view).toBe('rendered')
+  })
+
   it('captures the outgoing scroll ratio and restores it on the incoming view without the caller sequencing anything', () => {
     // `result.current` settles only after the passive-effect phase, which runs after the
     // layout effect under test, so the view is tracked from the render itself.

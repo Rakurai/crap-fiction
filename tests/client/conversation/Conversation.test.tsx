@@ -471,6 +471,23 @@ describe('sending from the keyboard', () => {
     expect(fireEvent.keyDown(composer, { key: 'Enter' })).toBe(false)
     await waitFor(() => expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { message: 'a message' }, DOCUMENTS, expect.any(AbortSignal)))
   })
+
+  it('leaves a control inside the composer to handle its own Enter, rather than submitting the message', async () => {
+    const dispatch = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding([]), dispatch }
+
+    renderConversation([], { room })
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: 'a message' } })
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'ask me' }), { key: 'Enter' })
+
+    expect(dispatch).not.toHaveBeenCalled()
+    expect((composer as HTMLTextAreaElement).value).toBe('a message')
+  })
 })
 
 describe('conversation activity, truthfully', () => {

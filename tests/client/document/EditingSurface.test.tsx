@@ -70,6 +70,20 @@ describe('a surface mounted on its own, with no other transport standing in for 
     await waitFor(() => expect(dispatch).toHaveBeenCalled())
   })
 
+  it('keeps the composer text through a trip into and back out of reading view', async () => {
+    render(<EditingSurface {...BASE_PROPS} />)
+
+    const composer = await screen.findByLabelText('Message the room')
+    fireEvent.change(composer, { target: { value: 'a draft of a reply' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
+    expect(screen.queryByLabelText('Manuscript source')).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect((screen.getByLabelText('Message the room') as HTMLTextAreaElement).value).toBe('a draft of a reply')
+  })
+
   it('renders the plain-text body and its reference schema the same way, on its own transports', () => {
     render(
       <EditingSurface
