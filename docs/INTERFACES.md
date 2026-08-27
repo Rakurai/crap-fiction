@@ -33,6 +33,11 @@ transport code. `message` is text safe to show.
 The envelope is how a failure is shaped, never a second place one is reported. Event frames and raw
 byte streams are not wrapped.
 
+The error branch is for a request the server could not carry out. An operation that did run and
+reached a negative outcome — nothing to change, nothing to say — reports that outcome inside its own
+success payload, because the author asked a question and got an answer. A route whose result can
+settle either way says so in what it returns, not by choosing a branch of the envelope.
+
 Every route returns the full result for its scope. There is no pagination.
 
 ## HTTP routes
@@ -44,9 +49,9 @@ POST   /pieces                                     title and the chosen mode; en
                                                    default cast
 GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
                                                    its invocation, plus each of the three surfaces'
-                                                   text, its reference schema where it has one,
-                                                   conversation index, current conversation, and
-                                                   roster with enabled state
+                                                   text, the file that text lives in, its reference
+                                                   schema where it has one, conversation index,
+                                                   current conversation, and roster with enabled state
 PATCH  /pieces/:id                                 title, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text

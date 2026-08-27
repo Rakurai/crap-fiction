@@ -124,6 +124,9 @@ A cast participant holding one craft responsibility, reasoning narrowly and deli
 it. It declares, for each mode and editing surface it is available on, whether it starts enabled
 there.
 
+A specialist may declare no availability at all. It is then a declared member of no cast, present
+in the roster of no surface, and reachable by no dispatch — authored and kept, and not in play.
+
 ### Story Editor
 
 The generalist. Exactly one participant declares it. Its objective is its own and holistic:
@@ -155,6 +158,11 @@ intention rather than a thing: nothing empty is kept, and nothing accumulates to
 **Conversation history and document state are independent.** A conversation does not version,
 own, or restore its surface's document. A discussion held against earlier text stands as it was
 said, and nothing reconciles it with the document as it now is.
+
+**The settled discussion is what a conversation has established**, as against the full record of
+what happened in it. It is the substance the author reads back and a later call reads as evidence:
+what participants contributed, and what was applied. Everything that happened is in the record;
+only what contributes is in the discussion.
 
 ## Author action
 

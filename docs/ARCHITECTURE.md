@@ -924,11 +924,12 @@ reloaded. The client resolves names through the roster, and the surface a conver
 not render until the roster has landed, so there is no window in which a conversation could be drawn in
 identities.
 
-**Nothing in the event set is a waiting state, a waiting count, or a reserved place**, for a specialist or
-for the Story Editor. A started action's resolved audience is a durable fact about what the dispatch will
-call, not a queue the client renders: a client that drew one named participant per audience member, empty
-until it reports something, would be inventing a state the model layer never asserted. What the author
-sees for a participant that has not yet reported anything is nothing at all.
+**Nothing in the event set is a queue: there is no waiting count and no place in an order**, for a
+specialist or for the Story Editor. A started action's resolved audience is a durable fact about what the
+dispatch will call, and naming those participants from it asserts nothing beyond that fact. What a client
+may not do is read a stage out of it that the model layer has not reported, or an order the room never
+promised. Each call's progress is reported for that call alone, and the moment it was submitted is part of
+what is reported, so elapsed time is a number the server stated rather than one the client began counting.
 
 **An action finishes as failed where the room itself failed**, distinctly from an action the author
 abandoned and from a dispatch that settled with failures inside it: a participant's failure is a response

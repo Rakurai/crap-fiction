@@ -175,10 +175,13 @@ failure is never presented as silence.
 **Know the room is working** — *per message*
 A message takes real time and the author watches it progress.
 *Done when:* the room states unconditionally that a conversation action is active the moment one
-opens, a called participant's own progress is shown only once the model layer reports it, several
-participants showing progress at once are shown independently, nothing interim is composed for a
-participant the model layer has not reported on, the author can keep writing throughout, and no
-response is rendered before it is complete.
+opens, every participant the action addressed is named from that same moment, the stage a
+participant's own call has reached is stated only as far as the model layer has reported it and is
+never guessed at on the participant's behalf, several participants reporting progress at once are
+shown independently, the author can keep writing throughout, and no response is rendered before it
+is complete. Naming a participant the room will call, saying how far its call has got, and holding
+what it finally said are three different things: the first is known when the action opens, the
+second only from the model layer, and the third only once a response is complete.
 
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a dispatch or
