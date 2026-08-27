@@ -11,10 +11,11 @@ Where this document describes a required interaction, it is settling its present
 > **Two halves are always present: the document being worked on, and the conversation about it.**
 
 Whichever surface the author is on, its document is where the work is and the conversation is
-where the work gets decided, so both halves are permanent and adjacent. On a window wider than
-the two of them the surplus is margin around the pair rather than a void between them, the
-conversation stays wide enough to read the room's sentences in, and neither half is pushed to an
-edge. Everything else — choosing a conversation, editing the room, configuration — arrives when
+where the work gets decided, so both halves are permanent and adjacent. The pair occupies the
+window. The conversation stays wide enough to read the room's sentences in and is capped there,
+because a conversation is a column of short messages and a wider one only travels the eye further
+for the same words; the surplus goes to the document, whose prose measure is centred in the space
+it has rather than dragged to an edge by it. Everything else — choosing a conversation, editing the room, configuration — arrives when
 the author reaches for it, over the window and on a ground of its own that accounts for what it
 covers, and leaves without disturbing either.
 
@@ -54,6 +55,13 @@ view is entered and left in one action each way with reading position preserved 
 that the author does it on impulse, mid-paragraph, without deciding to. It reads as the same
 manuscript with the application gone, not as a separate place.
 
+**Reading takes the whole window and holds the prose exactly where it was.** The measure and the
+type size are the editing surface's own, so entering and leaving re-wraps no line and the author's
+eye lands on the sentence it left. The piece's title stands at its head and is not editable there,
+because reading is for reading. The way out is stated as a fact about the machine that stays put
+while the prose scrolls, and it names the keystroke that already does it rather than adding a
+second way.
+
 ## The story context surface
 
 **A short switcher, beside the manuscript's other one-action controls, moves between the draft,
@@ -65,8 +73,12 @@ reason the other cannot start its own.
 
 **Story context is set as plain text, not as prose.** It carries no rendered view, no Markdown
 source toggle and no reading view — one surface, one way of seeing it, because it is notes
-rather than the story itself. Its reference schema sits beside it, offered as guidance the
-author can consult and dismiss rather than a form asking to be filled in.
+rather than the story itself. Its reference schema is offered below the notes, closed, as guidance
+the author can consult and dismiss rather than a form asking to be filled in.
+
+**It says which document it is and where that document is kept**, as a fact about the machine. These
+are files the author edits outside the studio as readily as in it, and a surface that will not say
+which file it is holding makes that a guess.
 
 ## The author context surface
 
@@ -100,31 +112,48 @@ control mentions the interviewer and sends its invocation as an ordinary message
 transcript in the author's own line, retypable by hand, and answered like any other mention.
 
 **Participants are addressed inside the message, by handle behind a sigil**, as in any chat
-room the author already uses. Addressing a specialist that is not in the room brings it in, and
-the room shows that it now holds one more specialist, so the change is never something the
-author discovers later.
+room the author already uses. Addressing a specialist that is not in the room brings it in, and the
+conversation states that it did and how many specialists the room now holds, so the change is never
+something the author discovers later. The Story Editor is not in that number: it is always present,
+and the room's own listing is where that is said. Stating the size here rather than standing it
+somewhere permanent is what keeps it free — the cast's size is worth knowing at the moment it changes
+and is clutter at every other moment.
+
+**Enter sends, and a modifier makes a new line.** The conversation is a chat and takes the chat
+convention: messages here are a sentence or two, prose is written in the other half, and the author
+who wants a paragraph in a message still gets one. While the completion list for a handle is open,
+Enter belongs to the list, because finishing an address must never dispatch a half-written message;
+and Enter does nothing whenever send is refusing, because the keyboard may not do what the interface
+has just said it will not. None of this is captioned on the surface: a hint explaining a keystroke is
+chrome explaining its own implementation, and one press teaches it.
 
 ### While the room answers
 
 **The author keeps writing.** A live cursor stays in the document throughout, and nothing about
-an author action in flight is modal, blocking, or a reason to stop typing. Chat send and every
-other response-triggering control are disabled for the action's whole duration, visibly so, but
-without losing their ordinary size or position — a control that shrank or relabelled itself would
-read as broken rather than as busy.
+an author action in flight is modal, blocking, or a reason to stop typing. Every response-triggering
+control is disabled for the action's whole duration, visibly so, and the one that sent the message
+becomes the one that stops it — the chat convention the author already knows, and honest here because
+the document was never touched, so the only thing there is to stop is the waiting.
 
-**An unconditional signal states that the action is active, and Abandon stands beside it as its own
-distinct, always-available control**, present the instant the action opens and for as long as it
-runs. Neither depends on the model layer reporting anything: a runtime that never reports progress
-still leaves the author certain their message was sent and certain they can stop it.
+**Every participant the action addressed has its own line from the instant it opens.** The line
+carries that participant's identity and where its call has got to: waiting to be called, having its
+model prepared, or working. It resolves when that participant's own response lands, independently of
+every other, because the room calls them independently and may call them at once. The Story Editor's
+line waits on the specialist readings it reads, which is a fact about what it does rather than a
+place held open for it.
 
-**A participant's own line appears only once the model layer reports real progress for it** — having
-its model prepared or working — and disappears the moment that participant's response lands. Several
-participants may show a line at once, because the room calls them independently. There is no reserved
-place for a participant the action has not yet heard from, no waiting count, and no place held for the
-Story Editor while specialist readings are still arriving: the unconditional signal and the disabled
-composer are what say the action is not yet settled, not a slot drawn in advance for a response that
-has not happened. Nothing is attributed to a participant that has not answered, and no response is
-shown before it is complete.
+**Elapsed time is one number per participant, and the studio does not start it.** The moment a call
+began is the server's to state, so a reload or a reopened piece finds the same elapsed time rather
+than a clock restarted by the surface that is drawing it. It runs from the call being submitted
+through the model being prepared and the model working, and is never reset between them: those are
+stages of one wait, and an author watching a slow local model needs to know how long they have been
+waiting, not how long the current stage has lasted.
+
+**No position in a queue is stated anywhere.** That a call is waiting is the whole of what the author
+can act on; a number counting down implies a schedule the studio does not control and cannot promise.
+
+Nothing is attributed to a participant that has not answered, and no response is shown before it is
+complete.
 
 **Nothing in the composition suggests one participant answered another.** Responses land in
 completion order rather than a fixed one, which makes this guardrail load-bearing: no connective
@@ -214,6 +243,13 @@ code diff, because the author is reading sentences and judging whether they are 
 note stay visible as on any other response, and the change itself opens and closes. Closed it is a
 count of what was altered, in the register facts about the machine are in, so length does not
 constrain it. Neither a reload nor navigating away and back auto-collapses it on the author's behalf.
+The disclosure is load-bearing over a conversation's life rather than in any one moment: applications
+accumulate, and a transcript where every past one permanently displays a withdrawn passage and its
+replacement stops being readable after three.
+
+**The count is of words, and exact.** Nothing counts sentences, because a sentence count needs a
+heuristic, the heuristic is wrong on dialogue and abbreviation, and a number in the register that
+states machine truth cannot be sometimes wrong and keep the register's meaning.
 
 **It says what changed and never where.** No paragraph number, no position, and nothing that jumps
 to the passage in the document. The author reads the change on the response and finds the passage by
@@ -224,7 +260,14 @@ edit.
 
 **Nothing responds to an application.** The room stays silent until the author speaks. Asking
 the room to look at what just changed is available as an ordinary message the author does not
-have to compose.
+have to compose — the one route across that silence, without which the author's only way to a
+reading of what just landed is to type out a paraphrase of a change they are looking at.
+
+**A response whose change has landed offers what is still true of it.** Applying is spent and asking
+it for a concrete change is answered, so neither remains; replying remains, because taking a
+specialist's suggestion is the most ordinary reason to say something back to it; and asking the room
+about the change appears, because there is now a change to ask about. Where an application failed or
+was abandoned the document is unchanged, so applying remains exactly as it was.
 
 ## An operation in flight
 
@@ -237,6 +280,12 @@ the one they are starting, because the state that would need explaining is unrea
 
 **Abandoning is available for as long as an operation is in flight**, and is not offered once it
 has produced its result — a response that landed is not one the author is abandoning.
+
+**It is offered where the operation is, and in exactly two places.** A conversation action is stopped
+from the control that started it, in the composer. An application is stopped from the statement that
+the document is being held, so the control sits beside the condition it ends. Nowhere else offers it:
+not on a participant's line, and not on a standing row above the transcript, because a control that
+appears in a third place is one the author has to decide the meaning of.
 
 **A conversation action and an application do not share one register for work under way.** During a
 conversation action the document is fully editable and a live cursor stays in it. During an application
@@ -295,6 +344,20 @@ beside the time. Nothing is ever recognizable by the room's words standing in fo
 having been written against earlier text, nothing warns that the document has moved on, and
 nothing offers to reconcile them.
 
+**The author's messages carry when they were said, and responses carry none.** A response belongs to
+the message above it and inherits its moment, and five responses stamped with near-identical times are
+noise. The stamp is what lets the author judge for themselves that words are old, which is the only way
+the studio can serve resumption without breaking the rule above: it states a machine fact and draws no
+conclusion from it.
+
+**The open conversation is named once, at the head of the conversation.** The listing is opened from a
+conversation in order to leave it and so must hold the one behind it, but that is the listing saying
+which row is current, not a second place the conversation is titled.
+
+**Asking to delete stays asked.** Once the author has asked, the row keeps its confirmation until they
+answer it: a confirmation that withdraws because the pointer drifted takes back a decision the author
+already made, which is the opposite of what asking was for.
+
 ## Registers
 
 Kinds of text are on screen and the author must feel which is which without thinking about it:
@@ -303,9 +366,18 @@ to the room**, which are neither the work nor the room's reading of it; and **fa
 machine** — participant state, elapsed time, counts, the story's length, model identity.
 
 Keeping the last in its own register is what stops an operational number from reading as content,
-and is why a length the author glances at constantly does not read as a score. Keeping the author's
-own words in one is what lets them scan a transcript for what they asked, and their words are never
-louder than either the work or the room's reading of it.
+and is why a length the author glances at constantly does not read as a score. It is the quietest of
+the four, because a fact about the machine is the least of what is on screen.
+
+Keeping the author's own words in one is what lets them scan a transcript for what they asked. What
+sets them apart is being set apart rather than being quieter: they are the author's own sentences and
+carry the ink of something worth re-reading, distinguished from the room's reading of the work by
+being marked as the author's rather than by being subordinate to it.
+
+**Anything the studio says about a response stands as its own line, never joined onto a
+participant's words.** A specialist did not say that its application returned nothing and cannot
+have. One concatenation puts the studio's sentence inside the room's register and the author has no
+way left to tell whose sentence they are reading, which is the whole of what these distinctions buy.
 
 The visual language carrying these distinctions is typography and colour rather than
 composition, and its values are the token layer's.
@@ -318,19 +390,24 @@ Derived from how often the author does each thing.
 actions on a response.
 
 **One action away** — the reading view; the Markdown view; another surface; choosing or starting a
-conversation; editing the room.
-
-**A place the author goes** — model assignment, the workspace, other pieces, the interface theme.
+conversation; editing the room; opening another piece; which model serves which participant.
 
 **Nearly invisible** — model status, saving, the mode once it is set.
 
-**The listing of pieces is that place**, and it holds the configuration that belongs to the author's
-machine rather than to any story: which model serves which participant, and which theme the interface
-is in. Both are decided rarely, and neither belongs in a surface the author is looking at while
-writing. It is also where launching the studio lands, so the one screen that precedes any open piece
-is the one that configures the machine and the one that says what this is: it carries the studio's
-name and one line of what it does, and where the pieces are kept is stated as a fact about the machine
-rather than as the most prominent thing on the screen.
+**Everything one action away arrives over the studio and leaves without disturbing it.** None of it
+is a screen the pair is replaced by, because the author reaches for all of it while working — for
+model assignment most of all, since the moment they want it is the moment a participant is answering
+badly.
+
+**Configuration of the author's machine is one place, and it is the one where models are assigned:**
+which model serves which participant, and which theme the interface is in. Both belong to the machine
+rather than to any story and both are decided rarely, and putting them together is what lets the
+studio answer *where are the settings* without ever growing a surface by that name.
+
+**The listing of pieces states where the pieces are kept**, as a fact about the machine rather than as
+the most prominent thing in it. It is also where launching the studio lands with no piece open, which
+makes it the one place the author is told what this is: it carries the studio's name and one line of
+what it does.
 
 **Model assignment is grouped by what a model is being chosen for** — the room, whose entries are the
 participants the author addresses, and the operations, which are the places the studio itself calls a
@@ -338,12 +415,25 @@ model from — because one undifferentiated sequence asks the author to hold in 
 are collaborators and which are machinery. Every entry says what the model there is for, the operations
 most of all, since the author has no other place to learn what they are.
 
+**Whether the models are reachable is stated where they are assigned**, as a fact beside that place's
+name, and stands nowhere else. It is the one moment the author needs it: a count of what is available
+is what makes an assignment possible, and the same words occupying the studio while the author writes
+tell them something they cannot use about a program they are not looking at.
+
 **A control's weight says what kind of act it is**, so the interface carries one weight per kind of act
-rather than one treatment for every control. Some of those weights are load-bearing. The accent is the
-author's own act of commitment and appears once on a screen; handing prose to a model is not that act
-and never carries it, because the author is the final authority and an interface whose loudest element
-invites a model to rewrite the prose says otherwise. And destroying something never wears the weight of
-dismissing it, because the two stand next to each other and only one of them can be undone.
+rather than one treatment for every control. Some of those weights are load-bearing.
+
+**The accent is the affirmative act** — the control that says do this thing, as against selecting,
+switching, revealing or dismissing. No count limits it per screen: what governs is that a control
+wearing it is one the author is choosing to do, so a screen where the author has two things to
+affirm shows two and a screen where they have none shows none, and the accent stays a statement
+about the act rather than a rationing of attention.
+
+**Destroying something never announces itself in a colour.** No alarm hue exists, because the
+interface has one act that discards the author's words and asking before doing it is what makes that
+safe; a red control makes the surface anxious in a place the author is only choosing a conversation
+to read. The destructive control is the deliberate one of the pair and never the louder one: it is
+bordered where the one that dismisses it is plain, so the author's eye finds the way out first.
 
 What follows from prominence: nothing needs two paths to it, unless one of them is the author's own
 sentence — addressing an absent specialist enables it, because typing to a collaborator is a worse
@@ -357,9 +447,9 @@ and are decided almost never.
 **These are the normal case.** Local models are slow, uneven and frequently wrong, so every
 composition here must be judged in these conditions before it is believed.
 
-**Nothing back yet.** The unconditional activity signal states that the room is working before any
-participant has anything to show. Nothing is attributed to one that has not answered, and none is
-shown waiting its turn.
+**Nothing back yet.** Each addressed participant's line states that its call is waiting, before any
+of them has anything to show. Nothing is attributed to one that has not answered, and none is shown
+its turn in a queue.
 
 **A long wait.** A full cast and the Story Editor together are several calls, and the room can take
 minutes to answer all of them. The transcript stays legible for the whole wait, the author is writing
@@ -387,8 +477,10 @@ too, and it says so.
 **A failed application.** The document is unchanged, editable again, and says so. Nothing is
 half-applied, and the recommendation remains applicable.
 
-**An abandoned application.** Identical to the author's eye: the document is as they left it,
-editable again, and the recommendation is still there to apply.
+**An abandoned application.** The document is in the same condition — as the author left it, editable
+again, the recommendation still there to apply — and the response says which of the two happened. An
+abandonment was the author's own act and a failure was the machine breaking, and that is what the
+author is weighing when they decide whether to try again.
 
 **A failed save.** The failure is stated quietly and persistently where the writing surface can be
 seen, named as that document's own where the piece holds more than one, clears itself when a
@@ -447,8 +539,8 @@ composed sentence.
 inbox of things to resolve, no prompt to bring artifacts into agreement. A review surface that
 arrives on the author's action, does its work and leaves is not one of these.
 
-**One authoritative location per thing**, and configuration is not one of the things the piece
-header holds.
+**One authoritative location per thing.** A door to somewhere is not a second location for what is
+behind it, but two doors to the same place are two paths, and the surface carries one path per thing.
 
 ## Constraints on composition
 

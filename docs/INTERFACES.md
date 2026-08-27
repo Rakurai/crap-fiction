@@ -104,13 +104,19 @@ The set is closed.
 
 | Event | Carries |
 |---|---|
-| `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes — delivered once, atomically with the subscription, before any other frame |
+| `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes, each with the stage and start moment of every participant it is still waiting on — delivered once, atomically with the subscription, before any other frame |
 | `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
 | `apply.pending` | The room scope, action, the entry applied, and the provisional identity of the replacement the model has just answered with |
-| `participant.activity` | The room scope, action, participant, and whether it is having its model prepared or working |
+| `participant.activity` | The room scope, action, participant, the stage its call has reached — waiting to be called, having its model prepared, or working — and the moment that call began |
 | `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
 | `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
 | `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
+
+A call's start moment is the server's, stamped once when the call is submitted and repeated unchanged
+on every later frame about that call and on the snapshot. It does not advance when the call moves from
+waiting to prepared to working, because those are stages of one wait. A client that stamped its own
+arrival time instead would restart the number on every reload and disagree with a second client on the
+same piece.
 
 A pending replacement's provisional identity reaches a client two ways: live on `apply.pending` the
 moment the model answers, and on the snapshot where the action a room scope reports in flight is an
@@ -229,8 +235,11 @@ the charter, and is composed only where a call addresses a participant directly.
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
 **description**, read by the author assigning it a model, and a **persona**, briefing the model with the
-participant's responsibility. It also declares its **eligibility**, exactly one of `cast`, `generalist`
-or `addressed-only`. A `cast` participant additionally declares **availability**: the mode-and-surface
+participant's responsibility. It also declares a **mark**, the short glyph its lines are signed with,
+and its **eligibility**, exactly one of `cast`, `generalist` or `addressed-only`. A mark names no
+colour: the colour a mark is drawn in is assigned by the studio from the roster's load order, so the
+content declares identity and the surface decides appearance. Two participants declaring the same mark
+is a startup failure, because a mark that signs two names signs neither. A `cast` participant additionally declares **availability**: the mode-and-surface
 pairs it is available for, and for each whether it starts enabled. An `addressed-only` participant may
 additionally declare a **function** — the named job it fills for the studio, inseparable from the
 **invocation**, the author's own words that the studio's affordance for that job sends.
