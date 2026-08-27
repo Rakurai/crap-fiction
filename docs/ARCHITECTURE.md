@@ -8,7 +8,9 @@ presentation, the declared surfaces, engineering discipline.
 A statement belongs here only if it would still be true after the code implementing it was
 rewritten. A fact whose accuracy can only be established by reading the source is the source's,
 not this document's. Values that are tuning rather than decision — a retry count, a timeout, a
-debounce interval, a colour — live where they are used and are absent here.
+debounce interval — live in one maintainer-facing application configuration, validated at
+startup, and are absent here. An appearance value, such as a colour, lives in the token layer
+instead.
 
 Where this document appears to decide product behaviour, it is recording what the behaviour above
 it forces.
@@ -1076,6 +1078,11 @@ the interface already composes, not as a crash and not as a new concept.
 ships none of them with a value.** An absent or malformed value is a startup failure naming it, because a
 deployment value defaulted in an image is a value nobody chose and the author would be the one to discover
 it.
+
+**An environment variable is a deployment value; application tuning is a configuration value.** The
+environment carries what differs by where the process runs. A retry count, a timeout or a debounce
+interval is the same for every deployment, so it travels in the repository's own configuration instead,
+validated at startup with the same failure discipline.
 
 **What counts as malformed is settled where the value is used, not where it is read.** The environment
 loader knows that the runtime location is a URL and nothing further: which schemes actually reach the

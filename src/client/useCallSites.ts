@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import type { assignModel as assignModelFn, fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRuntimeStatusFn } from './callSitesClient.js'
+import { config } from './config.js'
 import { useLoaded } from './load.js'
 import { failureMessage } from './request.js'
 
@@ -10,8 +11,6 @@ export type CallSiteAdapters = Readonly<{
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
   assignModel: typeof assignModelFn
 }>
-
-const SAVED_STANDS_MS = 2600
 
 export type CallSitesViewModel =
   | { readonly status: 'loading' }
@@ -41,7 +40,7 @@ export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
 
   useEffect(() => {
     if (saved === undefined) return
-    const timer = setTimeout(() => setSaved(undefined), SAVED_STANDS_MS)
+    const timer = setTimeout(() => setSaved(undefined), config.callSiteAssignment.savedStandsMs)
     return () => clearTimeout(timer)
   }, [saved])
 

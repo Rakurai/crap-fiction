@@ -283,3 +283,11 @@ The set is closed, and the image ships none of them with a value.
 
 An absent or malformed value is a startup failure naming it, on every path the studio is started by. A
 data root that is not an existing directory is malformed.
+
+## Application configuration
+
+`config.yaml`, at the repository root, carries application tuning: the maintainer's own decisions,
+the same for every deployment and travelling with the repository rather than the environment. It is
+validated once, on the server at startup and in the client at build time, against one shared schema.
+An absent or malformed value is a startup failure naming the file and the value; nothing in it is
+defaulted. No value it carries is transcribed here.

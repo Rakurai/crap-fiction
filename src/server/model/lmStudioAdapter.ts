@@ -2,15 +2,13 @@ import { LMStudioClient } from '@lmstudio/sdk'
 import pRetry from 'p-retry'
 import { z } from 'zod'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
+import { loadConfig } from '../config.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
 import type { CallPrompt, CallResult, CallState, ModelAccess } from './types.js'
 
-const RETRIES = 2
-const TIMEOUT_MS = 120_000
-
-const RESPONSE_MAX_TOKENS = 2_000
-const MANUSCRIPT_MAX_TOKENS = 32_000
+const { retries: RETRIES, timeoutMs: TIMEOUT_MS, responseMaxTokens: RESPONSE_MAX_TOKENS, manuscriptMaxTokens: MANUSCRIPT_MAX_TOKENS } =
+  loadConfig().model
 
 export type GetAssignment = (site: string) => string | undefined
 

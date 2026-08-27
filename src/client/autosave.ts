@@ -1,4 +1,5 @@
 import type { Clock } from '../shared/clock.js'
+import { config } from './config.js'
 import { failureMessage, type RequestResult } from './request.js'
 
 export type AutosaveState =
@@ -15,14 +16,12 @@ export type AutosaveController = Readonly<{
   dispose: () => void
 }>
 
-const DEBOUNCE_MS = 1000
-
 export function createAutosaveController(
   initialText: string,
   save: SaveDocument,
   onStateChange: (state: AutosaveState) => void,
   now: Clock,
-  debounceMs: number = DEBOUNCE_MS,
+  debounceMs: number = config.autosave.debounceMs,
 ): AutosaveController {
   let latest = initialText
   let dirty = false

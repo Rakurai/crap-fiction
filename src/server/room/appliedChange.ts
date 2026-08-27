@@ -1,10 +1,9 @@
 import { diffWordsWithSpace, type Change } from 'diff'
 import type { AppliedChangeContent } from '../../shared/appliedChange.js'
 import { countWords } from '../../shared/storyLength.js'
+import { loadConfig } from '../config.js'
 
-const CONTEXT_WORDS = 8
-
-const UNBOUNDED_FRACTION = 0.5
+const { contextWords: CONTEXT_WORDS, unboundedFraction: UNBOUNDED_FRACTION } = loadConfig().appliedChange
 
 function wordsOf(parts: readonly Change[], select: (part: Change) => boolean | undefined): number {
   return parts.filter(select).reduce((sum, part) => sum + countWords(part.value), 0)

@@ -4,7 +4,7 @@ import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
-import { firstSchemaIssue } from '../schemaIssue.js'
+import { firstSchemaIssue } from '../../shared/schemaIssue.js'
 import { RouteFailure } from '../routeFailure.js'
 
 export class TolerantReadError extends RouteFailure {

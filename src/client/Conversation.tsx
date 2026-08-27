@@ -10,6 +10,7 @@ import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
 import { isChangeDisclosed, setChangeDisclosed } from './appliedChangeDisclosure.js'
+import { config } from './config.js'
 import { elapsed, facts, machineWords, messageWhen, passageCount, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { Mark } from './Mark.js'
@@ -22,8 +23,6 @@ import type { ParticipantIdentity } from './useRoster.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
 
 const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
-
-const MAX_MENTION_MATCHES = 8
 
 export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
@@ -456,7 +455,7 @@ export function Conversation({
   const token = Ariakit.useStoreState(combobox, 'inputValue')
 
   const matches = useMemo(
-    () => (query === undefined ? [] : handles.filter((entry) => entry.handle.startsWith(token.toLowerCase())).slice(0, MAX_MENTION_MATCHES)),
+    () => (query === undefined ? [] : handles.filter((entry) => entry.handle.startsWith(token.toLowerCase())).slice(0, config.mentions.maxMatches)),
     [handles, query, token],
   )
 

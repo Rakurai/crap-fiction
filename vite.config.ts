@@ -1,12 +1,14 @@
 import react from '@vitejs/plugin-react'
+import yaml from '@rollup/plugin-yaml'
 import devServer, { defaultOptions } from '@hono/vite-dev-server'
-import { defineConfig, type UserConfig } from 'vite'
+import { defineConfig, type PluginOption, type UserConfig } from 'vite'
 import { loadEnv } from './src/server/env.js'
 
 export function studioConfig(entry: string): UserConfig {
   const env = loadEnv()
   return {
     plugins: [
+      yaml() as PluginOption,
       react(),
       devServer({
         entry,

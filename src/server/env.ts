@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { firstSchemaIssue } from './schemaIssue.js'
+import { firstSchemaIssue } from '../shared/schemaIssue.js'
 import { isAbsoluteLocation, isExistingDirectory } from './store/index.js'
 
 export const STUDIO_VARIABLES = [
