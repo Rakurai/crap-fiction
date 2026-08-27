@@ -161,7 +161,7 @@ Propose a new test only when you can name the distinct plausible failure it prot
 #### G. Code Quality
 
 - Hallucinated APIs: method calls, parameters, or imports that don't exist in the dependency versions specified
-- Comments that narrate obvious operations or restate the code
+- Any comment that is not one of the kinds STANDARDS admits, judged on the test it states rather than on whether the sentence reads as useful
 - `console.*` used as logging
 
 #### H. Architecture & Codebase Alignment

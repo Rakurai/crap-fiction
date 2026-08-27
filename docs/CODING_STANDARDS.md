@@ -60,9 +60,6 @@ a `??` at a call site. No seeded content, no demo mode, no example output, nothi
 A default gets accepted as evidence that something belongs there, and then satisfies the check that was
 meant to catch its absence.
 
-**No in-code history.** No version comments, no changelog blocks, no references to code that was
-removed or renamed. That is version control's job.
-
 **One adapter is a hypothetical seam; two are a real one.** Do not introduce a seam unless something
 varies across it — a second runtime, a test substitute, a policy the product requires switching. A
 premature seam is shallow by definition. Where a boundary is load-bearing, it is because it carries a
@@ -96,7 +93,7 @@ parser or an editor crosses a seam: typed domain values cross, and nothing else.
 Types are the machine-readable half of the interface.
 
 TypeScript runs `strict`. `any` does not appear in product code; where a third-party shape forces it,
-write `unknown` at the edge and narrow, or annotate the `any` with `// TODO refine type`.
+write `unknown` at the edge and narrow.
 
 Narrow aggressively: string literal unions, discriminated unions, `readonly`, `as const`. Make an
 invalid value hard to construct. Prefer a discriminated union with an exhaustive `switch` — checked
@@ -318,55 +315,55 @@ would become a durable record nobody decided to keep.
 
 ## Testing
 
-**The interface is the test surface.** Tests and callers cross the same seam. Where a module is a
-directory, its index file is that interface and a sibling file behind it is internal — a test imports
-the index and never a sibling, on the same terms as product code.
+**The interface is the test surface.** Where a module is a directory, its index is that interface; a
+test never imports a sibling behind it.
 
-**A test directory names what is protected, never the runtime that happens to be needed.** A reader
-knows from a path alone what a file is for, because the path groups tests by the capability or module
-they guard. Where a group needs a particular environment the runner selects it by matching those paths,
-so the environment follows the grouping and is never its reason. A directory named for a runtime tells a
-contributor nothing about where a new test belongs, and a layout that says nothing is re-guessed by
-everyone who adds to it.
+**A test's path says what is protected, never which runtime it needs.** The runner selects an
+environment by matching paths, so grouping comes first and the environment follows it.
 
-**Each property is asserted at exactly one boundary, and nowhere twice.** A rule asserted at two
-levels is a rule that will be changed at one. Where a property could be stated at more than one
-boundary, it is asserted at the deepest one able to state it in the product's own vocabulary — the
-boundary the mechanism belongs to, not the one nearest to the test.
+**Each property is asserted at exactly one boundary** — the deepest able to state it in the product's
+own vocabulary. Asserted at two, it will be changed at one.
 
-Prove the contracts and the core flows. Do not build exhaustive edge-case matrices; prefer a few
-high-signal tests at real seams over broad unit coverage. Each test earns its place by naming a
-distinct failure it would catch; a second test catching the same failure at the same boundary is a
-duplicate, not extra coverage. A schema is not a behaviour — that a value parses is a different claim
-from what the code does with it, and a test that only re-states a schema adds nothing past the schema
-itself. A closed set or a regular expression the product declares once is imported by the test that
-needs it, never retyped: a copy drifts the moment the original changes and the test stops noticing.
+**Every test names a distinct failure it would catch.** A second test catching the same failure at the
+same boundary is a duplicate. Prove the contracts and the core flows; prefer a few high-signal tests at
+real seams to broad unit coverage, and build no exhaustive edge-case matrix.
 
-Assert observable outcomes through the interface, never internal state, so tests survive a refactor
-behind it.
+**An oracle must be able to fail against a nameable defect.** Expected values are arrived at
+independently of the code under test: not recomputed by the mechanism under test, not read back from
+what the same act wrote, not a recorded output no reader checks.
 
-A test that models what the environment would otherwise compute is asserting the mechanism, not the
-property, and must say which one it owns. Modelling is legitimate — the arithmetic is worth
-protecting where the arithmetic is the risk — but the property still wants the environment that
-computes it, and until something supplies that, the property is unprotected however green the
-mechanism reads.
+**Assert observable outcomes through the interface, never internal state.** A test that has to change
+when a refactor changes nothing observable was protecting the arrangement rather than the contract; the
+fix is to stop the arrangement being visible to it.
 
-Mock only adapters at seams. Never mock an internal function to make a test convenient. Use the real
-or local-substitute implementation for anything that has one.
+**A schema is not a behaviour** — that a value parses is a different claim from what the code does with
+it. A closed set or pattern the product declares is imported, never retyped.
 
-**A harness is not a fixture.** A harness is the test infrastructure that stands a scenario up — a
-temporary directory, a scripted adapter class, a test server — and it supplies no default the product
-itself would not supply: it is plumbing, never a source of data a test forgot to provide. A fixture is
-the value one particular test hands that harness — the response it scripts, the artifact it
-hand-edits — and belongs to that test alone.
+**Modelling what the environment would compute asserts the mechanism, not the property.** Legitimate
+where the arithmetic is the risk, but the property stays unprotected until something supplies the real
+environment, however green the model reads.
 
-A module that reads the current time takes it as a parameter rather than calling the clock itself, so
-a test controls it directly instead of racing it.
+**Mock only adapters at seams**, and use the real or local-substitute implementation for anything that
+has one.
 
-When a module is deepened, the unit tests on the shallow modules it absorbed are waste. Delete them
-and test at the new interface.
+**A harness is plumbing; a fixture is data.** A harness stands a scenario up and supplies no default
+the product would not; a fixture is the value one test hands it, and belongs to that test.
 
-When a test fails, fix the implementation. Do not trivialize the assertion.
+**A module that reads the clock takes it as a parameter.**
+
+**Every existing test is a liability, and the burden of proof is retention.** Passing, age and having
+shipped beside its feature earn nothing — a test written with a feature encodes its bugs as readily as
+its contract. Deleting one still needs the failure it would catch named, and shown caught elsewhere or
+not worth catching.
+
+**The suite is an exemplar before it is a safety net** — the nearest test shapes the next one written.
+Where several weak tests share a cause, the cause is the defect.
+
+**Deepening a module makes the absorbed modules' unit tests waste.** Delete them and test at the new
+interface.
+
+**When a test fails, fix the implementation.** Never trivialize the assertion, and commit nothing
+skipped, quarantined or marked as work to do.
 
 ---
 
@@ -374,10 +371,34 @@ When a test fails, fix the implementation. Do not trivialize the assertion.
 
 One module per file, unless a small cohesive family reads better together.
 
-Names carry intent. Comments explain **why** — an invariant, a constraint, a non-obvious ordering —
-never **what** the code plainly says.
+**The default is no comment**, in every file the repository ships, in whatever syntax that file
+spells a comment. A comment is a second statement of a fact, and it drifts from the first.
 
-No commented-out code and no history in comments.
+**A comment character does not make a line a comment.** Where a shipped artifact is read as whole
+text that reaches an author or a model, that text is the product and this rule does not reach it.
+Judge a line by who reads it, never by its punctuation.
+
+**One test admits a comment: deleting it would leave a competent reader holding a wrong conclusion
+that the code, its names and its types cannot correct.** Not whether a reader would be helped, and
+not whether the sentence is true. A comment that fails is deleted, not shortened.
+
+Admitted:
+
+- A discriminator that cannot be discriminated where it is read.
+- A branch unreachable by a refinement the inferred type cannot express.
+- An ordering that carries a guarantee neither of the ordered operations states.
+- A value deliberately not derived from the one it appears to follow.
+- A dependency's or the platform's documented behaviour that the call site contradicts on its face.
+
+Prohibited, each reached by an argument that resembles the test above:
+
+- Restating the code, including a doc comment on a name that already says it.
+- Justifying a design decision — the decision's home is a design document.
+- Citing a document, a requirement, an issue or a review.
+- Narrating the domain. Domain vocabulary belongs in names.
+- Describing a test's arrangement, or restating its assertion in prose.
+- Section banners, dividers and grouping headers.
+- Commented-out code, work-to-do markers, and history of any kind.
 
 ---
 
@@ -391,10 +412,13 @@ No commented-out code and no history in comments.
 - Premature seams — one adapter and no concrete variation.
 - Modules that fail the deletion test.
 - Testing past the interface: mocking internals, asserting private state.
+- A coverage target, a ratio between levels, and one test per function, route, component or schema.
+- A test added because something is currently unexercised rather than because a failure was named.
 - `any` in product paths, non-null assertions, and `as` used to escape a shape.
 - Vendor types, framework errors or storage shapes crossing a seam.
 - Console writes used as logging, floating promises, polling loops.
 - In-code history of any kind.
+- A comment outside the admitted kinds, in any shipped file.
 
 ---
 
@@ -426,4 +450,9 @@ No commented-out code and no history in comments.
       distinct failure; no schema re-stated as a behaviour; closed sets and regexes imported, not copied.
 - [ ] Harnesses and fixtures kept distinct; a fixture is local to the test that needs it; a module
       reading the clock takes it as a parameter.
-- [ ] Comments say why; no history in code.
+- [ ] Every assertion can fail against a nameable defect; expected values arrived at independently of
+      the code under test.
+- [ ] No test changes when a refactor changes no observable behaviour; nothing committed skipped or
+      marked to do.
+- [ ] Every comment in every shipped file is one of the admitted kinds; deleting it would leave the
+      reader wrong.
