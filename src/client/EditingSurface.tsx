@@ -44,6 +44,7 @@ type EditingSurfaceProps = {
   readonly active: boolean
   readonly onSwitchToSurface: (surface: SurfaceId) => void
   readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
   /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
@@ -109,6 +110,7 @@ function MountedSurface({
   active,
   onSwitchToSurface,
   onOpenPieces,
+  onOpenModels,
   onTextChange,
   onSaveFailedChange,
   onFlushRegister,
@@ -159,6 +161,7 @@ function MountedSurface({
           title={title}
           mode={mode}
           onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           manuscript={document.session.manuscript}
           autosave={session.autosave}
           onOpenRoom={() => setPanel('room')}
@@ -173,6 +176,7 @@ function MountedSurface({
           surface={document.surface}
           title={title}
           onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           text={document.session.text}
           onChange={document.session.setText}
           referenceSchema={document.referenceSchema}

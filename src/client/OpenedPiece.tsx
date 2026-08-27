@@ -42,6 +42,7 @@ type OpenedPieceProps = {
   /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly onLeaveBlockedChange: (blocked: boolean) => void
   readonly switchRequest: PieceSwitchRequest
 }
@@ -65,6 +66,7 @@ function Surfaces({
   callSites,
   authorContextSelection,
   onOpenPieces,
+  onOpenModels,
   onLeaveBlockedChange,
   switchRequest,
 }: {
@@ -75,6 +77,7 @@ function Surfaces({
   readonly callSites: CallSiteAdapters
   readonly authorContextSelection?: AuthorContextSelection | undefined
   readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly onLeaveBlockedChange: (blocked: boolean) => void
   readonly switchRequest: PieceSwitchRequest
 }) {
@@ -157,6 +160,7 @@ function Surfaces({
           active={activeSurface === surface}
           onSwitchToSurface={setActiveSurface}
           onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           onTextChange={registry.update}
           onSaveFailedChange={handleSaveFailedChange}
           onFlushRegister={handleFlushRegister}
@@ -174,6 +178,7 @@ export function OpenedPiece({
   callSites,
   authorContextSelection,
   onOpenPieces,
+  onOpenModels,
   onLeaveBlockedChange,
   switchRequest,
 }: OpenedPieceProps) {
@@ -201,6 +206,7 @@ export function OpenedPiece({
         }}
         authorContextSelection={authorContextSelection}
         onOpenPieces={onOpenPieces}
+        onOpenModels={onOpenModels}
         onLeaveBlockedChange={onLeaveBlockedChange}
         switchRequest={switchRequest}
       />

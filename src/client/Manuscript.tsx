@@ -12,6 +12,7 @@ type ManuscriptProps = {
   readonly title: string
   readonly mode: string
   readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
   readonly onOpenRoom: () => void
@@ -29,6 +30,7 @@ export function Manuscript({
   title,
   mode,
   onOpenPieces,
+  onOpenModels,
   manuscript,
   autosave,
   onOpenRoom,
@@ -99,6 +101,9 @@ export function Manuscript({
             </button>
             <button type="button" className={styles.control} onClick={onOpenRoom}>
               room
+            </button>
+            <button type="button" className={styles.control} onClick={onOpenModels}>
+              models
             </button>
           </div>
         </div>

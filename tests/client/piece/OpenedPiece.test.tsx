@@ -101,6 +101,7 @@ function fullProps(
   opened: ReturnType<typeof studio>,
   overrides: Partial<{
     onOpenPieces: () => void
+    onOpenModels: () => void
     onLeaveBlockedChange: (blocked: boolean) => void
     switchRequest: PieceSwitchRequest
   }> = {},
@@ -108,6 +109,7 @@ function fullProps(
   return {
     ...opened.props,
     onOpenPieces: vi.fn(),
+    onOpenModels: vi.fn(),
     onLeaveBlockedChange: vi.fn(),
     switchRequest: NO_SWITCH_REQUEST,
     ...overrides,
@@ -300,7 +302,7 @@ describe('the author-context conversation selection', () => {
     await screen.findByText('opened as kept-across-a-piece-switch')
 
     fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
-    fireEvent.click(screen.getByRole('button', { name: 'new' }))
+    fireEvent.click(screen.getByRole('button', { name: 'new conversation' }))
 
     expect(onAuthorContextSelectionChange).toHaveBeenCalledWith(null)
   })

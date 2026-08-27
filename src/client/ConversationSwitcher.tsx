@@ -39,11 +39,9 @@ export function ConversationSwitcher({
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Conversations">
         <div className={styles.header}>
           <span className={styles.title}>Conversations</span>
-          <button type="button" className={styles.start} onClick={onStartNew}>
-            new
-          </button>
-          <button type="button" className={styles.done} onClick={onClose}>
-            done
+          <span className={styles.spacer} />
+          <button type="button" className={styles.close} onClick={onClose}>
+            close
           </button>
         </div>
         {conversations.length === 0 && <p className={styles.empty}>No conversations yet.</p>}
@@ -93,6 +91,11 @@ export function ConversationSwitcher({
             {error}
           </p>
         )}
+        <div className={styles.foot}>
+          <button type="button" className={styles.start} onClick={onStartNew}>
+            new conversation
+          </button>
+        </div>
       </div>
     </>
   )

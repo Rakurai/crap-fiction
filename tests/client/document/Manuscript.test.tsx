@@ -14,6 +14,7 @@ const DEFAULT_PROPS = {
   mode: 'flash',
   draft: 'First light of the day.',
   onOpenPieces: vi.fn(),
+  onOpenModels: vi.fn(),
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
   onSwitchToStoryContext: vi.fn(),
@@ -35,6 +36,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       title={props.title}
       mode={props.mode}
       onOpenPieces={props.onOpenPieces}
+      onOpenModels={props.onOpenModels}
       manuscript={manuscript}
       autosave={autosave}
       onOpenRoom={props.onOpenRoom}

@@ -50,6 +50,7 @@ const BASE_PROPS = {
   active: true,
   onSwitchToSurface: vi.fn(),
   onOpenPieces: vi.fn(),
+  onOpenModels: vi.fn(),
   onTextChange: vi.fn(),
   onSaveFailedChange: vi.fn(),
   onFlushRegister: vi.fn(),

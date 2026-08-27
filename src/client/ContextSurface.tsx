@@ -18,6 +18,7 @@ type ContextSurfaceProps = {
   readonly surface: ContextSurfaceId
   readonly title: string
   readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly text: string
   readonly onChange: (text: string) => void
   readonly referenceSchema: string | null
@@ -33,6 +34,7 @@ export function ContextSurface({
   surface,
   title,
   onOpenPieces,
+  onOpenModels,
   text,
   onChange,
   referenceSchema,
@@ -65,6 +67,9 @@ export function ContextSurface({
           </button>
           <button type="button" className={styles.control} onClick={onOpenRoom}>
             room
+          </button>
+          <button type="button" className={styles.control} onClick={onOpenModels}>
+            models
           </button>
         </div>
       </div>

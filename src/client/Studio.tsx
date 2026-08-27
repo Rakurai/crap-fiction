@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import { assignModel, fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
+import { ModelsWindow } from './ModelsWindow.js'
 import { OpenedPiece, type CallSiteAdapters } from './OpenedPiece.js'
 import { fetchPiece, saveSurfaceDocument, updatePiece } from './piecesClient.js'
 import { PiecesWindow } from './PiecesWindow.js'
@@ -14,6 +15,7 @@ import {
   subscribeToRoom,
 } from './roomClient.js'
 import styles from './Studio.module.css'
+import { useCallSites } from './useCallSites.js'
 import type { RoomAdapters } from './useConversation.js'
 import type { PieceAdapters } from './usePiece.js'
 import { usePieces } from './usePieces.js'
@@ -45,11 +47,13 @@ const ROOM_ADAPTERS: RoomAdapters = {
  * whichever of those is current, on its own ground, leaving without disturbing either.
  */
 export function Studio({ workspace }: StudioProps) {
-  useTheme()
+  const theme = useTheme()
+  const callSites = useCallSites({ fetchCallSites, fetchRuntimeStatus, assignModel })
   const [openedId, setOpenedId] = useState<string | undefined>(undefined)
   const [refreshKey, setRefreshKey] = useState(0)
   const pieces = usePieces(refreshKey)
   const [showPieces, setShowPieces] = useState(true)
+  const [showModels, setShowModels] = useState(false)
   const [switchTargetId, setSwitchTargetId] = useState<string | undefined>(undefined)
   const [leaveBlocked, setLeaveBlocked] = useState(false)
   // Outlives any one opened piece, so the author-context conversation the author is in stays
@@ -61,6 +65,8 @@ export function Studio({ workspace }: StudioProps) {
     setShowPieces(true)
     setRefreshKey((key) => key + 1)
   }, [])
+
+  const openModels = useCallback(() => setShowModels(true), [])
 
   function handleSwitchSettled(blocked: boolean): void {
     if (!blocked && switchTargetId !== undefined) {
@@ -99,6 +105,7 @@ export function Studio({ workspace }: StudioProps) {
           callSites={CALL_SITE_ADAPTERS}
           authorContextSelection={{ value: authorContextConversationId, onChange: setAuthorContextConversationId }}
           onOpenPieces={openPieces}
+          onOpenModels={openModels}
           onLeaveBlockedChange={setLeaveBlocked}
           switchRequest={{ targetId: switchTargetId, onSettled: handleSwitchSettled }}
         />
@@ -113,6 +120,7 @@ export function Studio({ workspace }: StudioProps) {
           onClose={() => setShowPieces(false)}
         />
       )}
+      {showModels && <ModelsWindow callSites={callSites} theme={theme} onClose={() => setShowModels(false)} />}
     </div>
   )
 }

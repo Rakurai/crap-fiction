@@ -29,8 +29,21 @@
   flex: 1;
 }
 
-.start,
-.done {
+.spacer {
+  flex: 1;
+}
+
+.close {
+  composes: view from './controls.module.css';
+}
+
+.foot {
+  border-top: 1px solid var(--rule);
+  margin-top: 4px;
+  padding-top: 15px;
+}
+
+.start {
   composes: surface from './controls.module.css';
 }
 
@@ -68,12 +81,7 @@
   cursor: pointer;
 }
 
-/* The conversation the transcript is showing is held, not merely emphasised. */
-.open[aria-current='true'] {
-  background: var(--tint);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
+/* The conversation the transcript is showing is held by its ink and its facts span alone. */
 .open[aria-current='true'] .opening {
   color: var(--ink);
 }
