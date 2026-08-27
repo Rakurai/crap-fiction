@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import { type SurfaceId } from '../shared/surfaces.js'
 import styles from './ContextSurface.module.css'
 import { DocumentHeader } from './DocumentHeader.js'
@@ -13,6 +14,10 @@ const LABEL: Readonly<Record<ContextSurfaceId, string>> = {
   authorContext: 'Author context',
 }
 
+function isUndoKeystroke(event: KeyboardEvent): boolean {
+  return event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey
+}
+
 type ContextSurfaceProps = {
   readonly surface: ContextSurfaceId
   readonly title: string
@@ -26,6 +31,7 @@ type ContextSurfaceProps = {
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
   readonly applying: ApplyingHold | undefined
+  readonly onReverseApplication: () => boolean
 }
 
 export function ContextSurface({
@@ -41,6 +47,7 @@ export function ContextSurface({
   onSwitchTo,
   lifecycle,
   applying,
+  onReverseApplication,
 }: ContextSurfaceProps) {
 
   return (
@@ -81,6 +88,9 @@ export function ContextSurface({
             value={text}
             disabled={applying !== undefined}
             onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (isUndoKeystroke(event) && onReverseApplication()) event.preventDefault()
+            }}
           />
         </div>
       </div>

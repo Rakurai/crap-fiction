@@ -174,6 +174,7 @@ function MountedSurface({
           onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
+          onReverseApplication={document.session.reverseApplication}
         />
       )}
       {showConversation && (
