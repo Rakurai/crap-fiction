@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { conversationEntryViewSchema } from './conversationEntryViews.js'
+import { failureCodeSchema } from './envelope.js'
 import { surfaceIdSchema } from './surfaces.js'
 
 export const actionKindSchema = z.enum(['dispatch', 'apply'])
@@ -32,11 +33,21 @@ export const applyPendingEventSchema = z.object({
 
 export type ApplyPendingEvent = z.infer<typeof applyPendingEventSchema>
 
+export const participantStageSchema = z.enum(['called', 'preparing', 'working'])
+
+export type ParticipantStage = z.infer<typeof participantStageSchema>
+
+export const participantStateSchema = z.object({
+  state: participantStageSchema,
+  startedAt: z.number().int().positive(),
+})
+
+export type ParticipantState = z.infer<typeof participantStateSchema>
+
 export const participantActivityEventSchema = z.object({
   actionId: z.string().min(1),
   participantId: z.string().min(1),
-  state: z.enum(['called', 'preparing', 'working']),
-  startedAt: z.number().int().positive(),
+  ...participantStateSchema.shape,
   surface: surfaceIdSchema,
 })
 
@@ -58,20 +69,13 @@ export const actionFinishedEventSchema = z.object({
 
 export type ActionFinishedEvent = z.infer<typeof actionFinishedEventSchema>
 
-export const conversationFailureCodeSchema = z.enum(['CONVERSATION_NOT_WRITTEN', 'UNEXPECTED_FAILURE'])
+export const conversationFailureCodeSchema = failureCodeSchema.extract(['CONVERSATION_NOT_WRITTEN', 'UNEXPECTED_FAILURE'])
 
 export type ConversationFailureCode = z.infer<typeof conversationFailureCodeSchema>
 
 export const conversationErrorEventSchema = z.object({ code: conversationFailureCodeSchema, message: z.string(), surface: surfaceIdSchema })
 
 export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
-
-export const participantStateSchema = z.object({
-  state: z.enum(['called', 'preparing', 'working']),
-  startedAt: z.number().int().positive(),
-})
-
-export type ParticipantState = z.infer<typeof participantStateSchema>
 
 export const dispatchActivitySnapshotSchema = z.object({
   actionId: z.string().min(1),
@@ -112,3 +116,26 @@ export const roomActivitySnapshotSchema = z
   .readonly()
 
 export type RoomActivitySnapshot = z.infer<typeof roomActivitySnapshotSchema>
+
+export const roomEventNameSchema = z.enum([
+  'activity.snapshot',
+  'action.started',
+  'apply.pending',
+  'participant.activity',
+  'entry.appended',
+  'action.finished',
+  'error',
+])
+
+export type RoomEventName = z.infer<typeof roomEventNameSchema>
+
+export const roomEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: roomEventNameSchema.extract(['action.started']), data: actionStartedEventSchema }),
+  z.object({ type: roomEventNameSchema.extract(['apply.pending']), data: applyPendingEventSchema }),
+  z.object({ type: roomEventNameSchema.extract(['participant.activity']), data: participantActivityEventSchema }),
+  z.object({ type: roomEventNameSchema.extract(['entry.appended']), data: entryAppendedEventSchema }),
+  z.object({ type: roomEventNameSchema.extract(['action.finished']), data: actionFinishedEventSchema }),
+  z.object({ type: roomEventNameSchema.extract(['error']), data: conversationErrorEventSchema }),
+])
+
+export type RoomEvent = z.infer<typeof roomEventSchema>
