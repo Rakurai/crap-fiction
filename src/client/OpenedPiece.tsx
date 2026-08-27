@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PieceDetail } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
@@ -24,6 +24,16 @@ export type CallSiteAdapters = Readonly<{
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
 }>
 
+/**
+ * A request, from the pieces window, to leave this piece for another. `targetId` changes each time
+ * the author asks; `onSettled` is called once with whether the request was blocked, after every
+ * surface's document has been flushed and waited on.
+ */
+export type PieceSwitchRequest = Readonly<{
+  targetId: string | undefined
+  onSettled: (blocked: boolean) => void
+}>
+
 type OpenedPieceProps = {
   readonly id: string
   readonly pieceAdapters: PieceAdapters
@@ -31,7 +41,9 @@ type OpenedPieceProps = {
   readonly callSites: CallSiteAdapters
   /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
   readonly authorContextSelection?: AuthorContextSelection | undefined
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onLeaveBlockedChange: (blocked: boolean) => void
+  readonly switchRequest: PieceSwitchRequest
 }
 
 function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfig {
@@ -52,7 +64,9 @@ function Surfaces({
   pieceAdapters,
   callSites,
   authorContextSelection,
-  onClose,
+  onOpenPieces,
+  onLeaveBlockedChange,
+  switchRequest,
 }: {
   readonly piece: PieceDetail
   readonly lifecycle: LifecycleProps
@@ -60,7 +74,9 @@ function Surfaces({
   readonly pieceAdapters: PieceAdapters
   readonly callSites: CallSiteAdapters
   readonly authorContextSelection?: AuthorContextSelection | undefined
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onLeaveBlockedChange: (blocked: boolean) => void
+  readonly switchRequest: PieceSwitchRequest
 }) {
   const roster = useRoster(callSites.fetchCallSites)
   const [probe] = useLoaded(callSites.fetchRuntimeStatus, [])
@@ -94,20 +110,28 @@ function Surfaces({
   // Each surface subscribes through the one connection this shell holds, not its own.
   const surfaceRoom: RoomAdapters = { ...room, subscribeToRoom: pieceStream }
 
-  // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
-  // flushed and awaited first, because a failed write is the one thing that keeps the piece open.
-  // `closing` disables repeated requests and keeps every surface's own persistence status visible
-  // for as long as this is waiting.
-  async function leave(): Promise<void> {
-    if (closing) return
+  useEffect(() => {
+    onLeaveBlockedChange(leaveBlocked)
+  }, [leaveBlocked, onLeaveBlockedChange])
+
+  // Switching to another piece is a coordinated lifecycle rather than an unmount cleanup: every
+  // surface's document is flushed and awaited first, because a failed write is the one thing that
+  // keeps this piece open. `closing` folds into `leaveBlocked` for as long as this is waiting, so a
+  // second request cannot start while one is already in flight.
+  const targetId = switchRequest.targetId
+  useEffect(() => {
+    if (targetId === undefined) return
+    let cancelled = false
     setClosing(true)
-    const result = await closePiece(flushersRef.current)
-    if (result.blocked) {
+    void closePiece(flushersRef.current).then((result) => {
+      if (cancelled) return
       setClosing(false)
-      return
+      switchRequest.onSettled(result.blocked)
+    })
+    return () => {
+      cancelled = true
     }
-    onClose()
-  }
+  }, [targetId])
 
   return (
     <div className={styles.row}>
@@ -132,8 +156,7 @@ function Surfaces({
           lifecycle={lifecycle}
           active={activeSurface === surface}
           onSwitchToSurface={setActiveSurface}
-          leaveBlocked={leaveBlocked}
-          onClose={() => void leave()}
+          onOpenPieces={onOpenPieces}
           onTextChange={registry.update}
           onSaveFailedChange={handleSaveFailedChange}
           onFlushRegister={handleFlushRegister}
@@ -144,8 +167,25 @@ function Surfaces({
   )
 }
 
-export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextSelection, onClose }: OpenedPieceProps) {
+export function OpenedPiece({
+  id,
+  pieceAdapters,
+  room,
+  callSites,
+  authorContextSelection,
+  onOpenPieces,
+  onLeaveBlockedChange,
+  switchRequest,
+}: OpenedPieceProps) {
   const piece = usePiece(id, pieceAdapters)
+
+  // Nothing here has a document to flush, so a piece still loading or failed to load never blocks
+  // a switch, and never has anything to report as blocking one.
+  useEffect(() => {
+    if (piece.status === 'ready') return
+    onLeaveBlockedChange(false)
+    if (switchRequest.targetId !== undefined) switchRequest.onSettled(false)
+  }, [piece.status, switchRequest.targetId])
 
   if (piece.status === 'ready') {
     return (
@@ -160,14 +200,16 @@ export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextS
           onRetitle: piece.retitle,
         }}
         authorContextSelection={authorContextSelection}
-        onClose={onClose}
+        onOpenPieces={onOpenPieces}
+        onLeaveBlockedChange={onLeaveBlockedChange}
+        switchRequest={switchRequest}
       />
     )
   }
 
   return (
     <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={onClose}>
+      <button type="button" className={styles.back} onClick={onOpenPieces}>
         ‹ pieces
       </button>
       {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}

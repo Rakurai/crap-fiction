@@ -11,11 +11,9 @@ import type { ManuscriptViewModel } from './useManuscript.js'
 type ManuscriptProps = {
   readonly title: string
   readonly mode: string
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
-  /** Whether leaving the piece is refused — this document's own failed save, or another's. */
-  readonly leaveBlocked: boolean
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
   readonly onSwitchToStoryContext: () => void
@@ -30,10 +28,9 @@ const WAY_BACK_HOLDS_MS = 2400
 export function Manuscript({
   title,
   mode,
-  onClose,
+  onOpenPieces,
   manuscript,
   autosave,
-  leaveBlocked,
   onOpenRoom,
   onOpenConversations,
   onSwitchToStoryContext,
@@ -77,7 +74,7 @@ export function Manuscript({
     <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
       {!reading && (
         <div className={styles.topBar}>
-          <button type="button" className={styles.leave} onClick={onClose} disabled={leaveBlocked}>
+          <button type="button" className={styles.leave} onClick={onOpenPieces}>
             ‹ pieces
           </button>
           <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />

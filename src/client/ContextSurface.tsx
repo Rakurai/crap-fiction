@@ -17,13 +17,11 @@ const DOCUMENT: Readonly<Record<ContextSurfaceId, { readonly label: string; read
 type ContextSurfaceProps = {
   readonly surface: ContextSurfaceId
   readonly title: string
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
   readonly text: string
   readonly onChange: (text: string) => void
   readonly referenceSchema: string | null
   readonly autosave: AutosaveViewModel
-  /** Whether leaving the piece is refused — this document's own failed save, or another's. */
-  readonly leaveBlocked: boolean
   readonly onOpenRoom: () => void
   readonly onOpenConversations: () => void
   readonly onSwitchTo: (surface: SurfaceId) => void
@@ -34,12 +32,11 @@ type ContextSurfaceProps = {
 export function ContextSurface({
   surface,
   title,
-  onClose,
+  onOpenPieces,
   text,
   onChange,
   referenceSchema,
   autosave,
-  leaveBlocked,
   onOpenRoom,
   onOpenConversations,
   onSwitchTo,
@@ -51,7 +48,7 @@ export function ContextSurface({
   return (
     <div className={styles.wrapper}>
       <div className={styles.topBar}>
-        <button type="button" className={styles.leave} onClick={onClose} disabled={leaveBlocked}>
+        <button type="button" className={styles.leave} onClick={onOpenPieces}>
           ‹ pieces
         </button>
         <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />

@@ -13,7 +13,7 @@ const DEFAULT_PROPS = {
   title: 'The Lighthouse',
   mode: 'flash',
   draft: 'First light of the day.',
-  onClose: vi.fn(),
+  onOpenPieces: vi.fn(),
   onOpenRoom: vi.fn(),
   onOpenConversations: vi.fn(),
   onSwitchToStoryContext: vi.fn(),
@@ -34,10 +34,9 @@ function Harness(props: typeof DEFAULT_PROPS) {
     <Manuscript
       title={props.title}
       mode={props.mode}
-      onClose={props.onClose}
+      onOpenPieces={props.onOpenPieces}
       manuscript={manuscript}
       autosave={autosave}
-      leaveBlocked={autosave.state.failed}
       onOpenRoom={props.onOpenRoom}
       onOpenConversations={props.onOpenConversations}
       onSwitchToStoryContext={props.onSwitchToStoryContext}
@@ -186,9 +185,9 @@ describe('the manuscript while a save is failing', () => {
   })
 
   /**
-   * That a standing failure is what blocks leaving is `closePiece.test.ts`'s claim, and that it
-   * blocks from any surface is `OpenedPiece.test.tsx`'s. What the manuscript owns is the register
-   * the failure is stated in, and that it is gone the moment a write succeeds.
+   * That a standing failure is what blocks switching to another piece is `closePiece.test.ts`'s
+   * claim, and that it blocks from any surface is `OpenedPiece.test.tsx`'s. What the manuscript
+   * owns is the register the failure is stated in, and that it is gone the moment a write succeeds.
    */
   it('says what the machine said, as a statement asking nothing, and takes it back once a write succeeds', async () => {
     saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })

@@ -43,9 +43,7 @@ type EditingSurfaceProps = {
   readonly lifecycle: LifecycleProps
   readonly active: boolean
   readonly onSwitchToSurface: (surface: SurfaceId) => void
-  /** Whether leaving the piece is refused — this surface's own failed save, or another's. */
-  readonly leaveBlocked: boolean
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
   /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
@@ -110,8 +108,7 @@ function MountedSurface({
   lifecycle,
   active,
   onSwitchToSurface,
-  leaveBlocked,
-  onClose,
+  onOpenPieces,
   onTextChange,
   onSaveFailedChange,
   onFlushRegister,
@@ -161,10 +158,9 @@ function MountedSurface({
         <Manuscript
           title={title}
           mode={mode}
-          onClose={onClose}
+          onOpenPieces={onOpenPieces}
           manuscript={document.session.manuscript}
           autosave={session.autosave}
-          leaveBlocked={leaveBlocked}
           onOpenRoom={() => setPanel('room')}
           onOpenConversations={openConversations}
           onSwitchToStoryContext={() => onSwitchToSurface('storyContext')}
@@ -176,12 +172,11 @@ function MountedSurface({
         <ContextSurface
           surface={document.surface}
           title={title}
-          onClose={onClose}
+          onOpenPieces={onOpenPieces}
           text={document.session.text}
           onChange={document.session.setText}
           referenceSchema={document.referenceSchema}
           autosave={session.autosave}
-          leaveBlocked={leaveBlocked}
           onOpenRoom={() => setPanel('room')}
           onOpenConversations={openConversations}
           onSwitchTo={onSwitchToSurface}

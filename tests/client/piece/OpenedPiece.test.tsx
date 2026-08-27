@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { RoomAdapters } from '../../../src/client/useConversation.js'
 import type { PieceDetail } from '../../../src/shared/pieceViews.js'
-import { OpenedPiece, type CallSiteAdapters } from '../../../src/client/OpenedPiece.js'
+import { OpenedPiece, type CallSiteAdapters, type PieceSwitchRequest } from '../../../src/client/OpenedPiece.js'
 import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
@@ -48,6 +48,7 @@ function conversationEntries(conversationId: string) {
 }
 
 const SAVED: RequestResult<null> = { outcome: 'value', value: null }
+const NO_SWITCH_REQUEST: PieceSwitchRequest = { targetId: undefined, onSettled: () => {} }
 
 /**
  * The studio a piece is opened in: the piece itself, the conversations each surface opens with,
@@ -96,13 +97,28 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-async function renderOpened(opened: ReturnType<typeof studio>, onClose: () => void = () => {}) {
-  render(<OpenedPiece id="cups" {...opened.props} onClose={onClose} />)
-  await screen.findByRole('button', { name: 'The Cups' })
+function fullProps(
+  opened: ReturnType<typeof studio>,
+  overrides: Partial<{
+    onOpenPieces: () => void
+    onLeaveBlockedChange: (blocked: boolean) => void
+    switchRequest: PieceSwitchRequest
+  }> = {},
+) {
+  return {
+    ...opened.props,
+    onOpenPieces: vi.fn(),
+    onLeaveBlockedChange: vi.fn(),
+    switchRequest: NO_SWITCH_REQUEST,
+    ...overrides,
+  }
 }
 
-function leaveButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: '‹ pieces' }) as HTMLButtonElement
+async function renderOpened(opened: ReturnType<typeof studio>, overrides: Parameters<typeof fullProps>[1] = {}) {
+  const props = fullProps(opened, overrides)
+  const view = render(<OpenedPiece id="cups" {...props} />)
+  await screen.findByRole('button', { name: 'The Cups' })
+  return { ...view, props }
 }
 
 async function settle() {
@@ -162,13 +178,14 @@ describe('switching between the draft and story context surfaces', () => {
 })
 
 describe('a failed save on one document', () => {
-  it("leaves the other document's state untouched, and blocks leaving until the failure resolves", async () => {
+  it('leaves the other document’s state untouched, and reports the piece as blocking a switch to another', async () => {
     const failingDraft = vi.fn((_id: string, surface: string, _text: string) =>
       surface === 'draft'
         ? Promise.resolve<RequestResult<null>>({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
         : Promise.resolve(SAVED),
     )
-    await renderOpened(studio({ saveDocument: failingDraft as unknown as RoomAdapters['saveDocument'] }))
+    const onLeaveBlockedChange = vi.fn()
+    await renderOpened(studio({ saveDocument: failingDraft as unknown as RoomAdapters['saveDocument'] }), { onLeaveBlockedChange })
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
@@ -176,7 +193,7 @@ describe('a failed save on one document', () => {
     await settle()
 
     expect(screen.getByText('EACCES: PERMISSION DENIED')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '‹ pieces' }).hasAttribute('disabled')).toBe(true)
+    expect(onLeaveBlockedChange).toHaveBeenLastCalledWith(true)
 
     switchToStoryContext()
     fireEvent.change(screen.getByLabelText('Story context'), { target: { value: 'Premise: two cups, one chipped.' } })
@@ -185,20 +202,20 @@ describe('a failed save on one document', () => {
     // Story context's own write succeeded, so only draft's document carries a failure notice.
     expect(screen.getAllByText('EACCES: PERMISSION DENIED')).toHaveLength(1)
     expect((screen.getByLabelText('Story context') as HTMLTextAreaElement).value).toBe('Premise: two cups, one chipped.')
-    // Draft's failure still blocks leaving, from whichever surface is showing.
-    expect(screen.getByRole('button', { name: '‹ pieces' }).hasAttribute('disabled')).toBe(true)
+    // Draft's failure still blocks a switch, from whichever surface is showing.
+    expect(onLeaveBlockedChange).toHaveBeenLastCalledWith(true)
 
     switchToDraft()
     failingDraft.mockImplementation(() => Promise.resolve(SAVED))
     fireEvent.change(screen.getByLabelText('Manuscript source'), { target: { value: 'First light of the day. Then light again.' } })
     await settle()
 
-    expect(screen.getByRole('button', { name: '‹ pieces' }).hasAttribute('disabled')).toBe(false)
+    expect(onLeaveBlockedChange).toHaveBeenLastCalledWith(false)
   })
 })
 
-describe('leaving the piece', () => {
-  it('waits on a dirty surface, and stays mounted with the failure visible and leaving disabled when that write fails', async () => {
+describe('switching to another piece', () => {
+  it('waits on a dirty surface, and reports the switch blocked with the failure visible when that write fails', async () => {
     let resolveSave: ((result: RequestResult<null>) => void) | undefined
     const heldSave = vi.fn(
       () =>
@@ -206,8 +223,8 @@ describe('leaving the piece', () => {
           resolveSave = resolve
         }),
     )
-    const onClose = vi.fn()
-    await renderOpened(studio({ saveDocument: heldSave as unknown as RoomAdapters['saveDocument'] }), onClose)
+    const onSettled = vi.fn()
+    const { rerender, props } = await renderOpened(studio({ saveDocument: heldSave as unknown as RoomAdapters['saveDocument'] }))
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
@@ -216,25 +233,21 @@ describe('leaving the piece', () => {
       await vi.advanceTimersByTimeAsync(1000)
     })
 
-    fireEvent.click(leaveButton())
-    expect(leaveButton().disabled).toBe(true)
-    expect(onClose).not.toHaveBeenCalled()
+    rerender(<OpenedPiece id="cups" {...props} switchRequest={{ targetId: 'saucers', onSettled }} />)
+    expect(onSettled).not.toHaveBeenCalled()
 
     await act(async () => {
       resolveSave?.({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
     })
 
-    expect(onClose).not.toHaveBeenCalled()
+    expect(onSettled).toHaveBeenCalledWith(true)
     expect(screen.getByText('EACCES: PERMISSION DENIED')).toBeTruthy()
-    // The failure keeps the piece open rather than the close request itself: the button is
-    // disabled by the standing failure, not merely by a `closing` flag stuck on.
-    expect(leaveButton().disabled).toBe(true)
   })
 
-  it('leaves while a surface still has work in flight, without asking the studio to end it', async () => {
+  it('settles a switch while a surface still has work in flight, without asking the studio to end it', async () => {
     const opened = studio()
-    const onClose = vi.fn()
-    await renderOpened(opened, onClose)
+    const onSettled = vi.fn()
+    const { rerender, props } = await renderOpened(opened)
 
     fireEvent.change(activeComposer(), { target: { value: 'what isn’t working' } })
     fireEvent.click(screen.getByRole('button', { name: 'send' }))
@@ -245,9 +258,9 @@ describe('leaving the piece', () => {
       data: { actionId: 'a1', conversationId: 'd1', kind: 'dispatch', sourceEntryId: 'e0', startedAt: 1_700_000_000_000, audience: [], surface: 'draft' },
     })
 
-    fireEvent.click(leaveButton())
+    rerender(<OpenedPiece id="cups" {...props} switchRequest={{ targetId: 'saucers', onSettled }} />)
 
-    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    await waitFor(() => expect(onSettled).toHaveBeenCalledWith(false))
     expect(opened.abandonOperation).not.toHaveBeenCalled()
   })
 })
@@ -273,12 +286,12 @@ describe('activity on one surface', () => {
 describe('the author-context conversation selection', () => {
   it("is read from the caller rather than the piece it opens with, and a fresh choice is reported back to the caller — so a switch away and back to a different piece never loses it", async () => {
     const onAuthorContextSelectionChange = vi.fn()
+    const opened = studio()
     render(
       <OpenedPiece
         id="cups"
-        {...studio().props}
+        {...fullProps(opened)}
         authorContextSelection={{ value: 'kept-across-a-piece-switch', onChange: onAuthorContextSelectionChange }}
-        onClose={() => {}}
       />,
     )
     await screen.findByRole('button', { name: 'The Cups' })
