@@ -378,6 +378,14 @@ spells a comment. A comment is a second statement of a fact, and it drifts from 
 text that reaches an author or a model, that text is the product and this rule does not reach it.
 Judge a line by who reads it, never by its punctuation.
 
+**A tuning artifact may explain what a value costs.** Where a shipped artifact carries no code and
+exists so that a maintainer can choose values, this rule's own remedy is unavailable to it: a scalar
+has no name beyond its key, no type beyond its literal, and no test that says what choosing
+differently would do. Such a file may annotate a value with the consequence of changing it — what it
+bounds, what it spends, what goes wrong at either extreme — addressed to the maintainer who has to
+choose. It may not re-spell the key, it may not narrate the code that reads the value, and the
+exemption reaches no artifact that is also code.
+
 **One test admits a comment: deleting it would leave a competent reader holding a wrong conclusion
 that the code, its names and its types cannot correct.** Not whether a reader would be helped, and
 not whether the sentence is true. A comment that fails is deleted, not shortened.
