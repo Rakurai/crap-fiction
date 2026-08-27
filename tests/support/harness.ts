@@ -4,12 +4,12 @@ import type { StudioEnv } from '../../src/server/env.js'
 import { createLogger } from '../../src/server/logger.js'
 import type { Charter } from '../../src/server/model/charter.js'
 import type { Fragment, PromptFragments } from '../../src/server/model/prompts.js'
-import { callSites } from '../../src/server/model/callSites.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import { PieceDocumentWriter } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
+import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { AuthorContextStore, DraftStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
@@ -84,17 +84,22 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
 
   const workspace = WorkspaceRegistry.openAt(dataRoot)
   const modelAccess = FixtureModelAdapter.bySite({}, spec.runtimeStatus)
+  const catalog = ShippedContentCatalog.assemble({
+    modes: spec.modes,
+    roles: spec.roles,
+    charter: UNREACHED_CHARTER,
+    fragments: unreachedFragments(),
+    authorContextReference: spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
+  })
 
   const app = createApp(
     env,
     workspace,
-    spec.modes,
+    catalog,
     new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
-    callSites(spec.roles),
     modelAccess,
     spec.room,
     createLogger(env.logLevel),
-    spec.authorContextReference,
   )
   return { app, workspace }
 }

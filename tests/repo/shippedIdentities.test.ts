@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CONTENT_ROOT, loadShippedContent } from '../../src/server/bootstrap.js'
+import { CONTENT_ROOT, ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { REPO_ROOT, sourcesUnder } from '../support/sourceTree.js'
 
 function escapeForRegExp(literal: string): string {
@@ -33,12 +33,9 @@ describe('the scanner', () => {
 
 describe('application code names no shipped identity', () => {
   it('holds no participant id, handle or mode id anywhere under src', () => {
-    const shipped = loadShippedContent(CONTENT_ROOT)
-    const identities = [
-      ...shipped.roles.map((role) => role.id),
-      ...shipped.roles.map((role) => role.handle),
-      ...shipped.modes.map((mode) => mode.id),
-    ]
+    const catalog = ShippedContentCatalog.load(CONTENT_ROOT)
+    const roles = [...catalog.roster.specialists, catalog.roster.storyEditor, ...catalog.roster.addressedOnly]
+    const identities = [...roles.map((role) => role.id), ...roles.map((role) => role.handle), ...catalog.modes.map((mode) => mode.id)]
 
     expect(filesNamingAny(sourcesUnder('src'), identities)).toEqual([])
   })

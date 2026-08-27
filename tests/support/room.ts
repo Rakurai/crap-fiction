@@ -7,7 +7,7 @@ import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { HistoryPolicy } from '../../src/server/room/context.js'
 import { Room } from '../../src/server/room/room.js'
-import { resolveRoster } from '../../src/server/room/roster.js'
+import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { ConversationEntryStore } from '../../src/server/store/index.js'
 
 /** Every value a Room's behaviour turns on, stated by the test rather than assumed here. */
@@ -23,17 +23,12 @@ export type RoomSpec = Readonly<{
 }>
 
 export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
-  return new Room(
-    spec.modelAccess,
-    new ConversationEntryStore(),
-    dataRoot,
-    resolveRoster(spec.roles),
-    spec.modes,
-    spec.charter,
-    spec.fragments,
-    spec.policy,
-    createLogger('silent'),
-    spec.now,
-    spec.authorContextReference,
-  )
+  const catalog = ShippedContentCatalog.assemble({
+    modes: spec.modes,
+    roles: spec.roles,
+    charter: spec.charter,
+    fragments: spec.fragments,
+    authorContextReference: spec.authorContextReference,
+  })
+  return new Room(spec.modelAccess, new ConversationEntryStore(), dataRoot, catalog, spec.policy, createLogger('silent'), spec.now)
 }

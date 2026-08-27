@@ -7,8 +7,7 @@ import type { CastMemberView, PieceDetail, PieceSummary, SurfaceDetail } from '.
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
-import type { ModeDescriptor } from './modes.js'
-import { defaultCastFor, specialistsFor, type Interviewer } from './room/roster.js'
+import type { ShippedContentCatalog } from './shippedContent.js'
 import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
   conversationActivity,
@@ -53,13 +52,6 @@ export class UnknownCastMemberError extends Error {
   constructor(pieceId: string, memberId: string) {
     super(`piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
     this.name = 'UnknownCastMemberError'
-  }
-}
-
-export class UnknownModeError extends Error {
-  constructor(modeId: string) {
-    super(`no loaded mode "${modeId}"`)
-    this.name = 'UnknownModeError'
   }
 }
 
@@ -114,14 +106,8 @@ function uniquePieceId(existing: ReadonlySet<string>, title: string): string {
   return `${base}-${n}`
 }
 
-export async function createPiece(
-  workspaceDir: string,
-  title: string,
-  modeId: string,
-  modes: readonly ModeDescriptor[],
-  specialists: readonly RoleDefinition[],
-): Promise<PieceSummary> {
-  if (!modes.some((mode) => mode.id === modeId)) throw new UnknownModeError(modeId)
+export async function createPiece(workspaceDir: string, title: string, modeId: string, catalog: ShippedContentCatalog): Promise<PieceSummary> {
+  catalog.mode(modeId)
 
   const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
@@ -129,9 +115,9 @@ export async function createPiece(
     title,
     mode: modeId,
     cast: {
-      draft: [...defaultCastFor(specialists, modeId, 'draft')],
-      storyContext: [...defaultCastFor(specialists, modeId, 'storyContext')],
-      authorContext: [...defaultCastFor(specialists, modeId, 'authorContext')],
+      draft: [...catalog.defaultCastFor(modeId, 'draft')],
+      storyContext: [...catalog.defaultCastFor(modeId, 'storyContext')],
+      authorContext: [...catalog.defaultCastFor(modeId, 'authorContext')],
     },
   })
 
@@ -149,52 +135,33 @@ function surfaceText(workspaceDir: string, dataRoot: string, id: string, piece: 
   return readAuthorContext(dataRoot) ?? ''
 }
 
-function surfaceReferenceSchema(piece: StoredPiece, surface: SurfaceId, modes: readonly ModeDescriptor[], authorContextReference: string): string | null {
-  if (surface === 'draft') return null
-  if (surface === 'authorContext') return authorContextReference
-  const mode = modes.find((candidate) => candidate.id === piece.metadata.mode)
-  if (mode === undefined) throw new UnknownModeError(piece.metadata.mode)
-  return mode.storyContextReference
-}
-
 function surfaceDetail(
   dataRoot: string,
   workspaceDir: string,
   id: string,
   piece: StoredPiece,
-  specialists: readonly RoleDefinition[],
-  modes: readonly ModeDescriptor[],
-  authorContextReference: string,
+  catalog: ShippedContentCatalog,
   surface: SurfaceId,
 ): SurfaceDetail {
-  const available = specialistsFor(specialists, piece.metadata.mode, surface)
+  const available = catalog.specialistsFor(piece.metadata.mode, surface)
   return {
     text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
-    referenceSchema: surfaceReferenceSchema(piece, surface, modes, authorContextReference),
+    referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
     cast: castView(available, piece.metadata.cast[surface]),
   }
 }
 
-export function getPiece(
-  dataRoot: string,
-  workspaceDir: string,
-  id: string,
-  specialists: readonly RoleDefinition[],
-  storyEditor: RoleDefinition,
-  interviewer: Interviewer,
-  modes: readonly ModeDescriptor[],
-  authorContextReference: string,
-): PieceDetail {
+export function getPiece(dataRoot: string, workspaceDir: string, id: string, catalog: ShippedContentCatalog): PieceDetail {
   const piece = requirePiece(workspaceDir, id)
-  const detailFor = (surface: SurfaceId): SurfaceDetail =>
-    surfaceDetail(dataRoot, workspaceDir, id, piece, specialists, modes, authorContextReference, surface)
+  const detailFor = (surface: SurfaceId): SurfaceDetail => surfaceDetail(dataRoot, workspaceDir, id, piece, catalog, surface)
   const surfaces: PieceDetail['surfaces'] = {
     draft: detailFor('draft'),
     storyContext: detailFor('storyContext'),
     authorContext: detailFor('authorContext'),
   }
+  const { storyEditor, interviewer } = catalog.roster
   return {
     ...summarize(id, piece),
     surfaces,
@@ -211,12 +178,12 @@ export function getPiece(
 export async function setPieceCast(
   workspaceDir: string,
   id: string,
-  specialists: readonly RoleDefinition[],
+  catalog: ShippedContentCatalog,
   surface: SurfaceId,
   cast: readonly string[],
 ): Promise<readonly CastMemberView[]> {
   const piece = requirePiece(workspaceDir, id)
-  const available = specialistsFor(specialists, piece.metadata.mode, surface)
+  const available = catalog.specialistsFor(piece.metadata.mode, surface)
   const ceiling = new Set(available.map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
@@ -245,19 +212,14 @@ export type PieceChanges = Readonly<{
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
-export async function updatePiece(
-  workspaceDir: string,
-  id: string,
-  specialists: readonly RoleDefinition[],
-  changes: PieceChanges,
-): Promise<void> {
+export async function updatePiece(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<void> {
   const { title, cast } = changes
 
   if (title !== undefined) {
     await updatePieceDetails(workspaceDir, id, { title })
   }
   if (cast !== undefined) {
-    await setPieceCast(workspaceDir, id, specialists, cast.surface, cast.ids)
+    await setPieceCast(workspaceDir, id, catalog, cast.surface, cast.ids)
   }
 }
 

@@ -8,10 +8,8 @@ import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
 import { getTheme, setTheme } from './interfaceTheme.js'
 import { listAssignments, setAssignment } from './model/assignments.js'
-import type { CallSiteDescriptor } from './model/callSites.js'
 import { UnknownCallSiteError, withAssignments } from './model/callSites.js'
 import type { ModelAccess } from './model/types.js'
-import type { ModeDescriptor } from './modes.js'
 import { originGuard } from './originGuard.js'
 import {
   ConversationNotFoundError,
@@ -24,7 +22,6 @@ import {
   PieceNotFoundError,
   startConversation,
   UnknownCastMemberError,
-  UnknownModeError,
   updatePiece,
 } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
@@ -39,6 +36,7 @@ import {
 } from './room/room.js'
 import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
+import { UnknownModeError, type ShippedContentCatalog } from './shippedContent.js'
 import { TolerantReadError } from './store/index.js'
 import { validateJson, validateParam } from './validate.js'
 import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
@@ -62,13 +60,11 @@ const surfaceParamSchema = z.object({ surface: surfaceIdSchema })
 export function createApp(
   env: StudioEnv,
   workspace: WorkspaceRegistry,
-  modes: readonly ModeDescriptor[],
+  catalog: ShippedContentCatalog,
   documentWriter: PieceDocumentWriter,
-  sites: readonly CallSiteDescriptor[],
   modelAccess: ModelAccess,
   room: Room,
   logger: Logger,
-  authorContextReference: string,
 ): Hono {
   const allowedOrigins = [`http://localhost:${env.port}`, `http://127.0.0.1:${env.port}`]
   const app = new Hono()
@@ -91,27 +87,27 @@ export function createApp(
   })
 
   app.get('/modes', (c) => {
-    return c.json(ok(modes.map((mode) => ({ id: mode.id, displayName: mode.displayName }))))
+    return c.json(ok(catalog.modes.map((mode) => ({ id: mode.id, displayName: mode.displayName }))))
   })
 
   app.post('/pieces', body(postPieceSchema), async (c) => {
     const { title, mode } = c.req.valid('json')
-    const piece = await createPiece(workspace.require(), title, mode, modes, room.specialists())
+    const piece = await createPiece(workspace.require(), title, mode, catalog)
     return c.json(ok(piece))
   })
 
   app.get('/pieces/:id', (c) => {
     const id = c.req.param('id')
-    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, room.specialists(), room.storyEditor(), room.interviewer(), modes, authorContextReference)))
+    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, catalog)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
     const id = c.req.param('id')
     const workspaceDir = workspace.require()
 
-    await updatePiece(workspaceDir, id, room.specialists(), c.req.valid('json'))
+    await updatePiece(workspaceDir, id, catalog, c.req.valid('json'))
 
-    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, room.specialists(), room.storyEditor(), room.interviewer(), modes, authorContextReference)))
+    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, catalog)))
   })
 
   const param = validateParam(surfaceParamSchema, logger)
@@ -191,13 +187,13 @@ export function createApp(
   })
 
   app.get('/call-sites', (c) => {
-    return c.json(ok(withAssignments(sites, listAssignments(env.dataRoot))))
+    return c.json(ok(withAssignments(catalog.callSites, listAssignments(env.dataRoot))))
   })
 
   app.put('/call-sites/:site/assignment', body(putAssignmentSchema), async (c) => {
     const site = c.req.param('site')
     const { model } = c.req.valid('json')
-    await setAssignment(env.dataRoot, sites, site, model)
+    await setAssignment(env.dataRoot, catalog.callSites, site, model)
     return c.json(ok({ site, assignment: model }))
   })
 
