@@ -9,7 +9,7 @@ import type { InterviewerView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
-import { elapsed, facts, machineWords, wordCount } from './facts.js'
+import { elapsed, facts, machineWords, messageWhen, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { Mark } from './Mark.js'
 import { isParticipantOutcome } from './entryProjection.js'
@@ -179,17 +179,21 @@ function AppliedChangeView({
   )
 }
 
-function roomChangedText(names: readonly string[]): string {
+function roomChangedText(names: readonly string[], castSize: number | undefined): string {
   const [only] = names
-  if (names.length === 1 && only !== undefined) return `${only} was addressed and is now in the room.`
-  return `${names.join(', ')} were addressed and are now in the room.`
+  const brought =
+    names.length === 1 && only !== undefined
+      ? `${only} was addressed and is now in the room.`
+      : `${names.join(', ')} were addressed and are now in the room.`
+  if (castSize === undefined) return brought
+  return `${brought} The room holds ${castSize} specialist${castSize === 1 ? '' : 's'}.`
 }
 
-function RoomChanged({ names }: { readonly names: readonly string[] }) {
+function RoomChanged({ names, castSize }: { readonly names: readonly string[]; readonly castSize: number | undefined }) {
   return (
     <div className={styles.roomChanged}>
       <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
-      <span className={styles.roomChangedWords}>{roomChangedText(names)}</span>
+      <span className={styles.roomChangedWords}>{roomChangedText(names, castSize)}</span>
     </div>
   )
 }
@@ -210,6 +214,7 @@ type EntryActions = Readonly<{
   handle: (id: string) => string | undefined
   mark: (id: string) => string | null
   ordinal: (id: string) => number | null
+  clock: Clock
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
@@ -284,6 +289,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     handle,
     mark,
     ordinal,
+    clock,
     applying,
     applyDisabled,
     applicationsFor,
@@ -299,7 +305,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       return (
         <>
           <p className={styles.message}>{entry.text}</p>
-          {entry.brought.length > 0 && <RoomChanged names={entry.brought.map(displayName)} />}
+          {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
+          {entry.brought.length > 0 && <RoomChanged names={entry.brought.map(displayName)} castSize={entry.castSize} />}
         </>
       )
     case 'concreteChangeRequest':
@@ -314,14 +321,14 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       )
     case 'participantNoComment':
       return (
-        <div className={styles.noComment}>
+        <div className={styles.participant}>
           <ParticipantIdentity
             name={displayName(entry.participantId)}
             handle={handle(entry.participantId)}
             mark={mark(entry.participantId)}
             ordinal={ordinal(entry.participantId)}
+            status={machineWords('nothing to add')}
           />
-          <p className={styles.noCommentWords}>has no comment.</p>
         </div>
       )
     case 'participantFailure':
@@ -583,6 +590,7 @@ export function Conversation({
     handle,
     mark,
     ordinal,
+    clock,
     applying: apply.applying,
     applyDisabled: roomBusy,
     applicationsFor,

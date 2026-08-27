@@ -461,7 +461,9 @@ describe('Room.dispatch', () => {
     await settled
 
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
-    expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
+    expect(landed).toEqual([
+      { id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [], atMs: expect.any(Number), castSize: expect.any(Number) },
+    ])
   })
 
   it('lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {

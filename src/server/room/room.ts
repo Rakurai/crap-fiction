@@ -310,6 +310,8 @@ export class Room {
     const modeSpecialists = this.#catalog.specialistsFor(piece.metadata.mode, roomScope.surface)
     const roster = [...modeSpecialists, this.#catalog.roster.storyEditor, ...this.#catalog.roster.addressedOnly]
 
+    const startedAt = this.#now()
+
     let addressedIds: readonly string[]
     let causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
     let ask: { claim: string; note: string | undefined; clarification: string | undefined } | undefined
@@ -319,13 +321,13 @@ export class Room {
       addressedIds = parseAddressing(opening.text, roster).map((role) => role.id)
       message = opening.text
       ask = undefined
-      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [] }
+      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [], atMs: startedAt }
     } else if (opening.kind === 'targeted') {
       if (!roster.some((role) => role.id === opening.target)) throw new ParticipantNotFoundError(pieceId, opening.target)
       addressedIds = [opening.target]
       message = opening.text
       ask = undefined
-      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [] }
+      causeEntry = { id: nanoid(), kind: 'authorMessage', text: opening.text, audience: addressedIds, brought: [], atMs: startedAt }
     } else {
       const response = findResponse(existingEntries, opening.respondingTo)
       if (response === undefined || response.outcome !== 'commentary') throw new CommentaryNotFoundError(pieceId, opening.respondingTo)
@@ -349,7 +351,7 @@ export class Room {
     const eligibleAddressedOnly = this.#catalog.roster.addressedOnly.filter((role) => addressedIds.includes(role.id))
 
     const brought = addressedIds.length === 0 ? [] : eligibleSpecialists.map((role) => role.id).filter((id) => !enabledCast.includes(id))
-    if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought }
+    if (causeEntry.kind === 'authorMessage') causeEntry = { ...causeEntry, brought, castSize: enabledCast.length + brought.length }
 
     const storyEditorIncluded = addressedIds.length === 0 || addressedIds.includes(this.#catalog.roster.storyEditor.id)
     const audience = [
@@ -359,7 +361,6 @@ export class Room {
     ]
 
     const actionId = nanoid()
-    const startedAt = this.#now()
 
     const dispatchState: ActiveDispatch = {
       kind: 'dispatch',
