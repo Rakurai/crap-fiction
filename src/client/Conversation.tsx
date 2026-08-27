@@ -408,7 +408,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
 }
 
 function participantStatus(state: DispatchActivitySnapshot['states'][string] | undefined, nowMs: number): string {
-  if (state === undefined) return machineWords('queued')
+  if (state === undefined) return machineWords('waiting')
   return facts(machineWords(state.state), elapsed(state.startedAt, nowMs))
 }
 

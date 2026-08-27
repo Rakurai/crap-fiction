@@ -280,7 +280,14 @@ describe('Room.dispatch', () => {
 
     await expect(settlementOf(room, piece.id)).resolves.toBeUndefined()
 
-    expect(events.map((event) => event.type)).toEqual(['action.started', 'entry.appended', 'error', 'action.finished'])
+    expect(events.map((event) => event.type)).toEqual([
+      'action.started',
+      'entry.appended',
+      'participant.activity',
+      'participant.activity',
+      'error',
+      'action.finished',
+    ])
     expect(events.find((event) => event.type === 'error')?.data).toMatchObject({
       code: 'UNEXPECTED_FAILURE',
       message: 'the seam broke in a way nothing named',
@@ -328,7 +335,7 @@ describe('Room.dispatch', () => {
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
-  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from preparing into working', async () => {
+  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from waiting through preparing into working', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
@@ -346,7 +353,7 @@ describe('Room.dispatch', () => {
 
     for (const participantId of ['shape', 'compression', 'story-editor']) {
       const own = activity.filter((event) => event.participantId === participantId)
-      expect(own.map((event) => event.state)).toEqual(['preparing', 'working'])
+      expect(own.map((event) => event.state)).toEqual(['waiting', 'preparing', 'working'])
       expect(own.every((event) => event.startedAt === 1_700_000_000_000)).toBe(true)
     }
   })

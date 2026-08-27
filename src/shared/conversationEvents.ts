@@ -35,7 +35,7 @@ export type ApplyPendingEvent = z.infer<typeof applyPendingEventSchema>
 export const participantActivityEventSchema = z.object({
   actionId: z.string().min(1),
   participantId: z.string().min(1),
-  state: z.enum(['preparing', 'working']),
+  state: z.enum(['waiting', 'preparing', 'working']),
   startedAt: z.number().int().positive(),
   surface: surfaceIdSchema,
 })
@@ -67,7 +67,7 @@ export const conversationErrorEventSchema = z.object({ code: conversationFailure
 export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
 
 export const participantStateSchema = z.object({
-  state: z.enum(['preparing', 'working']),
+  state: z.enum(['waiting', 'preparing', 'working']),
   startedAt: z.number().int().positive(),
 })
 

@@ -505,7 +505,7 @@ export class Room {
       referenceSchema: role.id === this.#catalog.roster.interviewer.role.id ? interviewerReference : undefined,
     })
 
-    const onState = (participantId: string, state: 'preparing' | 'working'): void => {
+    const onState = (participantId: string, state: ParticipantState['state']): void => {
       const startedAt = operation.states.get(participantId)?.startedAt ?? this.#now()
       operation.states.set(participantId, { state, startedAt })
       if (!this.#owns(roomScope, actionId)) return
@@ -534,6 +534,7 @@ export class Room {
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
+      onState(call.role.id, 'waiting')
       const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
         onState(call.role.id, state),
       )
@@ -572,6 +573,7 @@ export class Room {
         // has already excluded it unless it was named, so every call it does receive owes an answer.
         const storyEditor = this.#catalog.roster.storyEditor
         const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, true), evidence), this.#catalog.fragments, this.#catalog.charter)
+        onState(storyEditor.id, 'waiting')
         const outcome = await callParticipant(storyEditor, prompt, causeEntry.id, true, this.#modelAccess, signal, (state) =>
           onState(storyEditor.id, state),
         )

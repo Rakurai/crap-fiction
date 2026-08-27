@@ -112,7 +112,7 @@ The set is closed.
 | `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes, each with the audience it is waiting on and the stage and start moment of every participant whose call has reached one — delivered once, atomically with the subscription, before any other frame |
 | `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
 | `apply.pending` | The room scope, action, the entry applied, and the provisional identity of the replacement the model has just answered with |
-| `participant.activity` | The room scope, action, participant, the stage its call has reached — having its model prepared, or working — and the moment that call began. A participant the action is waiting on but has not yet called reaches no stage, and is carried by the absence of any activity for it |
+| `participant.activity` | The room scope, action, participant, the stage its call has reached — waiting to be called, having its model prepared, or working — and the moment that call began. A participant the action addresses but has not yet submitted a call carries no stage, and is carried by the absence of any activity for it |
 | `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
 | `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
 | `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
