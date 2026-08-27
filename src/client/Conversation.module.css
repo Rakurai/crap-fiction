@@ -9,6 +9,44 @@
   border-left: 1px solid var(--rule);
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  flex: none;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.headerOpening {
+  font: 400 13px/1.35 var(--font-prose);
+  font-style: italic;
+  color: var(--ink2);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerSpacer {
+  flex: 1;
+  min-width: 6px;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.headerControl {
+  composes: surface from './controls.module.css';
+}
+
 .transcript {
   flex: 1;
   min-height: 0;

@@ -1,6 +1,7 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AppliedChangeContent } from '../shared/appliedChange.js'
+import { openingWords } from '../shared/conversationEntries.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
@@ -42,6 +43,8 @@ type ConversationProps = {
   readonly onApplied: (text: string) => Promise<AutosaveState>
   readonly onApplyingChange?: (applying: { readonly participantName?: string } | undefined) => void
   readonly onConversationIdChange?: (conversationId: string) => void
+  readonly onOpenRoom: () => void
+  readonly onOpenConversations: () => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -435,6 +438,8 @@ export function Conversation({
   onApplied,
   onApplyingChange = () => {},
   onConversationIdChange = () => {},
+  onOpenRoom,
+  onOpenConversations,
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -496,6 +501,7 @@ export function Conversation({
 
   const nowMs = useNow(conversation.projection.activity !== undefined, clock)
   const roomBusy = conversation.busy || apply.applying !== undefined
+  const opening = openingWords(conversation.projection.entries)
 
   function askAboutChange(): void {
     if (roomBusy) return
@@ -564,6 +570,18 @@ export function Conversation({
 
   return (
     <div className={styles.wrapper}>
+      <div className={styles.header}>
+        <span className={styles.headerOpening}>{opening}</span>
+        <span className={styles.headerSpacer} />
+        <div className={styles.headerControls}>
+          <button type="button" className={styles.headerControl} onClick={onOpenConversations}>
+            conversations
+          </button>
+          <button type="button" className={styles.headerControl} onClick={onOpenRoom}>
+            room
+          </button>
+        </div>
+      </div>
       <div className={styles.transcript}>
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />

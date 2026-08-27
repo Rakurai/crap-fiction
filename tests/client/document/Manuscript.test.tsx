@@ -15,10 +15,7 @@ const DEFAULT_PROPS = {
   draft: 'First light of the day.',
   onOpenPieces: vi.fn(),
   onOpenModels: vi.fn(),
-  onOpenRoom: vi.fn(),
-  onOpenConversations: vi.fn(),
-  onSwitchToStoryContext: vi.fn(),
-  onSwitchToAuthorContext: vi.fn(),
+  onSwitchTo: vi.fn(),
   lifecycle: {
     retitling: false,
     retitleError: undefined as string | undefined,
@@ -39,10 +36,7 @@ function Harness(props: typeof DEFAULT_PROPS) {
       onOpenModels={props.onOpenModels}
       manuscript={manuscript}
       autosave={autosave}
-      onOpenRoom={props.onOpenRoom}
-      onOpenConversations={props.onOpenConversations}
-      onSwitchToStoryContext={props.onSwitchToStoryContext}
-      onSwitchToAuthorContext={props.onSwitchToAuthorContext}
+      onSwitchTo={props.onSwitchTo}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />
@@ -119,19 +113,6 @@ describe('the piece title', () => {
   })
 })
 
-describe('the surfaces the manuscript opens onto', () => {
-  afterEach(cleanup)
-
-  it('reaches the room in one action, knowing nothing beyond that it was reached', () => {
-    const onOpenRoom = vi.fn()
-    renderManuscript({ onOpenRoom })
-
-    fireEvent.click(screen.getByRole('button', { name: 'room' }))
-
-    expect(onOpenRoom).toHaveBeenCalledTimes(1)
-  })
-})
-
 describe('the reading view', () => {
   afterEach(cleanup)
 
@@ -152,7 +133,7 @@ describe('the reading view', () => {
     expect(wayBack[0]?.textContent).toContain('ESC')
 
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'PIECES' })).toBeTruthy()
   })
 })
 

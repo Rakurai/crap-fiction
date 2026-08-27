@@ -1,0 +1,84 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  flex: none;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.doors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+.door {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.door:hover {
+  color: var(--ink2);
+}
+
+.rule {
+  width: 1px;
+  height: 16px;
+  background: var(--rule);
+  flex: none;
+}
+
+.length {
+  flex: none;
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 6px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.switcher {
+  display: flex;
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: none;
+}
+
+.switcherOption {
+  font: 500 10.5px/1 var(--font-ui);
+  background: none;
+  color: var(--ink3);
+  border: none;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.switcherOptionActive {
+  background: var(--tint);
+  color: var(--ink);
+}
+
+.viewControl {
+  composes: view from './controls.module.css';
+}

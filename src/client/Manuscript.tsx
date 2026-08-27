@@ -1,10 +1,10 @@
 import { EditorContent } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
-import { EditableTitle } from './EditableTitle.js'
+import type { SurfaceId } from '../shared/surfaces.js'
+import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
-import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
 
@@ -15,10 +15,7 @@ type ManuscriptProps = {
   readonly onOpenModels: () => void
   readonly manuscript: ManuscriptViewModel
   readonly autosave: AutosaveViewModel
-  readonly onOpenRoom: () => void
-  readonly onOpenConversations: () => void
-  readonly onSwitchToStoryContext: () => void
-  readonly onSwitchToAuthorContext: () => void
+  readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName?: string } | undefined
 }
@@ -33,10 +30,7 @@ export function Manuscript({
   onOpenModels,
   manuscript,
   autosave,
-  onOpenRoom,
-  onOpenConversations,
-  onSwitchToStoryContext,
-  onSwitchToAuthorContext,
+  onSwitchTo,
   lifecycle,
   applying,
 }: ManuscriptProps) {
@@ -75,38 +69,20 @@ export function Manuscript({
   return (
     <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
       {!reading && (
-        <div className={styles.topBar}>
-          <button type="button" className={styles.leave} onClick={onOpenPieces}>
-            ‹ pieces
-          </button>
-          <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
-          <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
-          <span className={styles.spacer} />
-          <div className={styles.controls}>
-            <button type="button" className={styles.viewControl} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
-              {manuscript.view === 'source' ? 'rendered' : 'source'}
-            </button>
-            <button type="button" className={styles.viewControl} onClick={manuscript.showReading}>
-              reading
-            </button>
-            <span className={styles.controlsRule} />
-            <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
-              {SURFACE_CONTROL_LABEL.storyContext}
-            </button>
-            <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
-              {SURFACE_CONTROL_LABEL.authorContext}
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenConversations}>
-              conversations
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenRoom}>
-              room
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenModels}>
-              models
-            </button>
-          </div>
-        </div>
+        <DocumentHeader
+          onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
+          title={title}
+          lifecycle={lifecycle}
+          length={facts(modeName(mode), wordCount(manuscript.length))}
+          surface="draft"
+          onSwitchTo={onSwitchTo}
+          draftControls={{
+            viewLabel: manuscript.view === 'source' ? 'rendered' : 'source',
+            onToggleView: manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource,
+            onReading: manuscript.showReading,
+          }}
+        />
       )}
 
       {!reading && lifecycle.retitleError !== undefined && (

@@ -130,7 +130,7 @@ async function settle() {
 }
 
 function switchToStoryContext(): void {
-  fireEvent.click(screen.getByRole('button', { name: 'story context' }))
+  fireEvent.click(screen.getByRole('button', { name: 'story' }))
 }
 
 function switchToDraft(): void {
@@ -138,7 +138,7 @@ function switchToDraft(): void {
 }
 
 function switchToAuthorContext(): void {
-  fireEvent.click(screen.getByRole('button', { name: 'author context' }))
+  fireEvent.click(screen.getByRole('button', { name: 'author' }))
 }
 
 /** The composer belonging to whichever surface is currently visible — role queries alone exclude the hidden one. */
@@ -157,7 +157,7 @@ describe('switching between the draft and story context surfaces', () => {
     // sending: switching conversations is its own fresh session, but switching surfaces is not.
     fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
     fireEvent.click(await screen.findByRole('button', { name: /^try a different opening/ }))
-    await screen.findByText('opened as d2')
+    await screen.findByText('opened as d2', { selector: 'p' })
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     fireEvent.change(screen.getByLabelText('Manuscript source'), { target: { value: 'First light of the day. Then dusk.' } })
@@ -172,7 +172,7 @@ describe('switching between the draft and story context surfaces', () => {
 
     expect((screen.getByLabelText('Manuscript source') as HTMLTextAreaElement).value).toBe('First light of the day. Then dusk.')
     expect(activeComposer().value).toBe('what do you make of the new line')
-    await screen.findByText('opened as d2')
+    await screen.findByText('opened as d2', { selector: 'p' })
 
     fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
     expect((await screen.findByRole('button', { name: /^try a different opening/ })).getAttribute('aria-current')).toBe('true')
@@ -298,8 +298,8 @@ describe('the author-context conversation selection', () => {
     )
     await screen.findByRole('button', { name: 'The Cups' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'author context' }))
-    await screen.findByText('opened as kept-across-a-piece-switch')
+    fireEvent.click(screen.getByRole('button', { name: 'author' }))
+    await screen.findByText('opened as kept-across-a-piece-switch', { selector: 'p' })
 
     fireEvent.click(screen.getByRole('button', { name: 'conversations' }))
     fireEvent.click(screen.getByRole('button', { name: 'new conversation' }))

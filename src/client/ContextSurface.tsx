@@ -1,9 +1,8 @@
-import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
+import { type SurfaceId } from '../shared/surfaces.js'
 import styles from './ContextSurface.module.css'
-import { EditableTitle } from './EditableTitle.js'
+import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, timeOfDay } from './facts.js'
 import type { LifecycleProps } from './pieceLifecycle.js'
-import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 
 /** The surfaces this component draws: a plain text document beside a reference schema. */
@@ -23,8 +22,6 @@ type ContextSurfaceProps = {
   readonly onChange: (text: string) => void
   readonly referenceSchema: string | null
   readonly autosave: AutosaveViewModel
-  readonly onOpenRoom: () => void
-  readonly onOpenConversations: () => void
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
   readonly applying: { readonly participantName?: string } | undefined
@@ -39,8 +36,6 @@ export function ContextSurface({
   onChange,
   referenceSchema,
   autosave,
-  onOpenRoom,
-  onOpenConversations,
   onSwitchTo,
   lifecycle,
   applying,
@@ -49,30 +44,14 @@ export function ContextSurface({
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.topBar}>
-        <button type="button" className={styles.leave} onClick={onOpenPieces}>
-          ‹ pieces
-        </button>
-        <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
-        <span className={styles.spacer} />
-        <div className={styles.controls}>
-          {SURFACE_IDS.filter((candidate) => candidate !== surface).map((candidate) => (
-            <button key={candidate} type="button" className={styles.control} onClick={() => onSwitchTo(candidate)}>
-              {SURFACE_CONTROL_LABEL[candidate]}
-            </button>
-          ))}
-          <span className={styles.controlsRule} />
-          <button type="button" className={styles.control} onClick={onOpenConversations}>
-            conversations
-          </button>
-          <button type="button" className={styles.control} onClick={onOpenRoom}>
-            room
-          </button>
-          <button type="button" className={styles.control} onClick={onOpenModels}>
-            models
-          </button>
-        </div>
-      </div>
+      <DocumentHeader
+        onOpenPieces={onOpenPieces}
+        onOpenModels={onOpenModels}
+        title={title}
+        lifecycle={lifecycle}
+        surface={surface}
+        onSwitchTo={onSwitchTo}
+      />
 
       {lifecycle.retitleError !== undefined && (
         <p className={styles.lifecycleError} role="alert">

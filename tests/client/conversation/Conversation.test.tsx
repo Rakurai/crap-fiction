@@ -63,6 +63,8 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
       onApplied={() => Promise.resolve({ failed: false })}
+      onOpenRoom={() => {}}
+      onOpenConversations={() => {}}
       {...extra}
     />,
   )

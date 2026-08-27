@@ -164,10 +164,7 @@ function MountedSurface({
           onOpenModels={onOpenModels}
           manuscript={document.session.manuscript}
           autosave={session.autosave}
-          onOpenRoom={() => setPanel('room')}
-          onOpenConversations={openConversations}
-          onSwitchToStoryContext={() => onSwitchToSurface('storyContext')}
-          onSwitchToAuthorContext={() => onSwitchToSurface('authorContext')}
+          onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
         />
@@ -181,8 +178,6 @@ function MountedSurface({
           onChange={document.session.setText}
           referenceSchema={document.referenceSchema}
           autosave={session.autosave}
-          onOpenRoom={() => setPanel('room')}
-          onOpenConversations={openConversations}
           onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
@@ -208,6 +203,8 @@ function MountedSurface({
           onApplied={session.install}
           onApplyingChange={conversation.setApplying}
           onConversationIdChange={conversation.setActiveConversationId}
+          onOpenRoom={() => setPanel('room')}
+          onOpenConversations={openConversations}
         />
       )}
       {panel === 'room' && (
