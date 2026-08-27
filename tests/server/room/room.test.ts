@@ -20,6 +20,7 @@ import {
 } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
+import type { ParticipantActivityEvent } from '../../../src/shared/conversationEvents.js'
 import type { DocumentSnapshot } from '../../../src/shared/surfaces.js'
 import {
   ApplicationDocumentNotSavedError,
@@ -303,6 +304,29 @@ describe('Room.dispatch', () => {
     expect(landed).toHaveLength(4)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment')).toHaveLength(1)
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
+  })
+
+  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from preparing into working', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, states: ['preparing', 'working'] },
+    })
+
+    const activity: ParticipantActivityEvent[] = []
+    room.subscribe(piece.id, (event) => {
+      if (event.type === 'participant.activity') activity.push(event.data)
+    })
+
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    for (const participantId of ['shape', 'compression', 'story-editor']) {
+      const own = activity.filter((event) => event.participantId === participantId)
+      expect(own.map((event) => event.state)).toEqual(['preparing', 'working'])
+      expect(own.every((event) => event.startedAt === 1_700_000_000_000)).toBe(true)
+    }
   })
 
   it('submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {

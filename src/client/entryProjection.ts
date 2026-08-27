@@ -55,7 +55,8 @@ export function projectEvent(projection: ConversationProjection, event: RoomEven
     case 'participant.activity': {
       const activity = projection.activity
       if (activity === undefined || activity.actionId !== event.data.actionId) return projection
-      return { ...projection, activity: { ...activity, states: { ...activity.states, [event.data.participantId]: event.data.state } } }
+      const { participantId, state, startedAt } = event.data
+      return { ...projection, activity: { ...activity, states: { ...activity.states, [participantId]: { state, startedAt } } } }
     }
     case 'apply.pending':
       return projection

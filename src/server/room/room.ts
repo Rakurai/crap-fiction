@@ -22,6 +22,7 @@ import {
   type ConversationFailureCode,
   type EntryAppendedEvent,
   type ParticipantActivityEvent,
+  type ParticipantState,
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
@@ -122,7 +123,7 @@ type ActiveDispatch = {
   readonly actionId: string
   readonly sourceEntryId: string
   readonly audience: readonly string[]
-  readonly states: Map<string, 'preparing' | 'working'>
+  readonly states: Map<string, ParticipantState>
   readonly controller: AbortController
   readonly startedAt: number
 }
@@ -466,8 +467,9 @@ export class Room {
     })
 
     const onState = (participantId: string, state: 'preparing' | 'working'): void => {
-      operation.states.set(participantId, state)
-      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, surface: roomScope.surface } })
+      const startedAt = operation.states.get(participantId)?.startedAt ?? this.#now()
+      operation.states.set(participantId, { state, startedAt })
+      this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, startedAt, surface: roomScope.surface } })
     }
 
     const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {

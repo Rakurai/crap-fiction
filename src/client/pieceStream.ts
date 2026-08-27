@@ -37,7 +37,8 @@ export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent)
       }
     case 'participant.activity': {
       if (current === null || current.kind !== 'dispatch' || current.actionId !== event.data.actionId) return snapshot
-      return { ...snapshot, [surface]: { ...current, states: { ...current.states, [event.data.participantId]: event.data.state } } }
+      const { participantId, state, startedAt } = event.data
+      return { ...snapshot, [surface]: { ...current, states: { ...current.states, [participantId]: { state, startedAt } } } }
     }
     case 'apply.pending': {
       if (current === null || current.kind !== 'apply' || current.actionId !== event.data.actionId) return snapshot

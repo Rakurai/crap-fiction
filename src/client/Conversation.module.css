@@ -97,6 +97,10 @@
   border-top: 1px solid var(--rule);
 }
 
+.pending {
+  opacity: 0.5;
+}
+
 /*
  * A reading with nothing to add is a line, not a response: the same identity in the same order,
  * carrying no claim and no actions. It reads as a participant who read, not one who was absent.
@@ -120,6 +124,17 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+}
+
+.identitySpacer {
+  flex: 1;
+}
+
+.identityStatus {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.06em;
 }
 
 .handle {
@@ -185,34 +200,6 @@
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-.flightWrapper {
-  margin: 0 0 4px;
-}
-
-.flight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.activityFacts {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: 0.07em;
-  flex: 1;
-}
-
-.progress {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-}
-
-.progressLine {
-  font: 400 11.5px/1.5 var(--font-ui);
-  color: var(--ink2);
 }
 
 .apply {

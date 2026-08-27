@@ -12,6 +12,7 @@ import type { AutosaveState } from './autosave.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { Mark } from './Mark.js'
+import { isParticipantOutcome } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplyingResponse } from './useApply.js'
 import { useNow } from './useNow.js'
@@ -224,17 +225,25 @@ function ParticipantIdentity({
   handle,
   mark,
   ordinal,
+  status,
 }: {
   readonly name: string
   readonly handle: string | undefined
   readonly mark: string | null
   readonly ordinal: number | null
+  readonly status?: string
 }) {
   return (
     <div className={styles.identity}>
       <Mark mark={mark} ordinal={ordinal} />
       {handle !== undefined && <span className={styles.handle}>@{handle}</span>}
       <span className={styles.name}>{name}</span>
+      {status !== undefined && (
+        <>
+          <span className={styles.identitySpacer} />
+          <span className={styles.identityStatus}>{status}</span>
+        </>
+      )}
     </div>
   )
 }
@@ -382,30 +391,37 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
   }
 }
 
-function DispatchFlight({
-  activity,
+function participantStatus(state: DispatchActivitySnapshot['states'][string] | undefined, nowMs: number): string {
+  if (state === undefined) return machineWords('queued')
+  return facts(machineWords(state.state), elapsed(state.startedAt, nowMs))
+}
+
+function ParticipantFlightLine({
+  participantId,
   displayName,
+  handle,
+  mark,
+  ordinal,
+  state,
   nowMs,
 }: {
-  readonly activity: DispatchActivitySnapshot
+  readonly participantId: string
   readonly displayName: (participantId: string) => string
+  readonly handle: (participantId: string) => string | undefined
+  readonly mark: (participantId: string) => string | null
+  readonly ordinal: (participantId: string) => number | null
+  readonly state: DispatchActivitySnapshot['states'][string] | undefined
   readonly nowMs: number
 }) {
-  const active = Object.keys(activity.states)
   return (
-    <div className={styles.flightWrapper}>
-      <div className={styles.flight}>
-        <span className={styles.activityFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
-      </div>
-      {active.length > 0 && (
-        <ul className={styles.progress}>
-          {active.map((participantId) => (
-            <li key={participantId} className={styles.progressLine}>
-              {displayName(participantId)} is thinking.
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className={`${styles.participant} ${styles.pending}`}>
+      <ParticipantIdentity
+        name={displayName(participantId)}
+        handle={handle(participantId)}
+        mark={mark(participantId)}
+        ordinal={ordinal(participantId)}
+        status={participantStatus(state, nowMs)}
+      />
     </div>
   )
 }
@@ -493,13 +509,24 @@ export function Conversation({
   }, [conversation.conversationId, onConversationIdChange])
 
   const nowMs = useNow(conversation.projection.activity !== undefined, clock)
+  const activity = conversation.projection.activity
+  const pendingParticipants = useMemo(() => {
+    if (activity === undefined) return []
+    const answered = new Set(
+      conversation.projection.entries
+        .filter(isParticipantOutcome)
+        .filter((entry) => entry.causeId === activity.sourceEntryId)
+        .map((entry) => entry.participantId),
+    )
+    return activity.audience.filter((participantId) => !answered.has(participantId))
+  }, [activity, conversation.projection.entries])
   const roomBusy = conversation.busy || apply.applying !== undefined
   // A dispatch — a message, a reply, or a concrete-change request — is what turns the send
   // control into stop; an Apply holds the document instead, and abandoning it is the held
   // banner's control. `activity` is set only once a dispatch is confirmed under way, so the
   // control never relabels itself during the moment the surface is still learning what, if
   // anything, the room already has in flight.
-  const conversationActionInFlight = conversation.projection.activity !== undefined
+  const conversationActionInFlight = activity !== undefined
   const opening = openingWords(conversation.projection.entries)
 
   function askAboutChange(): void {
@@ -584,9 +611,18 @@ export function Conversation({
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
-        {conversation.projection.activity !== undefined && (
-          <DispatchFlight activity={conversation.projection.activity} displayName={displayName} nowMs={nowMs} />
-        )}
+        {pendingParticipants.map((participantId) => (
+          <ParticipantFlightLine
+            key={participantId}
+            participantId={participantId}
+            displayName={displayName}
+            handle={handle}
+            mark={mark}
+            ordinal={ordinal}
+            state={activity?.states[participantId]}
+            nowMs={nowMs}
+          />
+        ))}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
         <p className={styles.error} role="alert">

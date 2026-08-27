@@ -471,47 +471,6 @@ describe('sending from the keyboard', () => {
 describe('conversation activity, truthfully', () => {
   afterEach(cleanup)
 
-  const STARTED: RoomEvent = {
-    type: 'action.started',
-    data: {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'dispatch',
-      sourceEntryId: 'e0',
-      startedAt: 1_700_000_000_000,
-      audience: ['shape', 'reader'],
-      surface: 'draft',
-    },
-  }
-
-  it('draws an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-
-    expect(await screen.findByText(/ACTIVE/)).toBeTruthy()
-    expect(screen.queryByText(/is thinking/)).toBeNull()
-  })
-
-  it('shows one "is thinking" line per participant actually reporting progress, and none for the rest of a resolved audience it never got', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working', surface: 'draft' } })
-
-    expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
-    // The audience STARTED resolved holds `reader` too, which has reported nothing.
-    expect(screen.queryByText(/Reader Experience is thinking/)).toBeNull()
-    expect(screen.queryByText(/waiting/i)).toBeNull()
-
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing', surface: 'draft' } })
-
-    expect(screen.getByText('Shape is thinking.')).toBeTruthy()
-    expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
-  })
-
   it("reconnect: an apply already in flight for a response shows its flight from the stream's own snapshot alone, no new event required", async () => {
     const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
       actionId: 'a1',
