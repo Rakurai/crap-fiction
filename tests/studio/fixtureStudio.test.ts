@@ -50,7 +50,10 @@ describe('the fixture studio', () => {
       body: JSON.stringify({ title: 'Cups', mode: 'flash' }),
     })
 
-    const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1/dispatch', {
+    const minted = await app.request('/pieces/cups/surfaces/draft/conversations', { method: 'POST' })
+    const { id: conversationId } = (await minted.json()).data
+
+    const res = await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}/dispatch`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -60,7 +63,7 @@ describe('the fixture studio', () => {
     })
 
     expect(res.status).toBe(200)
-    expect((await res.json()).data).toMatchObject({ conversationId: 'c1' })
+    expect((await res.json()).data).toMatchObject({ conversationId })
   })
 
 })

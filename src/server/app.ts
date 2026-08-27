@@ -14,13 +14,11 @@ import { originGuard } from './originGuard.js'
 import {
   ConversationNotFoundError,
   createPiece,
-  deleteConversation,
   getConversation,
   getPiece,
   listPieces,
   type PieceDocumentWriter,
   PieceNotFoundError,
-  startConversation,
   UnknownCastMemberError,
   updatePiece,
 } from './pieces.js'
@@ -119,7 +117,8 @@ export function createApp(
   })
 
   app.post('/pieces/:id/surfaces/:surface/conversations', param, (c) => {
-    return c.json(ok(startConversation(workspace.require(), c.req.param('id'))))
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    return c.json(ok(room.mintConversation(workspace.require(), scope)))
   })
 
   app.get('/pieces/:id/surfaces/:surface/conversations/:cid', param, (c) => {
@@ -127,7 +126,8 @@ export function createApp(
   })
 
   app.delete('/pieces/:id/surfaces/:surface/conversations/:cid', param, async (c) => {
-    await deleteConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))
+    const scope: RoomScope = { pieceId: c.req.param('id'), surface: c.req.valid('param').surface }
+    await room.deleteConversation(workspace.require(), scope, c.req.param('cid'))
     return c.json(ok(null))
   })
 

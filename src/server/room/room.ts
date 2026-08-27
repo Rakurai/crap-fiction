@@ -26,7 +26,7 @@ import {
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
-import { PieceNotFoundError } from '../pieces.js'
+import { ConversationNotFoundError, deleteConversation, PieceNotFoundError, startConversation } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
 import {
@@ -191,6 +191,7 @@ export class Room {
   readonly #policy: HistoryPolicy
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
+  readonly #minted = new Set<string>()
   #currentPieceId: string | undefined
 
   constructor(
@@ -249,6 +250,33 @@ export class Room {
     return this.#operations.get(roomScopeKey(scope))
   }
 
+  #owns(scope: RoomScope, actionId: string): boolean {
+    return this.#operations.get(roomScopeKey(scope))?.actionId === actionId
+  }
+
+  #release(scope: RoomScope, actionId: string): void {
+    if (this.#owns(scope, actionId)) this.#operations.delete(roomScopeKey(scope))
+  }
+
+  #finish(scope: RoomScope, actionId: string, outcome: 'settled' | 'abandoned' | 'failed'): void {
+    if (!this.#owns(scope, actionId)) return
+    this.#operations.delete(roomScopeKey(scope))
+    this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome, surface: scope.surface } })
+  }
+
+  mintConversation(workspaceDir: string, roomScope: RoomScope): { readonly id: string } {
+    const minted = startConversation(workspaceDir, roomScope.pieceId)
+    this.#minted.add(minted.id)
+    return minted
+  }
+
+  async deleteConversation(workspaceDir: string, roomScope: RoomScope, conversationId: string): Promise<void> {
+    const operation = this.#operationFor(roomScope)
+    if (operation?.conversationId === conversationId) throw new RoomBusyError(roomScope.pieceId, roomScope.surface)
+    this.#minted.delete(conversationId)
+    await deleteConversation(this.#dataRoot, workspaceDir, roomScope.pieceId, roomScope.surface, conversationId)
+  }
+
   activitySnapshot(scope: RoomScope): ConversationActivitySnapshot | undefined {
     const operation = this.#operationFor(scope)
     if (operation === undefined) return undefined
@@ -282,12 +310,7 @@ export class Room {
     const operation = this.#operationFor(scope)
     if (operation === undefined || operation.actionId !== actionId) return
     operation.controller.abort()
-    this.#operations.delete(roomScopeKey(scope))
-    // A pending Apply has no async work left for the abort signal to interrupt — the model call
-    // already settled — so abandoning it is the only thing that will ever close out its action.
-    if (operation.kind === 'apply' && operation.pending !== undefined) {
-      this.#emit(scope.pieceId, { type: 'action.finished', data: { actionId, outcome: 'abandoned', surface: scope.surface } })
-    }
+    this.#finish(scope, actionId, 'abandoned')
   }
 
   async dispatch(
@@ -305,7 +328,9 @@ export class Room {
     if (piece === undefined) throw new PieceNotFoundError(pieceId)
 
     const conversationScope = conversationScopeFor(workspaceDir, roomScope)
-    const existingEntries = readConversationEntries(this.#dataRoot, conversationScope, conversationId)?.entries ?? []
+    const onDisk = readConversationEntries(this.#dataRoot, conversationScope, conversationId)
+    if (onDisk === undefined && !this.#minted.has(conversationId)) throw new ConversationNotFoundError(pieceId, conversationId)
+    const existingEntries = onDisk?.entries ?? []
     const modeDescription = this.#catalog.mode(piece.metadata.mode).description
     const modeSpecialists = this.#catalog.specialistsFor(piece.metadata.mode, roomScope.surface)
     const roster = [...modeSpecialists, this.#catalog.roster.storyEditor, ...this.#catalog.roster.addressedOnly]
@@ -389,40 +414,51 @@ export class Room {
       interviewerReference: this.#catalog.referenceFor(piece.metadata.mode, roomScope.surface) ?? undefined,
     }
     const cause = causeEntry
-    const key = roomScopeKey(roomScope)
+
+    let settled!: () => void
+    const settlement = new Promise<void>((resolve) => {
+      settled = resolve
+    })
+    this.#operations.set(roomScopeKey(roomScope), { ...dispatchState, settlement })
 
     const written = (async () => {
+      if (!this.#owns(roomScope, actionId)) return
       if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, roomScope.surface, [...enabledCast, ...brought])
+      if (!this.#owns(roomScope, actionId)) return
       await this.#entries.append(this.#dataRoot, conversationScope, conversationId, cause)
+      this.#minted.delete(conversationId)
     })()
 
-    const settlement = written
+    void written
       .then(
-        () => {
+        async () => {
+          if (!this.#owns(roomScope, actionId)) return
           this.#emit(pieceId, {
             type: 'action.started',
             data: { actionId, conversationId, kind: 'dispatch', sourceEntryId: cause.id, startedAt, audience, surface: roomScope.surface },
           })
+          if (!this.#owns(roomScope, actionId)) return
           this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: cause, surface: roomScope.surface } })
-          return this.#run(roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
-            this.#fail(pieceId, roomScope.surface, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
+          await this.#run(roomScope, conversationScope, conversationId, plan, dispatchState).catch((err: unknown) => {
+            this.#fail(roomScope, actionId, 'UNEXPECTED_FAILURE', failureText(err), err)
           })
         },
         () => {},
       )
       .finally(() => {
-        if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
+        this.#release(roomScope, actionId)
+        settled()
       })
-    this.#operations.set(key, { ...dispatchState, settlement })
 
     await written
     return { conversationId, actionId }
   }
 
-  #fail(pieceId: string, surface: RoomScope['surface'], actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
-    this.#logger.error({ pieceId, actionId, code, err: cause }, 'conversation action failed')
-    this.#emit(pieceId, { type: 'error', data: { code, message, surface } })
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface } })
+  #fail(scope: RoomScope, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+    this.#logger.error({ pieceId: scope.pieceId, actionId, code, err: cause }, 'conversation action failed')
+    if (!this.#owns(scope, actionId)) return
+    this.#emit(scope.pieceId, { type: 'error', data: { code, message, surface: scope.surface } })
+    this.#finish(scope, actionId, 'failed')
   }
 
   async #run(
@@ -471,6 +507,7 @@ export class Room {
     const onState = (participantId: string, state: 'preparing' | 'working'): void => {
       const startedAt = operation.states.get(participantId)?.startedAt ?? this.#now()
       operation.states.set(participantId, { state, startedAt })
+      if (!this.#owns(roomScope, actionId)) return
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, startedAt, surface: roomScope.surface } })
     }
 
@@ -492,7 +529,7 @@ export class Room {
     const reportFailureOnce = (message: string, err: unknown): void => {
       if (failed) return
       failed = true
-      this.#fail(pieceId, roomScope.surface, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+      this.#fail(roomScope, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
@@ -506,6 +543,10 @@ export class Room {
         return
       }
       if (failed) return
+      if (!this.#owns(roomScope, actionId)) {
+        abandoned = true
+        return
+      }
 
       try {
         await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
@@ -513,6 +554,7 @@ export class Room {
         reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
         return
       }
+      if (!this.#owns(roomScope, actionId)) return
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
 
       const gathered = evidenceFrom(outcome, call.role.displayName)
@@ -533,7 +575,7 @@ export class Room {
           onState(storyEditor.id, state),
         )
         operation.states.delete(storyEditor.id)
-        if (outcome.kind === 'abandoned') {
+        if (outcome.kind === 'abandoned' || !this.#owns(roomScope, actionId)) {
           abandoned = true
         } else {
           try {
@@ -541,14 +583,17 @@ export class Room {
           } catch (err) {
             reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
           }
-          if (!failed) this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
+          if (!failed && this.#owns(roomScope, actionId)) {
+            this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
+          }
         }
       }
     }
 
     if (!failed) {
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: abandoned ? 'abandoned' : 'settled', surface: roomScope.surface } })
-      this.#logger.info({ pieceId, actionId, outcome: abandoned ? 'abandoned' : 'settled' }, 'conversation action closed')
+      const outcome = abandoned ? 'abandoned' : 'settled'
+      this.#finish(roomScope, actionId, outcome)
+      this.#logger.info({ pieceId, actionId, outcome }, 'conversation action closed')
     }
   }
 
@@ -591,8 +636,7 @@ export class Room {
     })
 
     const closeOut = (outcome: 'settled' | 'abandoned' | 'failed'): void => {
-      if (this.#operations.get(key)?.actionId === actionId) this.#operations.delete(key)
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome, surface: roomScope.surface } })
+      this.#finish(roomScope, actionId, outcome)
     }
 
     try {
@@ -680,7 +724,6 @@ export class Room {
     applicationId: string,
   ): Promise<{ entryId: string; change: AppliedChangeContent }> {
     const pieceId = roomScope.pieceId
-    const key = roomScopeKey(roomScope)
     const operation = this.#operationFor(roomScope)
     const conversationScope = conversationScopeFor(workspaceDir, roomScope)
 
@@ -699,8 +742,7 @@ export class Room {
     const { pending, actionId } = operation
     const target = this.#readTargetText(workspaceDir, pieceId, roomScope.surface)
     if (target !== pending.replacement) {
-      this.#operations.delete(key)
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
+      this.#finish(roomScope, actionId, 'failed')
       throw new ApplicationDocumentNotSavedError(pieceId, applicationId)
     }
 
@@ -716,16 +758,14 @@ export class Room {
     } catch (err) {
       // The durable write is what commits an Apply, so a failed one ends the operation rather than
       // leaving the scope holding a replacement no author can now reach or abandon.
-      this.#operations.delete(key)
-      this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'failed', surface: roomScope.surface } })
+      this.#finish(roomScope, actionId, 'failed')
       throw err
     }
     this.#emit(pieceId, {
       type: 'entry.appended',
       data: { actionId, entry: { ...application, change: pending.change.content }, surface: roomScope.surface },
     })
-    this.#emit(pieceId, { type: 'action.finished', data: { actionId, outcome: 'settled', surface: roomScope.surface } })
-    this.#operations.delete(key)
+    this.#finish(roomScope, actionId, 'settled')
     return { entryId: application.id, change: pending.change.content }
   }
 
