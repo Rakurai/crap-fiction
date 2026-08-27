@@ -217,7 +217,7 @@ describe('compiling a context', () => {
   })
 
   it("the story editor alone weighs the dispatch's own readings, beside the history every call gets", () => {
-    const reading = { kind: 'substantive' as const, participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }
+    const reading = { participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }
 
     const context = compileStoryEditorContext(
       contextInput({ role: shape, message: 'a second question', entries: entriesWithMixedHistory }),
@@ -304,7 +304,7 @@ describe('rendering a prompt', () => {
 
   it("gives the story editor the dispatch's readings as their own section, naming the participant by display name, and no section at all where nothing substantive landed", () => {
     const withReading = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
-      { kind: 'substantive', participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
+      { participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
     ])
     const prompt = wholeOf(renderPrompt(withReading, fragments, charter))
     expect(prompt).toContain('FIXTURE_READINGS_HEADING')
@@ -493,7 +493,7 @@ describe('specialist independence', () => {
   it('rejects a compiled context that carries a reading from the dispatch being formed, before it is rendered', () => {
     const contaminated: Context = {
       ...ordinaryContext,
-      evidence: [{ kind: 'substantive', participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }],
+      evidence: [{ participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }],
     }
 
     expect(() => assertSpecialistIndependence([contaminated])).toThrow(SpecialistIndependenceViolation)

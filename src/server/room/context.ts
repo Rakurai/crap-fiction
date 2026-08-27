@@ -14,7 +14,7 @@ export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'response'; participant: string; claim: string; note: string | undefined }>
 
-export type ParticipantEvidence = Readonly<{ kind: 'substantive'; participant: string; claim: string; note: string | undefined }>
+export type ParticipantEvidence = Readonly<{ participant: string; claim: string; note: string | undefined }>
 
 export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
 
