@@ -404,6 +404,16 @@ describe('a frame the client cannot read after activity was already known', () =
     return { room, reportMalformedFrame: () => onMalformedFrame('malformed "entry.appended" event from the studio') }
   }
 
+  it('tells the author which frame could not be read', async () => {
+    const { room, reportMalformedFrame } = roomThatMisreadsAFrame(() => new Promise<RoomActivitySnapshot>(() => {}))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    act(() => reportMalformedFrame())
+
+    expect(result.current.error).toBe('malformed "entry.appended" event from the studio')
+  })
+
   it('re-establishes the snapshot instead of leaving activity stated known while it no longer is', async () => {
     const { room, reportMalformedFrame } = roomThatMisreadsAFrame(() => Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: activitySnapshot('a1') }))
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))

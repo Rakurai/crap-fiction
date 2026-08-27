@@ -243,8 +243,9 @@ export function useConversation(
         if (!active || event.data.surface !== surface) return
         update({ type: 'event', event })
       },
-      () => {
+      (message) => {
         if (!active) return
+        update({ type: 'reported', message })
         const peek = subscribeToRoom(pieceId, () => {}, () => {})
         learnActivity(peek.snapshot, peek.unsubscribe)
       },
