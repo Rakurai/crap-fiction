@@ -66,6 +66,19 @@ describe('useManuscript', () => {
     expect(result.current.markdown).not.toContain('Second paragraph.')
   })
 
+  it('carries a hard break through the source view and back without losing the draft', () => {
+    const { result } = renderHook(() => useManuscript('First line.'))
+
+    act(() => result.current.showSource())
+    act(() => result.current.setSourceText('First line.\\\nSecond line.'))
+    act(() => result.current.showRendered())
+
+    expect(result.current.markdown).toBe('First line.\\\nSecond line.')
+
+    act(() => result.current.showSource())
+    expect(result.current.sourceText).toBe('First line.\\\nSecond line.')
+  })
+
   it('captures the outgoing scroll ratio and restores it on the incoming view without the caller sequencing anything', () => {
     // `result.current` settles only after the passive-effect phase, which runs after the
     // layout effect under test, so the view is tracked from the render itself.

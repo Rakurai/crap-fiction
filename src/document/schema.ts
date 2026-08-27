@@ -12,8 +12,7 @@ import type { Schema } from 'prosemirror-model'
 type DocumentNodeName = 'doc' | 'paragraph' | 'text' | 'heading' | 'horizontalRule' | 'hardBreak'
 type DocumentMarkName = 'bold' | 'italic'
 
+export const documentExtensions = [Document, Text, Paragraph, Heading, Bold, Italic, HorizontalRule, HardBreak]
+
 // `getSchema` returns an unparameterized `Schema`; the extension list is what makes the cast true.
-export const documentSchema = getSchema([Document, Text, Paragraph, Heading, Bold, Italic, HorizontalRule, HardBreak]) as Schema<
-  DocumentNodeName,
-  DocumentMarkName
->
+export const documentSchema = getSchema(documentExtensions) as Schema<DocumentNodeName, DocumentMarkName>

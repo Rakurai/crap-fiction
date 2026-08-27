@@ -1,18 +1,12 @@
-import { Bold } from '@tiptap/extension-bold'
-import { Document } from '@tiptap/extension-document'
-import { Heading } from '@tiptap/extension-heading'
 import { History } from '@tiptap/extension-history'
-import { HorizontalRule } from '@tiptap/extension-horizontal-rule'
-import { Italic } from '@tiptap/extension-italic'
-import { Paragraph } from '@tiptap/extension-paragraph'
-import { Text } from '@tiptap/extension-text'
 import { closeHistory } from '@tiptap/pm/history'
 import { useEditor, type Editor } from '@tiptap/react'
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { editorContentToMarkdown, markdownToEditorContent } from '../document/markdown.js'
+import { documentExtensions } from '../document/schema.js'
 import { countWords } from '../shared/storyLength.js'
 
-const EXTENSIONS = [Document, Text, Paragraph, Heading, Bold, Italic, HorizontalRule, History]
+const EXTENSIONS = [...documentExtensions, History]
 
 export type ManuscriptView = 'rendered' | 'source' | 'reading'
 
@@ -33,7 +27,7 @@ export type ManuscriptViewModel = {
 function applySourceText(editor: Editor, text: string) {
   editor
     .chain()
-    .setContent(markdownToEditorContent(text), { emitUpdate: true })
+    .setContent(markdownToEditorContent(text), { emitUpdate: true, errorOnInvalidContent: true })
     .command(({ tr }) => {
       closeHistory(tr)
       return true
@@ -70,6 +64,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const editor = useEditor({
     extensions: EXTENSIONS,
+    enableContentCheck: true,
     editorProps: { attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Manuscript' } },
     content: markdownToEditorContent(initialMarkdown),
     onUpdate: ({ editor: current }) => {
