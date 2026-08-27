@@ -5,6 +5,7 @@ import type { ConversationActivitySnapshot, DispatchActivitySnapshot, RoomActivi
 import type { DocumentSnapshot } from '../../../src/shared/surfaces.js'
 import type { AutosaveState } from '../../../src/client/autosave.js'
 import type { RequestResult } from '../../../src/client/request.js'
+import { EMPTY_ROOM_ACTIVITY } from '../../../src/client/roomClient.js'
 import { useConversation, type RoomAdapters } from '../../../src/client/useConversation.js'
 import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../../support/roomAdapters.js'
 
@@ -382,5 +383,50 @@ describe('a room scope whose activity is not yet known', () => {
 
     await waitFor(() => expect(result.current.error).toMatch(/^malformed "activity.snapshot" event from the studio —/))
     expect(result.current.busy).toBe(true)
+  })
+})
+
+describe('a frame the client cannot read after activity was already known', () => {
+  function roomThatMisreadsAFrame(resume: () => Promise<RoomActivitySnapshot>) {
+    let onMalformedFrame: (message: string) => void = () => {
+      throw new Error('the malformed-frame handler was never registered')
+    }
+    let calls = 0
+    const subscribeToRoom: RoomAdapters['subscribeToRoom'] = vi.fn((_pieceId, _onEvent, onFrame) => {
+      calls += 1
+      if (calls === 1) {
+        onMalformedFrame = onFrame
+        return { snapshot: Promise.resolve(EMPTY_ROOM_ACTIVITY), unsubscribe: () => {} }
+      }
+      return { snapshot: resume(), unsubscribe: vi.fn() }
+    })
+    const room = roomAdapters({ fetchConversation: conversationOnDisk('c1', []), subscribeToRoom })
+    return { room, reportMalformedFrame: () => onMalformedFrame('malformed "entry.appended" event from the studio') }
+  }
+
+  it('re-establishes the snapshot instead of leaving activity stated known while it no longer is', async () => {
+    const { room, reportMalformedFrame } = roomThatMisreadsAFrame(() => Promise.resolve({ ...EMPTY_ROOM_ACTIVITY, draft: activitySnapshot('a1') }))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    act(() => reportMalformedFrame())
+
+    await waitFor(() => {
+      expect(result.current.busy).toBe(true)
+      expect(result.current.projection.activity?.actionId).toBe('a1')
+    })
+  })
+
+  it('holds the surface by the existing snapshot-failure lock when the re-established snapshot cannot be read either', async () => {
+    const { room, reportMalformedFrame } = roomThatMisreadsAFrame(() => Promise.reject(new Error('malformed "activity.snapshot" event from the studio')))
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    act(() => reportMalformedFrame())
+
+    await waitFor(() => {
+      expect(result.current.busy).toBe(true)
+      expect(result.current.error).toMatch(/^malformed "activity.snapshot" event from the studio —/)
+    })
   })
 })

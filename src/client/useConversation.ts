@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
-import type { ActionKind, ConversationActivitySnapshot } from '../shared/conversationEvents.js'
+import type { ActionKind, ConversationActivitySnapshot, RoomActivitySnapshot } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
 import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection, type RoomEvent } from './entryProjection.js'
@@ -223,26 +223,34 @@ export function useConversation(
       })
     }
 
+    function learnActivity(activityPromise: Promise<RoomActivitySnapshot>, cleanup?: () => void): void {
+      void activityPromise
+        .then((activity) => {
+          cleanup?.()
+          if (!active) return
+          update({ type: 'activityLearned', activity: activity[surface] })
+        })
+        .catch((err: unknown) => {
+          cleanup?.()
+          if (!active) return
+          update({ type: 'activityUnlearnable', message: `${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}` })
+        })
+    }
+
     const { snapshot, unsubscribe } = subscribeToRoom(
       pieceId,
       (event) => {
         if (!active || event.data.surface !== surface) return
         update({ type: 'event', event })
       },
-      (message) => {
-        if (active) update({ type: 'reported', message })
+      () => {
+        if (!active) return
+        const peek = subscribeToRoom(pieceId, () => {}, () => {})
+        learnActivity(peek.snapshot, peek.unsubscribe)
       },
     )
 
-    void snapshot
-      .then((activity) => {
-        if (!active) return
-        update({ type: 'activityLearned', activity: activity[surface] })
-      })
-      .catch((err: unknown) => {
-        if (!active) return
-        update({ type: 'activityUnlearnable', message: `${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}` })
-      })
+    learnActivity(snapshot)
 
     return () => {
       active = false

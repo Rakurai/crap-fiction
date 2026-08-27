@@ -19,10 +19,20 @@ export function sseStream(stream: SSEStreamingApi): {
   // The room emits synchronously and writing a frame is asynchronous: the chain
   // stops two frames interleaving into one a client cannot parse.
   let written: Promise<void> = Promise.resolve()
+  let failure: Error | undefined = undefined
+
   return {
     write: (event, data) => {
-      written = written.then(() => stream.writeSSE({ event, data: JSON.stringify(data) }))
+      written = written.then(() => {
+        if (failure !== undefined) return
+        return stream.writeSSE({ event, data: JSON.stringify(data) }).catch((err: unknown) => {
+          failure = err instanceof Error ? err : new Error(String(err))
+        })
+      })
     },
-    drain: () => written.catch(() => undefined),
+    drain: () =>
+      written.then(() => {
+        if (failure !== undefined) throw failure
+      }),
   }
 }

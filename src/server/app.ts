@@ -145,14 +145,23 @@ export function createApp(
 
   app.get('/pieces/:id/events', (c) => {
     const pieceId = c.req.param('id')
-    return streamSSE(c, async (stream) => {
-      const events = sseStream(stream)
-      const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
-      events.write('activity.snapshot', snapshot)
-      await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
-      unsubscribe()
-      await events.drain()
-    })
+    return streamSSE(
+      c,
+      async (stream) => {
+        const events = sseStream(stream)
+        const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
+        try {
+          events.write('activity.snapshot', snapshot)
+          await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
+        } finally {
+          unsubscribe()
+          await events.drain()
+        }
+      },
+      async (err) => {
+        logger.error({ err, pieceId }, 'the event stream failed')
+      },
+    )
   })
 
   app.get('/theme', (c) => {
