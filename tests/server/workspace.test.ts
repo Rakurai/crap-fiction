@@ -1,8 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { WorkspaceNotSetError, WorkspaceOutsideRootError, WorkspaceRegistry } from '../../src/server/workspace.js'
+import {
+  PersistedWorkspaceUnusableError,
+  WorkspaceNotSetError,
+  WorkspaceOutsideRootError,
+  WorkspaceRegistry,
+} from '../../src/server/workspace.js'
 
 describe('WorkspaceRegistry', () => {
   let dataRoot: string
@@ -37,5 +42,15 @@ describe('WorkspaceRegistry', () => {
 
     await expect(registry.set('/etc/passwd')).rejects.toThrow(WorkspaceOutsideRootError)
     expect(registry.get()).toBeUndefined()
+  })
+
+  it('refuses to open on a persisted value outside the data root, naming the file and the value', async () => {
+    const settings = path.join(dataRoot, 'config', 'settings.yaml')
+    mkdirSync(path.dirname(settings), { recursive: true })
+    writeFileSync(settings, 'workspace: /\n', 'utf8')
+
+    expect(() => WorkspaceRegistry.openAt(dataRoot)).toThrowError(PersistedWorkspaceUnusableError)
+    expect(() => WorkspaceRegistry.openAt(dataRoot)).toThrowError(new RegExp(`${settings}.*"/"`))
+    expect(readFileSync(settings, 'utf8')).toBe('workspace: /\n')
   })
 })

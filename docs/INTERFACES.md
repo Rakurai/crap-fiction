@@ -281,4 +281,5 @@ The set is closed, and the image ships none of them with a value.
 | `STUDIO_MODEL_RUNTIME_URL` | where the model module reaches the runtime |
 | `STUDIO_LOG_LEVEL` | the logger's level |
 
-An absent or malformed value is a startup failure naming it.
+An absent or malformed value is a startup failure naming it, on every path the studio is started by. A
+data root that is not an existing directory is malformed.

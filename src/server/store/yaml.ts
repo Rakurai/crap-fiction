@@ -188,6 +188,10 @@ export function fileExists(filePath: string): boolean {
   return existsSync(filePath)
 }
 
+export function directoryExists(dir: string): boolean {
+  return existsSync(dir) && statSync(dir).isDirectory()
+}
+
 export function fileModifiedMs(filePath: string): number {
   return statSync(filePath).mtimeMs
 }

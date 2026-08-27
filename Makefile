@@ -21,20 +21,14 @@ sandcastle:
 	$(TSX) .sandcastle/main.mts
 
 # Launch the studio: Vite serving the client, with the Hono application inside
-# it. The data root is checked for existence here because the alternative is a
-# launch that looks healthy and then fails with a bare ENOENT the first time the
-# author names a workspace.
+# it. Every value in $(STUDIO_ENV) is checked by the studio itself as it starts,
+# so nothing here inspects one.
 run:
 	@test -f $(STUDIO_ENV) || { \
 	  echo 'no $(STUDIO_ENV): write one setting STUDIO_DATA_ROOT, STUDIO_PORT, STUDIO_MODEL_RUNTIME_URL and STUDIO_LOG_LEVEL' >&2; \
 	  exit 1; \
 	}
-	@set -a; . ./$(STUDIO_ENV); set +a; \
-	  test -d "$$STUDIO_DATA_ROOT" || { \
-	    echo "STUDIO_DATA_ROOT is not a directory: $$STUDIO_DATA_ROOT" >&2; \
-	    exit 1; \
-	  }; \
-	  exec npm run dev
+	@set -a; . ./$(STUDIO_ENV); set +a; exec npm run dev
 
 # Everything that can say the studio is broken without a browser, in the order
 # that tells you fastest: types, then the suite. This is the whole gate for an

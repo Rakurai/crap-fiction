@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -183,6 +183,46 @@ describe('path containment', () => {
     expect(readPiece(workspaceDir, 'escaped')).toBeUndefined()
 
     rmSync(outside, { recursive: true, force: true })
+  })
+
+  it('refuses a target that does not exist yet but sits beneath a symlinked ancestor', async () => {
+    const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-'))
+    symlinkSync(outside, path.join(workspaceDir, 'escaped'))
+
+    await expect(writeStoryContext(workspaceDir, path.join('escaped', 'nested'), 'Premise: x\n')).rejects.toThrowError(PathEscapesRootError)
+    await expect(new DraftStore().write(workspaceDir, path.join('escaped', 'nested'), 'text')).rejects.toThrowError(PathEscapesRootError)
+    expect(existsSync(path.join(outside, 'nested'))).toBe(false)
+
+    rmSync(outside, { recursive: true, force: true })
+  })
+
+  it('measures containment against what the root really names, so a symlinked workspace still writes', async () => {
+    const real = mkdtempSync(path.join(tmpdir(), 'studio-real-workspace-'))
+    const linked = path.join(dataRoot, 'linked-workspace')
+    symlinkSync(real, linked)
+
+    await writePieceMetadata(linked, 'cups', CUPS)
+
+    expect(readPiece(linked, 'cups')?.metadata).toEqual(CUPS)
+    expect(existsSync(path.join(real, 'cups', 'piece.yaml'))).toBe(true)
+
+    rmSync(real, { recursive: true, force: true })
+  })
+
+  it('keeps every segment a write creates beneath the root', async () => {
+    const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: 'cups', surface: 'draft' }
+    await new ConversationEntryStore().append(dataRoot, scope, 'c1', {
+      id: 'e1',
+      kind: 'authorMessage',
+      text: 'x',
+      audience: [],
+      brought: [],
+    })
+
+    const root = realpathSync(workspaceDir)
+    for (const segment of ['cups', path.join('cups', 'conversations'), path.join('cups', 'conversations', 'draft')]) {
+      expect(realpathSync(path.join(workspaceDir, segment)).startsWith(root + path.sep)).toBe(true)
+    }
   })
 })
 

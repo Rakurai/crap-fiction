@@ -6,9 +6,10 @@ import type { ConversationEntry, EntryConversation } from '../../shared/conversa
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import type { ConversationScope } from '../scope.js'
-import { resolveWithinRoot } from './containment.js'
+import { PathEscapesRootError, resolveWithinRoot } from './containment.js'
 import {
   deleteFile,
+  directoryExists,
   directoryNames,
   fileExists,
   fileModifiedMs,
@@ -33,7 +34,11 @@ export function isAbsoluteLocation(value: string): boolean {
   return path.isAbsolute(value)
 }
 
-function settingsFile(dataRoot: string): string {
+export function isExistingDirectory(value: string): boolean {
+  return directoryExists(value)
+}
+
+export function settingsFile(dataRoot: string): string {
   return path.join(dataRoot, 'config', 'settings.yaml')
 }
 
@@ -100,8 +105,9 @@ export type StoredPiece = {
 function pieceDirectory(workspaceDir: string, id: string): string | undefined {
   try {
     return resolveWithinRoot(workspaceDir, id)
-  } catch {
-    return undefined
+  } catch (err) {
+    if (err instanceof PathEscapesRootError) return undefined
+    throw err
   }
 }
 

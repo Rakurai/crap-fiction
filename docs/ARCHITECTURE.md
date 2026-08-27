@@ -230,10 +230,9 @@ only fact the software cannot infer, so it is the only thing asked, once.
 
 **Everything durable sits under one data root**, which is process configuration and the only path the
 application is given. The workspace is a directory inside it, and author configuration is beside the
-workspaces rather than inside any of them. The workspace the author names is rejected unless it lands
-inside the data root. The data root itself is never asked for, because whoever ran the application
-already said where it is — and config living under it rather than in a per-user home directory is
-what makes the author's assignments and author context survive the process being replaced.
+workspaces rather than inside any of them. The data root itself is never asked for, because whoever ran
+the application already said where it is — and config living under it rather than in a per-user home
+directory is what makes the author's assignments and author context survive the process being replaced.
 
 **The layout is the store boundary's, and only its.** Every artifact is reached by asking for the
 artifact, never by handing the store a path, so no module outside it composes one, and moving a file
@@ -1013,9 +1012,20 @@ followed literally and produce an unreachable application.
 has open in another tab from posting to a write route while they are elsewhere.
 
 **Every path is resolved before it is used and rejected unless it lands inside the workspace directory**,
-and a symlink leaving the workspace is not followed. The workspace the author names is resolved and
-contained the same way against the data root. The failure this prevents is a route writing prose somewhere
-the author never chose.
+and a symlink leaving the workspace is not followed. Resolution answers for a location that does not exist
+yet, because a write's target never does: the root and the nearest existing ancestor of the candidate are
+both resolved through their links, and containment is tested against what those really name. The workspace
+the author names is resolved and contained the same way against the data root, whether it arrives from the
+author or is read back from the settings file at startup — a persisted value outside the data root is a
+startup failure naming the file and the value, never a fallback and never a silent reset. The failure all
+of this prevents is a route writing prose somewhere the author never chose.
+
+**Containment defends against a hand-edited settings value and a stray symlink, and not against another
+process mutating the filesystem while the studio runs.** The studio is one author's on their own machine,
+and the other process would already be theirs. So checking a path and then writing to it by name is
+sufficient here, and the residual window between the check and the write is accepted rather than closed:
+closing it would mean holding directory handles and resolving every segment relative to them, which is a
+large amount of machinery bought against a threat this deployment does not have.
 
 **YAML is parsed against a schema rather than into arbitrary objects**, and model output and Markdown are
 rendered as prose rather than as markup. A model returning a script tag is ordinary malformed output, and

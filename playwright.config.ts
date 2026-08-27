@@ -24,8 +24,13 @@ const FIXTURE_PORT = 5274
  * A run starts from nothing, so each journey walks the path a first run walks:
  * no settings file, no workspace, no pieces. The directories are left behind
  * after a run rather than cleaned up, because a failed journey is diagnosed by
- * looking at what did and did not reach disk.
+ * looking at what did and did not reach disk. They sit beside the runner's own
+ * output rather than inside it: the runner empties its output directory after
+ * this file is read, and a data root the studio was told to start against must
+ * still be there when it starts.
  */
+const RUNNER_OUTPUT = path.join(import.meta.dirname, 'test-results', 'runner')
+
 function emptyDataRoot(name: string): string {
   const dir = path.join(import.meta.dirname, 'test-results', name)
   rmSync(dir, { recursive: true, force: true })
@@ -44,6 +49,7 @@ export default defineConfig({
   // file is claimed twice or by neither.
   testDir: 'tests',
   testMatch: '**/*.spec.ts',
+  outputDir: RUNNER_OUTPUT,
   reporter: 'list',
   // One studio, one data root, one author: the suite is serial by construction,
   // and two journeys creating pieces in the same workspace at once would be
