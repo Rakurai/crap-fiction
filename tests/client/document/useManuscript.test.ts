@@ -49,6 +49,23 @@ describe('useManuscript', () => {
     expect(result.current.markdown).not.toContain('Second paragraph.')
   })
 
+  it('bounds an application on both sides, so prose typed after it undoes separately', () => {
+    const { result } = renderHook(() => useManuscript('First paragraph.'))
+
+    act(() => result.current.applyRecommendation('First paragraph. Second paragraph.'))
+    expect(result.current.markdown).toContain('Second paragraph.')
+
+    act(() => typeParagraph(editorOf(result.current), ' Third paragraph.'))
+    expect(result.current.markdown).toContain('Third paragraph.')
+
+    act(() => editorOf(result.current).commands.undo())
+    expect(result.current.markdown).not.toContain('Third paragraph.')
+    expect(result.current.markdown).toContain('Second paragraph.')
+
+    act(() => editorOf(result.current).commands.undo())
+    expect(result.current.markdown).not.toContain('Second paragraph.')
+  })
+
   it('captures the outgoing scroll ratio and restores it on the incoming view without the caller sequencing anything', () => {
     // `result.current` settles only after the passive-effect phase, which runs after the
     // layout effect under test, so the view is tracked from the render itself.

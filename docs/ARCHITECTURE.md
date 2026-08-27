@@ -189,7 +189,10 @@ cheaply is equally acceptable.
 
 **History belongs to the editor.** The application installs no history of its own and keeps no undo
 stack. Applying a recommendation is performed through the editor's ordinary mutation mechanism as a
-single transaction so that it participates in undo and redo as one action.
+single transaction so that it participates in undo and redo as one action. That transaction's history
+event is closed on both sides: it does not merge with whatever the author typed before it, and prose
+the author types afterward does not merge into it either, so a single undo aimed at the author's own
+typing never reaches back into the room's change.
 
 **Nothing application-specific enters the document.** No node attributes carrying application state,
 no marks for recommendations, no decorations tracking responses.

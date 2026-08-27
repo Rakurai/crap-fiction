@@ -41,6 +41,11 @@ function applySourceText(editor: Editor, text: string) {
     .run()
 }
 
+function applyRecommendationText(editor: Editor, text: string) {
+  applySourceText(editor, text)
+  editor.view.dispatch(closeHistory(editor.state.tr))
+}
+
 export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   const [view, setView] = useState<ManuscriptView>('rendered')
   const [sourceText, setSourceText] = useState('')
@@ -110,7 +115,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
   const applyRecommendation = useCallback(
     (text: string) => {
       if (editor === null) return
-      applySourceText(editor, text)
+      applyRecommendationText(editor, text)
       if (view === 'source') setSourceText(text)
     },
     [editor, view],
