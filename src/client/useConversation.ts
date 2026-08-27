@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
+import type { ActionKind, ConversationActivitySnapshot } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
-import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
+import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection, type RoomEvent } from './entryProjection.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -29,6 +30,136 @@ const STAYS_LOCKED = 'this surface stays locked until it is reopened'
  */
 export type ResumedApply = Readonly<{ actionId: string; responseId: string; applicationId: string | undefined }>
 
+/**
+ * The one action this surface's room scope is running, whichever of its conversations opened it.
+ * Every fact a control needs about it is held here once, so no part of it can be released while
+ * another part stays set.
+ */
+type SurfaceOperation = Readonly<{
+  actionId: string
+  conversationId: string
+  kind: ActionKind
+  sourceEntryId: string
+  applicationId: string | undefined
+}>
+
+type SurfaceState = Readonly<{
+  operation: SurfaceOperation | undefined
+  opening: boolean
+  activityStatus: 'learning' | 'known' | 'failed'
+  projection: ConversationProjection
+  mine: string | null
+  error: string | undefined
+}>
+
+type SurfaceChange =
+  | Readonly<{ type: 'event'; event: RoomEvent }>
+  | Readonly<{ type: 'entriesRead'; entries: readonly ConversationEntryView[] }>
+  | Readonly<{ type: 'activityLearned'; activity: ConversationActivitySnapshot | null }>
+  | Readonly<{ type: 'activityUnlearnable'; message: string }>
+  | Readonly<{ type: 'minted'; conversationId: string }>
+  | Readonly<{ type: 'opening' }>
+  | Readonly<{ type: 'stopped'; message: string | undefined }>
+  | Readonly<{ type: 'reported'; message: string }>
+  | Readonly<{ type: 'abandoned'; actionId: string }>
+
+function operationOf(activity: ConversationActivitySnapshot): SurfaceOperation {
+  return {
+    actionId: activity.actionId,
+    conversationId: activity.conversationId,
+    kind: activity.kind,
+    sourceEntryId: activity.sourceEntryId,
+    applicationId: activity.kind === 'apply' ? activity.applicationId : undefined,
+  }
+}
+
+function reduceEvent(state: SurfaceState, event: RoomEvent): SurfaceState {
+  const { operation } = state
+  switch (event.type) {
+    case 'error':
+      return { ...state, error: event.data.message }
+    case 'action.started': {
+      const started: SurfaceOperation = {
+        actionId: event.data.actionId,
+        conversationId: event.data.conversationId,
+        kind: event.data.kind,
+        sourceEntryId: event.data.sourceEntryId,
+        applicationId: undefined,
+      }
+      return {
+        ...state,
+        opening: false,
+        operation: started,
+        projection: started.conversationId === state.mine ? projectEvent(state.projection, event) : state.projection,
+      }
+    }
+    case 'apply.pending': {
+      if (operation?.actionId !== event.data.actionId) return state
+      return { ...state, operation: { ...operation, applicationId: event.data.applicationId } }
+    }
+    case 'action.finished': {
+      if (operation?.actionId !== event.data.actionId) return { ...state, projection: projectEvent(state.projection, event) }
+      return {
+        ...state,
+        operation: undefined,
+        projection: operation.conversationId === state.mine ? projectEvent(state.projection, event) : state.projection,
+      }
+    }
+    default: {
+      if (operation?.actionId === event.data.actionId && operation.conversationId !== state.mine) return state
+      return { ...state, projection: projectEvent(state.projection, event) }
+    }
+  }
+}
+
+function reduce(state: SurfaceState, change: SurfaceChange): SurfaceState {
+  switch (change.type) {
+    case 'event':
+      return reduceEvent(state, change.event)
+    case 'entriesRead': {
+      const merged = state.projection.entries.reduce((projection, entry) => appendEntry(projection, entry), {
+        ...state.projection,
+        entries: change.entries,
+      })
+      return { ...state, projection: merged }
+    }
+    case 'activityLearned': {
+      const { activity } = change
+      if (activity === null) return { ...state, activityStatus: 'known' }
+      const operation = operationOf(activity)
+      const showable = operation.conversationId === state.mine && activity.kind === 'dispatch'
+      return {
+        ...state,
+        activityStatus: 'known',
+        operation,
+        projection: showable ? { ...state.projection, activity } : state.projection,
+      }
+    }
+    case 'activityUnlearnable':
+      return { ...state, activityStatus: 'failed', error: change.message }
+    case 'minted':
+      return { ...state, mine: change.conversationId }
+    case 'opening':
+      return { ...state, opening: true, error: undefined }
+    case 'stopped':
+      return { ...state, opening: false, error: change.message ?? state.error }
+    case 'reported':
+      return { ...state, error: change.message }
+    case 'abandoned': {
+      if (state.operation?.actionId !== change.actionId) return state
+      return {
+        ...state,
+        operation: undefined,
+        projection: state.projection.activity?.actionId === change.actionId ? { ...state.projection, activity: undefined } : state.projection,
+      }
+    }
+    default: {
+      const exhaustive: never = change
+      return exhaustive
+    }
+  }
+}
+
 export type ConversationViewModel = Readonly<{
   projection: ConversationProjection
   /**
@@ -43,8 +174,13 @@ export type ConversationViewModel = Readonly<{
   sendMessage: (message: string) => void
   reply: (participantId: string, message: string) => void
   askForConcreteChange: (respondingTo: string, clarification: string | undefined) => void
-  /** Resolves true only when the room authoritatively released this conversation's operation. */
+  /**
+   * Abandons whatever this surface's room scope is running, from whichever of its conversations is
+   * mounted. Resolves true only when the room authoritatively released it.
+   */
   abandon: () => Promise<boolean>
+  /** The same, for a caller holding the identity of its own action and a failure to state with it. */
+  abandonAction: (conversationId: string, actionId: string, after: string | undefined) => Promise<boolean>
   conversationId: string | null
   /** The Apply this conversation was mid-flight on when its stream connected, if any. */
   resumedApplying: ResumedApply | undefined
@@ -71,21 +207,15 @@ export function useConversation(
   room: RoomAdapters,
 ): ConversationViewModel {
   const { createConversation, fetchConversation, dispatch, subscribeToRoom, abandonOperation } = room
-  const [projection, setProjection] = useState<ConversationProjection>(EMPTY_PROJECTION)
-  // Until the room's own activity has arrived, what this surface has in flight is unknown rather
-  // than nothing, and unknown locks the surface exactly as an action in flight does.
-  const [activityStatus, setActivityStatus] = useState<'learning' | 'known' | 'failed'>('learning')
-  const [busy, setBusy] = useState(false)
-  const [applyingInRoom, setApplyingInRoom] = useState(false)
-  const [actionId, setActionId] = useState<string | undefined>(undefined)
-  const actionIdRef = useRef(actionId)
-  // Whether the action this surface holds was opened in the conversation this hook is showing. Only
-  // its own is this hook's to abandon; another conversation's still holds the surface's controls.
-  const ownActionRef = useRef(false)
+  const [state, update] = useReducer(reduce, {
+    operation: undefined,
+    opening: false,
+    activityStatus: 'learning',
+    projection: EMPTY_PROJECTION,
+    mine: initialConversationId,
+    error: undefined,
+  })
   const abandoningRef = useRef(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [resumedApplying, setResumedApplying] = useState<ResumedApply | undefined>(undefined)
-  const conversationIdRef = useRef<string | null>(initialConversationId)
   // Held rather than read from the prop: this hook mints an id on a fresh conversation's first
   // dispatch and reports it upward, and depending on the prop would rebuild the event stream in the
   // moment that dispatch is opening. The author switching is a remount, not a changed prop.
@@ -98,13 +228,11 @@ export function useConversation(
       void fetchConversation(pieceId, surface, openedWithConversationId).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
-          setProjection((prev) =>
-            prev.entries.reduce((merged, entry) => appendEntry(merged, entry), { ...prev, entries: result.value.entries }),
-          )
+          update({ type: 'entriesRead', entries: result.value.entries })
           return
         }
         const message = failureMessage(result)
-        if (message !== undefined) setError(message)
+        if (message !== undefined) update({ type: 'reported', message })
       })
     }
 
@@ -112,49 +240,13 @@ export function useConversation(
       pieceId,
       (event) => {
         if (!active || event.data.surface !== surface) return
-        if (event.type === 'error') {
-          setError(event.data.message)
-          return
-        }
-        if (event.type === 'action.started') {
-          ownActionRef.current = event.data.conversationId === conversationIdRef.current
-          actionIdRef.current = event.data.actionId
-          setActionId(event.data.actionId)
-          setBusy(true)
-          setApplyingInRoom(event.data.kind === 'apply')
-          if (ownActionRef.current) setProjection((prev) => projectEvent(prev, event))
-          return
-        }
-        if (event.type === 'apply.pending' && actionIdRef.current === event.data.actionId) {
-          if (ownActionRef.current) {
-            setResumedApplying({
-              actionId: event.data.actionId,
-              responseId: event.data.sourceEntryId,
-              applicationId: event.data.applicationId,
-            })
-          }
-          return
-        }
-        if (event.type === 'action.finished' && actionIdRef.current === event.data.actionId) {
-          const ownAction = ownActionRef.current
-          actionIdRef.current = undefined
-          ownActionRef.current = false
-          abandoningRef.current = false
-          setActionId(undefined)
-          setBusy(false)
-          setApplyingInRoom(false)
-          setResumedApplying(undefined)
-          if (ownAction) setProjection((prev) => projectEvent(prev, event))
-          return
-        }
-        if ('actionId' in event.data && actionIdRef.current === event.data.actionId && !ownActionRef.current) return
-        setProjection((prev) => projectEvent(prev, event))
+        update({ type: 'event', event })
       },
       // A frame this client cannot read is reported and otherwise passed over. Only the snapshot's
       // own failure locks the surface, and it says so where it is awaited: a malformed frame of any
       // other kind leaves what the room is doing already learned.
       (message) => {
-        if (active) setError(message)
+        if (active) update({ type: 'reported', message })
       },
     )
 
@@ -165,34 +257,13 @@ export function useConversation(
     void snapshot
       .then((activity) => {
         if (!active) return
-        setActivityStatus('known')
-        const surfaceActivity = activity[surface]
-        if (surfaceActivity === null) {
-          setApplyingInRoom(false)
-          return
-        }
-        actionIdRef.current = surfaceActivity.actionId
-        ownActionRef.current = surfaceActivity.conversationId === openedWithConversationId
-        setActionId(surfaceActivity.actionId)
-        setBusy(true)
-        setApplyingInRoom(surfaceActivity.kind === 'apply')
-        if (!ownActionRef.current) return
-        if (surfaceActivity.kind === 'dispatch') {
-          setProjection((prev) => ({ ...prev, activity: surfaceActivity }))
-        } else {
-          setResumedApplying({
-            actionId: surfaceActivity.actionId,
-            responseId: surfaceActivity.sourceEntryId,
-            applicationId: surfaceActivity.applicationId,
-          })
-        }
+        update({ type: 'activityLearned', activity: activity[surface] })
       })
       // Terminal: the surface never learns what its room scope is doing, so it stays locked for the
       // life of this mount and says why in the studio's own words rather than a substitute of ours.
       .catch((err: unknown) => {
         if (!active) return
-        setActivityStatus('failed')
-        setError(`${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}`)
+        update({ type: 'activityUnlearnable', message: `${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}` })
       })
 
     return () => {
@@ -201,39 +272,33 @@ export function useConversation(
     }
   }, [pieceId, surface, openedWithConversationId])
 
-  const roomBusy = busy || activityStatus !== 'known'
+  const roomBusy = state.opening || state.operation !== undefined || state.activityStatus !== 'known'
 
   function openDispatch(opening: DispatchOpening): void {
     if (roomBusy) return
     // Started, not waited on: the current documents travel in the request either way, so the
     // dispatch never depends on this write having landed before it opens.
     void flushDocument()
-    setError(undefined)
-    setBusy(true)
-
-    function stop(message: string | undefined): void {
-      if (message !== undefined) setError(message)
-      setBusy(false)
-    }
+    update({ type: 'opening' })
 
     async function run(): Promise<void> {
-      let conversationId = conversationIdRef.current
+      let conversationId = state.mine
       if (conversationId === null) {
         const created = await createConversation(pieceId, surface)
         if (created.outcome !== 'value') {
-          stop(failureMessage(created))
+          update({ type: 'stopped', message: failureMessage(created) })
           return
         }
         conversationId = created.value.id
-        conversationIdRef.current = created.value.id
+        update({ type: 'minted', conversationId })
       }
 
       const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments())
-      if (result.outcome !== 'value') stop(failureMessage(result))
+      if (result.outcome !== 'value') update({ type: 'stopped', message: failureMessage(result) })
     }
 
     void run().catch((err: unknown) => {
-      stop(err instanceof Error ? err.message : UNSENT)
+      update({ type: 'stopped', message: err instanceof Error ? err.message : UNSENT })
     })
   }
 
@@ -252,39 +317,43 @@ export function useConversation(
   // The controls are the author's again only once the studio has answered that it let the action go.
   // Releasing them on the request would show an idle surface the room is still working on, and a
   // failed abandonment would leave that surface addressable and every dispatch from it refused.
-  async function abandon(): Promise<boolean> {
-    const target = actionId
-    const conversationId = conversationIdRef.current
-    if (target === undefined || conversationId === null || !ownActionRef.current || abandoningRef.current) return false
+  async function abandonAction(conversationId: string, actionId: string, after: string | undefined): Promise<boolean> {
+    if (abandoningRef.current) return false
     abandoningRef.current = true
-    const result = await abandonOperation(pieceId, surface, conversationId, target)
-    const message = failureMessage(result)
-    if (message !== undefined) {
-      abandoningRef.current = false
-      setError(message)
+    const result = await abandonOperation(pieceId, surface, conversationId, actionId)
+    abandoningRef.current = false
+    const unfreed = failureMessage(result)
+    if (unfreed !== undefined) {
+      update({ type: 'reported', message: after === undefined ? unfreed : `${after} — ${unfreed}` })
       return false
     }
-    if (actionIdRef.current === target) {
-      actionIdRef.current = undefined
-      ownActionRef.current = false
-      abandoningRef.current = false
-      setActionId(undefined)
-      setBusy(false)
-      setProjection((prev) => (prev.activity?.actionId === target ? { ...prev, activity: undefined } : prev))
-    }
+    update({ type: 'abandoned', actionId })
     return true
   }
 
+  async function abandon(): Promise<boolean> {
+    const { operation } = state
+    if (operation === undefined) return false
+    return await abandonAction(operation.conversationId, operation.actionId, undefined)
+  }
+
+  const resumedApplying = useMemo((): ResumedApply | undefined => {
+    const { operation } = state
+    if (operation === undefined || operation.kind !== 'apply' || operation.conversationId !== state.mine) return undefined
+    return { actionId: operation.actionId, responseId: operation.sourceEntryId, applicationId: operation.applicationId }
+  }, [state.operation, state.mine])
+
   return {
-    projection,
+    projection: state.projection,
     busy: roomBusy,
-    applyingInRoom,
-    error,
+    applyingInRoom: state.operation?.kind === 'apply',
+    error: state.error,
     sendMessage,
     reply,
     askForConcreteChange,
     abandon,
-    conversationId: conversationIdRef.current,
+    abandonAction,
+    conversationId: state.mine,
     resumedApplying,
   }
 }

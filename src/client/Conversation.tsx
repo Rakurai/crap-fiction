@@ -478,7 +478,16 @@ export function Conversation({
 
   const conversation = useConversation(pieceId, surface, currentConversationId, flushDocument, () => documents, room)
 
-  const apply = useApply(pieceId, surface, conversation.conversationId, () => documents, onApplied, room, conversation.resumedApplying)
+  const apply = useApply(
+    pieceId,
+    surface,
+    conversation.conversationId,
+    () => documents,
+    onApplied,
+    room,
+    conversation.abandonAction,
+    conversation.resumedApplying,
+  )
 
   useEffect(() => {
     onApplyingChange(

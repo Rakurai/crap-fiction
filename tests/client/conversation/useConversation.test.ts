@@ -94,8 +94,9 @@ describe('merging the conversation on disk with the one being streamed', () => {
     })
   })
 
-  it('stays held by an action the room reports on this surface for another conversation, and shows nothing of it', async () => {
-    const { room } = roomWithHeldConversation([], { ...activitySnapshot('a1'), conversationId: 'some-other-conversation' })
+  it('stays held by an action the room reports on this surface for another conversation, shows nothing of it, and abandons it where it is', async () => {
+    const { subscribeToRoom } = roomStream(onTheDraft({ ...activitySnapshot('a1'), conversationId: 'some-other-conversation' }))
+    const room = roomAdapters({ fetchConversation: conversationOnDisk('c1', []), abandonOperation: letsGo(), subscribeToRoom })
 
     const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
 
@@ -106,11 +107,13 @@ describe('merging the conversation on disk with the one being streamed', () => {
     expect(result.current.busy).toBe(true)
     expect(result.current.projection.activity).toBeUndefined()
 
-    act(() => {
-      result.current.abandon()
+    await act(async () => {
+      await result.current.abandon()
     })
 
-    expect(room.abandonOperation).not.toHaveBeenCalled()
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1')
+    expect(result.current.busy).toBe(false)
+    expect(result.current.applyingInRoom).toBe(false)
   })
 })
 
@@ -248,6 +251,25 @@ describe('abandoning an operation', () => {
 
     expect(result.current.busy).toBe(false)
     expect(result.current.projection.activity).toBeUndefined()
+  })
+
+  it("releases the document an Apply from another conversation was holding on the studio's answer alone, with no terminal frame", async () => {
+    const room = roomAsked(
+      { actionId: 'a1', conversationId: 'some-other-conversation', kind: 'apply', sourceEntryId: 'e1', startedAt: STARTED_AT, applicationId: undefined },
+      letsGo(),
+    )
+
+    const { result } = renderHook(() => useConversation('the-lighthouse', 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room))
+
+    await waitFor(() => expect(result.current.applyingInRoom).toBe(true))
+
+    await act(async () => {
+      await result.current.abandon()
+    })
+
+    expect(room.abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'some-other-conversation', 'a1')
+    expect(result.current.applyingInRoom).toBe(false)
+    expect(result.current.busy).toBe(false)
   })
 
   it('reports it when the studio cannot be asked to abandon, and stays held by the operation it still has', async () => {

@@ -3,18 +3,16 @@ import type { AutosaveState } from './autosave.js'
 import type { FailureReason } from '../shared/modelResult.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
-  abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
   confirmApplication as confirmApplicationFn,
   retrievePendingApply as retrievePendingApplyFn,
 } from './roomClient.js'
 import { failureMessage } from './request.js'
-import type { ResumedApply } from './useConversation.js'
+import type { ConversationViewModel, ResumedApply } from './useConversation.js'
 
 export type ApplyAdapters = Readonly<{
   applyRecommendation: typeof applyRecommendationFn
   confirmApplication: typeof confirmApplicationFn
-  abandonOperation: typeof abandonOperationFn
   retrievePendingApply: typeof retrievePendingApplyFn
 }>
 
@@ -40,9 +38,10 @@ export function useApply(
   getDocuments: () => DocumentSnapshot,
   install: (markdown: string) => Promise<AutosaveState>,
   adapters: ApplyAdapters,
+  abandonAction: ConversationViewModel['abandonAction'],
   resumed?: ResumedApply,
 ): ApplyViewModel {
-  const { applyRecommendation, confirmApplication, abandonOperation, retrievePendingApply } = adapters
+  const { applyRecommendation, confirmApplication, retrievePendingApply } = adapters
   const [applying, setApplying] = useState<ApplyingResponse | undefined>(resumed !== undefined ? { responseId: resumed.responseId } : undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [settlement, setSettlement] = useState<ApplySettlement | undefined>(undefined)
@@ -57,17 +56,13 @@ export function useApply(
   }
 
   // A save, confirmation or retrieval failure leaves the server's pending Apply sitting at its room
-  // scope; abandoning it is what frees that scope and closes out the action, same as the author
-  // doing so by hand. The document is released only once the room has answered that it is free: an
-  // abandonment that failed leaves the room still holding the Apply, and unlocking here would
-  // invite an edit the room's own pending replacement is about to contradict.
+  // scope; abandoning it through the surface's one operation owner is what frees that scope and
+  // closes out the action, same as the author doing so by hand. The document is released only once
+  // the room has answered that it is free: an abandonment that failed leaves the room still holding
+  // the Apply, and unlocking here would invite an edit the room's own pending replacement is about
+  // to contradict.
   async function stopAndAbandon(cid: string, actionId: string, message: string | undefined): Promise<void> {
-    const abandoned = await abandonOperation(pieceId, surface, cid, actionId)
-    const unfreed = failureMessage(abandoned)
-    if (unfreed !== undefined) {
-      setError(message === undefined ? unfreed : `${message} — ${unfreed}`)
-      return
-    }
+    if (!(await abandonAction(cid, actionId, message))) return
     stop(message)
   }
 
