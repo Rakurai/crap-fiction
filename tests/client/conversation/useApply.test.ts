@@ -147,4 +147,53 @@ describe('resuming a pending Apply the room reported already in flight on reconn
     expect(install).not.toHaveBeenCalled()
     expect(abandonAction).toHaveBeenCalledWith('c1', 'a1', 'the studio did not answer')
   })
+
+  it('does not install nor confirm a retrieval that settles after the surface has unmounted', async () => {
+    let resolveRetrieval: (result: RequestResult<PendingApply>) => void = () => {
+      throw new Error('the pending application was never asked for')
+    }
+    const install = vi.fn(() => Promise.resolve(SAVED))
+    const room = adapters({
+      retrievePendingApply: vi.fn(() => new Promise<RequestResult<PendingApply>>((resolve) => (resolveRetrieval = resolve))),
+    })
+
+    const { unmount } = renderHook(() => useApply('the-lighthouse', 'draft', 'c1', () => DOCUMENTS, install, room, owner(), RESUMED))
+
+    unmount()
+
+    await act(async () => {
+      resolveRetrieval({ outcome: 'value', value: { replacement: 'the resumed text' } })
+    })
+
+    expect(install).not.toHaveBeenCalled()
+    expect(room.confirmApplication).not.toHaveBeenCalled()
+  })
+
+  it('installs the retrieval for the application that is current when it settles, not one superseded by a later dep change resolving after it', async () => {
+    let resolveFirst: (result: RequestResult<PendingApply>) => void = () => {
+      throw new Error('the first application was never asked for')
+    }
+    const retrievePendingApply = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<RequestResult<PendingApply>>((resolve) => (resolveFirst = resolve)))
+      .mockImplementationOnce(() => Promise.resolve<RequestResult<PendingApply>>({ outcome: 'value', value: { replacement: 'second text' } }))
+    const install = vi.fn(() => Promise.resolve(SAVED))
+    const room = adapters({ retrievePendingApply })
+
+    const { rerender } = renderHook(
+      ({ resumed }: { resumed: ResumedApply }) => useApply('the-lighthouse', 'draft', 'c1', () => DOCUMENTS, install, room, owner(), resumed),
+      { initialProps: { resumed: { actionId: 'a1', responseId: 'e1', applicationId: 'app1' } } },
+    )
+
+    rerender({ resumed: { actionId: 'a2', responseId: 'e2', applicationId: 'app2' } })
+
+    await waitFor(() => expect(install).toHaveBeenCalledWith('second text'))
+
+    await act(async () => {
+      resolveFirst({ outcome: 'value', value: { replacement: 'first text' } })
+    })
+
+    expect(install).toHaveBeenCalledOnce()
+    expect(install).not.toHaveBeenCalledWith('first text')
+  })
 })

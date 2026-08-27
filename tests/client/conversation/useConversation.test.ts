@@ -308,6 +308,62 @@ describe('resuming an Apply the room reported already in flight', () => {
   })
 })
 
+describe('a dispatch that settles after the surface is gone', () => {
+  it('does not proceed to dispatch once the surface has unmounted while creating the conversation it needs', async () => {
+    let resolveCreate: (result: RequestResult<{ id: string }>) => void = () => {
+      throw new Error('createConversation was never called')
+    }
+    const createConversation = vi.fn(() => new Promise<RequestResult<{ id: string }>>((resolve) => (resolveCreate = resolve)))
+    const dispatch = vi.fn()
+    const { subscribeToRoom } = roomStream(onTheDraft(null))
+    const room = roomAdapters({ createConversation, dispatch, subscribeToRoom })
+
+    const { result, unmount } = renderHook(() => useConversation('the-lighthouse', 'draft', null, NOOP_FLUSH, () => DOCUMENTS, room))
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    act(() => {
+      result.current.sendMessage('hello')
+    })
+
+    unmount()
+
+    await act(async () => {
+      resolveCreate({ outcome: 'value', value: { id: 'c1' } })
+    })
+
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+})
+
+describe('a conversation read that settles after a newer one has already landed', () => {
+  it('keeps the newer read’s entries rather than the stale one that resolves later', async () => {
+    let resolveFirst: (result: RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>) => void = () => {
+      throw new Error('the first conversation read was never made')
+    }
+    const fetchConversation = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<RequestResult<{ id: string; entries: readonly ConversationEntryView[] }>>((resolve) => (resolveFirst = resolve)))
+      .mockImplementationOnce(() => Promise.resolve({ outcome: 'value' as const, value: { id: 'c1', entries: [authorMessage('e2', 'second')] } }))
+    const { subscribeToRoom } = roomStream(onTheDraft(null))
+    const room = roomAdapters({ fetchConversation, subscribeToRoom })
+
+    const { result, rerender } = renderHook(
+      ({ pieceId }: { pieceId: string }) => useConversation(pieceId, 'draft', 'c1', NOOP_FLUSH, () => DOCUMENTS, room),
+      { initialProps: { pieceId: 'the-lighthouse' } },
+    )
+
+    rerender({ pieceId: 'the-other-piece' })
+
+    await waitFor(() => expect(result.current.projection.entries.map((entry) => entry.id)).toEqual(['e2']))
+
+    await act(async () => {
+      resolveFirst({ outcome: 'value', value: { id: 'c1', entries: [authorMessage('e1', 'first')] } })
+    })
+
+    expect(result.current.projection.entries.map((entry) => entry.id)).toEqual(['e2'])
+  })
+})
+
 describe('a room scope whose activity is not yet known', () => {
   it('is locked from the first render, before any snapshot has arrived — unknown is not idle', () => {
     const room = roomReporting(new Promise<RoomActivitySnapshot>(() => {}))
