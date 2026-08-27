@@ -20,8 +20,8 @@ import { useSurfaceConversations } from './useSurfaceConversations.js'
 
 /** The surface identity travels with its body so its document and room state cannot disagree. */
 export type SurfaceBodyConfig =
-  | Readonly<{ kind: 'prose'; surface: 'draft' }>
-  | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; referenceSchema: string | null }>
+  | Readonly<{ kind: 'prose'; surface: 'draft'; location: string }>
+  | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; location: string; referenceSchema: string | null }>
 
 type EditingSurfaceProps = {
   readonly pieceId: string
@@ -43,9 +43,8 @@ type EditingSurfaceProps = {
   readonly lifecycle: LifecycleProps
   readonly active: boolean
   readonly onSwitchToSurface: (surface: SurfaceId) => void
-  /** Whether leaving the piece is refused — this surface's own failed save, or another's. */
-  readonly leaveBlocked: boolean
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly onTextChange: (surface: SurfaceId, text: string) => void
   readonly onSaveFailedChange: (surface: SurfaceId, failed: boolean) => void
   /** Reported once, so the shell can flush and wait on this surface's write when the piece closes. */
@@ -55,9 +54,12 @@ type EditingSurfaceProps = {
 
 type MountedProps = Omit<EditingSurfaceProps, 'body' | 'initialText'>
 
+type ProseBody = Extract<SurfaceBodyConfig, { kind: 'prose' }>
+type PlainTextBody = Extract<SurfaceBodyConfig, { kind: 'plainText' }>
+
 type MountedDocument =
-  | Readonly<{ kind: 'prose'; surface: 'draft'; session: ProseSession }>
-  | Readonly<{ kind: 'plainText'; surface: ContextSurfaceId; session: PlainTextSession; referenceSchema: string | null }>
+  | Readonly<ProseBody & { session: ProseSession }>
+  | Readonly<PlainTextBody & { session: PlainTextSession }>
 
 /**
  * One editing surface, mounted once per surface `OpenedPiece` opens. It owns its document session and
@@ -69,27 +71,26 @@ type MountedDocument =
  */
 export function EditingSurface({ body, initialText, ...mounted }: EditingSurfaceProps) {
   return body.kind === 'prose' ? (
-    <ProseEditingSurface {...mounted} initialText={initialText} />
+    <ProseEditingSurface {...mounted} initialText={initialText} body={body} />
   ) : (
-    <PlainTextEditingSurface {...mounted} initialText={initialText} surface={body.surface} referenceSchema={body.referenceSchema} />
+    <PlainTextEditingSurface {...mounted} initialText={initialText} body={body} />
   )
 }
 
-function ProseEditingSurface({ initialText, ...mounted }: MountedProps & { readonly initialText: string }) {
+function ProseEditingSurface({ initialText, body, ...mounted }: MountedProps & { readonly initialText: string; readonly body: ProseBody }) {
   const { pieceId, room } = mounted
   const session = useProseSession(initialText, (text) => room.saveDocument(pieceId, 'draft', text))
-  return <MountedSurface {...mounted} document={{ kind: 'prose', surface: 'draft', session }} />
+  return <MountedSurface {...mounted} document={{ ...body, session }} />
 }
 
 function PlainTextEditingSurface({
   initialText,
-  surface,
-  referenceSchema,
+  body,
   ...mounted
-}: MountedProps & { readonly initialText: string; readonly surface: ContextSurfaceId; readonly referenceSchema: string | null }) {
+}: MountedProps & { readonly initialText: string; readonly body: PlainTextBody }) {
   const { pieceId, room } = mounted
-  const session = usePlainTextSession(initialText, (text) => room.saveDocument(pieceId, surface, text))
-  return <MountedSurface {...mounted} document={{ kind: 'plainText', surface, session, referenceSchema }} />
+  const session = usePlainTextSession(initialText, (text) => room.saveDocument(pieceId, body.surface, text))
+  return <MountedSurface {...mounted} document={{ ...body, session }} />
 }
 
 function MountedSurface({
@@ -110,8 +111,8 @@ function MountedSurface({
   lifecycle,
   active,
   onSwitchToSurface,
-  leaveBlocked,
-  onClose,
+  onOpenPieces,
+  onOpenModels,
   onTextChange,
   onSaveFailedChange,
   onFlushRegister,
@@ -161,14 +162,12 @@ function MountedSurface({
         <Manuscript
           title={title}
           mode={mode}
-          onClose={onClose}
+          onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           manuscript={document.session.manuscript}
+          location={document.location}
           autosave={session.autosave}
-          leaveBlocked={leaveBlocked}
-          onOpenRoom={() => setPanel('room')}
-          onOpenConversations={openConversations}
-          onSwitchToStoryContext={() => onSwitchToSurface('storyContext')}
-          onSwitchToAuthorContext={() => onSwitchToSurface('authorContext')}
+          onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
         />
@@ -176,14 +175,13 @@ function MountedSurface({
         <ContextSurface
           surface={document.surface}
           title={title}
-          onClose={onClose}
+          onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           text={document.session.text}
+          location={document.location}
           onChange={document.session.setText}
           referenceSchema={document.referenceSchema}
           autosave={session.autosave}
-          leaveBlocked={leaveBlocked}
-          onOpenRoom={() => setPanel('room')}
-          onOpenConversations={openConversations}
           onSwitchTo={onSwitchToSurface}
           lifecycle={lifecycle}
           applying={conversation.applying}
@@ -198,8 +196,7 @@ function MountedSurface({
           documents={documents}
           flushDocument={session.autosave.flush}
           room={room}
-          displayName={roster.displayName}
-          handle={roster.handle}
+          identify={roster.identify}
           handles={handles}
           interviewer={interviewer}
           runtime={runtime}
@@ -207,6 +204,8 @@ function MountedSurface({
           onApplied={session.install}
           onApplyingChange={conversation.setApplying}
           onConversationIdChange={conversation.setActiveConversationId}
+          onOpenRoom={() => setPanel('room')}
+          onOpenConversations={openConversations}
         />
       )}
       {panel === 'room' && (

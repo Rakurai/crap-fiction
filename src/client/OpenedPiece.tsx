@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PieceDetail } from '../shared/pieceViews.js'
 import { SURFACE_IDS, type SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
@@ -7,6 +7,7 @@ import type { fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRun
 import { closePiece } from './closePiece.js'
 import { useDocumentSnapshotRegistry } from './documentSnapshotRegistry.js'
 import { EditingSurface, type SurfaceBodyConfig } from './EditingSurface.js'
+import { EmptyPair } from './EmptyPair.js'
 import { useLoaded } from './load.js'
 import styles from './OpenedPiece.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
@@ -24,6 +25,11 @@ export type CallSiteAdapters = Readonly<{
   fetchRuntimeStatus: typeof fetchRuntimeStatusFn
 }>
 
+export type PieceSwitchRequest = Readonly<{
+  targetId: string | undefined
+  onSettled: (blocked: boolean) => void
+}>
+
 type OpenedPieceProps = {
   readonly id: string
   readonly pieceAdapters: PieceAdapters
@@ -31,12 +37,15 @@ type OpenedPieceProps = {
   readonly callSites: CallSiteAdapters
   /** Omitted, the author-context conversation selection is local to this mount, same as the other surfaces. */
   readonly authorContextSelection?: AuthorContextSelection | undefined
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
+  readonly onLeaveBlockedChange: (blocked: boolean) => void
+  readonly switchRequest: PieceSwitchRequest
 }
 
 function bodyConfigFor(piece: PieceDetail, surface: SurfaceId): SurfaceBodyConfig {
-  if (surface === 'draft') return { kind: 'prose', surface }
-  return { kind: 'plainText', surface, referenceSchema: piece.surfaces[surface].referenceSchema }
+  if (surface === 'draft') return { kind: 'prose', surface, location: piece.surfaces[surface].location }
+  return { kind: 'plainText', surface, location: piece.surfaces[surface].location, referenceSchema: piece.surfaces[surface].referenceSchema }
 }
 
 /**
@@ -52,7 +61,10 @@ function Surfaces({
   pieceAdapters,
   callSites,
   authorContextSelection,
-  onClose,
+  onOpenPieces,
+  onOpenModels,
+  onLeaveBlockedChange,
+  switchRequest,
 }: {
   readonly piece: PieceDetail
   readonly lifecycle: LifecycleProps
@@ -60,7 +72,10 @@ function Surfaces({
   readonly pieceAdapters: PieceAdapters
   readonly callSites: CallSiteAdapters
   readonly authorContextSelection?: AuthorContextSelection | undefined
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
+  readonly onLeaveBlockedChange: (blocked: boolean) => void
+  readonly switchRequest: PieceSwitchRequest
 }) {
   const roster = useRoster(callSites.fetchCallSites)
   const [probe] = useLoaded(callSites.fetchRuntimeStatus, [])
@@ -94,20 +109,24 @@ function Surfaces({
   // Each surface subscribes through the one connection this shell holds, not its own.
   const surfaceRoom: RoomAdapters = { ...room, subscribeToRoom: pieceStream }
 
-  // Leaving is a coordinated lifecycle rather than an unmount cleanup: every surface's document is
-  // flushed and awaited first, because a failed write is the one thing that keeps the piece open.
-  // `closing` disables repeated requests and keeps every surface's own persistence status visible
-  // for as long as this is waiting.
-  async function leave(): Promise<void> {
-    if (closing) return
+  useEffect(() => {
+    onLeaveBlockedChange(leaveBlocked)
+  }, [leaveBlocked, onLeaveBlockedChange])
+
+  const targetId = switchRequest.targetId
+  useEffect(() => {
+    if (targetId === undefined) return
+    let cancelled = false
     setClosing(true)
-    const result = await closePiece(flushersRef.current)
-    if (result.blocked) {
+    void closePiece(flushersRef.current).then((result) => {
+      if (cancelled) return
       setClosing(false)
-      return
+      switchRequest.onSettled(result.blocked)
+    })
+    return () => {
+      cancelled = true
     }
-    onClose()
-  }
+  }, [targetId])
 
   return (
     <div className={styles.row}>
@@ -132,8 +151,8 @@ function Surfaces({
           lifecycle={lifecycle}
           active={activeSurface === surface}
           onSwitchToSurface={setActiveSurface}
-          leaveBlocked={leaveBlocked}
-          onClose={() => void leave()}
+          onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
           onTextChange={registry.update}
           onSaveFailedChange={handleSaveFailedChange}
           onFlushRegister={handleFlushRegister}
@@ -144,8 +163,24 @@ function Surfaces({
   )
 }
 
-export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextSelection, onClose }: OpenedPieceProps) {
+export function OpenedPiece({
+  id,
+  pieceAdapters,
+  room,
+  callSites,
+  authorContextSelection,
+  onOpenPieces,
+  onOpenModels,
+  onLeaveBlockedChange,
+  switchRequest,
+}: OpenedPieceProps) {
   const piece = usePiece(id, pieceAdapters)
+
+  useEffect(() => {
+    if (piece.status === 'ready') return
+    onLeaveBlockedChange(false)
+    if (switchRequest.targetId !== undefined) switchRequest.onSettled(false)
+  }, [piece.status, switchRequest.targetId])
 
   if (piece.status === 'ready') {
     return (
@@ -160,22 +195,13 @@ export function OpenedPiece({ id, pieceAdapters, room, callSites, authorContextS
           onRetitle: piece.retitle,
         }}
         authorContextSelection={authorContextSelection}
-        onClose={onClose}
+        onOpenPieces={onOpenPieces}
+        onOpenModels={onOpenModels}
+        onLeaveBlockedChange={onLeaveBlockedChange}
+        switchRequest={switchRequest}
       />
     )
   }
 
-  return (
-    <div className={styles.screen}>
-      <button type="button" className={styles.back} onClick={onClose}>
-        ‹ pieces
-      </button>
-      {piece.status === 'loading' && <p className={styles.status}>Opening…</p>}
-      {piece.status === 'error' && (
-        <p className={styles.error} role="alert">
-          {piece.message}
-        </p>
-      )}
-    </div>
-  )
+  return <EmptyPair state={piece.status === 'error' ? { kind: 'failed', message: piece.message } : { kind: 'opening' }} />
 }

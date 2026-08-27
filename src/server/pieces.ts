@@ -21,6 +21,7 @@ import {
   readConversationEntries,
   readPiece,
   readStoryContext,
+  SURFACE_LOCATIONS,
   writePieceCast,
   writePieceDetails,
   writePieceMetadata,
@@ -72,14 +73,24 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
   return piece
 }
 
-function castView(specialists: readonly RoleDefinition[], enabled: readonly string[]): readonly CastMemberView[] {
-  return specialists.map((role) => ({
-    id: role.id,
-    handle: role.handle,
-    displayName: role.displayName,
-    description: role.description,
-    enabled: enabled.includes(role.id),
-  }))
+function castView(
+  specialists: readonly RoleDefinition[],
+  enabled: readonly string[],
+  ordinals: ReadonlyMap<string, number>,
+): readonly CastMemberView[] {
+  return specialists.map((role) => {
+    const ordinal = ordinals.get(role.id)
+    if (ordinal === undefined) throw new Error(`no ordinal recorded for cast participant "${role.id}"`)
+    return {
+      id: role.id,
+      handle: role.handle,
+      displayName: role.displayName,
+      description: role.description,
+      mark: role.mark,
+      ordinal,
+      enabled: enabled.includes(role.id),
+    }
+  })
 }
 
 export function listConversations(
@@ -146,10 +157,11 @@ function surfaceDetail(
   const available = catalog.specialistsFor(piece.metadata.mode, surface)
   return {
     text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
+    location: SURFACE_LOCATIONS[surface],
     referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
-    cast: castView(available, piece.metadata.cast[surface]),
+    cast: castView(available, piece.metadata.cast[surface], catalog.markOrdinals),
   }
 }
 
@@ -165,7 +177,7 @@ export function getPiece(dataRoot: string, workspaceDir: string, id: string, cat
   return {
     ...summarize(id, piece),
     surfaces,
-    storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description },
+    storyEditor: { handle: storyEditor.handle, displayName: storyEditor.displayName, description: storyEditor.description, mark: storyEditor.mark },
     interviewer: {
       handle: interviewer.role.handle,
       displayName: interviewer.role.displayName,
@@ -189,7 +201,7 @@ export async function setPieceCast(
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
   await writePieceCast(workspaceDir, id, surface, cast)
-  return castView(available, cast)
+  return castView(available, cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(

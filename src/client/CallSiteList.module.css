@@ -10,7 +10,7 @@
 }
 
 .heading {
-  flex: 1;
+  flex: none;
   font: 600 11.5px/1 var(--font-ui);
   color: var(--ink);
   margin: 0;
@@ -18,8 +18,15 @@
 
 .column {
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .06em;
+}
+
+.what {
+  flex: 1;
+  font: 400 11px/1.4 var(--font-ui);
+  color: var(--ink3);
+  margin: 0;
 }
 
 .list {
@@ -40,8 +47,8 @@
 }
 
 .handle {
-  font: 600 12px/1 var(--font-room);
-  color: var(--room-ink);
+  font: 600 12px/1 var(--font-ui);
+  color: var(--ink3);
 }
 
 .name {
@@ -51,7 +58,7 @@
 
 .saved {
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   animation: dr-in .12s ease-out;
 }

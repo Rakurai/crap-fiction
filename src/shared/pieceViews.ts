@@ -18,6 +18,8 @@ export const castMemberViewSchema = z
     handle: z.string(),
     displayName: z.string(),
     description: z.string(),
+    mark: z.string(),
+    ordinal: z.number(),
     enabled: z.boolean(),
   })
   .readonly()
@@ -28,6 +30,7 @@ export const storyEditorViewSchema = z
     handle: z.string(),
     displayName: z.string(),
     description: z.string(),
+    mark: z.string(),
   })
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
@@ -46,6 +49,7 @@ export type InterviewerView = z.infer<typeof interviewerViewSchema>
 export const surfaceDetailSchema = z
   .object({
     text: z.string(),
+    location: z.string().min(1),
     referenceSchema: z.string().nullable(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),

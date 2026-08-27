@@ -16,14 +16,14 @@ function adapters(updatePiece: PieceAdapters['updatePiece']): PieceAdapters {
 }
 
 function member(id: string, enabled: boolean): CastMemberView {
-  return { id, handle: id, displayName: id, description: `about ${id}`, enabled }
+  return { id, handle: id, displayName: id, description: `about ${id}`, mark: id.slice(0, 2).toUpperCase(), ordinal: 0, enabled }
 }
 
 const SHAPE = member('shape', false)
 const READER = member('reader', false)
 
 function surface(cast: readonly CastMemberView[]): SurfaceDetail {
-  return { text: '', referenceSchema: null, currentConversationId: null, conversations: [], cast }
+  return { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], cast }
 }
 
 function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail> {
@@ -36,7 +36,7 @@ function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail>
       length: 0,
       modified: 1_700_000_000_000,
       surfaces: { draft: surface(cast), storyContext: surface([]), authorContext: surface([]) },
-      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole', mark: 'SE' },
       interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
     },
   }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
 import type { Clock } from '../shared/clock.js'
+import { NO_AUTHOR_MESSAGE } from './conversationNaming.js'
 import styles from './ConversationSwitcher.module.css'
 import { machineWords, whenChanged } from './facts.js'
 import { Scrim } from './Scrim.js'
@@ -16,8 +17,6 @@ type ConversationSwitcherProps = {
   readonly onDelete: (id: string) => void
   readonly onClose: () => void
 }
-
-const NO_AUTHOR_MESSAGE = machineWords('asked for a concrete change')
 
 export function ConversationSwitcher({
   conversations,
@@ -39,11 +38,9 @@ export function ConversationSwitcher({
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Conversations">
         <div className={styles.header}>
           <span className={styles.title}>Conversations</span>
-          <button type="button" className={styles.start} onClick={onStartNew}>
-            new
-          </button>
-          <button type="button" className={styles.done} onClick={onClose}>
-            done
+          <span className={styles.spacer} />
+          <button type="button" className={styles.close} onClick={onClose}>
+            close
           </button>
         </div>
         {conversations.length === 0 && <p className={styles.empty}>No conversations yet.</p>}
@@ -93,6 +90,11 @@ export function ConversationSwitcher({
             {error}
           </p>
         )}
+        <div className={styles.foot}>
+          <button type="button" className={styles.start} onClick={onStartNew}>
+            new conversation
+          </button>
+        </div>
       </div>
     </>
   )

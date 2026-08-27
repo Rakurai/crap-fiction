@@ -13,17 +13,15 @@ const DEFAULT_PROPS = {
   title: 'The Lighthouse',
   mode: 'flash',
   draft: 'First light of the day.',
-  onClose: vi.fn(),
-  onOpenRoom: vi.fn(),
-  onOpenConversations: vi.fn(),
-  onSwitchToStoryContext: vi.fn(),
-  onSwitchToAuthorContext: vi.fn(),
+  onOpenPieces: vi.fn(),
+  onOpenModels: vi.fn(),
+  onSwitchTo: vi.fn(),
   lifecycle: {
     retitling: false,
     retitleError: undefined as string | undefined,
     onRetitle: vi.fn(),
   },
-  applying: undefined as { readonly participantName: string } | undefined,
+  applying: undefined as { readonly participantName?: string; readonly abandon: () => void } | undefined,
 }
 
 function Harness(props: typeof DEFAULT_PROPS) {
@@ -34,14 +32,12 @@ function Harness(props: typeof DEFAULT_PROPS) {
     <Manuscript
       title={props.title}
       mode={props.mode}
-      onClose={props.onClose}
+      onOpenPieces={props.onOpenPieces}
+      onOpenModels={props.onOpenModels}
+      location="draft.md"
       manuscript={manuscript}
       autosave={autosave}
-      leaveBlocked={autosave.state.failed}
-      onOpenRoom={props.onOpenRoom}
-      onOpenConversations={props.onOpenConversations}
-      onSwitchToStoryContext={props.onSwitchToStoryContext}
-      onSwitchToAuthorContext={props.onSwitchToAuthorContext}
+      onSwitchTo={props.onSwitchTo}
       lifecycle={props.lifecycle}
       applying={props.applying}
     />
@@ -118,48 +114,11 @@ describe('the piece title', () => {
   })
 })
 
-describe('the surfaces the manuscript opens onto', () => {
-  afterEach(cleanup)
-
-  it('reaches the room in one action, knowing nothing beyond that it was reached', () => {
-    const onOpenRoom = vi.fn()
-    renderManuscript({ onOpenRoom })
-
-    fireEvent.click(screen.getByRole('button', { name: 'room' }))
-
-    expect(onOpenRoom).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('the reading view', () => {
-  afterEach(cleanup)
-
-  /**
-   * At rest the view is the prose and nothing else. The way out is not inside the column as
-   * though it were the story's last line: it arrives on the pointer, where the author's hand is,
-   * and it says the keystroke rather than replacing it.
-   */
-  it('holds no control at rest, offers one way back the moment the pointer moves, and is left by the keystroke that offer names', () => {
-    renderManuscript({ draft: 'First light.' })
-
-    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
-    expect(screen.queryAllByRole('button')).toEqual([])
-
-    fireEvent.pointerMove(screen.getByLabelText('Manuscript'))
-    const wayBack = screen.getAllByRole('button')
-    expect(wayBack).toHaveLength(1)
-    expect(wayBack[0]?.textContent).toContain('ESC')
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByRole('button', { name: '‹ pieces' })).toBeTruthy()
-  })
-})
-
 describe('the manuscript while an application is in flight', () => {
   afterEach(cleanup)
 
   it('holds the source read-only naming the response holding it, and is editable again with no trace the instant it settles', () => {
-    const { rerender } = renderManuscript({ applying: { participantName: 'Compression' } })
+    const { rerender } = renderManuscript({ applying: { participantName: 'Compression', abandon: vi.fn() } })
 
     fireEvent.click(screen.getByRole('button', { name: 'source' }))
     expect(screen.getByLabelText('Manuscript source').hasAttribute('disabled')).toBe(true)
@@ -185,11 +144,6 @@ describe('the manuscript while a save is failing', () => {
     vi.useRealTimers()
   })
 
-  /**
-   * That a standing failure is what blocks leaving is `closePiece.test.ts`'s claim, and that it
-   * blocks from any surface is `OpenedPiece.test.tsx`'s. What the manuscript owns is the register
-   * the failure is stated in, and that it is gone the moment a write succeeds.
-   */
   it('says what the machine said, as a statement asking nothing, and takes it back once a write succeeds', async () => {
     saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
     renderManuscript({ draft: 'First light.' })

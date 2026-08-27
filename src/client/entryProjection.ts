@@ -20,9 +20,10 @@ export type RoomEvent =
 export type ConversationProjection = Readonly<{
   entries: readonly ConversationEntryView[]
   activity: DispatchActivitySnapshot | undefined
+  freshApplicationIds: ReadonlySet<string>
 }>
 
-export const EMPTY_PROJECTION: ConversationProjection = { entries: [], activity: undefined }
+export const EMPTY_PROJECTION: ConversationProjection = { entries: [], activity: undefined, freshApplicationIds: new Set() }
 
 export function isParticipantOutcome(
   entry: ConversationEntryView,
@@ -55,20 +56,23 @@ export function projectEvent(projection: ConversationProjection, event: RoomEven
     case 'participant.activity': {
       const activity = projection.activity
       if (activity === undefined || activity.actionId !== event.data.actionId) return projection
-      return { ...projection, activity: { ...activity, states: { ...activity.states, [event.data.participantId]: event.data.state } } }
+      const { participantId, state, startedAt } = event.data
+      return { ...projection, activity: { ...activity, states: { ...activity.states, [participantId]: { state, startedAt } } } }
     }
     case 'apply.pending':
       return projection
     case 'entry.appended': {
       const next = appendEntry(projection, event.data.entry)
-      const activity = next.activity
+      if (next === projection) return next
       const { entry } = event.data
+      const freshApplicationIds = entry.kind === 'application' ? new Set(next.freshApplicationIds).add(entry.id) : next.freshApplicationIds
+      const activity = next.activity
       if (activity !== undefined && activity.actionId === event.data.actionId && isParticipantOutcome(entry)) {
         const states = { ...activity.states }
         delete states[entry.participantId]
-        return { ...next, activity: { ...activity, states } }
+        return { ...next, activity: { ...activity, states }, freshApplicationIds }
       }
-      return next
+      return { ...next, freshApplicationIds }
     }
     case 'action.finished': {
       if (projection.activity?.actionId !== event.data.actionId) return projection

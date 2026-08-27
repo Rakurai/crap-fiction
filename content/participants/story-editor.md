@@ -2,6 +2,7 @@
 handle: editor
 displayName: Story Editor
 description: Makes the holistic judgment about what best serves the author's work.
+mark: SE
 eligibility: generalist
 ---
 ## Responsibility

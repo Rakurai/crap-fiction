@@ -7,6 +7,8 @@ export const authorMessageEntrySchema = z.object({
   text: z.string().min(1),
   audience: z.array(z.string().min(1)).readonly(),
   brought: z.array(z.string().min(1)).readonly(),
+  atMs: z.number().optional(),
+  castSize: z.number().int().nonnegative().optional(),
 })
 
 export type AuthorMessageEntry = z.infer<typeof authorMessageEntrySchema>
@@ -17,6 +19,7 @@ export const concreteChangeRequestEntrySchema = z.object({
   target: z.string().min(1),
   respondingTo: z.string().min(1),
   clarification: z.string().min(1).optional(),
+  atMs: z.number().optional(),
 })
 
 export type ConcreteChangeRequestEntry = z.infer<typeof concreteChangeRequestEntrySchema>

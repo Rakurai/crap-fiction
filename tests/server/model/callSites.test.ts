@@ -3,8 +3,8 @@ import { callSites, DuplicateCallSiteError, withAssignments } from '../../../src
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
 
 const roles: readonly RoleDefinition[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', persona: 'reasons about x', eligibility: 'cast', function: undefined, availability: [] },
-  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', persona: 'reasons about y', eligibility: 'generalist', function: undefined, availability: [] },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', persona: 'reasons about x', eligibility: 'cast', function: undefined, availability: [] },
+  { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', mark: 'SE', persona: 'reasons about y', eligibility: 'generalist', function: undefined, availability: [] },
 ]
 
 describe('callSites', () => {
@@ -27,7 +27,7 @@ describe('callSites', () => {
 
   it('fails when a participant id collides with an operation call site', () => {
     const colliding: readonly RoleDefinition[] = [
-      { id: 'apply', handle: 'apply', displayName: 'Apply', description: 'z', persona: 'reasons about z', eligibility: 'cast', function: undefined, availability: [] },
+      { id: 'apply', handle: 'apply', displayName: 'Apply', description: 'z', mark: 'AP', persona: 'reasons about z', eligibility: 'cast', function: undefined, availability: [] },
     ]
     expect(() => callSites(colliding)).toThrowError(DuplicateCallSiteError)
   })

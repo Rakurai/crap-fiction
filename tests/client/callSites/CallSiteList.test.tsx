@@ -9,6 +9,8 @@ const UNASSIGNED: readonly CallSiteAssignmentView[] = [
     handle: 'editor',
     displayName: 'Story Editor',
     description: 'holds the whole of it',
+    mark: 'SE',
+    ordinal: null,
     assignment: null,
   },
 ]

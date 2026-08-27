@@ -16,8 +16,11 @@ describe('applyRoomEvent', () => {
     expect(snapshot.draft).toMatchObject({ actionId: 'a1', kind: 'dispatch', states: {} })
     expect(snapshot.storyContext).toBeNull()
 
-    snapshot = applyRoomEvent(snapshot, { type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working', surface: 'draft' } })
-    expect(snapshot.draft).toMatchObject({ states: { shape: 'working' } })
+    snapshot = applyRoomEvent(snapshot, {
+      type: 'participant.activity',
+      data: { actionId: 'a1', participantId: 'shape', state: 'working', startedAt: 1, surface: 'draft' },
+    })
+    expect(snapshot.draft).toMatchObject({ states: { shape: { state: 'working', startedAt: 1 } } })
 
     snapshot = applyRoomEvent(snapshot, {
       type: 'entry.appended',

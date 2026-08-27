@@ -8,6 +8,10 @@ export function control(page: Page, name: string): Locator {
   return page.getByRole('button', { name, exact: true })
 }
 
+export function paneControl(page: Page, long: string, short: string): Locator {
+  return page.getByRole('button', { name: new RegExp(`^(${long}|${short})$`) })
+}
+
 export async function openPiece(page: Page, title: string): Promise<void> {
   await page.goto('/')
 
@@ -36,9 +40,8 @@ export async function reopenPiece(page: Page, title: string): Promise<void> {
   await expect(manuscript(page)).toBeVisible()
 }
 
-/** The ordinary way out, which is also what flushes every surface to disk. */
-export async function leavePiece(page: Page): Promise<void> {
-  await control(page, '‹ pieces').click()
+export async function openPieces(page: Page): Promise<void> {
+  await control(page, 'PIECES').click()
   await expect(control(page, 'new piece')).toBeVisible()
 }
 
@@ -71,14 +74,14 @@ export function composer(page: Page): Locator {
 export async function sendToRoom(page: Page, message: string): Promise<Locator> {
   await composer(page).fill(message)
   await control(page, 'send').click()
-  const abandon = control(page, 'abandon')
-  await expect(abandon).toBeVisible()
-  return abandon
+  const stop = control(page, 'stop')
+  await expect(stop).toBeVisible()
+  return stop
 }
 
 export async function writeThroughSource(page: Page, markdown: string): Promise<void> {
-  await control(page, 'source').click()
+  await paneControl(page, 'source', 'src').click()
   await page.getByRole('textbox', { name: 'Manuscript source' }).fill(markdown)
-  await control(page, 'rendered').click()
+  await paneControl(page, 'rendered', 'prose').click()
   await expect(manuscript(page)).toBeVisible()
 }

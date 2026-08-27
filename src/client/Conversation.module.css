@@ -1,12 +1,50 @@
 .wrapper {
   flex: 0 1 520px;
   width: 520px;
-  min-width: 420px;
+  min-width: 340px;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--paper);
   border-left: 1px solid var(--rule);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  flex: none;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.headerOpening {
+  font: 400 13px/1.35 var(--font-prose);
+  font-style: italic;
+  color: var(--ink2);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerSpacer {
+  flex: 1;
+  min-width: 6px;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.headerControl {
+  composes: surface from './controls.module.css';
 }
 
 .transcript {
@@ -19,13 +57,21 @@
   gap: 18px;
 }
 
-/* The author's own words: the manuscript's face, in its own voice, and not the room's. */
 .message {
   font: 400 13.5px/1.6 var(--font-prose);
-  font-style: italic;
-  color: var(--ink2);
-  padding-left: 11px;
-  border-left: 2px solid var(--rule2);
+  color: var(--ink);
+  padding: 0 11px;
+  border-left: 2px solid var(--ink3);
+  border-right: 2px solid var(--ink3);
+  margin: 0 0 4px;
+}
+
+.messageWhen {
+  display: block;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.07em;
+  padding: 0 11px;
   margin: 0 0 4px;
 }
 
@@ -42,7 +88,7 @@
 .roomChangedFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
 }
 
@@ -59,22 +105,8 @@
   border-top: 1px solid var(--rule);
 }
 
-/*
- * A reading with nothing to add is a line, not a response: the same identity in the same order,
- * carrying no claim and no actions. It reads as a participant who read, not one who was absent.
- */
-.noComment {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 11px 0 2px;
-  border-top: 1px solid var(--rule);
-}
-
-.noCommentWords {
-  font: 400 11.5px/1 var(--font-ui);
-  color: var(--ink3);
-  margin: 0;
+.pending {
+  opacity: 0.5;
 }
 
 /* Identity is the handle the author addresses, which is also how the addressing gets learned. */
@@ -84,9 +116,20 @@
   gap: 8px;
 }
 
+.identitySpacer {
+  flex: 1;
+}
+
+.identityStatus {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: 0.06em;
+}
+
 .handle {
-  font: 600 12.5px/1 var(--font-room);
-  color: var(--room-ink);
+  font: 600 12.5px/1 var(--font-ui);
+  color: var(--ink3);
 }
 
 .name {
@@ -95,8 +138,8 @@
 }
 
 .claim {
-  font: 400 15px/1.55 var(--font-room);
-  color: var(--room-ink);
+  font: 400 15px/1.55 var(--font-prose);
+  color: var(--ink);
   margin: 0;
   text-wrap: pretty;
 }
@@ -113,7 +156,7 @@
 .claimMore {
   align-self: flex-start;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
   background: none;
   border: none;
@@ -127,8 +170,8 @@
 }
 
 .note {
-  font: 400 13px/1.6 var(--font-room);
-  color: var(--room-ink2);
+  font: 400 13px/1.6 var(--font-ui);
+  color: var(--ink2);
   margin: 0;
 }
 
@@ -141,43 +184,10 @@
 
 .returned {
   font: 400 10.5px/1.5 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-.flightWrapper {
-  margin: 0 0 4px;
-}
-
-.flight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.activityFacts {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
-  letter-spacing: 0.07em;
-  flex: 1;
-}
-
-.progress {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-}
-
-.progressLine {
-  font: 400 11.5px/1.5 var(--font-ui);
-  color: var(--ink2);
-}
-
-.abandon {
-  composes: surface from './controls.module.css';
-  flex: none;
 }
 
 .apply {
@@ -228,7 +238,7 @@
 .askedFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
 }
 
@@ -239,7 +249,7 @@
 
 .applyingFacts {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
   flex: 1;
 }
@@ -255,7 +265,7 @@
 .changeFacts,
 .changeToggle {
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
 }
 
@@ -328,7 +338,7 @@
 .unavailableFacts {
   flex: none;
   font: 400 9.5px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: 0.07em;
 }
 
@@ -392,8 +402,8 @@
 }
 
 .mentionHandle {
-  font: 600 12px/1 var(--font-room);
-  color: var(--room-ink);
+  font: 600 12px/1 var(--font-ui);
+  color: var(--ink3);
 }
 
 .mentionName {

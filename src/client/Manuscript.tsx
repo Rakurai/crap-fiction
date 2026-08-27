@@ -1,64 +1,47 @@
 import { EditorContent } from '@tiptap/react'
-import { useEffect, useRef, useState } from 'react'
-import { EditableTitle } from './EditableTitle.js'
+import { useEffect, useState } from 'react'
+import type { SurfaceId } from '../shared/surfaces.js'
+import { DocumentHeader } from './DocumentHeader.js'
 import { facts, machineWords, modeName, timeOfDay, wordCount } from './facts.js'
 import styles from './Manuscript.module.css'
 import type { LifecycleProps } from './pieceLifecycle.js'
-import { SURFACE_CONTROL_LABEL } from './surfaceLabels.js'
+import type { ApplyingHold } from './useConversationSession.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 import type { ManuscriptViewModel } from './useManuscript.js'
+import { usePaneWidth } from './usePaneWidth.js'
 
 type ManuscriptProps = {
   readonly title: string
   readonly mode: string
-  readonly onClose: () => void
+  readonly onOpenPieces: () => void
+  readonly onOpenModels: () => void
   readonly manuscript: ManuscriptViewModel
+  readonly location: string
   readonly autosave: AutosaveViewModel
-  /** Whether leaving the piece is refused — this document's own failed save, or another's. */
-  readonly leaveBlocked: boolean
-  readonly onOpenRoom: () => void
-  readonly onOpenConversations: () => void
-  readonly onSwitchToStoryContext: () => void
-  readonly onSwitchToAuthorContext: () => void
+  readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
-  readonly applying: { readonly participantName?: string } | undefined
+  readonly applying: ApplyingHold | undefined
 }
-
-/** How long the way out of the reading view stands after the author last moved the pointer. */
-const WAY_BACK_HOLDS_MS = 2400
 
 export function Manuscript({
   title,
   mode,
-  onClose,
+  onOpenPieces,
+  onOpenModels,
   manuscript,
+  location,
   autosave,
-  leaveBlocked,
-  onOpenRoom,
-  onOpenConversations,
-  onSwitchToStoryContext,
-  onSwitchToAuthorContext,
+  onSwitchTo,
   lifecycle,
   applying,
 }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
-  const [wayBackRevealed, setWayBackRevealed] = useState(false)
-  const wayBackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  // The reading view holds no chrome at rest. Moving the pointer is what asks for the way out,
-  // which is what a long piece entered near the top needs and a short one never has to see.
-  function revealTheWayBack(): void {
-    setWayBackRevealed(true)
-    if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
-    wayBackTimer.current = setTimeout(() => setWayBackRevealed(false), WAY_BACK_HOLDS_MS)
-  }
+  const [paneRef, paneWidth] = usePaneWidth<HTMLDivElement>()
+  const [widthBesideConversation, setWidthBesideConversation] = useState<number | undefined>(undefined)
 
   useEffect(() => {
-    setWayBackRevealed(false)
-    return () => {
-      if (wayBackTimer.current !== undefined) clearTimeout(wayBackTimer.current)
-    }
-  }, [manuscript.view])
+    if (!reading && Number.isFinite(paneWidth)) setWidthBesideConversation(paneWidth)
+  }, [reading, paneWidth])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -74,37 +57,22 @@ export function Manuscript({
   }, [manuscript.editor, reading, applying])
 
   return (
-    <div className={reading ? `${styles.wrapper} ${styles.wrapperReading}` : styles.wrapper}>
+    <div ref={paneRef} className={styles.wrapper}>
       {!reading && (
-        <div className={styles.topBar}>
-          <button type="button" className={styles.leave} onClick={onClose} disabled={leaveBlocked}>
-            ‹ pieces
-          </button>
-          <EditableTitle title={title} saving={lifecycle.retitling} onRetitle={lifecycle.onRetitle} />
-          <span className={styles.length}>{facts(modeName(mode), wordCount(manuscript.length))}</span>
-          <span className={styles.spacer} />
-          <div className={styles.controls}>
-            <button type="button" className={styles.viewControl} onClick={manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource}>
-              {manuscript.view === 'source' ? 'rendered' : 'source'}
-            </button>
-            <button type="button" className={styles.viewControl} onClick={manuscript.showReading}>
-              reading
-            </button>
-            <span className={styles.controlsRule} />
-            <button type="button" className={styles.control} onClick={onSwitchToStoryContext}>
-              {SURFACE_CONTROL_LABEL.storyContext}
-            </button>
-            <button type="button" className={styles.control} onClick={onSwitchToAuthorContext}>
-              {SURFACE_CONTROL_LABEL.authorContext}
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenConversations}>
-              conversations
-            </button>
-            <button type="button" className={styles.control} onClick={onOpenRoom}>
-              room
-            </button>
-          </div>
-        </div>
+        <DocumentHeader
+          onOpenPieces={onOpenPieces}
+          onOpenModels={onOpenModels}
+          title={title}
+          lifecycle={lifecycle}
+          length={facts(modeName(mode), wordCount(manuscript.length))}
+          surface="draft"
+          onSwitchTo={onSwitchTo}
+          draftControls={{
+            viewLabel: manuscript.view === 'source' ? 'rendered' : 'source',
+            onToggleView: manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource,
+            onReading: manuscript.showReading,
+          }}
+        />
       )}
 
       {!reading && lifecycle.retitleError !== undefined && (
@@ -113,21 +81,25 @@ export function Manuscript({
         </p>
       )}
 
-      {!reading && applying !== undefined && (
+      {applying !== undefined && (
         <div className={styles.applyingBanner}>
           <span className={styles.applyingBannerFacts}>READ-ONLY</span>
           <span className={styles.applyingBannerWords}>
             {applying.participantName === undefined ? 'Held while a change is applied.' : `Held while ${applying.participantName}'s change is applied.`}
           </span>
+          <button type="button" className={styles.applyingBannerAbandon} onClick={applying.abandon}>
+            abandon
+          </button>
         </div>
       )}
 
       <div
         ref={manuscript.containerRef}
         className={reading ? `${styles.scroll} ${styles.readingScroll}` : styles.scroll}
-        onPointerMove={reading ? revealTheWayBack : undefined}
+        style={reading && widthBesideConversation !== undefined ? { maxWidth: widthBesideConversation } : undefined}
       >
         <div className={styles.measure}>
+          {reading && <h1 className={styles.readingTitle}>{title}</h1>}
           {manuscript.view === 'source' ? (
             <textarea
               aria-label="Manuscript source"
@@ -144,17 +116,13 @@ export function Manuscript({
         </div>
       </div>
 
-      {reading && wayBackRevealed && (
-        <button type="button" className={styles.wayBack} onClick={manuscript.showRendered}>
-          {facts(machineWords('esc'), machineWords('return'))}
-        </button>
-      )}
+      {reading && <div className={styles.wayBack}>{facts(machineWords('esc'), machineWords('return'))}</div>}
 
       {!reading && autosave.state.failed && (
         <div className={styles.saveFailed}>
           <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
           <p className={styles.saveFailedMessage} role="status">
-            The last write to draft.md failed. Nothing has been discarded — keep writing. Leaving for another piece is
+            The last write to {location} failed. Nothing has been discarded — keep writing. Leaving for another piece is
             unavailable while “{title}” is unsaved.
           </p>
           <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>

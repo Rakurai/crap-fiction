@@ -15,9 +15,9 @@ test('applying a recommendation rewrites the manuscript, holds it, releases it, 
   await editor.click()
   await page.keyboard.type(OPENING)
 
-  const abandon = await sendToRoom(page, 'is the opening carrying its weight')
+  const stop = await sendToRoom(page, 'is the opening carrying its weight')
   await expect(page.getByText(SUGGESTION_CLAIM)).toBeVisible()
-  await expect(abandon).toBeHidden()
+  await expect(stop).toBeHidden()
 
   await answerControl(page, 'Change', 'apply').click()
 

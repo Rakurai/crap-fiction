@@ -65,16 +65,16 @@
   --accent:   #d08a5e;
   --accentfg: #241610;
 
-  --room-ink:  #c7d1dc;
-  --room-ink2: #98a3af;
-
-  --facts-ink: #948d84;
-
-  --danger:      #e07b76;
-  --danger-rule: rgba(224, 123, 118, .40);
+  --mark-0: #7fb0a8;
+  --mark-1: #8f9bd6;
+  --mark-2: #c99169;
+  --mark-3: #a3a375;
+  --mark-4: #b592c4;
+  --mark-5: #7fa8c9;
+  --mark-6: #c98fa0;
+  --mark-7: #93c48f;
 
   --font-prose: Spectral, Georgia, serif;
-  --font-room: 'Public Sans', system-ui, sans-serif;
   --font-ui: 'Public Sans', system-ui, sans-serif;
   --font-facts: ui-monospace, Menlo, monospace;
 }
@@ -98,13 +98,14 @@
     --accent:   #a6603c;
     --accentfg: #fdf8f4;
 
-    --room-ink:  #37424f;
-    --room-ink2: #5a6675;
-
-    --facts-ink: #6b6659;
-
-    --danger:      #9c3226;
-    --danger-rule: rgba(156, 50, 38, .40);
+    --mark-0: #3f7a70;
+    --mark-1: #4f5aa3;
+    --mark-2: #96552e;
+    --mark-3: #6e6f3a;
+    --mark-4: #7a4f8f;
+    --mark-5: #3f5f8f;
+    --mark-6: #8f4f63;
+    --mark-7: #3f7a52;
   }
 }
 
@@ -126,13 +127,14 @@
   --accent:   #a6603c;
   --accentfg: #fdf8f4;
 
-  --room-ink:  #37424f;
-  --room-ink2: #5a6675;
-
-  --facts-ink: #6b6659;
-
-  --danger:      #9c3226;
-  --danger-rule: rgba(156, 50, 38, .40);
+  --mark-0: #3f7a70;
+  --mark-1: #4f5aa3;
+  --mark-2: #96552e;
+  --mark-3: #6e6f3a;
+  --mark-4: #7a4f8f;
+  --mark-5: #3f5f8f;
+  --mark-6: #8f4f63;
+  --mark-7: #3f7a52;
 }
 
 @keyframes dr-breathe { 0%, 100% { opacity: .32 } 50% { opacity: 1 } }

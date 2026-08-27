@@ -28,13 +28,26 @@
   cursor: pointer;
 }
 
-.open:hover {
+.open:hover:enabled {
   text-decoration: underline;
+}
+
+.open:disabled {
+  color: var(--ink3);
+  cursor: default;
 }
 
 .facts {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.openStamp {
+  flex: none;
+  font: 400 9.5px/1 var(--font-facts);
+  color: var(--ink4);
   letter-spacing: .06em;
   white-space: nowrap;
 }

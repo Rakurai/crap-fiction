@@ -2,6 +2,7 @@
 handle: voice
 displayName: Voice
 description: Judges whether the telling sustains the expressive identity the story intends.
+mark: VO
 eligibility: cast
 availability:
   - mode: flash

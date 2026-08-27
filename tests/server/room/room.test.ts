@@ -20,6 +20,7 @@ import {
 } from '../../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
+import type { ParticipantActivityEvent } from '../../../src/shared/conversationEvents.js'
 import type { DocumentSnapshot } from '../../../src/shared/surfaces.js'
 import {
   ApplicationDocumentNotSavedError,
@@ -50,6 +51,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     handle: 'shape',
     displayName: 'Shape',
     description: 'x',
+    mark: 'SH',
     persona: 'reasons about x',
     eligibility: 'cast',
     function: undefined,
@@ -60,6 +62,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     handle: 'compression',
     displayName: 'Compression',
     description: 'y',
+    mark: 'CO',
     persona: 'reasons about y',
     eligibility: 'cast',
     function: undefined,
@@ -70,6 +73,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     handle: 'interiority',
     displayName: 'Interiority',
     description: 'v',
+    mark: 'IN',
     persona: 'reasons about v',
     eligibility: 'cast',
     function: undefined,
@@ -80,6 +84,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     handle: 'editor',
     displayName: 'Story Editor',
     description: 'z',
+    mark: 'SE',
     persona: 'reasons about z',
     eligibility: 'generalist',
     function: undefined,
@@ -90,6 +95,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     handle: 'toolsmith',
     displayName: 'Toolsmith',
     description: 'w',
+    mark: 'TO',
     persona: 'reasons about w',
     eligibility: 'addressed-only',
     function: undefined,
@@ -300,6 +306,29 @@ describe('Room.dispatch', () => {
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
+  it('stamps every participant it calls with a start moment from its own clock, carried unchanged from preparing into working', async () => {
+    const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, states: ['preparing', 'working'] },
+    })
+
+    const activity: ParticipantActivityEvent[] = []
+    room.subscribe(piece.id, (event) => {
+      if (event.type === 'participant.activity') activity.push(event.data)
+    })
+
+    await room.dispatch(workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    for (const participantId of ['shape', 'compression', 'story-editor']) {
+      const own = activity.filter((event) => event.participantId === participantId)
+      expect(own.map((event) => event.state)).toEqual(['preparing', 'working'])
+      expect(own.every((event) => event.startedAt === 1_700_000_000_000)).toBe(true)
+    }
+  })
+
   it('submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
     const piece = await createPiece(workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room, adapter } = buildRoom(dataRoot, {
@@ -432,7 +461,9 @@ describe('Room.dispatch', () => {
     await settled
 
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
-    expect(landed).toEqual([{ id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [] }])
+    expect(landed).toEqual([
+      { id: expect.any(String), kind: 'authorMessage', text: 'a message', audience: [], brought: [], atMs: expect.any(Number), castSize: expect.any(Number) },
+    ])
   })
 
   it('lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {

@@ -19,8 +19,8 @@ function started(actionId: string, audience: readonly string[] = ['shape', 'comp
   }
 }
 
-function activity(participantId: string, state: 'preparing' | 'working', actionId = 'a1'): RoomEvent {
-  return { type: 'participant.activity', data: { actionId, participantId, state, surface: 'draft' } }
+function activity(participantId: string, state: 'preparing' | 'working', actionId = 'a1', startedAt = STARTED_AT): RoomEvent {
+  return { type: 'participant.activity', data: { actionId, participantId, state, startedAt, surface: 'draft' } }
 }
 
 function appended(entry: ConversationEntryView, actionId = 'a1'): RoomEvent {
@@ -46,10 +46,10 @@ describe('projectEvent', () => {
     })
 
     projection = projectEvent(projection, activity('shape', 'preparing'))
-    expect(projection.activity?.states.shape).toBe('preparing')
+    expect(projection.activity?.states.shape).toEqual({ state: 'preparing', startedAt: STARTED_AT })
 
     projection = projectEvent(projection, activity('shape', 'working'))
-    expect(projection.activity?.states.shape).toBe('working')
+    expect(projection.activity?.states.shape).toEqual({ state: 'working', startedAt: STARTED_AT })
   })
 
   it('appends a landed entry, clearing the participant that produced it from the active states and leaving one with none alone', () => {

@@ -5,9 +5,9 @@ import {
   answerOf,
   control,
   createPiece,
-  leavePiece,
   manuscript,
   openPiece,
+  openPieces,
   reopenPiece,
   sendToRoom,
   transcriptLine,
@@ -44,25 +44,25 @@ test('each surface holds its own work, a context change applies and persists, an
 
   await sendToRoom(page, DRAFT_ASK)
 
-  await control(page, 'story context').click()
+  await control(page, 'story').click()
   const storyContext = contextDocument(page, 'Story context')
   await expect(storyContext).toBeVisible()
-  await expect(page.getByText(DRAFT_ASK)).toBeHidden()
-  await expect(control(page, 'abandon')).toBeHidden()
+  await expect(transcriptLine(page, DRAFT_ASK)).toBeHidden()
+  await expect(control(page, 'stop')).toBeHidden()
 
   await storyContext.fill(STORY_NOTE)
   await sendToRoom(page, STORY_ASK)
 
   await control(page, 'draft').click()
-  await expect(control(page, 'abandon')).toBeVisible()
+  await expect(control(page, 'stop')).toBeVisible()
   await expect(editor).toHaveText(OPENING)
   await expect(transcriptLine(page, SUGGESTION_CLAIM)).toBeVisible()
-  await expect(control(page, 'abandon')).toBeHidden()
+  await expect(control(page, 'stop')).toBeHidden()
 
-  await control(page, 'story context').click()
+  await control(page, 'story').click()
   await expect(answerOf(page, 'Story Editor')).toBeVisible()
-  await expect(page.getByText(STORY_ASK)).toBeVisible()
-  await expect(page.getByText(DRAFT_ASK)).toBeHidden()
+  await expect(transcriptLine(page, STORY_ASK)).toBeVisible()
+  await expect(transcriptLine(page, DRAFT_ASK)).toBeHidden()
 
   await answerControl(page, 'Story Editor', 'apply').click()
   await expect(page.getByText('READ-ONLY')).toBeVisible()
@@ -73,27 +73,26 @@ test('each surface holds its own work, a context change applies and persists, an
   await expect(page.getByText('READ-ONLY')).toBeHidden()
   await expect(storyContext).toBeEnabled()
 
-  await control(page, 'author context').click()
+  await control(page, 'author').click()
   const authorContext = contextDocument(page, 'Author context')
   await authorContext.fill(AUTHOR_NOTE)
   await sendToRoom(page, AUTHOR_ASK)
-  await expect(page.getByText(AUTHOR_ASK)).toBeVisible()
+  await expect(transcriptLine(page, AUTHOR_ASK)).toBeVisible()
   await expect(answerOf(page, 'Story Editor')).toBeVisible()
 
-  // Leaving is what flushes every surface, so reopening shows what reached disk.
-  await leavePiece(page)
-  await reopenPiece(page, FIRST)
-  await expect(editor).toHaveText(OPENING)
-
-  await control(page, 'story context').click()
-  await expect(storyContext).toHaveValue(APPLIED_TEXT)
-
-  await leavePiece(page)
+  await openPieces(page)
   await createPiece(page, SECOND)
   await expect(editor).toHaveText('')
 
-  await control(page, 'author context').click()
+  await control(page, 'author').click()
   await expect(authorContext).toHaveValue(AUTHOR_NOTE)
-  await expect(page.getByText(AUTHOR_ASK)).toBeVisible()
+  await expect(transcriptLine(page, AUTHOR_ASK)).toBeVisible()
   await expect(answerOf(page, 'Story Editor')).toBeVisible()
+
+  await openPieces(page)
+  await reopenPiece(page, FIRST)
+  await expect(editor).toHaveText(OPENING)
+
+  await control(page, 'story').click()
+  await expect(storyContext).toHaveValue(APPLIED_TEXT)
 })

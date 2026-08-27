@@ -13,6 +13,10 @@ export function wordCount(length: number): string {
   return `${words.format(length)} ${length === 1 ? 'WORD' : 'WORDS'}`
 }
 
+export function passageCount(count: number): string {
+  return `${words.format(count)} ${count === 1 ? 'PASSAGE' : 'PASSAGES'}`
+}
+
 export function modeName(mode: string): string {
   return mode.toUpperCase()
 }
@@ -31,10 +35,16 @@ export function elapsed(fromMs: number, nowMs: number): string {
 }
 
 export function whenChanged(atMs: number, now: Clock): string {
+  return isSameDay(new Date(atMs), new Date(now())) ? 'TODAY' : coarseDistance(atMs, now)
+}
+
+export function messageWhen(atMs: number, now: Clock): string {
+  return isSameDay(new Date(atMs), new Date(now())) ? timeOfDay(atMs) : coarseDistance(atMs, now)
+}
+
+function coarseDistance(atMs: number, now: Clock): string {
   const at = new Date(atMs)
   const reference = new Date(now())
-  if (isSameDay(at, reference)) return 'TODAY'
-
   const days = Math.abs(differenceInCalendarDays(reference, at))
   if (days < 7) return ago(days, 'DAY')
   if (days < 30) return ago(Math.round(days / 7), 'WEEK')

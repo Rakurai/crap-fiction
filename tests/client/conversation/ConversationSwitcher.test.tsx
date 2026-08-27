@@ -70,8 +70,8 @@ describe('the conversation listing', () => {
     renderSwitcher(undefined, { onSelect, onStartNew, onClose })
 
     fireEvent.click(screen.getByText('does the opening earn its length'))
-    fireEvent.click(screen.getByRole('button', { name: 'new' }))
-    fireEvent.click(screen.getByRole('button', { name: 'done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'new conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'close' }))
 
     expect(onSelect).toHaveBeenCalledWith('c1')
     expect(onStartNew).toHaveBeenCalledTimes(1)
@@ -95,6 +95,16 @@ describe('the conversation listing', () => {
     fireEvent.click(armFor('does the opening earn its length'))
     fireEvent.click(screen.getByRole('button', { name: 'delete' }))
     expect(onDelete).toHaveBeenCalledWith('c1')
+  })
+
+  it('keeps an armed row armed once the pointer leaves it', () => {
+    renderSwitcher(undefined)
+
+    fireEvent.click(armFor('does the opening earn its length'))
+    fireEvent.mouseLeave(screen.getByRole('button', { name: 'delete' }).closest('li')!)
+
+    expect(screen.getByRole('button', { name: 'delete' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'keep' })).toBeTruthy()
   })
 
   it('goes quiet on the row a deletion is in flight for', () => {

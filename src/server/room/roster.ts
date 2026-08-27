@@ -1,4 +1,4 @@
-import { INTERVIEWER_FUNCTION, type RoleDefinition } from '../model/roles.js'
+import { INTERVIEWER_FUNCTION, markOrdinals, type RoleDefinition } from '../model/roles.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 
 export class GeneralistNotInRosterError extends Error {
@@ -23,6 +23,7 @@ export type Interviewer = Readonly<{
 
 export type RoomRoster = Readonly<{
   specialists: readonly RoleDefinition[]
+  markOrdinals: ReadonlyMap<string, number>
   storyEditor: RoleDefinition
   addressedOnly: readonly RoleDefinition[]
   interviewer: Interviewer
@@ -43,7 +44,7 @@ export function resolveRoster(roles: readonly RoleDefinition[]): RoomRoster {
   const invocation = declared?.function?.invocation
   if (declared === undefined || invocation === undefined) throw new InterviewerNotInRosterError()
 
-  return { specialists, storyEditor, addressedOnly, interviewer: { role: declared, invocation } }
+  return { specialists, markOrdinals: markOrdinals(roles), storyEditor, addressedOnly, interviewer: { role: declared, invocation } }
 }
 
 export function specialistsFor(specialists: readonly RoleDefinition[], modeId: string, surface: SurfaceId): readonly RoleDefinition[] {

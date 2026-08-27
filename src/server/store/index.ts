@@ -48,8 +48,19 @@ export async function writeSettingsSection(dataRoot: string, section: SettingsSe
   await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
 }
 
+const CONFIG_DIR = 'config'
+const DRAFT_FILE = 'draft.md'
+const STORY_CONTEXT_FILE = 'story-context.yaml'
+const AUTHOR_CONTEXT_FILE = 'author-context.yaml'
+
+export const SURFACE_LOCATIONS: Readonly<Record<SurfaceId, string>> = {
+  draft: DRAFT_FILE,
+  storyContext: STORY_CONTEXT_FILE,
+  authorContext: path.posix.join(CONFIG_DIR, AUTHOR_CONTEXT_FILE),
+}
+
 function authorContextFile(dataRoot: string): string {
-  return path.join(dataRoot, 'config', 'author-context.yaml')
+  return path.join(dataRoot, CONFIG_DIR, AUTHOR_CONTEXT_FILE)
 }
 
 export function readAuthorContext(dataRoot: string): string | undefined {
@@ -99,11 +110,11 @@ function pieceMetadataFile(pieceDir: string): string {
 }
 
 function draftFile(pieceDir: string): string {
-  return path.join(pieceDir, 'draft.md')
+  return path.join(pieceDir, DRAFT_FILE)
 }
 
 function storyContextFile(pieceDir: string): string {
-  return path.join(pieceDir, 'story-context.yaml')
+  return path.join(pieceDir, STORY_CONTEXT_FILE)
 }
 
 export function readStoryContext(workspaceDir: string, id: string): string | undefined {

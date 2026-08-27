@@ -2,6 +2,7 @@
 handle: logic
 displayName: Character Logic
 description: Judges whether consequential behavior follows from an intelligible internal state.
+mark: CL
 eligibility: cast
 availability:
   - mode: flash

@@ -54,13 +54,16 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       documents={DOCUMENTS}
       flushDocument={() => Promise.resolve({ failed: false })}
       room={roomHolding(entries)}
-      displayName={(id) => NAMES[id] ?? id}
-      handle={(id) => HANDLE_BY_ID[id]}
+      identify={(id) => ({ displayName: NAMES[id] ?? id, handle: HANDLE_BY_ID[id], mark: null, ordinal: null })}
       handles={HANDLES}
       interviewer={INTERVIEWER}
       runtime={{ reachable: true }}
       clock={() => 1_700_000_000_000}
       onApplied={() => Promise.resolve({ failed: false })}
+      onApplyingChange={() => {}}
+      onConversationIdChange={() => {}}
+      onOpenRoom={() => {}}
+      onOpenConversations={() => {}}
       {...extra}
     />,
   )
@@ -120,10 +123,9 @@ describe('a landed response in the conversation', () => {
 
     await screen.findByText('It holds.')
 
-    const declined = blockContaining('has no comment.')
+    const declined = blockContaining('NOTHING TO ADD')
     expect(declined.textContent).toContain('@shape')
     expect(declined.textContent).toContain('Shape')
-    // Nothing to act on, so none of the actions a response carries appear against it.
     expect(within(declined).queryByRole('button')).toBeNull()
     expect(within(declined).queryByRole('textbox')).toBeNull()
   })
@@ -177,6 +179,29 @@ describe('a specialist the addressing brought into the room', () => {
     await screen.findByText('It holds.')
     expect(screen.queryByText('ROOM CHANGED')).toBeNull()
   })
+
+  it('counts the room the addressing left behind, in the singular where it holds one specialist', async () => {
+    renderConversation([
+      { id: 'e1', kind: 'authorMessage', text: '@reader and @shape', audience: ['reader', 'shape'], brought: ['reader', 'shape'], castSize: 4 },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
+    ])
+
+    await screen.findByText('It runs long.')
+    expect(
+      screen.getByText('Reader Experience, Shape were addressed and are now in the room. The room holds 4 specialists.'),
+    ).toBeTruthy()
+
+    cleanup()
+    renderConversation([
+      { id: 'e1', kind: 'authorMessage', text: '@reader alone', audience: ['reader'], brought: ['reader'], castSize: 1 },
+      { id: 'e2', kind: 'participantResponse', participantId: 'reader', causeId: 'e1', outcome: 'commentary', claim: 'It runs long.' },
+    ])
+
+    await screen.findByText('It runs long.')
+    expect(
+      screen.getByText('Reader Experience was addressed and is now in the room. The room holds 1 specialist.'),
+    ).toBeTruthy()
+  })
 })
 
 const RESPONSE_WITH_RECOMMENDATION: ConversationEntryView = {
@@ -209,7 +234,6 @@ describe('the applied change, shown on its originating response', () => {
     const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
     expect(screen.getByText('the old line')).toBeTruthy()
     expect(screen.getByText('the new line')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy()
 
     fireEvent.click(toggle)
 
@@ -438,110 +462,34 @@ describe('handle completion at the composer', () => {
   })
 })
 
-describe('conversation activity, truthfully', () => {
+describe('sending from the keyboard', () => {
   afterEach(cleanup)
 
-  const STARTED: RoomEvent = {
-    type: 'action.started',
-    data: {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'dispatch',
-      sourceEntryId: 'e0',
-      startedAt: 1_700_000_000_000,
-      audience: ['shape', 'reader'],
-      surface: 'draft',
-    },
-  }
+  it('sends on Enter, leaves Shift+Enter for a newline, and does nothing while the send control is disabled', async () => {
+    const dispatch = vi.fn(() =>
+      Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
+    )
+    const room: RoomAdapters = { ...roomHolding([]), dispatch }
 
-  it('offers an actionable Abandon control and an unconditional activity signal the instant a dispatch opens, before any participant reports progress', async () => {
-    const { room, stream } = roomStreaming([])
     renderConversation([], { room })
 
-    stream(STARTED)
-
-    expect(await screen.findByRole('button', { name: 'abandon' })).toBeTruthy()
-    expect(screen.getByText(/ACTIVE/)).toBeTruthy()
-    expect(screen.queryByText(/is thinking/)).toBeNull()
-  })
-
-  it('shows one "is thinking" line per participant actually reporting progress, and none for the rest of a resolved audience it never got', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working', surface: 'draft' } })
-
-    expect(await screen.findByText('Shape is thinking.')).toBeTruthy()
-    // The audience STARTED resolved holds `reader` too, which has reported nothing.
-    expect(screen.queryByText(/Reader Experience is thinking/)).toBeNull()
-    expect(screen.queryByText(/waiting/i)).toBeNull()
-
-    stream({ type: 'participant.activity', data: { actionId: 'a1', participantId: 'reader', state: 'preparing', surface: 'draft' } })
-
-    expect(screen.getByText('Shape is thinking.')).toBeTruthy()
-    expect(screen.getByText('Reader Experience is thinking.')).toBeTruthy()
-  })
-
-  it('disables send while busy without relabelling it', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    const send = (await screen.findByRole('button', { name: 'send' })) as HTMLButtonElement
     const composer = await screen.findByLabelText('Message the room')
+
+    fireEvent.keyDown(composer, { key: 'Enter' })
+    expect(dispatch).not.toHaveBeenCalled()
+
     fireEvent.change(composer, { target: { value: 'a message' } })
-    expect(send.disabled).toBe(false)
 
-    stream(STARTED)
+    expect(fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })).toBe(true)
+    expect(dispatch).not.toHaveBeenCalled()
 
-    await waitFor(() => expect(send.disabled).toBe(true))
-    expect(send.textContent).toBe('send')
+    expect(fireEvent.keyDown(composer, { key: 'Enter' })).toBe(false)
+    await waitFor(() => expect(dispatch).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', { message: 'a message' }, DOCUMENTS))
   })
+})
 
-  /**
-   * That the controls stay held until the studio answers is `useConversation.test.ts`'s claim.
-   * What the conversation owns is the offer: while an action is in flight there is a control to
-   * abandon it, and clicking it names that action and no other.
-   */
-  it('offers the action in flight to be abandoned, by its own identity', async () => {
-    const abandonOperation = vi.fn(() => new Promise<RequestResult<null>>(() => {}))
-    const { room, stream } = roomStreaming([], abandonOperation)
-    renderConversation([], { room })
-
-    await screen.findByLabelText('Message the room')
-    stream(STARTED)
-
-    fireEvent.click(await screen.findByRole('button', { name: 'abandon' }))
-
-    expect(abandonOperation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'a1')
-  })
-
-  /**
-   * What an abandoned dispatch leaves on the page. Which events can still move the projection
-   * afterwards is `entryProjection.test.ts`'s claim; what this owns is that the author is left
-   * reading the response rather than a room still apparently at work.
-   */
-  it('leaves the response an abandoned dispatch landed on the page, with nothing still shown as in flight', async () => {
-    const { room, stream } = roomStreaming([])
-    renderConversation([], { room })
-
-    stream(STARTED)
-    stream({
-      type: 'entry.appended',
-      data: {
-        actionId: 'a1',
-        entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' },
-        surface: 'draft',
-      },
-    })
-    await screen.findByText('It holds.')
-
-    fireEvent.click(screen.getByRole('button', { name: 'abandon' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'abandon' })).toBeNull())
-
-    expect(screen.getByText('It holds.')).toBeTruthy()
-    expect(screen.queryByText(/is thinking/)).toBeNull()
-  })
+describe('conversation activity, truthfully', () => {
+  afterEach(cleanup)
 
   it("reconnect: an apply already in flight for a response shows its flight from the stream's own snapshot alone, no new event required", async () => {
     const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {

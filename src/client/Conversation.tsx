@@ -1,6 +1,7 @@
 import * as Ariakit from '@ariakit/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AppliedChangeContent } from '../shared/appliedChange.js'
+import type { AppliedChangeContent, ChangedPassage } from '../shared/appliedChange.js'
+import { conversationName } from './conversationNaming.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
@@ -8,11 +9,16 @@ import type { InterviewerView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
-import { elapsed, facts, machineWords, wordCount } from './facts.js'
+import { isChangeDisclosed, setChangeDisclosed } from './appliedChangeDisclosure.js'
+import { elapsed, facts, machineWords, messageWhen, passageCount, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
+import { Mark } from './Mark.js'
+import { isParticipantOutcome } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
-import { useApply, type ApplyingResponse } from './useApply.js'
+import { useApply, type ApplySettlement, type ApplyingResponse } from './useApply.js'
 import { useNow } from './useNow.js'
+import type { ApplyingHold } from './useConversationSession.js'
+import type { ParticipantIdentity } from './useRoster.js'
 import { type RoomAdapters, useConversation } from './useConversation.js'
 
 const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
@@ -28,8 +34,7 @@ type ConversationProps = {
   readonly documents: DocumentSnapshot
   readonly flushDocument: () => Promise<AutosaveState>
   readonly room: RoomAdapters
-  readonly displayName: (participantId: string) => string
-  readonly handle: (participantId: string) => string | undefined
+  readonly identify: (participantId: string) => ParticipantIdentity
   readonly handles: readonly HandleEntry[]
   /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
   readonly interviewer: InterviewerView
@@ -37,8 +42,10 @@ type ConversationProps = {
   readonly clock: Clock
   /** The surface's one persistence writer: what an Apply installs its replacement through. */
   readonly onApplied: (text: string) => Promise<AutosaveState>
-  readonly onApplyingChange?: (applying: { readonly participantName?: string } | undefined) => void
-  readonly onConversationIdChange?: (conversationId: string) => void
+  readonly onApplyingChange: (applying: ApplyingHold | undefined) => void
+  readonly onConversationIdChange: (conversationId: string) => void
+  readonly onOpenRoom: () => void
+  readonly onOpenConversations: () => void
 }
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
@@ -57,7 +64,7 @@ function ResponseActions({
   readonly responseId: string
   readonly participantId: string
   readonly participantName: string
-  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed'
+  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed' | 'applied'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void
@@ -109,7 +116,7 @@ function ResponseActions({
           ask for a concrete change
         </button>
       )}
-      <button type="button" className={styles.actionButton} disabled={withText && disabled} onClick={reply}>
+      <button type="button" className={styles.actionButton} disabled={disabled} onClick={reply}>
         reply
       </button>
       <input
@@ -123,27 +130,39 @@ function ResponseActions({
   )
 }
 
-function ApplyingFlight({ onAbandon }: { readonly onAbandon: () => void }) {
+function ApplyingFlight() {
   return (
     <div className={styles.apply}>
       <span className={styles.applyingFacts}>APPLYING</span>
-      <button type="button" className={styles.abandon} onClick={onAbandon}>
-        abandon
-      </button>
     </div>
   )
 }
 
+function changeSummary(passages: readonly ChangedPassage[]): string {
+  const words = passages.reduce((sum, passage) => sum + countWords(passage.after), 0)
+  return passages.length > 1
+    ? facts(machineWords('applied'), wordCount(words), passageCount(passages.length))
+    : facts(machineWords('applied'), wordCount(words))
+}
+
 function AppliedChangeView({
+  id,
   content,
+  freshlyStreamed,
   askDisabled,
   onAskAboutChange,
 }: {
+  readonly id: string
   readonly content: AppliedChangeContent | undefined
+  readonly freshlyStreamed: boolean
   readonly askDisabled: boolean
   readonly onAskAboutChange: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => freshlyStreamed || isChangeDisclosed(id))
+
+  useEffect(() => {
+    setChangeDisclosed(id, open)
+  }, [id, open])
 
   return (
     <div className={styles.change}>
@@ -154,7 +173,7 @@ function AppliedChangeView({
       ) : (
         <>
           <button type="button" className={styles.changeToggle} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
-            {facts(machineWords('applied'), wordCount(content.passages.reduce((sum, passage) => sum + countWords(passage.after), 0)))}
+            {changeSummary(content.passages)}
           </button>
           {open && (
             <div className={styles.changeDiff}>
@@ -175,17 +194,21 @@ function AppliedChangeView({
   )
 }
 
-function roomChangedText(names: readonly string[]): string {
+function roomChangedText(names: readonly string[], castSize: number | undefined): string {
   const [only] = names
-  if (names.length === 1 && only !== undefined) return `${only} was addressed and is now in the room.`
-  return `${names.join(', ')} were addressed and are now in the room.`
+  const brought =
+    names.length === 1 && only !== undefined
+      ? `${only} was addressed and is now in the room.`
+      : `${names.join(', ')} were addressed and are now in the room.`
+  if (castSize === undefined) return brought
+  return `${brought} The room holds ${castSize} specialist${castSize === 1 ? '' : 's'}.`
 }
 
-function RoomChanged({ names }: { readonly names: readonly string[] }) {
+function RoomChanged({ names, castSize }: { readonly names: readonly string[]; readonly castSize: number | undefined }) {
   return (
     <div className={styles.roomChanged}>
       <span className={styles.roomChangedFacts}>ROOM CHANGED</span>
-      <span className={styles.roomChangedWords}>{roomChangedText(names)}</span>
+      <span className={styles.roomChangedWords}>{roomChangedText(names, castSize)}</span>
     </div>
   )
 }
@@ -194,32 +217,44 @@ function askedText(name: string): string {
   return `${name} was asked for a concrete change.`
 }
 
-function participantNameFor(entries: readonly ConversationEntryView[], responseId: string, displayName: (id: string) => string): string {
+function participantNameFor(
+  entries: readonly ConversationEntryView[],
+  responseId: string,
+  identify: (id: string) => ParticipantIdentity,
+): string {
   const entry = entries.find((candidate) => candidate.id === responseId)
-  return displayName(entry?.kind === 'participantResponse' ? entry.participantId : responseId)
+  return identify(entry?.kind === 'participantResponse' ? entry.participantId : responseId).displayName
 }
 
 const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
 
 type EntryActions = Readonly<{
-  displayName: (id: string) => string
-  handle: (id: string) => string | undefined
+  identify: (id: string) => ParticipantIdentity
+  clock: Clock
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
+  freshApplicationIds: ReadonlySet<string>
+  settlement: ApplySettlement | undefined
   onApply: (responseId: string, constraint: string | undefined) => void
-  onAbandonApply: () => void
   onAskAboutChange: () => void
   onReplyEmpty: (participantId: string) => void
   onReply: (participantId: string, message: string) => void
   onAsk: (responseId: string, clarification: string | undefined) => void
 }>
 
-function ParticipantIdentity({ name, handle }: { readonly name: string; readonly handle: string | undefined }) {
+function IdentityLine({ identity, status }: { readonly identity: ParticipantIdentity; readonly status?: string | undefined }) {
   return (
     <div className={styles.identity}>
-      {handle !== undefined && <span className={styles.handle}>@{handle}</span>}
-      <span className={styles.name}>{name}</span>
+      <Mark mark={identity.mark} ordinal={identity.ordinal} />
+      {identity.handle !== undefined && <span className={styles.handle}>@{identity.handle}</span>}
+      <span className={styles.name}>{identity.displayName}</span>
+      {status !== undefined && (
+        <>
+          <span className={styles.identitySpacer} />
+          <span className={styles.identityStatus}>{status}</span>
+        </>
+      )}
     </div>
   )
 }
@@ -255,15 +290,30 @@ function Claim({ text }: { readonly text: string }) {
 }
 
 function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
-  const { displayName, handle, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } =
-    actions
+  const {
+    identify,
+    clock,
+    applying,
+    applyDisabled,
+    applicationsFor,
+    freshApplicationIds,
+    settlement,
+    onApply,
+    onAskAboutChange,
+    onReplyEmpty,
+    onReply,
+    onAsk,
+  } = actions
 
   switch (entry.kind) {
     case 'authorMessage':
       return (
         <>
           <p className={styles.message}>{entry.text}</p>
-          {entry.brought.length > 0 && <RoomChanged names={entry.brought.map(displayName)} />}
+          {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
+          {entry.brought.length > 0 && (
+            <RoomChanged names={entry.brought.map((participantId) => identify(participantId).displayName)} castSize={entry.castSize} />
+          )}
         </>
       )
     case 'concreteChangeRequest':
@@ -271,28 +321,30 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
         <>
           <div className={styles.asked}>
             <span className={styles.askedFacts}>{machineWords('asked')}</span>
-            <span className={styles.askedWords}>{askedText(displayName(entry.target))}</span>
+            <span className={styles.askedWords}>{askedText(identify(entry.target).displayName)}</span>
           </div>
           {entry.clarification !== undefined && <p className={styles.message}>{entry.clarification}</p>}
+          {entry.clarification !== undefined && entry.atMs !== undefined && (
+            <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>
+          )}
         </>
       )
     case 'participantNoComment':
       return (
-        <div className={styles.noComment}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
-          <p className={styles.noCommentWords}>has no comment.</p>
+        <div className={styles.participant}>
+          <IdentityLine identity={identify(entry.participantId)} status={machineWords('nothing to add')} />
         </div>
       )
     case 'participantFailure':
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <IdentityLine identity={identify(entry.participantId)} />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
           <ResponseActions
             responseId={entry.id}
             participantId={entry.participantId}
-            participantName={displayName(entry.participantId)}
+            participantName={identify(entry.participantId).displayName}
             outcome="failed"
             disabled={applyDisabled}
             onApply={onApply}
@@ -305,22 +357,44 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'participantResponse': {
       const applyingThis = applying?.responseId === entry.id
       const applications = applicationsFor(entry.id)
+      const applied = applications.length > 0
+      const responseSettlement = applied ? undefined : settlement?.responseId === entry.id ? settlement : undefined
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <IdentityLine
+            identity={identify(entry.participantId)}
+            status={
+              responseSettlement === undefined
+                ? undefined
+                : machineWords(responseSettlement.kind === 'failed' ? 'application failed' : 'application abandoned')
+            }
+          />
           <Claim text={entry.claim} />
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
+          {responseSettlement?.kind === 'failed' && (
+            <>
+              <p className={styles.failed}>the application did not settle — {machineWords(responseSettlement.reason)}</p>
+              {responseSettlement.returned !== undefined && <p className={styles.returned}>{responseSettlement.returned}</p>}
+            </>
+          )}
           {applications.map((application) => (
-            <AppliedChangeView key={application.id} content={application.change} askDisabled={applyDisabled} onAskAboutChange={onAskAboutChange} />
+            <AppliedChangeView
+              key={application.id}
+              id={application.id}
+              content={application.change}
+              freshlyStreamed={freshApplicationIds.has(application.id)}
+              askDisabled={applyDisabled}
+              onAskAboutChange={onAskAboutChange}
+            />
           ))}
           {applyingThis ? (
-            <ApplyingFlight onAbandon={onAbandonApply} />
+            <ApplyingFlight />
           ) : (
             <ResponseActions
               responseId={entry.id}
               participantId={entry.participantId}
-              participantName={displayName(entry.participantId)}
-              outcome={entry.outcome}
+              participantName={identify(entry.participantId).displayName}
+              outcome={applied ? 'applied' : entry.outcome}
               disabled={applyDisabled}
               onApply={onApply}
               onAsk={onAsk}
@@ -340,35 +414,25 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
   }
 }
 
-function DispatchFlight({
-  activity,
-  displayName,
+function participantStatus(state: DispatchActivitySnapshot['states'][string] | undefined, nowMs: number): string {
+  if (state === undefined) return machineWords('queued')
+  return facts(machineWords(state.state), elapsed(state.startedAt, nowMs))
+}
+
+function ParticipantFlightLine({
+  participantId,
+  identify,
+  state,
   nowMs,
-  onAbandon,
 }: {
-  readonly activity: DispatchActivitySnapshot
-  readonly displayName: (participantId: string) => string
+  readonly participantId: string
+  readonly identify: (participantId: string) => ParticipantIdentity
+  readonly state: DispatchActivitySnapshot['states'][string] | undefined
   readonly nowMs: number
-  readonly onAbandon: () => void
 }) {
-  const active = Object.keys(activity.states)
   return (
-    <div className={styles.flightWrapper}>
-      <div className={styles.flight}>
-        <span className={styles.activityFacts}>{facts(machineWords('active'), elapsed(activity.startedAt, nowMs))}</span>
-        <button type="button" className={styles.abandon} onClick={onAbandon}>
-          abandon
-        </button>
-      </div>
-      {active.length > 0 && (
-        <ul className={styles.progress}>
-          {active.map((participantId) => (
-            <li key={participantId} className={styles.progressLine}>
-              {displayName(participantId)} is thinking.
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className={`${styles.participant} ${styles.pending}`}>
+      <IdentityLine identity={identify(participantId)} status={participantStatus(state, nowMs)} />
     </div>
   )
 }
@@ -380,15 +444,16 @@ export function Conversation({
   documents,
   flushDocument,
   room,
-  displayName,
-  handle,
+  identify,
   handles,
   interviewer,
   runtime,
   clock,
   onApplied,
-  onApplyingChange = () => {},
-  onConversationIdChange = () => {},
+  onApplyingChange,
+  onConversationIdChange,
+  onOpenRoom,
+  onOpenConversations,
 }: ConversationProps) {
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
@@ -418,12 +483,15 @@ export function Conversation({
   useEffect(() => {
     onApplyingChange(
       apply.applying !== undefined
-        ? { participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, displayName) }
+        ? {
+            participantName: participantNameFor(conversation.projection.entries, apply.applying.responseId, identify),
+            abandon: () => void abandonCurrentAction(),
+          }
         : conversation.applyingInRoom
-          ? {}
+          ? { abandon: () => void abandonCurrentAction() }
           : undefined,
     )
-  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, displayName, onApplyingChange])
+  }, [apply.applying, conversation.applyingInRoom, conversation.projection.entries, identify, onApplyingChange])
 
   async function abandonCurrentAction(): Promise<void> {
     if (await conversation.abandon()) apply.clear()
@@ -449,7 +517,20 @@ export function Conversation({
   }, [conversation.conversationId, onConversationIdChange])
 
   const nowMs = useNow(conversation.projection.activity !== undefined, clock)
+  const activity = conversation.projection.activity
+  const pendingParticipants = useMemo(() => {
+    if (activity === undefined) return []
+    const answered = new Set(
+      conversation.projection.entries
+        .filter(isParticipantOutcome)
+        .filter((entry) => entry.causeId === activity.sourceEntryId)
+        .map((entry) => entry.participantId),
+    )
+    return activity.audience.filter((participantId) => !answered.has(participantId))
+  }, [activity, conversation.projection.entries])
   const roomBusy = conversation.busy || apply.applying !== undefined
+  const conversationActionInFlight = activity !== undefined
+  const opening = conversationName(conversation.projection.entries)
 
   function askAboutChange(): void {
     if (roomBusy) return
@@ -463,7 +544,7 @@ export function Conversation({
   }
 
   function replyEmpty(participantId: string): void {
-    const participantHandle = handle(participantId)
+    const participantHandle = identify(participantId).handle
     if (participantHandle === undefined) return
     const prefix = `@${participantHandle} `
     const next = message.startsWith(prefix) ? message : `${prefix}${message}`
@@ -501,13 +582,14 @@ export function Conversation({
   }
 
   const actions: EntryActions = {
-    displayName,
-    handle,
+    identify,
+    clock,
     applying: apply.applying,
     applyDisabled: roomBusy,
     applicationsFor,
+    freshApplicationIds: conversation.projection.freshApplicationIds,
+    settlement: apply.settlement,
     onApply: apply.apply,
-    onAbandonApply: () => void abandonCurrentAction(),
     onAskAboutChange: askAboutChange,
     onReplyEmpty: replyEmpty,
     onReply: reply,
@@ -516,18 +598,31 @@ export function Conversation({
 
   return (
     <div className={styles.wrapper}>
+      <div className={styles.header}>
+        <span className={styles.headerOpening}>{opening}</span>
+        <span className={styles.headerSpacer} />
+        <div className={styles.headerControls}>
+          <button type="button" className={styles.headerControl} onClick={onOpenConversations}>
+            conversations
+          </button>
+          <button type="button" className={styles.headerControl} onClick={onOpenRoom}>
+            room
+          </button>
+        </div>
+      </div>
       <div className={styles.transcript}>
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
-        {conversation.projection.activity !== undefined && (
-          <DispatchFlight
-            activity={conversation.projection.activity}
-            displayName={displayName}
+        {pendingParticipants.map((participantId) => (
+          <ParticipantFlightLine
+            key={participantId}
+            participantId={participantId}
+            identify={identify}
+            state={activity?.states[participantId]}
             nowMs={nowMs}
-            onAbandon={() => void abandonCurrentAction()}
           />
-        )}
+        ))}
       </div>
       {(conversation.error ?? apply.error) !== undefined && (
         <p className={styles.error} role="alert">
@@ -543,6 +638,11 @@ export function Conversation({
       <form
         className={styles.composer}
         onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey || event.defaultPrevented) return
           event.preventDefault()
           submit()
         }}
@@ -597,9 +697,15 @@ export function Conversation({
         <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
           ask me
         </button>
-        <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-          send
-        </button>
+        {conversationActionInFlight ? (
+          <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
+            stop
+          </button>
+        ) : (
+          <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
+            send
+          </button>
+        )}
       </form>
     </div>
   )

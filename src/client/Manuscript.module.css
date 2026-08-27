@@ -13,27 +13,14 @@
   background: var(--prose);
 }
 
-/* Reading holds the conversation's width so that entering it moves no line of prose. */
-.wrapperReading {
-  margin-right: 520px;
-}
-
-.topBar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 52px;
-  flex: none;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--rule);
-  overflow: hidden;
-}
-
 .title {
   font: 500 13px/1 var(--font-ui);
   color: var(--ink);
   white-space: nowrap;
-  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
   background: none;
   border: none;
   border-radius: 3px;
@@ -77,18 +64,6 @@
   border-top: 1px solid var(--rule2);
 }
 
-/*
- * Stated whole or not at all: it is the only thing in the bar that could give way under pressure,
- * and truncating it leaves an ellipsis standing where a fact was, which says less than nothing.
- */
-.length {
-  flex: none;
-  font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
-  letter-spacing: .07em;
-  white-space: nowrap;
-}
-
 .applyingBanner {
   flex: none;
   display: flex;
@@ -102,7 +77,7 @@
 .applyingBannerFacts {
   flex: none;
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
 }
 
@@ -111,35 +86,19 @@
   color: var(--ink2);
 }
 
-.spacer {
-  flex: 1;
-  min-width: 6px;
-}
-
-.controls {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.applyingBannerAbandon {
   flex: none;
+  margin-left: auto;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--ink3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
-.controlsRule {
-  width: 1px;
-  height: 16px;
-  background: var(--rule);
-}
-
-.control {
-  composes: surface from './controls.module.css';
-}
-
-.viewControl {
-  composes: view from './controls.module.css';
-}
-
-.leave {
-  composes: surface from './controls.module.css';
-  flex: none;
+.applyingBannerAbandon:hover {
+  color: var(--ink);
 }
 
 .scroll {
@@ -153,7 +112,9 @@
 
 /* The top bar's height, added back as padding: the first line stays where the author left it. */
 .readingScroll {
+  box-sizing: border-box;
   padding-top: 90px;
+  margin-inline: auto;
 }
 
 .measure {
@@ -161,23 +122,24 @@
   max-width: 620px;
 }
 
+.readingTitle {
+  font: 500 27px/1.25 var(--font-prose);
+  color: var(--ink);
+  margin: 0 0 34px;
+}
+
 .wayBack {
   position: absolute;
   right: 26px;
   bottom: 22px;
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 8px 10px;
-  cursor: pointer;
   animation: dr-in .14s ease-out;
-}
-
-.wayBack:hover {
-  color: var(--ink2);
 }
 
 .source {
@@ -231,7 +193,7 @@
 
 .saveFailedStamp {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   white-space: nowrap;
 }
@@ -245,7 +207,7 @@
 
 .saveFailedCause {
   font: 400 10px/1.5 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   max-width: 220px;
   flex: none;

@@ -1,5 +1,5 @@
 import styles from './App.module.css'
-import { PiecesScreen } from './PiecesScreen.js'
+import { Studio } from './Studio.js'
 import { useWorkspace } from './useWorkspace.js'
 import { WorkspacePrompt } from './WorkspacePrompt.js'
 
@@ -17,7 +17,7 @@ export function App() {
       {workspace.status === 'unset' && (
         <WorkspacePrompt error={workspace.error} submitting={workspace.submitting} onSubmit={workspace.submit} />
       )}
-      {workspace.status === 'set' && <PiecesScreen workspace={workspace.workspace} />}
+      {workspace.status === 'set' && <Studio workspace={workspace.workspace} />}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 handle: interview
 displayName: Interviewer
 description: Asks one consequential question that clarifies what the author is trying to make.
+mark: IV
 eligibility: addressed-only
 function:
   name: interviewer

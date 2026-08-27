@@ -36,6 +36,7 @@ export const participantActivityEventSchema = z.object({
   actionId: z.string().min(1),
   participantId: z.string().min(1),
   state: z.enum(['preparing', 'working']),
+  startedAt: z.number().int().positive(),
   surface: surfaceIdSchema,
 })
 
@@ -65,13 +66,20 @@ export const conversationErrorEventSchema = z.object({ code: conversationFailure
 
 export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
 
+export const participantStateSchema = z.object({
+  state: z.enum(['preparing', 'working']),
+  startedAt: z.number().int().positive(),
+})
+
+export type ParticipantState = z.infer<typeof participantStateSchema>
+
 export const dispatchActivitySnapshotSchema = z.object({
   actionId: z.string().min(1),
   conversationId: z.string().min(1),
   kind: z.literal('dispatch'),
   sourceEntryId: z.string().min(1),
   audience: z.array(z.string().min(1)).readonly(),
-  states: z.record(z.string(), z.enum(['preparing', 'working'])),
+  states: z.record(z.string(), participantStateSchema),
   startedAt: z.number().int().positive(),
 })
 

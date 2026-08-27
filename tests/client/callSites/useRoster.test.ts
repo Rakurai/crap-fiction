@@ -5,9 +5,9 @@ import type { RequestResult } from '../../../src/client/request.js'
 import { useRoster } from '../../../src/client/useRoster.js'
 
 const SITES: readonly CallSiteAssignmentView[] = [
-  { site: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', assignment: null },
-  { site: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', assignment: null },
-  { site: 'apply', handle: null, displayName: 'Apply', description: 'z', assignment: null },
+  { site: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', ordinal: 0, assignment: null },
+  { site: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', mark: 'SE', ordinal: null, assignment: null },
+  { site: 'apply', handle: null, displayName: 'Apply', description: 'z', mark: null, ordinal: null, assignment: null },
 ]
 
 function fetchCallSites(): Promise<RequestResult<readonly CallSiteAssignmentView[]>> {
@@ -20,9 +20,8 @@ describe('useRoster', () => {
 
     await waitFor(() => expect(result.current.settled).toBe(true))
 
-    expect(result.current.displayName('shape')).toBe('Shape')
-    expect(result.current.handle('shape')).toBe('shape')
-    expect(result.current.handle('apply')).toBeUndefined()
-    expect(result.current.displayName('retired')).toBe('retired')
+    expect(result.current.identify('shape')).toEqual({ displayName: 'Shape', handle: 'shape', mark: 'SH', ordinal: 0 })
+    expect(result.current.identify('apply')).toEqual({ displayName: 'Apply', handle: undefined, mark: null, ordinal: null })
+    expect(result.current.identify('retired')).toEqual({ displayName: 'retired', handle: undefined, mark: null, ordinal: null })
   })
 })

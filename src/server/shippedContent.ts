@@ -100,6 +100,10 @@ export class ShippedContentCatalog {
     return this.#displayNames
   }
 
+  get markOrdinals(): ReadonlyMap<string, number> {
+    return this.#roster.markOrdinals
+  }
+
   specialistsFor(modeId: string, surface: SurfaceId): readonly RoleDefinition[] {
     return specialistsFor(this.#roster.specialists, modeId, surface)
   }

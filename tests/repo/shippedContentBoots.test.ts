@@ -45,6 +45,7 @@ describe('content a release must refuse', () => {
         'handle: shape',
         'displayName: Shape',
         'description: x',
+        'mark: SH',
         'eligibility: cast',
         'availability:',
         '  - mode: novella',
@@ -57,7 +58,7 @@ describe('content a release must refuse', () => {
     )
     writeFileSync(
       path.join(brokenRoot, 'participants', 'story-editor.md'),
-      ['---', 'handle: editor', 'displayName: Story Editor', 'description: y', 'eligibility: generalist', '---', 'reasons about y'].join('\n'),
+      ['---', 'handle: editor', 'displayName: Story Editor', 'description: y', 'mark: ED', 'eligibility: generalist', '---', 'reasons about y'].join('\n'),
       'utf8',
     )
 
@@ -73,7 +74,9 @@ describe('content a release must refuse', () => {
     mkdirSync(path.join(brokenRoot, 'participants'), { recursive: true })
     writeFileSync(
       path.join(brokenRoot, 'participants', 'shape.md'),
-      ['---', 'handle: shape', 'displayName: Shape', 'description: x', 'eligibility: cast', 'availability: []', '---', 'reasons about x'].join('\n'),
+      ['---', 'handle: shape', 'displayName: Shape', 'description: x', 'mark: SH', 'eligibility: cast', 'availability: []', '---', 'reasons about x'].join(
+        '\n',
+      ),
       'utf8',
     )
 

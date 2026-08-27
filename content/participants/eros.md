@@ -2,6 +2,7 @@
 handle: eros
 displayName: Eroticism
 description: Judges how desire, restraint, embodiment, agency, and intimacy create erotic charge.
+mark: ER
 eligibility: cast
 availability:
   - mode: flash
