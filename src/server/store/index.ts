@@ -196,6 +196,28 @@ export async function writePieceCast(workspaceDir: string, id: string, surface: 
   await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
 }
 
+/**
+ * Recording the entry for a dispatch and then durably bringing a specialist into the cast it
+ * names as one call: the entry lands before the cast change, so a process loss between the two
+ * writes can only leave an entry naming a cast change that never landed, never a cast gained for
+ * a dispatch that never happened. Each write is independently idempotent, so retrying the whole
+ * call is safe.
+ */
+export async function writeDispatchCause(
+  workspaceDir: string,
+  id: string,
+  surface: SurfaceId,
+  broughtCast: readonly string[] | undefined,
+  dataRoot: string,
+  scope: ConversationScope,
+  conversationId: string,
+  entries: ConversationEntryStore,
+  cause: ConversationEntry,
+): Promise<void> {
+  await entries.append(dataRoot, scope, conversationId, cause)
+  if (broughtCast !== undefined) await writePieceCast(workspaceDir, id, surface, broughtCast)
+}
+
 export async function writePieceDetails(
   workspaceDir: string,
   id: string,

@@ -38,7 +38,7 @@ import {
   readPiece,
   readStoryContext,
   writeApplication,
-  writePieceCast,
+  writeDispatchCause,
 } from '../store/index.js'
 import { computeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
@@ -416,9 +416,17 @@ export class Room {
 
     const written = (async () => {
       if (!this.#owns(roomScope, actionId)) return
-      if (brought.length > 0) await writePieceCast(workspaceDir, pieceId, roomScope.surface, [...enabledCast, ...brought])
-      if (!this.#owns(roomScope, actionId)) return
-      await this.#entries.append(this.#dataRoot, conversationScope, conversationId, cause)
+      await writeDispatchCause(
+        workspaceDir,
+        pieceId,
+        roomScope.surface,
+        brought.length > 0 ? [...enabledCast, ...brought] : undefined,
+        this.#dataRoot,
+        conversationScope,
+        conversationId,
+        this.#entries,
+        cause,
+      )
       this.#minted.delete(conversationId)
     })()
 
