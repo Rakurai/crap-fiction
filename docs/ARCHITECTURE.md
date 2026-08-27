@@ -620,7 +620,7 @@ any excerpting scheme is to specify, and excerpting would put a second inference
 **Conversation history is supplied by policy**, and the seam is the whole of the difference between
 the policies. **Shared history is the default**: a specialist sees the conversation as it happened —
 author messages, prior dispatches' participant responses, and the applications that changed the
-manuscript. **Stricter independence is the alternative** and filters other specialists' historical
+surface's document. **Stricter independence is the alternative** and filters other specialists' historical
 responses that the author did not act on, leaving author messages, applied recommendations and the
 participant's own prior responses. Which policy produces better collaboration is an empirical
 question, so switching between them must remain a configuration change rather than a redesign.

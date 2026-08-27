@@ -13,6 +13,7 @@ export const SHIPPED_HISTORY_POLICY: HistoryPolicy = 'shared'
 export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'response'; participant: string; claim: string; note: string | undefined }>
+  | Readonly<{ kind: 'application'; participant: string }>
 
 export type ParticipantEvidence = Readonly<{ participant: string; claim: string; note: string | undefined }>
 
@@ -53,16 +54,37 @@ function displayNameFor(participants: ReadonlyMap<string, string>, id: string): 
   return participants.get(id) ?? id
 }
 
+function respondingParticipantId(entries: readonly ConversationEntry[], responseId: string): string | undefined {
+  for (const entry of entries) {
+    if (entry.kind === 'participantResponse' && entry.id === responseId) return entry.participantId
+  }
+  return undefined
+}
+
+function applicationHistoryEntry(
+  entries: readonly ConversationEntry[],
+  responseId: string,
+  participants: ReadonlyMap<string, string>,
+): HistoryEntry {
+  const participantId = respondingParticipantId(entries, responseId)
+  return { kind: 'application', participant: displayNameFor(participants, participantId ?? responseId) }
+}
+
 function deriveHistory(
   entries: readonly ConversationEntry[] | undefined,
   policy: HistoryPolicy,
   roleId: string,
   participants: ReadonlyMap<string, string>,
 ): readonly HistoryEntry[] {
+  const all = entries ?? []
   const result: HistoryEntry[] = []
-  for (const entry of entries ?? []) {
+  for (const entry of all) {
     if (entry.kind === 'authorMessage') {
       result.push({ kind: 'message', text: entry.text })
+      continue
+    }
+    if (entry.kind === 'application') {
+      result.push(applicationHistoryEntry(all, entry.responseId, participants))
       continue
     }
     if (entry.kind !== 'participantResponse') continue
@@ -144,6 +166,7 @@ function fullHistory(entries: readonly ConversationEntry[], participants: Readon
     if (entry.kind === 'authorMessage') result.push({ kind: 'message', text: entry.text })
     else if (entry.kind === 'participantResponse')
       result.push({ kind: 'response', participant: displayNameFor(participants, entry.participantId), claim: entry.claim, note: entry.note })
+    else if (entry.kind === 'application') result.push(applicationHistoryEntry(entries, entry.responseId, participants))
   }
   return result
 }
@@ -194,15 +217,15 @@ function section(fragments: PromptFragments, name: SectionName, variable: string
   return renderFragment(fragments.sections[name], { [variable]: value.trim() })
 }
 
+function historyLine(fragments: PromptFragments, entry: HistoryEntry): string {
+  if (entry.kind === 'message') return renderFragment(fragments.lines.historyMessage, { text: entry.text })
+  if (entry.kind === 'application') return renderFragment(fragments.lines.historyApplication, { participant: entry.participant })
+  return renderFragment(fragments.lines.historyResponse, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) })
+}
+
 function historyLines(fragments: PromptFragments, history: readonly HistoryEntry[]): string | undefined {
   if (history.length === 0) return undefined
-  return history
-    .map((entry) =>
-      entry.kind === 'message'
-        ? renderFragment(fragments.lines.historyMessage, { text: entry.text })
-        : renderFragment(fragments.lines.historyResponse, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) }),
-    )
-    .join('\n')
+  return history.map((entry) => historyLine(fragments, entry)).join('\n')
 }
 
 function readingsLines(fragments: PromptFragments, evidence: readonly ParticipantEvidence[]): string | undefined {

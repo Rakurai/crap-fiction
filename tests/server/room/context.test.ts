@@ -135,6 +135,30 @@ const SHARED_HISTORY = [
   { kind: 'response', participant: 'Shape', claim: 'the entry is late', note: undefined },
 ]
 
+const entriesWithApplication: readonly ConversationEntry[] = [
+  { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
+  {
+    id: 'e2',
+    kind: 'participantResponse',
+    participantId: 'shape',
+    causeId: 'e1',
+    outcome: 'applicableSuggestion',
+    claim: 'cut the second paragraph',
+    note: 'it repeats the opening',
+  },
+  { id: 'e3', kind: 'application', responseId: 'e2', changeId: 'a-change-file-with-no-file-on-disk' },
+  { id: 'e4', kind: 'authorMessage', text: 'a later question', audience: [], brought: [] },
+  { id: 'e5', kind: 'participantResponse', participantId: 'compression', causeId: 'e4', outcome: 'commentary', claim: 'the ending still drags' },
+]
+
+const WHOLE_CONVERSATION_WITH_APPLICATION = [
+  { kind: 'message', text: 'first question' },
+  { kind: 'response', participant: 'Shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
+  { kind: 'application', participant: 'Shape' },
+  { kind: 'message', text: 'a later question' },
+  { kind: 'response', participant: 'Compression', claim: 'the ending still drags', note: undefined },
+]
+
 describe('compiling a context', () => {
   it('carries what the author and the studio supplied through untouched, whichever call is being made', () => {
     const forApply = compileApplyContext(
@@ -186,6 +210,27 @@ describe('compiling a context', () => {
   it('an apply reads the conversation whole, past any one response, and reports none where there is none yet', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
     expect(compileSpecialistContext(contextInput({ role: shape, message: 'a message' })).history).toEqual([])
+  })
+
+  it('carries an application in every history, naming the participant whose recommendation it was, and never a change file', () => {
+    const stricter: HistoryPolicy = 'stricter'
+
+    expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithApplication })).history).toEqual(
+      WHOLE_CONVERSATION_WITH_APPLICATION,
+    )
+    expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithApplication, policy: stricter })).history).toEqual([
+      { kind: 'message', text: 'first question' },
+      { kind: 'application', participant: 'Shape' },
+      { kind: 'message', text: 'a later question' },
+      { kind: 'response', participant: 'Compression', claim: 'the ending still drags', note: undefined },
+    ])
+    expect(compileApplyContext(applyContextInput({ entries: entriesWithApplication })).history).toEqual(WHOLE_CONVERSATION_WITH_APPLICATION)
+
+    // The change file's name reaches nowhere the history can leak it into a prompt.
+    const rendered = wholeOf(
+      renderApplyPrompt(compileApplyContext(applyContextInput({ entries: entriesWithApplication })), fragments),
+    )
+    expect(rendered).not.toContain('a-change-file-with-no-file-on-disk')
   })
 
   it("gives a specialist every prior message and substantive response under the shared policy, and under the stricter one only its own", () => {
