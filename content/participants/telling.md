@@ -2,6 +2,7 @@
 handle: telling
 displayName: Narrative Delivery
 description: Judges how viewpoint, access, order, distance, and omission present the chosen story.
+mark: ND
 eligibility: cast
 availability:
   - mode: flash

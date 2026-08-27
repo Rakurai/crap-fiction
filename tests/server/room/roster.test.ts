@@ -8,6 +8,7 @@ const SHAPE: RoleDefinition = {
   handle: 'shape',
   displayName: 'Shape',
   description: 'the shape of it',
+  mark: 'SH',
   persona: 'reasons about the shape of it',
   eligibility: 'cast',
   function: undefined,
@@ -21,6 +22,7 @@ const COMPRESSION: RoleDefinition = {
   handle: 'compression',
   displayName: 'Compression',
   description: 'what earns its space',
+  mark: 'CO',
   persona: 'reasons about what earns its space',
   eligibility: 'cast',
   function: undefined,
@@ -31,6 +33,7 @@ const EDITOR: RoleDefinition = {
   handle: 'editor',
   displayName: 'Story Editor',
   description: 'the judgment',
+  mark: 'ED',
   persona: 'reasons about the judgment',
   eligibility: 'generalist',
   function: undefined,
@@ -41,6 +44,7 @@ const TOOLSMITH: RoleDefinition = {
   handle: 'toolsmith',
   displayName: 'Toolsmith',
   description: 'a tool the author reaches for by name',
+  mark: 'TO',
   persona: 'reasons about the tool the author asked for',
   eligibility: 'addressed-only',
   function: undefined,
@@ -65,6 +69,20 @@ describe('resolving who is in the room', () => {
 
   it('refuses a role set in which no participant declares the interviewer function', () => {
     expect(() => resolveRoster([SHAPE, EDITOR, TOOLSMITH])).toThrowError(InterviewerNotInRosterError)
+  })
+})
+
+describe("assigning cast ordinals from the full roster's load order", () => {
+  it('gives every cast participant its position among the loaded roles, unmoved by which mode-and-surface view filters it out', () => {
+    const roster = resolveRoster([SHAPE, COMPRESSION, EDITOR, TOOLSMITH, INTERVIEWER_FIXTURE])
+
+    expect(roster.specialistOrdinals.get('shape')).toBe(0)
+    expect(roster.specialistOrdinals.get('compression')).toBe(1)
+
+    // Shape is unavailable for the authorContext surface, so this view excludes it — but that
+    // does not shift compression's recorded ordinal to fill the gap.
+    expect(specialistsFor(roster.specialists, 'flash', 'authorContext').map((role) => role.id)).toEqual(['compression'])
+    expect(roster.specialistOrdinals.get('compression')).toBe(1)
   })
 })
 

@@ -18,6 +18,8 @@ export const castMemberViewSchema = z
     handle: z.string(),
     displayName: z.string(),
     description: z.string(),
+    mark: z.string(),
+    ordinal: z.number(),
     enabled: z.boolean(),
   })
   .readonly()
@@ -28,6 +30,7 @@ export const storyEditorViewSchema = z
     handle: z.string(),
     displayName: z.string(),
     description: z.string(),
+    mark: z.string(),
   })
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>

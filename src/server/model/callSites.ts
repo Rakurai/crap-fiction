@@ -26,6 +26,8 @@ export type CallSiteDescriptor = Readonly<{
   handle: string | null
   displayName: string
   description: string
+  mark: string | null
+  ordinal: number | null
 }>
 
 /**
@@ -39,6 +41,8 @@ const OPERATIONS: readonly CallSiteDescriptor[] = [
     handle: null,
     displayName: 'Apply',
     description: 'Rewrites the passage a recommendation names, in the manuscript, in your prose rather than its own.',
+    mark: null,
+    ordinal: null,
   },
 ]
 
@@ -49,8 +53,17 @@ export function callSites(roles: readonly RoleDefinition[]): readonly CallSiteDe
     }
   }
 
+  const specialistIds = roles.filter((role) => role.eligibility === 'cast').map((role) => role.id)
+
   return [
-    ...roles.map((role) => ({ site: role.id, handle: role.handle, displayName: role.displayName, description: role.description })),
+    ...roles.map((role) => ({
+      site: role.id,
+      handle: role.handle,
+      displayName: role.displayName,
+      description: role.description,
+      mark: role.mark,
+      ordinal: role.eligibility === 'cast' ? specialistIds.indexOf(role.id) : null,
+    })),
     ...OPERATIONS,
   ]
 }

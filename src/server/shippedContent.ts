@@ -100,6 +100,11 @@ export class ShippedContentCatalog {
     return this.#displayNames
   }
 
+  /** Every cast participant's stable ordinal, by id — the full roster's load order, unaffected by any piece's enabled subset. */
+  get specialistOrdinals(): ReadonlyMap<string, number> {
+    return this.#roster.specialistOrdinals
+  }
+
   specialistsFor(modeId: string, surface: SurfaceId): readonly RoleDefinition[] {
     return specialistsFor(this.#roster.specialists, modeId, surface)
   }

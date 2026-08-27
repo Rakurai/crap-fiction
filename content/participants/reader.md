@@ -2,6 +2,7 @@
 handle: reader
 displayName: Reader Model
 description: Tracks what the reader knows, expects, questions, and is forced to reinterpret.
+mark: RM
 eligibility: cast
 availability:
   - mode: flash

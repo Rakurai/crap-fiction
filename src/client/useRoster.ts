@@ -5,6 +5,8 @@ export type RosterViewModel = Readonly<{
   settled: boolean
   displayName: (participantId: string) => string
   handle: (participantId: string) => string | undefined
+  mark: (participantId: string) => string | null
+  ordinal: (participantId: string) => number | null
 }>
 
 export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewModel {
@@ -15,5 +17,7 @@ export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewMo
     settled: sites.kind !== 'loading',
     displayName: (participantId) => named.find((site) => site.site === participantId)?.displayName ?? participantId,
     handle: (participantId) => named.find((site) => site.site === participantId)?.handle ?? undefined,
+    mark: (participantId) => named.find((site) => site.site === participantId)?.mark ?? null,
+    ordinal: (participantId) => named.find((site) => site.site === participantId)?.ordinal ?? null,
   }
 }

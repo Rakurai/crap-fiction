@@ -56,6 +56,8 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
       room={roomHolding(entries)}
       displayName={(id) => NAMES[id] ?? id}
       handle={(id) => HANDLE_BY_ID[id]}
+      mark={() => null}
+      ordinal={() => null}
       handles={HANDLES}
       interviewer={INTERVIEWER}
       runtime={{ reachable: true }}

@@ -19,6 +19,7 @@ const identity = {
   handle: z.string().regex(handlePattern, 'must be one lowercase token, distinct from the display name'),
   displayName: z.string().min(1),
   description: z.string().min(1),
+  mark: z.string().length(2, 'must be exactly two characters'),
 }
 
 /**
@@ -55,6 +56,7 @@ export type RoleDefinition = Readonly<{
   handle: string
   displayName: string
   description: string
+  mark: string
   persona: string
   eligibility: Eligibility
   availability: readonly AvailabilityEntry[]
@@ -89,6 +91,7 @@ export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): re
     handle: document.handle,
     displayName: document.displayName,
     description: document.description,
+    mark: document.mark,
     persona: document.persona,
     eligibility: document.eligibility,
     availability: document.eligibility === 'cast' ? document.availability : [],
@@ -97,11 +100,14 @@ export function loadRoles(contentRoot: string, modeIds: ReadonlySet<string>): re
 
   const seenIds = new Set<string>()
   const seenHandles = new Set<string>()
+  const seenMarks = new Set<string>()
   for (const role of roles) {
     if (seenIds.has(role.id)) refuse(role.id, `duplicate participant id "${role.id}"`)
     if (seenHandles.has(role.handle)) refuse(role.id, `duplicate handle "${role.handle}"`)
+    if (seenMarks.has(role.mark)) refuse(role.id, `duplicate mark "${role.mark}"`)
     seenIds.add(role.id)
     seenHandles.add(role.handle)
+    seenMarks.add(role.mark)
 
     const pairs = new Set<string>()
     for (const entry of role.availability) {

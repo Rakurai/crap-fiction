@@ -10,10 +10,11 @@ import {
 } from '../../../src/server/model/roles.js'
 import { ShippedDataError } from '../../../src/server/store/index.js'
 
-const STORY_EDITOR = '---\nhandle: editor\ndisplayName: Story Editor\ndescription: y\neligibility: generalist\n---\nReasons about the whole.\n'
+const STORY_EDITOR = '---\nhandle: editor\ndisplayName: Story Editor\ndescription: y\nmark: ED\neligibility: generalist\n---\nReasons about the whole.\n'
 
 function addressedOnlyParticipant(handle: string, declaration: string): string {
-  return `---\nhandle: ${handle}\ndisplayName: Asker\ndescription: z\neligibility: addressed-only\n${declaration}---\nAsks one question.\n`
+  const mark = handle.slice(0, 2).toUpperCase()
+  return `---\nhandle: ${handle}\ndisplayName: Asker\ndescription: z\nmark: ${mark}\neligibility: addressed-only\n${declaration}---\nAsks one question.\n`
 }
 
 const DECLARES_INTERVIEWER = `function:\n  name: ${INTERVIEWER_FUNCTION}\n  invocation: ask me a clarifying question\n`
@@ -21,7 +22,7 @@ const DECLARES_INTERVIEWER = `function:\n  name: ${INTERVIEWER_FUNCTION}\n  invo
 const INTERVIEWER = addressedOnlyParticipant('interview', DECLARES_INTERVIEWER)
 
 function castParticipant(availability: string): string {
-  return `---\nhandle: shape\ndisplayName: Shape\ndescription: Reasons about shape.\neligibility: cast\n${availability}---\nReasons about the entry, the turn and the close.\n`
+  return `---\nhandle: shape\ndisplayName: Shape\ndescription: Reasons about shape.\nmark: SH\neligibility: cast\n${availability}---\nReasons about the entry, the turn and the close.\n`
 }
 
 const AVAILABLE_IN_FLASH = 'availability:\n  - mode: flash\n    surface: draft\n    enabledByDefault: true\n'
@@ -53,6 +54,7 @@ describe('loadRoles', () => {
         handle: 'interview',
         displayName: 'Asker',
         description: 'z',
+        mark: 'IN',
         persona: 'Asks one question.',
         eligibility: 'addressed-only',
         availability: [],
@@ -63,6 +65,7 @@ describe('loadRoles', () => {
         handle: 'shape',
         displayName: 'Shape',
         description: 'Reasons about shape.',
+        mark: 'SH',
         persona: 'Reasons about the entry, the turn and the close.',
         eligibility: 'cast',
         availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
@@ -73,6 +76,7 @@ describe('loadRoles', () => {
         handle: 'editor',
         displayName: 'Story Editor',
         description: 'y',
+        mark: 'ED',
         persona: 'Reasons about the whole.',
         eligibility: 'generalist',
         availability: [],
@@ -133,6 +137,19 @@ describe('loadRoles', () => {
     writeParticipant('story-editor', STORY_EDITOR)
 
     expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/duplicate handle/)
+  })
+
+  it('fails startup naming the file when two participants declare the same mark', () => {
+    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
+    writeParticipant(
+      'compression',
+      '---\nhandle: compression\ndisplayName: Compression\ndescription: w\nmark: SH\neligibility: cast\n' +
+        AVAILABLE_IN_FLASH +
+        '---\nReasons about compression.\n',
+    )
+    writeParticipant('story-editor', STORY_EDITOR)
+
+    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/duplicate mark/)
   })
 
   it('fails startup naming the file when availability names a mode that did not load, or repeats a mode and surface', () => {

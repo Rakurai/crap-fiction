@@ -2,6 +2,7 @@
 handle: cause
 displayName: Causality
 description: Tracks whether consequential events arise from established conditions and prior action.
+mark: CA
 eligibility: cast
 availability:
   - mode: flash

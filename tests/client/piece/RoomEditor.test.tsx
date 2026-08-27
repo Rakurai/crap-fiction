@@ -4,14 +4,15 @@ import type { CastMemberView, StoryEditorView } from '../../../src/shared/pieceV
 import { RoomEditor } from '../../../src/client/RoomEditor.js'
 
 const MEMBERS: readonly CastMemberView[] = [
-  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
-  { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
+  { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
+  { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
 ]
 
 const STORY_EDITOR: StoryEditorView = {
   handle: 'editor',
   displayName: 'Story Editor',
   description: 'holds the whole of it',
+  mark: 'SE',
 }
 
 describe('editing the room', () => {

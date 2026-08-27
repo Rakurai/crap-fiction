@@ -78,8 +78,10 @@
   color: var(--ink);
 }
 
+/* Interface-italic is the marker for a conversation's own name. */
 .opening {
-  font: 400 13px/1.35 var(--font-prose);
+  font: 400 13px/1.35 var(--font-ui);
+  font-style: italic;
   color: var(--ink2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,7 +90,7 @@
 
 .when {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .06em;
 }
 
@@ -107,20 +109,21 @@
   opacity: 1;
 }
 
+/* The deliberate one of the pair is bordered; the one that dismisses it is plain. */
 .confirmDelete {
-  composes: destructive from './controls.module.css';
+  composes: surface from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }
 
 .keep {
-  composes: surface from './controls.module.css';
+  composes: view from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }
 
 .error {
   font: 400 11px/1.4 var(--font-ui);
-  color: var(--danger);
+  color: var(--ink2);
   margin-top: 10px;
 }

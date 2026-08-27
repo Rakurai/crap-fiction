@@ -10,7 +10,7 @@
 
 .label {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .08em;
   text-transform: uppercase;
   flex: none;

@@ -53,6 +53,7 @@ const specialists: readonly RoleDefinition[] = [
     handle: 'shape',
     displayName: 'Shape',
     description: 'the shape of it',
+    mark: 'SH',
     persona: 'reasons about the shape of it',
     eligibility: 'cast',
     function: undefined,
@@ -63,6 +64,7 @@ const specialists: readonly RoleDefinition[] = [
     handle: 'comp',
     displayName: 'Compression',
     description: 'what earns its space',
+    mark: 'CO',
     persona: 'reasons about what earns its space',
     eligibility: 'cast',
     function: undefined,
@@ -79,6 +81,7 @@ const storyEditor: RoleDefinition = {
   function: undefined,
   displayName: 'Story Editor',
   description: 'holds the whole of it',
+  mark: 'SE',
   persona: 'reasons about the whole of it',
   availability: [],
 }
@@ -176,8 +179,8 @@ describe('pieces', () => {
     const created = await createPiece(workspaceDir, 'Cups', flash.id, catalogFor([flash]))
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
     const cast = [
-      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: true },
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: true },
     ]
     expect(opened).toEqual({
       ...created,
@@ -186,7 +189,7 @@ describe('pieces', () => {
         storyContext: { text: '', referenceSchema: flash.storyContextReference, currentConversationId: null, conversations: [], cast: [] },
         authorContext: { text: '', referenceSchema: AUTHOR_CONTEXT_REFERENCE_FIXTURE, currentConversationId: null, conversations: [], cast: [] },
       },
-      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it' },
+      storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
       interviewer: {
         handle: interviewer.role.handle,
         displayName: interviewer.role.displayName,
@@ -226,6 +229,7 @@ describe('pieces', () => {
       handle: 'archivist',
       displayName: 'Archivist',
       description: 'keeps the notes that outlast any one piece',
+      mark: 'AR',
       persona: 'reasons about the notes that outlast any one piece',
       eligibility: 'cast',
       function: undefined,
@@ -298,8 +302,8 @@ describe('setPieceCast', () => {
     const disabled = await setPieceCast(workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape'])
 
     expect(disabled).toEqual([
-      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', enabled: false },
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
+      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
     ])
     expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash])).surfaces.draft.cast).toEqual(disabled)
 

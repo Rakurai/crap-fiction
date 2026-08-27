@@ -39,7 +39,7 @@ const PIECE: PieceDetail = {
       cast: [],
     },
   },
-  storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+  storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole', mark: 'SE' },
   interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
 }
 

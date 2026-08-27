@@ -22,7 +22,7 @@ function roomHolding(): RoomAdapters {
   })
 }
 
-const ROSTER = { settled: true, displayName: (id: string) => id, handle: () => undefined }
+const ROSTER = { settled: true, displayName: (id: string) => id, handle: () => undefined, mark: () => null, ordinal: () => null }
 
 const BASE_PROPS = {
   pieceId: 'the-lighthouse',
@@ -33,7 +33,7 @@ const BASE_PROPS = {
   initialConversationId: null,
   initialCast: [],
   initialConversations: [],
-  storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole' },
+  storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole', mark: 'SE' },
   interviewer: { handle: 'interview', displayName: 'Interviewer', description: 'asks one question', invocation: 'ask me a clarifying question' },
   room: roomHolding(),
   pieceAdapters: {

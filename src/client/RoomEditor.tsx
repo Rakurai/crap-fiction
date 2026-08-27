@@ -1,5 +1,6 @@
 import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import { machineWords } from './facts.js'
+import { Mark } from './Mark.js'
 import styles from './RoomEditor.module.css'
 import { Scrim } from './Scrim.js'
 
@@ -29,6 +30,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
           {members.map((member) => (
             <li key={member.id} className={styles.item}>
               <div className={styles.identity}>
+                <Mark mark={member.mark} ordinal={member.ordinal} />
                 <span className={styles.handle}>@{member.handle}</span>
                 <span className={styles.name}>{member.displayName}</span>
                 {/* Present is the panel's own premise, so only absence is stamped. */}
@@ -48,6 +50,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
           {/* The room is the cast and the Story Editor. It is here because it is always here. */}
           <li className={styles.item}>
             <div className={styles.identity}>
+              <Mark mark={storyEditor.mark} ordinal={null} />
               <span className={styles.handle}>@{storyEditor.handle}</span>
               <span className={styles.name}>{storyEditor.displayName}</span>
             </div>

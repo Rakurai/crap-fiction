@@ -11,6 +11,7 @@ function participantFrontmatter(
     handle: string
     displayName: string
     description: string
+    mark: string
     eligibility: string
     availability?: readonly Availability[]
     function?: Readonly<{ name: string; invocation: string }>
@@ -61,6 +62,7 @@ function buildFixtureRoot(): string {
         handle: 'shape',
         displayName: 'Shape',
         description: 'the shape of it',
+        mark: 'SH',
         eligibility: 'cast',
         availability: [
           { mode: 'flash', surface: 'draft', enabledByDefault: true },
@@ -78,6 +80,7 @@ function buildFixtureRoot(): string {
         handle: 'reader',
         displayName: 'Reader',
         description: 'how it reads',
+        mark: 'RE',
         eligibility: 'cast',
         availability: [{ mode: 'flash', surface: 'storyContext', enabledByDefault: true }],
       },
@@ -88,7 +91,7 @@ function buildFixtureRoot(): string {
   writeFileSync(
     path.join(participantsDir, 'archivist.md'),
     participantFrontmatter(
-      { handle: 'archivist', displayName: 'Archivist', description: 'the notes that outlast a piece', eligibility: 'addressed-only' },
+      { handle: 'archivist', displayName: 'Archivist', description: 'the notes that outlast a piece', mark: 'AR', eligibility: 'addressed-only' },
       'reasons about the notes that outlast a piece',
     ),
     'utf8',
@@ -100,6 +103,7 @@ function buildFixtureRoot(): string {
         handle: 'interviewer',
         displayName: 'Interviewer',
         description: 'asks the author what only the author knows',
+        mark: 'IV',
         eligibility: 'addressed-only',
         function: { name: 'interviewer', invocation: 'ask me a clarifying question' },
       },
@@ -110,7 +114,7 @@ function buildFixtureRoot(): string {
   writeFileSync(
     path.join(participantsDir, 'story-editor.md'),
     participantFrontmatter(
-      { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', eligibility: 'generalist' },
+      { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE', eligibility: 'generalist' },
       'reasons about the whole of it',
     ),
     'utf8',

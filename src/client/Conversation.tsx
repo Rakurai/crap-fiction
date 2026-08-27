@@ -10,6 +10,7 @@ import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
 import { elapsed, facts, machineWords, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
+import { Mark } from './Mark.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplyingResponse } from './useApply.js'
 import { useNow } from './useNow.js'
@@ -30,6 +31,8 @@ type ConversationProps = {
   readonly room: RoomAdapters
   readonly displayName: (participantId: string) => string
   readonly handle: (participantId: string) => string | undefined
+  readonly mark: (participantId: string) => string | null
+  readonly ordinal: (participantId: string) => number | null
   readonly handles: readonly HandleEntry[]
   /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
   readonly interviewer: InterviewerView
@@ -204,6 +207,8 @@ const EMPTY_APPLICATIONS: readonly ApplicationEntryView[] = []
 type EntryActions = Readonly<{
   displayName: (id: string) => string
   handle: (id: string) => string | undefined
+  mark: (id: string) => string | null
+  ordinal: (id: string) => number | null
   applying: ApplyingResponse | undefined
   applyDisabled: boolean
   applicationsFor: (responseId: string) => readonly ApplicationEntryView[]
@@ -215,9 +220,20 @@ type EntryActions = Readonly<{
   onAsk: (responseId: string, clarification: string | undefined) => void
 }>
 
-function ParticipantIdentity({ name, handle }: { readonly name: string; readonly handle: string | undefined }) {
+function ParticipantIdentity({
+  name,
+  handle,
+  mark,
+  ordinal,
+}: {
+  readonly name: string
+  readonly handle: string | undefined
+  readonly mark: string | null
+  readonly ordinal: number | null
+}) {
   return (
     <div className={styles.identity}>
+      <Mark mark={mark} ordinal={ordinal} />
       {handle !== undefined && <span className={styles.handle}>@{handle}</span>}
       <span className={styles.name}>{name}</span>
     </div>
@@ -255,8 +271,21 @@ function Claim({ text }: { readonly text: string }) {
 }
 
 function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; readonly actions: EntryActions }) {
-  const { displayName, handle, applying, applyDisabled, applicationsFor, onApply, onAbandonApply, onAskAboutChange, onReplyEmpty, onReply, onAsk } =
-    actions
+  const {
+    displayName,
+    handle,
+    mark,
+    ordinal,
+    applying,
+    applyDisabled,
+    applicationsFor,
+    onApply,
+    onAbandonApply,
+    onAskAboutChange,
+    onReplyEmpty,
+    onReply,
+    onAsk,
+  } = actions
 
   switch (entry.kind) {
     case 'authorMessage':
@@ -279,14 +308,24 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'participantNoComment':
       return (
         <div className={styles.noComment}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <ParticipantIdentity
+            name={displayName(entry.participantId)}
+            handle={handle(entry.participantId)}
+            mark={mark(entry.participantId)}
+            ordinal={ordinal(entry.participantId)}
+          />
           <p className={styles.noCommentWords}>has no comment.</p>
         </div>
       )
     case 'participantFailure':
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <ParticipantIdentity
+            name={displayName(entry.participantId)}
+            handle={handle(entry.participantId)}
+            mark={mark(entry.participantId)}
+            ordinal={ordinal(entry.participantId)}
+          />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
           <ResponseActions
@@ -307,7 +346,12 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       const applications = applicationsFor(entry.id)
       return (
         <div className={styles.participant}>
-          <ParticipantIdentity name={displayName(entry.participantId)} handle={handle(entry.participantId)} />
+          <ParticipantIdentity
+            name={displayName(entry.participantId)}
+            handle={handle(entry.participantId)}
+            mark={mark(entry.participantId)}
+            ordinal={ordinal(entry.participantId)}
+          />
           <Claim text={entry.claim} />
           {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
           {applications.map((application) => (
@@ -382,6 +426,8 @@ export function Conversation({
   room,
   displayName,
   handle,
+  mark,
+  ordinal,
   handles,
   interviewer,
   runtime,
@@ -503,6 +549,8 @@ export function Conversation({
   const actions: EntryActions = {
     displayName,
     handle,
+    mark,
+    ordinal,
     applying: apply.applying,
     applyDisabled: roomBusy,
     applicationsFor,

@@ -2,6 +2,7 @@
 handle: continuity
 displayName: Continuity
 description: Tracks consequential facts, knowledge, relationships, and commitments across long spans.
+mark: CN
 eligibility: cast
 availability: []
 ---

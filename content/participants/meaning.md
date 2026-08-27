@@ -2,6 +2,7 @@
 handle: meaning
 displayName: Thematic Coherence
 description: Judges whether choices and consequences embody the concern the author intends to explore.
+mark: TC
 eligibility: cast
 availability:
   - mode: flash

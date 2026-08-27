@@ -195,6 +195,8 @@ function MountedSurface({
           room={room}
           displayName={roster.displayName}
           handle={roster.handle}
+          mark={roster.mark}
+          ordinal={roster.ordinal}
           handles={handles}
           interviewer={interviewer}
           runtime={runtime}

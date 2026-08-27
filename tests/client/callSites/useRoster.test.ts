@@ -5,9 +5,9 @@ import type { RequestResult } from '../../../src/client/request.js'
 import { useRoster } from '../../../src/client/useRoster.js'
 
 const SITES: readonly CallSiteAssignmentView[] = [
-  { site: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', assignment: null },
-  { site: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', assignment: null },
-  { site: 'apply', handle: null, displayName: 'Apply', description: 'z', assignment: null },
+  { site: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', ordinal: 0, assignment: null },
+  { site: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', mark: 'SE', ordinal: null, assignment: null },
+  { site: 'apply', handle: null, displayName: 'Apply', description: 'z', mark: null, ordinal: null, assignment: null },
 ]
 
 function fetchCallSites(): Promise<RequestResult<readonly CallSiteAssignmentView[]>> {

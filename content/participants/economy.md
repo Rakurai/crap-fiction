@@ -2,6 +2,7 @@
 handle: economy
 displayName: Economy
 description: Judges whether the story earns the limited space it spends at its form and scale.
+mark: EC
 eligibility: cast
 availability:
   - mode: flash

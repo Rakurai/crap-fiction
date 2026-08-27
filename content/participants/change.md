@@ -2,6 +2,7 @@
 handle: change
 displayName: Change
 description: Judges whether the story's units produce meaningful progression, reversal, and payoff.
+mark: CH
 eligibility: cast
 availability:
   - mode: flash

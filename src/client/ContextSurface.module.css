@@ -41,7 +41,7 @@
 .applyingBannerFacts {
   flex: none;
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
 }
 
@@ -113,7 +113,7 @@
 
 .referenceSummary {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   cursor: pointer;
 }
@@ -137,7 +137,7 @@
 
 .saveFailedStamp {
   font: 400 10px/1 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   white-space: nowrap;
 }
@@ -151,7 +151,7 @@
 
 .saveFailedCause {
   font: 400 10px/1.5 var(--font-facts);
-  color: var(--facts-ink);
+  color: var(--ink4);
   letter-spacing: .07em;
   max-width: 220px;
   flex: none;
