@@ -49,8 +49,12 @@ export function readSettingsSection<T>(dataRoot: string, section: SettingsSectio
   return settings?.[section]
 }
 
-export async function writeSettingsSection(dataRoot: string, section: SettingsSection, value: unknown): Promise<void> {
-  await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
+export class SettingsStore {
+  readonly #lock = new Mutex()
+
+  async writeSection(dataRoot: string, section: SettingsSection, value: unknown): Promise<void> {
+    await this.#lock.runExclusive(() => writeYamlArtifact(settingsFile(dataRoot), { [section]: value }))
+  }
 }
 
 const CONFIG_DIR = 'config'
@@ -159,12 +163,24 @@ export function readPiece(workspaceDir: string, id: string): StoredPiece | undef
   }
 }
 
-export async function writePieceMetadata(
-  workspaceDir: string,
-  id: string,
-  metadata: PieceMetadata,
-): Promise<void> {
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata })
+export class PieceMetadataStore {
+  readonly #lock = new Mutex()
+
+  async write(workspaceDir: string, id: string, metadata: PieceMetadata): Promise<void> {
+    await this.#lock.runExclusive(() => writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata }))
+  }
+
+  async writeCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } }),
+    )
+  }
+
+  async writeDetails(workspaceDir: string, id: string, patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>): Promise<void> {
+    const values: Record<string, unknown> = {}
+    if (patch.title !== undefined) values.title = patch.title
+    await this.#lock.runExclusive(() => writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values))
+  }
 }
 
 export class DraftStore {
@@ -190,42 +206,6 @@ export class AuthorContextStore {
   async write(dataRoot: string, text: string): Promise<void> {
     await this.#lock.runExclusive(() => writeAuthorContext(dataRoot, text))
   }
-}
-
-export async function writePieceCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
-}
-
-/**
- * Recording the entry for a dispatch and then durably bringing a specialist into the cast it
- * names as one call: the entry lands before the cast change, so a process loss between the two
- * writes can only leave an entry naming a cast change that never landed, never a cast gained for
- * a dispatch that never happened. Each write is independently idempotent, so retrying the whole
- * call is safe.
- */
-export async function writeDispatchCause(
-  workspaceDir: string,
-  id: string,
-  surface: SurfaceId,
-  broughtCast: readonly string[] | undefined,
-  dataRoot: string,
-  scope: ConversationScope,
-  conversationId: string,
-  entries: ConversationEntryStore,
-  cause: ConversationEntry,
-): Promise<void> {
-  await entries.append(dataRoot, scope, conversationId, cause)
-  if (broughtCast !== undefined) await writePieceCast(workspaceDir, id, surface, broughtCast)
-}
-
-export async function writePieceDetails(
-  workspaceDir: string,
-  id: string,
-  patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>,
-): Promise<void> {
-  const values: Record<string, unknown> = {}
-  if (patch.title !== undefined) values.title = patch.title
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
 }
 
 type ScopedNamespace = 'conversations' | 'changes'
@@ -287,6 +267,19 @@ export class ConversationEntryStore {
       await writeJsonArtifact(file, next)
     })
   }
+}
+
+export async function writeDispatchCause(
+  entries: ConversationEntryStore,
+  pieceMetadata: PieceMetadataStore,
+  dataRoot: string,
+  scope: ConversationScope,
+  conversationId: string,
+  cause: ConversationEntry,
+  cast: Readonly<{ workspaceDir: string; pieceId: string; surface: SurfaceId; members: readonly string[] }> | undefined,
+): Promise<void> {
+  await entries.append(dataRoot, scope, conversationId, cause)
+  if (cast !== undefined) await pieceMetadata.writeCast(cast.workspaceDir, cast.pieceId, cast.surface, cast.members)
 }
 
 /**

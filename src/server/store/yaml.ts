@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import path from 'node:path'
-import { Mutex } from 'async-mutex'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
@@ -104,23 +103,11 @@ function setPaths(document: Document, prefix: readonly string[], values: Record<
   }
 }
 
-const yamlLocks = new Map<string, Mutex>()
-
-function lockFor(filePath: string): Mutex {
-  const existing = yamlLocks.get(filePath)
-  if (existing !== undefined) return existing
-  const lock = new Mutex()
-  yamlLocks.set(filePath, lock)
-  return lock
-}
-
 export async function writeYamlArtifact(filePath: string, values: Record<string, unknown>): Promise<void> {
-  await lockFor(filePath).runExclusive(async () => {
-    const document = existsSync(filePath) ? parseDocument(readFileSync(filePath, 'utf8')) : new Document({})
-    setPaths(document, [], values)
-    mkdirSync(path.dirname(filePath), { recursive: true })
-    await writeFileAtomic(filePath, document.toString())
-  })
+  const document = existsSync(filePath) ? parseDocument(readFileSync(filePath, 'utf8')) : new Document({})
+  setPaths(document, [], values)
+  mkdirSync(path.dirname(filePath), { recursive: true })
+  await writeFileAtomic(filePath, document.toString())
 }
 
 function parseShippedYaml<T>(filePath: string, schema: z.ZodType<T>): T {

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ConversationScope } from '../../../src/server/scope.js'
 import {
@@ -11,6 +11,8 @@ import {
   deleteConversation,
   mostRecentConversationId,
   PathEscapesRootError,
+  PieceMetadataStore,
+  SettingsStore,
   TolerantReadError,
   readAuthorContext,
   readConversationEntries,
@@ -19,15 +21,14 @@ import {
   readStoryContext,
   resolveWorkspaceDirectory,
   writeAuthorContext,
-  writePieceCast,
-  writePieceDetails,
-  writePieceMetadata,
-  writeSettingsSection,
+  writeDispatchCause,
   writeStoryContext,
 } from '../../../src/server/store/index.js'
 import type { ConversationEntry } from '../../../src/shared/conversationEntries.js'
 
 const CUPS = { title: 'Cups', mode: 'flash', cast: { draft: ['shape'], storyContext: [], authorContext: [] } }
+const pieceMetadata = new PieceMetadataStore()
+const settings = new SettingsStore()
 
 describe('the settings file', () => {
   let dataRoot: string
@@ -48,7 +49,7 @@ describe('the settings file', () => {
     mkdirSync(path.dirname(settingsPath()), { recursive: true })
     writeFileSync(settingsPath(), '# author notes\nworkspace: old-path\nunknown-to-schema: kept\n', 'utf8')
 
-    await writeSettingsSection(dataRoot, 'workspace', 'new-path')
+    await settings.writeSection(dataRoot, 'workspace', 'new-path')
 
     const text = readFileSync(settingsPath(), 'utf8')
     expect(text).toContain('# author notes')
@@ -58,16 +59,26 @@ describe('the settings file', () => {
   })
 
   it('reads an absent optional section as empty rather than as absent', async () => {
-    await writeSettingsSection(dataRoot, 'workspace', 'my-writing')
+    await settings.writeSection(dataRoot, 'workspace', 'my-writing')
 
     const schema = z.object({ theme: z.enum(['light', 'dark']).optional() })
     expect(readSettingsSection(dataRoot, 'interfacePreferences', schema)).toEqual({})
   })
 
   it('sets one section and leaves the others as they stood', async () => {
-    await writeSettingsSection(dataRoot, 'workspace', 'my-writing')
-    await writeSettingsSection(dataRoot, 'modelAssignments', { shape: 'a-model' })
-    await writeSettingsSection(dataRoot, 'interfacePreferences', { theme: 'dark' })
+    await settings.writeSection(dataRoot, 'workspace', 'my-writing')
+    await settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' })
+    await settings.writeSection(dataRoot, 'interfacePreferences', { theme: 'dark' })
+
+    expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
+    expect(readSettingsSection(dataRoot, 'modelAssignments', z.record(z.string(), z.string()))).toEqual({ shape: 'a-model' })
+  })
+
+  it('serializes two concurrent writers of the same file, so neither discards the other', async () => {
+    await Promise.all([
+      settings.writeSection(dataRoot, 'workspace', 'my-writing'),
+      settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' }),
+    ])
 
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readSettingsSection(dataRoot, 'modelAssignments', z.record(z.string(), z.string()))).toEqual({ shape: 'a-model' })
@@ -82,7 +93,7 @@ describe('the tolerant reader', () => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
     workspaceDir = path.join(dataRoot, 'my-writing')
     mkdirSync(workspaceDir, { recursive: true })
-    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -156,7 +167,7 @@ describe('path containment', () => {
     expect(readPiece(workspaceDir, '../../etc')).toBeUndefined()
     expect(readStoryContext(workspaceDir, '../../etc')).toBeUndefined()
 
-    await expect(writePieceMetadata(workspaceDir, '../../etc', CUPS)).rejects.toThrowError(PathEscapesRootError)
+    await expect(pieceMetadata.write(workspaceDir, '../../etc', CUPS)).rejects.toThrowError(PathEscapesRootError)
     await expect(writeStoryContext(workspaceDir, '../../etc', 'Premise: x\n')).rejects.toThrowError(PathEscapesRootError)
     await expect(new DraftStore().write(workspaceDir, '../../escaped', 'text')).rejects.toThrowError(PathEscapesRootError)
   })
@@ -191,7 +202,7 @@ describe('path containment', () => {
     const linked = path.join(dataRoot, 'linked-workspace')
     symlinkSync(real, linked)
 
-    await writePieceMetadata(linked, 'cups', CUPS)
+    await pieceMetadata.write(linked, 'cups', CUPS)
 
     expect(readPiece(linked, 'cups')?.metadata).toEqual(CUPS)
     expect(existsSync(path.join(real, 'cups', 'piece.yaml'))).toBe(true)
@@ -221,7 +232,7 @@ describe("a piece's metadata", () => {
 
   beforeEach(async () => {
     workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
-    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -229,16 +240,16 @@ describe("a piece's metadata", () => {
   })
 
   it('sets only the entry a write names, leaving the piece as it otherwise stood', async () => {
-    await writePieceCast(workspaceDir, 'cups', 'draft', ['shape', 'compression'])
+    await pieceMetadata.writeCast(workspaceDir, 'cups', 'draft', ['shape', 'compression'])
     expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({ ...CUPS, cast: { ...CUPS.cast, draft: ['shape', 'compression'] } })
 
-    await writePieceDetails(workspaceDir, 'cups', { title: 'The Cups' })
+    await pieceMetadata.writeDetails(workspaceDir, 'cups', { title: 'The Cups' })
     expect(readPiece(workspaceDir, 'cups')?.metadata).toEqual({ ...CUPS, title: 'The Cups', cast: { ...CUPS.cast, draft: ['shape', 'compression'] } })
   })
 
   it('holds each surface\'s cast independently, so writing one leaves the others untouched', async () => {
-    await writePieceCast(workspaceDir, 'cups', 'storyContext', ['compression'])
-    await writePieceCast(workspaceDir, 'cups', 'authorContext', ['interiority'])
+    await pieceMetadata.writeCast(workspaceDir, 'cups', 'storyContext', ['compression'])
+    await pieceMetadata.writeCast(workspaceDir, 'cups', 'authorContext', ['interiority'])
 
     expect(readPiece(workspaceDir, 'cups')?.metadata.cast).toEqual({
       draft: ['shape'],
@@ -256,7 +267,7 @@ describe('the context documents', () => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
     workspaceDir = path.join(dataRoot, 'my-writing')
     mkdirSync(workspaceDir, { recursive: true })
-    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -298,7 +309,7 @@ describe('a conversation', () => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
     workspaceDir = path.join(dataRoot, 'my-writing')
     mkdirSync(workspaceDir, { recursive: true })
-    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {
@@ -331,6 +342,22 @@ describe('a conversation', () => {
     await Promise.all([store.append(dataRoot, scope(), 'c1', authorMessage), store.append(dataRoot, scope(), 'c1', response)])
 
     expect(readConversationEntries(dataRoot, scope(), 'c1')).toEqual({ id: 'c1', entries: [authorMessage, response] })
+  })
+
+  it('writes no cast change when the cause entry fails to append, because the entry is written first', async () => {
+    const entries = new ConversationEntryStore()
+    vi.spyOn(entries, 'append').mockRejectedValue(new Error('append failed'))
+
+    await expect(
+      writeDispatchCause(entries, pieceMetadata, dataRoot, scope(), 'c1', authorMessage, {
+        workspaceDir,
+        pieceId: 'cups',
+        surface: 'draft',
+        members: ['shape', 'compression'],
+      }),
+    ).rejects.toThrow('append failed')
+
+    expect(readPiece(workspaceDir, 'cups')?.metadata.cast.draft).toEqual(['shape'])
   })
 
   it('reports every conversation a piece holds with its last activity, and the most recently written one as the most recent', async () => {
@@ -384,7 +411,7 @@ describe("a piece's draft", () => {
 
   beforeEach(async () => {
     workspaceDir = mkdtempSync(path.join(tmpdir(), 'studio-workspace-'))
-    await writePieceMetadata(workspaceDir, 'cups', CUPS)
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
   })
 
   afterEach(() => {

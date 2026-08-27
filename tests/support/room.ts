@@ -8,7 +8,7 @@ import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { HistoryPolicy } from '../../src/server/room/context.js'
 import { Room } from '../../src/server/room/room.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
-import { ConversationEntryStore } from '../../src/server/store/index.js'
+import { ConversationEntryStore, PieceMetadataStore } from '../../src/server/store/index.js'
 
 export type RoomSpec = Readonly<{
   modes: readonly ModeDescriptor[]
@@ -29,5 +29,5 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     fragments: spec.fragments,
     authorContextReference: spec.authorContextReference,
   })
-  return new Room(spec.modelAccess, new ConversationEntryStore(), dataRoot, catalog, spec.policy, createLogger('silent'), spec.now)
+  return new Room(spec.modelAccess, new ConversationEntryStore(), new PieceMetadataStore(), dataRoot, catalog, spec.policy, createLogger('silent'), spec.now)
 }

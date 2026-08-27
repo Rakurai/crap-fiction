@@ -32,6 +32,7 @@ import { RouteFailure } from '../routeFailure.js'
 import { conversationScopeFor, roomScopeKey, type ConversationScope, type RoomScope } from '../scope.js'
 import {
   ConversationEntryStore,
+  PieceMetadataStore,
   readAppliedChanges,
   readAuthorContext,
   readConversationEntries,
@@ -180,6 +181,7 @@ function findResponse(
 export class Room {
   readonly #modelAccess: ModelAccess
   readonly #entries: ConversationEntryStore
+  readonly #pieceMetadata: PieceMetadataStore
   readonly #dataRoot: string
   readonly #logger: Logger
   readonly #now: Clock
@@ -193,6 +195,7 @@ export class Room {
   constructor(
     modelAccess: ModelAccess,
     entries: ConversationEntryStore,
+    pieceMetadata: PieceMetadataStore,
     dataRoot: string,
     catalog: ShippedContentCatalog,
     policy: HistoryPolicy,
@@ -201,6 +204,7 @@ export class Room {
   ) {
     this.#modelAccess = modelAccess
     this.#entries = entries
+    this.#pieceMetadata = pieceMetadata
     this.#dataRoot = dataRoot
     this.#logger = logger
     this.#now = now
@@ -417,15 +421,13 @@ export class Room {
     const written = (async () => {
       if (!this.#owns(roomScope, actionId)) return
       await writeDispatchCause(
-        workspaceDir,
-        pieceId,
-        roomScope.surface,
-        brought.length > 0 ? [...enabledCast, ...brought] : undefined,
+        this.#entries,
+        this.#pieceMetadata,
         this.#dataRoot,
         conversationScope,
         conversationId,
-        this.#entries,
         cause,
+        brought.length > 0 ? { workspaceDir, pieceId, surface: roomScope.surface, members: [...enabledCast, ...brought] } : undefined,
       )
       this.#minted.delete(conversationId)
     })()

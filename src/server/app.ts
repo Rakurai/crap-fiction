@@ -10,7 +10,7 @@ import type { InterfaceTheme } from './interfaceTheme.js'
 import type { CallSiteAssignments } from './model/assignments.js'
 import type { ModelAccess } from './model/types.js'
 import { originGuard } from './originGuard.js'
-import { createPiece, listPieces, type PieceDocumentWriter, type PieceStore } from './pieces.js'
+import { listPieces, type PieceDocumentWriter, type PieceStore } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
 import type { Room } from './room/room.js'
 import { RouteFailure, statusFor } from './routeFailure.js'
@@ -74,7 +74,7 @@ export function createApp(
 
   app.post('/pieces', body(postPieceSchema), async (c) => {
     const { title, mode } = c.req.valid('json')
-    const piece = await createPiece(workspace.require(), title, mode, catalog)
+    const piece = await pieceStore.create(workspace.require(), title, mode, catalog)
     return c.json(ok(piece))
   })
 

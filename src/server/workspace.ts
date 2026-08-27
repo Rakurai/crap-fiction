@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { RouteFailure } from './routeFailure.js'
-import { PathEscapesRootError, readSettingsSection, resolveWorkspaceDirectory, settingsFile, writeSettingsSection } from './store/index.js'
+import { PathEscapesRootError, readSettingsSection, resolveWorkspaceDirectory, settingsFile, type SettingsStore } from './store/index.js'
 
 export class WorkspaceOutsideRootError extends RouteFailure {
   constructor(dataRoot: string, candidate: string) {
@@ -38,14 +38,15 @@ function containedWorkspace(dataRoot: string, candidate: string): string {
 
 export class WorkspaceRegistry {
   readonly #dataRoot: string
+  readonly #settings: SettingsStore
   #workspace: string | undefined
 
-  static openAt(dataRoot: string): WorkspaceRegistry {
+  static openAt(dataRoot: string, settings: SettingsStore): WorkspaceRegistry {
     const persisted = readSettingsSection(dataRoot, 'workspace', workspacePathSchema)
-    if (persisted === undefined) return new WorkspaceRegistry(dataRoot, undefined)
+    if (persisted === undefined) return new WorkspaceRegistry(dataRoot, settings, undefined)
 
     try {
-      return new WorkspaceRegistry(dataRoot, containedWorkspace(dataRoot, persisted))
+      return new WorkspaceRegistry(dataRoot, settings, containedWorkspace(dataRoot, persisted))
     } catch (err) {
       if (err instanceof WorkspaceOutsideRootError) {
         throw new PersistedWorkspaceUnusableError(settingsFile(dataRoot), persisted, `is not inside the data root "${dataRoot}"`)
@@ -54,8 +55,9 @@ export class WorkspaceRegistry {
     }
   }
 
-  private constructor(dataRoot: string, workspace: string | undefined) {
+  private constructor(dataRoot: string, settings: SettingsStore, workspace: string | undefined) {
     this.#dataRoot = dataRoot
+    this.#settings = settings
     this.#workspace = workspace
   }
 
@@ -71,7 +73,7 @@ export class WorkspaceRegistry {
   async set(candidate: string): Promise<string> {
     const resolved = containedWorkspace(this.#dataRoot, candidate)
 
-    await writeSettingsSection(this.#dataRoot, 'workspace', resolved)
+    await this.#settings.writeSection(this.#dataRoot, 'workspace', resolved)
     this.#workspace = resolved
     return resolved
   }

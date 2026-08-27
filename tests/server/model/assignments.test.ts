@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getAssignment, listAssignments, setAssignment } from '../../../src/server/model/assignments.js'
 import { callSites, UnknownCallSiteError } from '../../../src/server/model/callSites.js'
 import type { RoleDefinition } from '../../../src/server/model/roles.js'
+import { SettingsStore } from '../../../src/server/store/index.js'
 
 const roles: readonly RoleDefinition[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', persona: 'reasons about x', eligibility: 'cast', function: undefined, availability: [] },
@@ -14,6 +15,7 @@ const sites = callSites(roles)
 
 describe('assignments', () => {
   let dataRoot: string
+  const settings = new SettingsStore()
 
   beforeEach(() => {
     dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-assignments-'))
@@ -27,9 +29,9 @@ describe('assignments', () => {
     expect(getAssignment(dataRoot, 'shape')).toBeUndefined()
     expect(listAssignments(dataRoot)).toEqual(new Map())
 
-    await setAssignment(dataRoot, sites, 'shape', 'llama-3')
-    await setAssignment(dataRoot, sites, 'story-editor', 'qwen-14b')
-    await setAssignment(dataRoot, sites, 'shape', 'llama-3-70b')
+    await setAssignment(settings, dataRoot, sites, 'shape', 'llama-3')
+    await setAssignment(settings, dataRoot, sites, 'story-editor', 'qwen-14b')
+    await setAssignment(settings, dataRoot, sites, 'shape', 'llama-3-70b')
 
     expect(getAssignment(dataRoot, 'shape')).toBe('llama-3-70b')
     expect(listAssignments(dataRoot)).toEqual(
@@ -41,7 +43,7 @@ describe('assignments', () => {
   })
 
   it('refuses to assign a model to a call site that does not exist', async () => {
-    await expect(setAssignment(dataRoot, sites, 'no-such-site', 'llama-3')).rejects.toThrow(UnknownCallSiteError)
+    await expect(setAssignment(settings, dataRoot, sites, 'no-such-site', 'llama-3')).rejects.toThrow(UnknownCallSiteError)
     expect(listAssignments(dataRoot)).toEqual(new Map())
   })
 })

@@ -23,11 +23,9 @@ import {
   readPiece,
   readStoryContext,
   SURFACE_LOCATIONS,
-  writePieceCast,
-  writePieceDetails,
-  writePieceMetadata,
   type AuthorContextStore,
   type DraftStore,
+  type PieceMetadataStore,
   type StoredPiece,
   type StoryContextStore,
 } from './store/index.js'
@@ -118,12 +116,18 @@ function uniquePieceId(existing: ReadonlySet<string>, title: string): string {
   return `${base}-${n}`
 }
 
-export async function createPiece(workspaceDir: string, title: string, modeId: string, catalog: ShippedContentCatalog): Promise<PieceSummary> {
+export async function createPiece(
+  pieceMetadata: PieceMetadataStore,
+  workspaceDir: string,
+  title: string,
+  modeId: string,
+  catalog: ShippedContentCatalog,
+): Promise<PieceSummary> {
   catalog.mode(modeId)
 
   const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
-  await writePieceMetadata(workspaceDir, id, {
+  await pieceMetadata.write(workspaceDir, id, {
     title,
     mode: modeId,
     cast: {
@@ -189,6 +193,7 @@ export function getPiece(dataRoot: string, workspaceDir: string, id: string, cat
 }
 
 export async function setPieceCast(
+  pieceMetadata: PieceMetadataStore,
   workspaceDir: string,
   id: string,
   catalog: ShippedContentCatalog,
@@ -201,17 +206,18 @@ export async function setPieceCast(
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
-  await writePieceCast(workspaceDir, id, surface, cast)
+  await pieceMetadata.writeCast(workspaceDir, id, surface, cast)
   return castView(available, cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(
+  pieceMetadata: PieceMetadataStore,
   workspaceDir: string,
   id: string,
   patch: Readonly<{ title?: string }>,
 ): Promise<PieceSummary> {
   requirePiece(workspaceDir, id)
-  await writePieceDetails(workspaceDir, id, patch)
+  await pieceMetadata.writeDetails(workspaceDir, id, patch)
   return summarize(id, requirePiece(workspaceDir, id))
 }
 
@@ -220,14 +226,20 @@ export type PieceChanges = Readonly<{
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
-export async function updatePiece(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<void> {
+export async function updatePiece(
+  pieceMetadata: PieceMetadataStore,
+  workspaceDir: string,
+  id: string,
+  catalog: ShippedContentCatalog,
+  changes: PieceChanges,
+): Promise<void> {
   const { title, cast } = changes
 
   if (title !== undefined) {
-    await updatePieceDetails(workspaceDir, id, { title })
+    await updatePieceDetails(pieceMetadata, workspaceDir, id, { title })
   }
   if (cast !== undefined) {
-    await setPieceCast(workspaceDir, id, catalog, cast.surface, cast.ids)
+    await setPieceCast(pieceMetadata, workspaceDir, id, catalog, cast.surface, cast.ids)
   }
 }
 
@@ -278,9 +290,11 @@ export async function deleteConversation(
 
 export class PieceStore {
   readonly #dataRoot: string
+  readonly #pieceMetadata: PieceMetadataStore
 
-  constructor(dataRoot: string) {
+  constructor(dataRoot: string, pieceMetadata: PieceMetadataStore) {
     this.#dataRoot = dataRoot
+    this.#pieceMetadata = pieceMetadata
   }
 
   detail(workspaceDir: string, id: string, catalog: ShippedContentCatalog): PieceDetail {
@@ -291,8 +305,12 @@ export class PieceStore {
     return getConversation(this.#dataRoot, workspaceDir, pieceId, surface, conversationId)
   }
 
+  async create(workspaceDir: string, title: string, modeId: string, catalog: ShippedContentCatalog): Promise<PieceSummary> {
+    return createPiece(this.#pieceMetadata, workspaceDir, title, modeId, catalog)
+  }
+
   async update(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<PieceDetail> {
-    await updatePiece(workspaceDir, id, catalog, changes)
+    await updatePiece(this.#pieceMetadata, workspaceDir, id, catalog, changes)
     return this.detail(workspaceDir, id, catalog)
   }
 }

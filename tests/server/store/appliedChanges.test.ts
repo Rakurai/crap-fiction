@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ConversationScope } from '../../../src/server/scope.js'
-import { deleteAppliedChange, readAppliedChanges, writeAppliedChange, writePieceMetadata } from '../../../src/server/store/index.js'
+import { deleteAppliedChange, PieceMetadataStore, readAppliedChanges, writeAppliedChange } from '../../../src/server/store/index.js'
 import { appliedChangeSchema, type AppliedChange } from '../../../src/shared/appliedChange.js'
 
 const cutSentence: AppliedChange = {
@@ -12,6 +12,7 @@ const cutSentence: AppliedChange = {
 }
 
 const REWRITE: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
+const pieceMetadata = new PieceMetadataStore()
 
 describe('applied changes', () => {
   let dataRoot: string
@@ -23,7 +24,7 @@ describe('applied changes', () => {
     workspaceDir = path.join(dataRoot, 'my-writing')
     mkdirSync(workspaceDir, { recursive: true })
     scope = { kind: 'piece', workspaceDir, pieceId: 'cups', surface: 'draft' }
-    await writePieceMetadata(workspaceDir, 'cups', {
+    await pieceMetadata.write(workspaceDir, 'cups', {
       title: 'Cups',
       mode: 'flash',
       cast: { draft: ['shape'], storyContext: [], authorContext: [] },
