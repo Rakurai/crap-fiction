@@ -487,6 +487,13 @@ answering. How many times a failed call is retried and how long a call may wait 
 values, maintainer-facing, in one place — never author configuration and never a knob on the
 interface, which several callers could then disagree about.
 
+**The module retries what the model got wrong about answering; a caller re-asks what the model got
+wrong about the material.** A call that never came back as the structure it was asked for is the
+module's own failure to absorb, and it retries. An answer that conforms and is still wrong against
+something the module never learns exists — a document, an anchor into one — is a failure only the
+caller can see, so correcting it is the caller's loop and costs further calls rather than further
+attempts inside one.
+
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
 it can answer makes the author wait for a reason the interface can state. The interface admits the
 richer state and lets a weaker implementation under-report, rather than levelling down to what every
@@ -827,7 +834,7 @@ locking a document for a dispatch would break the premise that the author writes
 
 ## Applying a recommendation
 
-**One call.** Its input is the current draft, the full current conversation, the recommendation itself,
+**One compiled request.** Its input is the current draft, the full current conversation, the recommendation itself,
 both durable contexts, the reference schema where the target surface has one, the author's constraint
 where they supplied one, and the surface the recommendation names. Its output is that surface's document
 embodying it.
@@ -897,8 +904,22 @@ mean something other than what it said.
 being free: a model that wants to reflow a paragraph nobody mentioned has to quote that paragraph, in
 full and exactly.
 
-**An unresolvable set fails as inapplicable, and that reason belongs to applying's set rather than to
-the model's.** The answer conformed and could not be applied to the document, which is a thing no call
+**A set that does not resolve is corrected rather than failed on the first attempt.** The room owns a
+bounded loop: it calls the seam, resolves what came back, and where any edit is defective composes
+further turns and calls again. One defective edit invalidates the whole returned set, so the next
+round re-asks against the document unchanged rather than against a partly edited one. A correction
+carries everything the first call carried and the attempts already rejected — the edit set as the
+model returned it, and the room's diagnosis of it, naming each failed edit by the anchor it quoted
+and saying of an edit that resolved that it resolved. Attempts accumulate rather than replace, and
+the standing material is byte-identical in every round. The loop is one operation throughout: one
+started action, one busy window, one pending replacement at the end, and one abandonment path
+cancelling whichever round is in flight. How many rounds there are is the room's own
+maintainer-facing value, never crossing the model seam and never reaching the author as an attempt
+count. A failed call in any round, a call that timed out included, ends the application rather than
+spending the rounds that remain.
+
+**A set still unresolvable when the rounds are exhausted fails as inapplicable, and that reason
+belongs to applying's set rather than to the model's.** The answer conformed and could not be applied to the document, which is a thing no call
 can report about itself. It carries nothing back — what a failure carries verbatim exists for what a
 runtime returned when it was not the structure asked for, and here the answer was well formed and its
 content is the author's prose. The reason reaches the author as machine words, so it is named for what
@@ -1219,7 +1240,7 @@ boundary's assertions cover:
 | Boundary | Its assertion territory |
 |---|---|
 | **context** | independence, the history policies, and the Story Editor's asymmetric input |
-| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, and that no operation writes any surface's document |
+| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, the edit loop and the inapplicable failure exhausting it leaves, and that no operation writes any surface's document |
 | **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
 | **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, the turns a call site sends crossing intact and in order with their declared roles, no reasoning above the seam, and the adapter's serialization of independent submissions |
 | **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |

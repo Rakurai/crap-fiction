@@ -8,6 +8,9 @@ model:
   responseMaxTokens: 2000     # generation bound for an ordinary specialist or Story Editor reply
   manuscriptMaxTokens: 32000  # generation bound for an Apply call, which returns a whole manuscript
 
+applying:
+  rounds: 3                  # attempts at an edit set that resolves — one and its corrections; each is a further model call
+
 appliedChange:
   contextWords: 8            # words of unchanged prose kept before and after a change, for context
   unboundedFraction: 0.5     # a change touching more than this fraction of a passage is reported as a whole rewrite

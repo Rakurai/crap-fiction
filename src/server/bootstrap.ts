@@ -42,6 +42,7 @@ export function bootstrap(makeModelAccess: (env: StudioEnv, config: StudioConfig
     env.dataRoot,
     catalog,
     SHIPPED_HISTORY_POLICY,
+    config.applying,
     logger,
     Date.now,
     createComputeAppliedChangeContent(config.appliedChange),

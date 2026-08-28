@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import pino from 'pino'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { canonicalMarkdown } from '../../src/document/markdown.js'
 import type { ModelAccess } from '../../src/server/model/types.js'
@@ -35,6 +36,7 @@ import {
 } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
+import { createLogger } from '../../src/server/logger.js'
 import { FixtureModelAdapter, type FixtureBehavior, type FixtureScript } from '../support/modelAdapter.js'
 import { buildTestRoom } from '../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
@@ -125,7 +127,9 @@ function roomSpecWith(modelAccess: ModelAccess) {
     charter: CHARTER_FIXTURE,
     fragments: PROMPT_FRAGMENTS_FIXTURE,
     policy: SHIPPED_HISTORY_POLICY,
+    applying: { rounds: 3 },
     modelAccess,
+    logger: createLogger('silent'),
     now: () => 1_700_000_000_000,
     authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
   }
@@ -861,6 +865,11 @@ describe('Room.dispatch', () => {
 const STORY_CONTEXT_WITH_A_COMMENT = 'Premise: two cups.\n\n<!-- ask her which cup is chipped -->\n'
 
 describe('Room.apply', () => {
+  const UNRESOLVED_EDITS: FixtureBehavior = {
+    result: { outcome: 'value', value: { edits: [{ find: 'a line that was never in the draft', replace: 'anything at all' }] } },
+  }
+  const RESOLVING_EDITS: FixtureBehavior = { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised text' }] } } }
+
   let dataRoot: string
   let workspaceDir: string
 
@@ -1202,18 +1211,62 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
-  it('fails as inapplicable, carrying nothing back, where an anchor does not resolve — the target document untouched and the recommendation still applicable', async () => {
+  it('corrects an unresolved anchor in a further round, landing the corrected set within one action and one busy window, the correction carrying the first call\'s material and the rejected attempt after it', async () => {
     const { pieceId } = await pieceWithRecommendation()
-    const { room } = buildRoom(dataRoot, {
+    const { room, adapter } = buildRoom(dataRoot, { apply: [UNRESOLVED_EDITS, RESOLVING_EDITS] })
+    const events: RoomEvent[] = []
+    room.subscribe(pieceId, (event) => events.push(event))
+
+    const { actionId, outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+
+    expect(outcome).toMatchObject({ outcome: 'pending', actionId, replacement: 'revised text' })
+    expect(events.filter((event) => event.type === 'action.started')).toHaveLength(1)
+    expect(events.filter((event) => event.type === 'action.finished')).toHaveLength(0)
+    expect(room.activitySnapshot(scope(pieceId))).toMatchObject({ kind: 'apply', actionId })
+
+    const [first, second] = adapter.turnsFor('apply')
+    if (first === undefined || second === undefined) throw new Error('expected the room to have called the seam twice')
+    expect(second.slice(0, 2)).toEqual(first)
+    expect(second.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user'])
+    expect(second[2]?.content).toContain('a line that was never in the draft')
+    expect(second[3]?.content).toContain('FIXTURE_EDIT_UNMATCHED a line that was never in the draft')
+  })
+
+  it('lets a single unresolved edit invalidate the whole returned set, saying of its sibling that it resolved and re-asking against the document unchanged', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room, adapter } = buildRoom(dataRoot, {
       apply: [
-        { result: { outcome: 'value', value: { edits: [{ find: 'a line that was never in the draft', replace: 'anything at all' }] } } },
-        { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised text' }] } } },
+        {
+          result: {
+            outcome: 'value',
+            value: {
+              edits: [
+                { find: 'draft', replace: 'reworked' },
+                { find: 'a line that was never in the draft', replace: 'anything at all' },
+              ],
+            },
+          },
+        },
+        RESOLVING_EDITS,
       ],
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+
+    expect(outcome).toMatchObject({ outcome: 'pending', replacement: 'revised text' })
+    expect(adapter.promptFor('apply')).toContain('FIXTURE_EDIT_RESOLVED draft')
+  })
+
+  it('fails as inapplicable once the rounds are exhausted, carrying nothing back — the target document untouched and the recommendation still applicable', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room, adapter } = buildRoom(dataRoot, {
+      apply: [UNRESOLVED_EDITS, UNRESOLVED_EDITS, UNRESOLVED_EDITS, RESOLVING_EDITS],
     })
 
     const { actionId, outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
 
     expect(outcome).toEqual({ outcome: 'failed', actionId, reason: 'inapplicable' })
+    expect(adapter.turnsFor('apply')).toHaveLength(3)
     expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
     expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
@@ -1221,6 +1274,61 @@ describe('Room.apply', () => {
 
     const retried = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
     expect(retried.outcome).toMatchObject({ outcome: 'pending', replacement: 'revised text' })
+  })
+
+  it('abandoned while a correction round is in flight, cancels that round, leaves the document untouched and frees the scope', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    let calls = 0
+    const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, { ...RESOLVING_EDITS, held: true }] }, { reachable: true, models: [] }, () => {
+      calls += 1
+    })
+    const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
+    const events: RoomEvent[] = []
+    room.subscribe(pieceId, (event) => events.push(event))
+
+    const applying = room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+    await vi.waitFor(() => {
+      if (calls < 2) throw new Error('the correction round has not begun')
+    })
+    const started = events.find((event) => event.type === 'action.started')
+    if (started === undefined) throw new Error('expected action.started to have fired')
+    room.abandon(scope(pieceId), started.data.actionId)
+
+    await expect(applying).resolves.toMatchObject({ outcome: { outcome: 'abandoned' } })
+    expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+  })
+
+  it('ends on a timed-out correction round as the failed call it is, rather than spending the rounds that remain', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room, adapter } = buildRoom(dataRoot, { apply: [UNRESOLVED_EDITS, { result: { outcome: 'failed', reason: 'timeout' } }, RESOLVING_EDITS] })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+
+    expect(outcome).toMatchObject({ outcome: 'failed', reason: 'timeout' })
+    expect(adapter.turnsFor('apply')).toHaveLength(2)
+    expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+  })
+
+  it('logs a round that did not resolve as its number and a count of each diagnosis, and never an anchor, a replacement or a span of the document', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const lines: string[] = []
+    const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, RESOLVING_EDITS] }, { reachable: true, models: [] })
+    const room = buildTestRoom(dataRoot, {
+      ...roomSpecWith(adapter),
+      logger: pino({ level: 'info' }, { write: (line: string) => lines.push(line) }),
+    })
+
+    await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+
+    const logged = lines.map((line) => JSON.parse(line))
+    expect(logged.filter((line) => line.msg === 'application edits did not resolve')).toEqual([
+      expect.objectContaining({ round: 1, diagnoses: { unmatched: 1 } }),
+    ])
+    expect(lines.join('')).not.toContain('a line that was never in the draft')
+    expect(lines.join('')).not.toContain('anything at all')
+    expect(lines.join('')).not.toContain('draft text')
   })
 
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved while the target does not yet match — either refusal records nothing but frees the scope for a fresh application', async () => {

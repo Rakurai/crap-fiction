@@ -1,12 +1,16 @@
 import type { Edit } from '../../shared/applyResult.js'
 
-export type EditDefect = 'unresolved' | 'emptyAnchor' | 'overlapping'
+export type EditDiagnosis = 'unmatched' | 'ambiguous' | 'occurrenceOutOfRange' | 'overlapping' | 'emptyAnchor'
 
-export type EditDefects = Readonly<Partial<Record<EditDefect, number>>>
+export type EditVerdict =
+  | Readonly<{ outcome: 'resolved'; find: string }>
+  | Readonly<{ outcome: 'defective'; find: string; diagnosis: EditDiagnosis }>
+
+export type DiagnosisCounts = Readonly<Partial<Record<EditDiagnosis, number>>>
 
 export type EditResolution =
   | Readonly<{ outcome: 'resolved'; text: string }>
-  | Readonly<{ outcome: 'defective'; defects: EditDefects }>
+  | Readonly<{ outcome: 'defective'; verdicts: readonly EditVerdict[] }>
 
 type Span = Readonly<{ start: number; end: number; replace: string }>
 
@@ -22,16 +26,22 @@ function occurrencesOf(target: string, find: string): readonly number[] {
   return found
 }
 
-function spanFor(target: string, edit: Edit): Span | EditDefect {
+function spanFor(target: string, edit: Edit): Span | EditDiagnosis {
   if (edit.find === '') {
     if (target !== '') return 'emptyAnchor'
-    if ((edit.occurrence ?? 0) !== 0) return 'unresolved'
+    if ((edit.occurrence ?? 0) !== 0) return 'occurrenceOutOfRange'
     return { start: 0, end: 0, replace: edit.replace }
   }
 
   const found = occurrencesOf(target, edit.find)
-  const at = edit.occurrence === undefined ? (found.length === 1 ? found[0] : undefined) : found[edit.occurrence]
-  if (at === undefined) return 'unresolved'
+  const [first] = found
+  if (first === undefined) return 'unmatched'
+  if (edit.occurrence === undefined) {
+    if (found.length > 1) return 'ambiguous'
+    return { start: first, end: first + edit.find.length, replace: edit.replace }
+  }
+  const at = found[edit.occurrence]
+  if (at === undefined) return 'occurrenceOutOfRange'
   return { start: at, end: at + edit.find.length, replace: edit.replace }
 }
 
@@ -39,9 +49,12 @@ function overlaps(one: Span, other: Span): boolean {
   return one.start < other.end && other.start < one.end
 }
 
-function tally(defects: readonly EditDefect[]): EditDefects {
-  const counts: Partial<Record<EditDefect, number>> = {}
-  for (const defect of defects) counts[defect] = (counts[defect] ?? 0) + 1
+export function diagnosisCounts(verdicts: readonly EditVerdict[]): DiagnosisCounts {
+  const counts: Partial<Record<EditDiagnosis, number>> = {}
+  for (const verdict of verdicts) {
+    if (verdict.outcome === 'resolved') continue
+    counts[verdict.diagnosis] = (counts[verdict.diagnosis] ?? 0) + 1
+  }
   return counts
 }
 
@@ -56,13 +69,13 @@ function spliced(target: string, spans: readonly Span[]): string {
   return text + target.slice(at)
 }
 
-function overlappingAmong(verdicts: readonly (Span | EditDefect)[]): ReadonlySet<number> {
+function overlappingAmong(resolved: readonly (Span | EditDiagnosis)[]): ReadonlySet<number> {
   const found = new Set<number>()
-  for (let i = 0; i < verdicts.length; i++) {
-    const one = verdicts[i]
+  for (let i = 0; i < resolved.length; i++) {
+    const one = resolved[i]
     if (one === undefined || typeof one === 'string') continue
-    for (let j = i + 1; j < verdicts.length; j++) {
-      const other = verdicts[j]
+    for (let j = i + 1; j < resolved.length; j++) {
+      const other = resolved[j]
       if (other === undefined || typeof other === 'string') continue
       if (!overlaps(one, other)) continue
       found.add(i)
@@ -72,18 +85,17 @@ function overlappingAmong(verdicts: readonly (Span | EditDefect)[]): ReadonlySet
   return found
 }
 
+function verdictFor(find: string, span: Span | EditDiagnosis, overlapping: boolean): EditVerdict {
+  if (typeof span === 'string') return { outcome: 'defective', find, diagnosis: span }
+  if (overlapping) return { outcome: 'defective', find, diagnosis: 'overlapping' }
+  return { outcome: 'resolved', find }
+}
+
 export function resolveEdits(target: string, edits: readonly Edit[]): EditResolution {
-  const verdicts = edits.map((edit) => spanFor(target, edit))
-  const overlapping = overlappingAmong(verdicts)
+  const placed = edits.map((edit) => ({ find: edit.find, span: spanFor(target, edit) }))
+  const overlapping = overlappingAmong(placed.map((entry) => entry.span))
+  const verdicts = placed.map((entry, index) => verdictFor(entry.find, entry.span, overlapping.has(index)))
 
-  const defects: EditDefect[] = []
-  const spans: Span[] = []
-  verdicts.forEach((verdict, index) => {
-    if (typeof verdict === 'string') defects.push(verdict)
-    else if (overlapping.has(index)) defects.push('overlapping')
-    else spans.push(verdict)
-  })
-
-  if (defects.length > 0) return { outcome: 'defective', defects: tally(defects) }
-  return { outcome: 'resolved', text: spliced(target, spans) }
+  if (verdicts.some((verdict) => verdict.outcome === 'defective')) return { outcome: 'defective', verdicts }
+  return { outcome: 'resolved', text: spliced(target, placed.flatMap((entry) => (typeof entry.span === 'string' ? [] : [entry.span]))) }
 }

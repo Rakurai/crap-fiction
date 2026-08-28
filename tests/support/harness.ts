@@ -57,7 +57,9 @@ export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], rol
     charter: UNREACHED_CHARTER,
     fragments: unreachedFragments(),
     policy: SHIPPED_HISTORY_POLICY,
+    applying: { rounds: 3 },
     modelAccess: FixtureModelAdapter.bySite({}, undefined),
+    logger: createLogger('silent'),
     now: () => {
       throw new Error('this scenario opened no operation, so nothing should have read the clock')
     },

@@ -4,7 +4,9 @@ import { renderFragment } from '../model/prompts.js'
 import type { RoleDefinition } from '../model/roles.js'
 import type { CallTurns } from '../model/types.js'
 import type { ConversationEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
+import type { Edit } from '../../shared/applyResult.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import type { EditVerdict } from './edits.js'
 import { RouteFailure } from '../routeFailure.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
@@ -186,6 +188,8 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
+export type RejectedAttempt = Readonly<{ edits: readonly Edit[]; verdicts: readonly EditVerdict[] }>
+
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
     modeDescription: input.modeDescription,
@@ -272,7 +276,35 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
     .join('\n')
 }
 
-export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallTurns {
+function diagnosisLine(fragments: PromptFragments, verdict: EditVerdict): string {
+  if (verdict.outcome === 'resolved') return renderFragment(fragments.lines.editResolved, { anchor: verdict.find })
+  switch (verdict.diagnosis) {
+    case 'unmatched':
+      return renderFragment(fragments.lines.editUnmatched, { anchor: verdict.find })
+    case 'ambiguous':
+      return renderFragment(fragments.lines.editAmbiguous, { anchor: verdict.find })
+    case 'occurrenceOutOfRange':
+      return renderFragment(fragments.lines.editOccurrenceOutOfRange, { anchor: verdict.find })
+    case 'overlapping':
+      return renderFragment(fragments.lines.editOverlapping, { anchor: verdict.find })
+    case 'emptyAnchor':
+      return fixedSection(fragments.lines.editEmptyAnchor)
+    default: {
+      const exhaustive: never = verdict.diagnosis
+      return exhaustive
+    }
+  }
+}
+
+function attemptTurns(fragments: PromptFragments, attempt: RejectedAttempt): CallTurns {
+  const diagnoses = attempt.verdicts.map((verdict) => diagnosisLine(fragments, verdict)).join('\n')
+  return [
+    { role: 'assistant', content: JSON.stringify({ edits: attempt.edits }) },
+    { role: 'user', content: renderFragment(fragments.sections.rejectedAttempt, { diagnoses }) },
+  ]
+}
+
+export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments, rejected: readonly RejectedAttempt[]): CallTurns {
   const standing = compose([context.modeDescription, fixedSection(fragments.roles.apply)])
   const request = compose([
     taskSection(fragments.tasks.apply, context.surface),
@@ -285,7 +317,7 @@ export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragme
     section(fragments, 'recommendation', 'recommendation', readingValue(context.recommendationClaim, context.recommendationNote)),
     section(fragments, 'constraint', 'constraint', context.constraint),
   ])
-  return turns(standing, request)
+  return [...turns(standing, request), ...rejected.flatMap((attempt) => attemptTurns(fragments, attempt))]
 }
 
 export function renderPrompt(context: Context, fragments: PromptFragments, charter: Charter): CallTurns {

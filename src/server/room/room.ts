@@ -5,7 +5,7 @@ import { appliedChangeSchema } from '../../shared/appliedChange.js'
 import { INAPPLICABLE, type ApplyOutcome } from '../../shared/applyViews.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
-import type { ModelAccess } from '../model/types.js'
+import type { FailureReason, ModelAccess } from '../model/types.js'
 import { applyResultSchema, type Replacement } from '../../shared/applyResult.js'
 import type {
   ApplicationEntry,
@@ -38,16 +38,18 @@ import {
 } from '../store/index.js'
 import type { ComputeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
-import { resolveEdits } from './edits.js'
+import { diagnosisCounts, resolveEdits } from './edits.js'
 import {
   compileApplyContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
   renderPrompt,
+  type ApplyContext,
   type ContextInput,
   type HistoryPolicy,
   type ParticipantEvidence,
+  type RejectedAttempt,
 } from './context.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import type { ShippedContentCatalog } from '../shippedContent.js'
@@ -143,6 +145,14 @@ type ActiveApply = {
 
 type ActiveOperation = RunningDispatch | ActiveApply
 
+export type ApplyingConfig = Readonly<{ rounds: number }>
+
+type EditsForApplication =
+  | Readonly<{ outcome: 'resolved'; text: string }>
+  | Readonly<{ outcome: 'abandoned' }>
+  | Readonly<{ outcome: 'inapplicable' }>
+  | Readonly<{ outcome: 'failed'; reason: FailureReason; returned: string | undefined }>
+
 type DispatchPlan = Readonly<{
   causeEntry: AuthorMessageEntry | ConcreteChangeRequestEntry
   message: string | undefined
@@ -174,6 +184,7 @@ export class Room {
   readonly #now: Clock
   readonly #catalog: ShippedContentCatalog
   readonly #policy: HistoryPolicy
+  readonly #applying: ApplyingConfig
   readonly #computeAppliedChangeContent: ComputeAppliedChangeContent
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
@@ -187,6 +198,7 @@ export class Room {
     dataRoot: string,
     catalog: ShippedContentCatalog,
     policy: HistoryPolicy,
+    applying: ApplyingConfig,
     logger: Logger,
     now: Clock,
     computeAppliedChangeContent: ComputeAppliedChangeContent,
@@ -199,6 +211,7 @@ export class Room {
     this.#now = now
     this.#catalog = catalog
     this.#policy = policy
+    this.#applying = applying
     this.#computeAppliedChangeContent = computeAppliedChangeContent
   }
 
@@ -662,27 +675,21 @@ export class Room {
         entries,
         participants: this.#catalog.participantDisplayNames,
       })
-      const turns = renderApplyPrompt(context, this.#catalog.fragments)
-      const result = await this.#modelAccess.call('apply', turns, applyResultSchema, controller.signal)
-      if (result.outcome !== 'value') {
-        closeOut(result.outcome === 'abandoned' ? 'abandoned' : 'failed')
-        return {
-          actionId,
-          outcome:
-            result.outcome === 'abandoned'
-              ? { outcome: 'abandoned', actionId }
-              : { outcome: 'failed', actionId, reason: result.reason, returned: result.returned },
-        }
+      const edits = await this.#applicableEdits(pieceId, actionId, context, target, controller.signal)
+      if (edits.outcome === 'abandoned') {
+        closeOut('abandoned')
+        return { actionId, outcome: { outcome: 'abandoned', actionId } }
       }
-
-      const resolution = resolveEdits(target, result.value.edits)
-      if (resolution.outcome === 'defective') {
+      if (edits.outcome === 'failed') {
         closeOut('failed')
-        this.#logger.info({ pieceId, actionId, defects: resolution.defects }, 'application inapplicable')
+        return { actionId, outcome: { outcome: 'failed', actionId, reason: edits.reason, returned: edits.returned } }
+      }
+      if (edits.outcome === 'inapplicable') {
+        closeOut('failed')
         return { actionId, outcome: { outcome: 'failed', actionId, reason: INAPPLICABLE } }
       }
 
-      const replacement = roomScope.surface === 'draft' ? canonicalMarkdown(resolution.text) : resolution.text
+      const replacement = roomScope.surface === 'draft' ? canonicalMarkdown(edits.text) : edits.text
       if (replacement === target) {
         closeOut('settled')
         return { actionId, outcome: { outcome: 'noChange', actionId } }
@@ -712,6 +719,34 @@ export class Room {
       closeOut('failed')
       throw err
     }
+  }
+
+  async #applicableEdits(
+    pieceId: string,
+    actionId: string,
+    context: ApplyContext,
+    target: string,
+    signal: AbortSignal,
+  ): Promise<EditsForApplication> {
+    const rejected: RejectedAttempt[] = []
+
+    for (let round = 1; round <= this.#applying.rounds; round++) {
+      const turns = renderApplyPrompt(context, this.#catalog.fragments, rejected)
+      const result = await this.#modelAccess.call('apply', turns, applyResultSchema, signal)
+      if (result.outcome === 'abandoned') return { outcome: 'abandoned' }
+      if (result.outcome === 'failed') return { outcome: 'failed', reason: result.reason, returned: result.returned }
+
+      const resolution = resolveEdits(target, result.value.edits)
+      if (resolution.outcome === 'resolved') return { outcome: 'resolved', text: resolution.text }
+
+      this.#logger.info(
+        { pieceId, actionId, round, diagnoses: diagnosisCounts(resolution.verdicts) },
+        'application edits did not resolve',
+      )
+      rejected.push({ edits: result.value.edits, verdicts: resolution.verdicts })
+    }
+
+    return { outcome: 'inapplicable' }
   }
 
   pendingReplacement(roomScope: RoomScope, conversationId: string, applicationId: string): string {

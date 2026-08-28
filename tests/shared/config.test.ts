@@ -3,6 +3,7 @@ import { validateConfig } from '../../src/shared/config.js'
 
 const fixture = {
   model: { retries: 4, timeoutMs: 9000, responseMaxTokens: 300, manuscriptMaxTokens: 4000 },
+  applying: { rounds: 3 },
   appliedChange: { contextWords: 3, unboundedFraction: 0.7 },
   autosave: { debounceMs: 500 },
   elapsedTime: { tickMs: 250 },

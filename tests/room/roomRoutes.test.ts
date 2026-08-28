@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createLogger } from '../../src/server/logger.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RoomScope } from '../../src/server/scope.js'
@@ -77,7 +78,9 @@ describe('the room over HTTP', () => {
       charter: CHARTER_FIXTURE,
       fragments: PROMPT_FRAGMENTS_FIXTURE,
       policy: SHIPPED_HISTORY_POLICY,
+      applying: { rounds: 3 },
       modelAccess,
+      logger: createLogger('silent'),
       now: () => 1_700_000_000_000,
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
     })

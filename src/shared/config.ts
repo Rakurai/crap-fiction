@@ -8,6 +8,9 @@ const configSchema = z.object({
     responseMaxTokens: z.number().int().positive(),
     manuscriptMaxTokens: z.number().int().positive(),
   }),
+  applying: z.object({
+    rounds: z.number().int().positive(),
+  }),
   appliedChange: z.object({
     contextWords: z.number().int().nonnegative(),
     unboundedFraction: z.number().min(0).max(1),
