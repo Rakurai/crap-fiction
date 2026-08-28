@@ -10,6 +10,7 @@ import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import type { Room } from '../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../support/modelAdapter.js'
 import { buildTestApp } from '../support/harness.js'
+import { ConversationEntryStore } from '../../src/server/store/index.js'
 import { buildTestRoom } from '../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
@@ -46,6 +47,7 @@ describe('the room over HTTP', () => {
       policy: SHIPPED_HISTORY_POLICY,
       applying: { rounds: 3 },
       modelAccess,
+      entries: new ConversationEntryStore(),
       logger: createLogger('silent'),
       now: () => 1_700_000_000_000,
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,

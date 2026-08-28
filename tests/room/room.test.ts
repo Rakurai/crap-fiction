@@ -113,7 +113,21 @@ const FIXTURE_CATALOG: ShippedContentCatalog = ShippedContentCatalog.assemble({
   authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
 })
 
-function roomSpecWith(modelAccess: ModelAccess) {
+class EntryStoreRefusing extends ConversationEntryStore {
+  readonly #refused: string
+
+  constructor(refusedParticipantId: string) {
+    super()
+    this.#refused = refusedParticipantId
+  }
+
+  override async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
+    if ('participantId' in entry && entry.participantId === this.#refused) throw new Error('the conversation file refused the write')
+    await super.append(dataRoot, scope, conversationId, entry)
+  }
+}
+
+function roomSpecWith(modelAccess: ModelAccess, entries: ConversationEntryStore) {
   return {
     modes: [MODE_FIXTURE],
     roles: FIXTURE_ROLES,
@@ -122,6 +136,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
     policy: SHIPPED_HISTORY_POLICY,
     applying: { rounds: 3 },
     modelAccess,
+    entries,
     logger: createLogger('silent'),
     now: () => 1_700_000_000_000,
     authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
@@ -130,7 +145,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
 
 function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureScript>>): { room: Room; adapter: FixtureModelAdapter } {
   const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
-  const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
+  const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new ConversationEntryStore()))
   return { room, adapter }
 }
 
@@ -208,7 +223,6 @@ describe('Room.dispatch', () => {
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
@@ -272,7 +286,7 @@ describe('Room.dispatch', () => {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
     }
-    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken, new ConversationEntryStore()))
 
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
@@ -785,17 +799,15 @@ describe('Room.dispatch', () => {
 
   it('states the response it could not write, keeps the responses beside it, and settles the dispatch', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
-    const appended = ConversationEntryStore.prototype.append
-    vi.spyOn(ConversationEntryStore.prototype, 'append').mockImplementation(function (this: ConversationEntryStore, ...args) {
-      const entry = args[3]
-      if ('participantId' in entry && entry.participantId === 'shape') return Promise.reject(new Error('the conversation file refused the write'))
-      return appended.apply(this, args)
-    })
-    const { room } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
-    })
+    const adapter = FixtureModelAdapter.bySite(
+      {
+        shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
+        compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
+        'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+      },
+      { reachable: true, models: [] },
+    )
+    const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new EntryStoreRefusing('shape')))
 
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
@@ -1120,7 +1132,7 @@ describe('Room.apply', () => {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
     }
-    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken, new ConversationEntryStore()))
 
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
@@ -1241,7 +1253,7 @@ describe('Room.apply', () => {
     const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, { ...RESOLVING_EDITS, held: true }] }, { reachable: true, models: [] }, () => {
       calls += 1
     })
-    const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
+    const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new ConversationEntryStore()))
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
 
@@ -1275,7 +1287,7 @@ describe('Room.apply', () => {
     const lines: string[] = []
     const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, RESOLVING_EDITS] }, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, {
-      ...roomSpecWith(adapter),
+      ...roomSpecWith(adapter, new ConversationEntryStore()),
       logger: pino({ level: 'info' }, { write: (line: string) => lines.push(line) }),
     })
 
