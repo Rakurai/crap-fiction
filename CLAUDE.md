@@ -31,3 +31,5 @@ Single-context: one `CONTEXT.md` at the repo root, holding the domain model and 
 ## Engineering discipline
 
 `docs/CODING_STANDARDS.md` is binding on all code: module depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP layer, configuration, client shape, logging, testing. It owns no architecture facts, no declared surface and no product behaviour — where it appears to decide any of those, the design doc set governs — and it names no instance of its own rules. Read it before writing code, not after review.
+
+Three commands answer for the code and none of them substitutes for another: `npm run typecheck`, `npm run lint` for the rules that hold over the repository rather than over the product, and `npm test` with `npm run test:e2e` for the product's own behaviour. A change is finished when all of them pass.

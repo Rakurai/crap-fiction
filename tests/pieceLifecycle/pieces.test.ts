@@ -32,23 +32,16 @@ import {
 import type { ConversationScope } from '../../src/server/scope.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
-import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, INTERVIEWER_ROSTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, INTERVIEWER_ROSTER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
-const flash: ModeDescriptor = {
-  id: 'flash',
-  displayName: 'Flash',
-  description: 'A short piece read in one sitting.',
-  storyContextReference: 'Sections, each holding entries.',
-}
-
-const epic: ModeDescriptor = {
+const EPIC: ModeDescriptor = {
   id: 'epic',
   displayName: 'Epic',
   description: 'A piece read over several sittings.',
   storyContextReference: 'Sections, each holding entries.',
 }
 
-const specialists: readonly RoleDefinition[] = [
+const SPECIALISTS: readonly RoleDefinition[] = [
   {
     id: 'shape',
     handle: 'shape',
@@ -73,9 +66,9 @@ const specialists: readonly RoleDefinition[] = [
   },
 ]
 
-const interviewer = INTERVIEWER_ROSTER_FIXTURE
+const INTERVIEWER = INTERVIEWER_ROSTER_FIXTURE
 
-const storyEditor: RoleDefinition = {
+const STORY_EDITOR: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
   eligibility: 'generalist',
@@ -87,10 +80,10 @@ const storyEditor: RoleDefinition = {
   availability: [],
 }
 
-function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[] = specialists): ShippedContentCatalog {
+function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[] = SPECIALISTS): ShippedContentCatalog {
   return ShippedContentCatalog.assemble({
     modes,
-    roles: [...roles, storyEditor, interviewer.role],
+    roles: [...roles, STORY_EDITOR, INTERVIEWER.role],
     charter: 'unused in these tests',
     fragments: PROMPT_FRAGMENTS_FIXTURE,
     authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
@@ -99,7 +92,7 @@ function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefini
 
 const pieceMetadata = new PieceMetadataStore()
 
-describe('pieces', () => {
+describe('creating a piece, listing the workspace, and opening one again', () => {
   let dataRoot: string
   let workspaceDir: string
 
@@ -114,7 +107,7 @@ describe('pieces', () => {
   })
 
   it('creates a piece from a title alone, with the mode default cast enabled and no draft written', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
     expect(piece.id).toBe('the-cups')
     expect(piece.title).toBe('The Cups')
@@ -123,32 +116,32 @@ describe('pieces', () => {
   })
 
   it("writes all three surfaces' derived casts in one metadata write", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', flash.id, catalogFor([flash]))
-    const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE]))
 
     expect(opened.surfaces.draft.roster.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
-    await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([flash]), 'storyContext', [])
-    await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([flash]), 'authorContext', [])
+    expect(opened.surfaces.storyContext.roster.map((member) => member.id)).toEqual([])
+    expect(opened.surfaces.authorContext.roster.map((member) => member.id)).toEqual([])
   })
 
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'A Long Way', epic.id, catalogFor([flash, epic]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'A Long Way', EPIC.id, catalogFor([MODE_FIXTURE, EPIC]))
     expect(piece.mode).toBe('epic')
-    expect(getPiece(dataRoot, workspaceDir, piece.id, catalogFor([flash, epic])).mode).toBe('epic')
+    expect(getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE, EPIC])).mode).toBe('epic')
 
-    await expect(createPiece(pieceMetadata, workspaceDir, 'Nope', 'novella', catalogFor([flash, epic]))).rejects.toThrowError(UnknownModeError)
+    await expect(createPiece(pieceMetadata, workspaceDir, 'Nope', 'novella', catalogFor([MODE_FIXTURE, EPIC]))).rejects.toThrowError(UnknownModeError)
   })
 
   it('disambiguates a colliding slug at creation', async () => {
-    const first = await createPiece(pieceMetadata, workspaceDir, 'The Cups', flash.id, catalogFor([flash]))
-    const second = await createPiece(pieceMetadata, workspaceDir, 'The Cups', flash.id, catalogFor([flash]))
+    const first = await createPiece(pieceMetadata, workspaceDir, 'The Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const second = await createPiece(pieceMetadata, workspaceDir, 'The Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
     expect(first.id).toBe('the-cups')
     expect(second.id).toBe('the-cups-2')
   })
 
   it('lists a directory scan showing each piece length and modified time', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const draftFile = path.join(workspaceDir, piece.id, 'draft.md')
     writeFileSync(draftFile, 'Two small words.', 'utf8')
 
@@ -161,14 +154,14 @@ describe('pieces', () => {
 
   it('ignores a directory with no piece.yaml', async () => {
     mkdirSync(path.join(workspaceDir, 'not-a-piece'))
-    await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
     expect(listPieces(workspaceDir)).toHaveLength(1)
   })
 
   it('orders the listing by most recently modified first', async () => {
-    const older = await createPiece(pieceMetadata, workspaceDir, 'Older', flash.id, catalogFor([flash]))
-    const newer = await createPiece(pieceMetadata, workspaceDir, 'Newer', flash.id, catalogFor([flash]))
+    const older = await createPiece(pieceMetadata, workspaceDir, 'Older', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const newer = await createPiece(pieceMetadata, workspaceDir, 'Newer', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
     const past = new Date(Date.now() - 10_000)
     utimesSync(path.join(workspaceDir, older.id, 'piece.yaml'), past, past)
@@ -178,8 +171,8 @@ describe('pieces', () => {
   })
 
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
-    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
     const roster = [
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: true },
@@ -191,7 +184,7 @@ describe('pieces', () => {
         storyContext: {
           text: '',
           location: 'story-context.yaml',
-          referenceSchema: flash.storyContextReference,
+          referenceSchema: MODE_FIXTURE.storyContextReference,
           currentConversationId: null,
           conversations: [],
           roster: [],
@@ -207,35 +200,35 @@ describe('pieces', () => {
       },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
       interviewer: {
-        handle: interviewer.role.handle,
-        displayName: interviewer.role.displayName,
-        description: interviewer.role.description,
-        invocation: interviewer.invocation,
+        handle: INTERVIEWER.role.handle,
+        displayName: INTERVIEWER.role.displayName,
+        description: INTERVIEWER.role.description,
+        invocation: INTERVIEWER.invocation,
       },
     })
   })
 
   it('opens a piece carrying the draft and the story context the author wrote, verbatim', async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     writeFileSync(path.join(workspaceDir, created.id, 'draft.md'), 'Two small words.', 'utf8')
     const storyContextText = '# notes\nPremise: two cups, one left behind\nPoint of view: close third, past tense\n'
     writeFileSync(path.join(workspaceDir, created.id, 'story-context.yaml'), storyContextText, 'utf8')
 
-    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
+    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
     expect(opened.surfaces.draft.text).toBe('Two small words.')
     expect(opened.surfaces.storyContext.text).toBe(storyContextText)
   })
 
   it("opens a piece's author-context surface reading the data root's global document, with the studio's reference schema", async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
-    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
     expect(opened.surfaces.authorContext.referenceSchema).toBe(AUTHOR_CONTEXT_REFERENCE_FIXTURE)
-    expect(opened.surfaces.storyContext.referenceSchema).toBe(flash.storyContextReference)
+    expect(opened.surfaces.storyContext.referenceSchema).toBe(MODE_FIXTURE.storyContextReference)
     expect(opened.surfaces.draft.referenceSchema).toBeNull()
   })
 
   it('refuses to open a piece whose mode is not loaded, rather than reporting a story context with no reference schema', async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     expect(() => getPiece(dataRoot, workspaceDir, created.id, catalogFor([]))).toThrowError(UnknownModeError)
   })
 
@@ -251,13 +244,13 @@ describe('pieces', () => {
       function: undefined,
       availability: [{ mode: 'flash', surface: 'authorContext', enabledByDefault: false }],
     }
-    const withArchivist = [...specialists, archivist]
+    const withArchivist = [...SPECIALISTS, archivist]
 
     const otherWorkspaceDir = path.join(dataRoot, 'another-writing')
     mkdirSync(otherWorkspaceDir, { recursive: true })
 
-    const inFirst = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash], withArchivist))
-    const inSecond = await createPiece(pieceMetadata, otherWorkspaceDir, 'Saucers', flash.id, catalogFor([flash], withArchivist))
+    const inFirst = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE], withArchivist))
+    const inSecond = await createPiece(pieceMetadata, otherWorkspaceDir, 'Saucers', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE], withArchivist))
 
     await writeAuthorContext(dataRoot, 'Notes that generalize across every piece.')
     await new ConversationEntryStore().append(dataRoot, { kind: 'global' }, 'shared-conversation', {
@@ -267,10 +260,10 @@ describe('pieces', () => {
       audience: [],
       brought: [],
     })
-    await setPieceCast(pieceMetadata, workspaceDir, inFirst.id, catalogFor([flash], withArchivist), 'authorContext', ['archivist'])
+    await setPieceCast(pieceMetadata, workspaceDir, inFirst.id, catalogFor([MODE_FIXTURE], withArchivist), 'authorContext', ['archivist'])
 
-    const openedFromFirst = getPiece(dataRoot, workspaceDir, inFirst.id, catalogFor([flash], withArchivist))
-    const openedFromSecond = getPiece(dataRoot, otherWorkspaceDir, inSecond.id, catalogFor([flash], withArchivist))
+    const openedFromFirst = getPiece(dataRoot, workspaceDir, inFirst.id, catalogFor([MODE_FIXTURE], withArchivist))
+    const openedFromSecond = getPiece(dataRoot, otherWorkspaceDir, inSecond.id, catalogFor([MODE_FIXTURE], withArchivist))
 
     expect(openedFromFirst.surfaces.authorContext.text).toBe('Notes that generalize across every piece.')
     expect(openedFromSecond.surfaces.authorContext.text).toBe(openedFromFirst.surfaces.authorContext.text)
@@ -283,8 +276,8 @@ describe('pieces', () => {
 
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
     for (const id of ['nothing-here', '../../etc']) {
-      expect(() => getPiece(dataRoot, workspaceDir, id, catalogFor([flash]))).toThrowError(PieceNotFoundError)
-      await expect(setPieceCast(pieceMetadata, workspaceDir, id, catalogFor([flash]), 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
+      expect(() => getPiece(dataRoot, workspaceDir, id, catalogFor([MODE_FIXTURE]))).toThrowError(PieceNotFoundError)
+      await expect(setPieceCast(pieceMetadata, workspaceDir, id, catalogFor([MODE_FIXTURE]), 'draft', ['shape'])).rejects.toThrowError(PieceNotFoundError)
       await expect(updatePieceDetails(pieceMetadata, workspaceDir, id, { title: 'Anything' })).rejects.toThrowError(PieceNotFoundError)
       await expect(
         new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot).save(workspaceDir, id, 'draft', 'text'),
@@ -308,36 +301,40 @@ describe('setPieceCast', () => {
   })
 
   it('disables a specialist, reports the cast as it now stands, and makes it eligible again when named once more', async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
-    const disabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape'])
+    const disabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape'])
 
     expect(disabled).toEqual([
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
     ])
-    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash])).surfaces.draft.roster).toEqual(disabled)
+    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE])).surfaces.draft.roster).toEqual(disabled)
 
-    const reEnabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape', 'compression'])
+    const reEnabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
   })
 
   it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
-    await expect(setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape', 'story-editor'])).rejects.toThrowError(
+    await expect(setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape', 'story-editor'])).rejects.toThrowError(
       UnknownCastMemberError,
     )
   })
 
   it("stores each surface's cast independently of the others", async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
-    await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape'])
-    await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'storyContext', [])
+    await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape'])
+    await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'storyContext', [])
 
-    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
-    expect(opened.surfaces.draft.roster.find((member) => member.id === 'shape')?.enabled).toBe(true)
+    const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
+    expect(opened.surfaces.draft.roster.map((member) => ({ id: member.id, enabled: member.enabled }))).toEqual([
+      { id: 'shape', enabled: true },
+      { id: 'compression', enabled: false },
+    ])
+    expect(opened.surfaces.storyContext.roster).toEqual([])
   })
 })
 
@@ -356,12 +353,12 @@ describe('updatePieceDetails', () => {
   })
 
   it('retitles a piece, leaving its mode and directory untouched', async () => {
-    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
 
     const summary = await updatePieceDetails(pieceMetadata, workspaceDir, created.id, { title: 'The Cups' })
 
     expect(summary).toMatchObject({ id: 'cups', title: 'The Cups', mode: 'flash' })
-    expect(getPiece(dataRoot, workspaceDir, 'cups', catalogFor([flash])).title).toBe('The Cups')
+    expect(getPiece(dataRoot, workspaceDir, 'cups', catalogFor([MODE_FIXTURE])).title).toBe('The Cups')
   })
 })
 
@@ -380,20 +377,21 @@ describe('PieceDocumentWriter', () => {
     return new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), workspaceDir)
   }
 
-  it("writes an existing piece's draft through to the store", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+  it('routes each surface to the artifact it is kept in: the draft and story context under the piece, the author context beside the workspace', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const writer = documentWriter()
 
-    await documentWriter().save(workspaceDir, piece.id, 'draft', 'Two small words.')
+    await writer.save(workspaceDir, piece.id, 'draft', 'Two small words.')
+    await writer.save(workspaceDir, piece.id, 'storyContext', 'Premise: two cups, one left behind\n')
+    await writer.save(workspaceDir, piece.id, 'authorContext', 'Prefers the plainer word.\n')
 
-    expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('Two small words.')
-  })
+    function written(...segments: readonly string[]): string {
+      return readFileSync(path.join(workspaceDir, ...segments), 'utf8')
+    }
 
-  it("writes an existing piece's story context through to the store, independently of the draft", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
-
-    await documentWriter().save(workspaceDir, piece.id, 'storyContext', 'Premise: two cups, one left behind\n')
-
-    expect(readFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), 'utf8')).toBe('Premise: two cups, one left behind\n')
+    expect(written(piece.id, 'draft.md')).toBe('Two small words.')
+    expect(written(piece.id, 'story-context.yaml')).toBe('Premise: two cups, one left behind\n')
+    expect(written('config', 'author-context.yaml')).toBe('Prefers the plainer word.\n')
   })
 })
 
@@ -416,12 +414,12 @@ describe('getConversation', () => {
   }
 
   it('refuses to read a conversation nothing has written yet, as a stated ConversationNotFoundError', async () => {
-    await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     expect(() => getConversation(dataRoot, workspaceDir, 'cups', 'draft', 'c1')).toThrowError(ConversationNotFoundError)
   })
 
   it('joins an application onto the change it produced, by identity, and leaves an unapplied response with none', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const store = new ConversationEntryStore()
     const authorMessage: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'a message', audience: [], brought: [] }
     const response: ConversationEntry = {
@@ -457,7 +455,7 @@ describe('getConversation', () => {
   })
 
   it('degrades to the application shown without its change when the change file is missing, rather than erroring', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const store = new ConversationEntryStore()
     const application: ConversationEntry = { id: 'e1', kind: 'application', responseId: 'no-such-response', changeId: 'never-written' }
     await store.append(dataRoot, scopeFor(piece.id), 'c1', application)
@@ -482,12 +480,12 @@ describe('listConversations', () => {
   })
 
   it('reports none for a piece with no conversations', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     expect(listConversations(dataRoot, workspaceDir, piece.id, 'draft')).toEqual([])
   })
 
   it("carries the conversation's opening words onto the summary", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     await new ConversationEntryStore().append(dataRoot, { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }, 'c1', {
       id: 'e1',
       kind: 'authorMessage',
@@ -501,7 +499,7 @@ describe('listConversations', () => {
   })
 
   it('orders the listing by last activity, most recent first', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const store = new ConversationEntryStore()
     const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }
     const anyEntry: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] }
@@ -529,12 +527,12 @@ describe('deleteConversation', () => {
   })
 
   it('refuses to delete a conversation nothing has written yet, as a stated ConversationNotFoundError', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     await expect(deleteConversation(dataRoot, workspaceDir, piece.id, 'draft', 'never-written')).rejects.toThrowError(ConversationNotFoundError)
   })
 
   it('removes the conversation and the change files its applications name, leaving the rest untouched', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const store = new ConversationEntryStore()
     const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'draft' }
     await store.append(dataRoot, scope, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })

@@ -9,19 +9,13 @@ describe('author-context conversation selection', () => {
     sessionStorage.clear()
   })
 
-  it('has nothing stored before any selection is made', () => {
+  it('tells a selection never made from a selection of no conversation, and reads either back as it was written', () => {
     expect(readStoredAuthorContextConversationId()).toBeUndefined()
-  })
 
-  it('reads back a written selection, surviving a reload of the module', () => {
     writeStoredAuthorContextConversationId('conv-1')
-
     expect(readStoredAuthorContextConversationId()).toBe('conv-1')
-  })
 
-  it('reads back a written null selection as null, not as nothing stored', () => {
     writeStoredAuthorContextConversationId(null)
-
     expect(readStoredAuthorContextConversationId()).toBeNull()
   })
 })

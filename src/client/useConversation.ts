@@ -198,6 +198,7 @@ export function useConversation(
   const actionController = useRef<AbortController | undefined>(undefined)
 
   useEffect(() => {
+    mounted.current = true
     return () => {
       mounted.current = false
       actionController.current?.abort()

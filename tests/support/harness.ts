@@ -12,11 +12,11 @@ import { PieceDocumentWriter, PieceStore } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
-import { AuthorContextStore, DraftStore, PieceMetadataStore, SettingsStore, StoryContextStore } from '../../src/server/store/index.js'
+import { AuthorContextStore, ConversationEntryStore, DraftStore, PieceMetadataStore, SettingsStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
-import { PROMPT_FRAGMENTS_FIXTURE } from './roomFixtures.js'
+import { PROMPT_FRAGMENTS_FIXTURE, ROLES_FIXTURE } from './roomFixtures.js'
 import { buildTestRoom } from './room.js'
 
 export type AppSpec = Readonly<{
@@ -59,11 +59,22 @@ export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], rol
     policy: SHIPPED_HISTORY_POLICY,
     applying: { rounds: 3 },
     modelAccess: FixtureModelAdapter.bySite({}, undefined),
+    entries: new ConversationEntryStore(),
     logger: createLogger('silent'),
     now: () => {
       throw new Error('this scenario opened no operation, so nothing should have read the clock')
     },
     authorContextReference: UNREACHED,
+  })
+}
+
+export function idleStudio(dataRoot: string, modes: readonly ModeDescriptor[], runtimeStatus: RuntimeStatus | undefined): TestApp {
+  return buildTestApp(dataRoot, {
+    modes,
+    roles: ROLES_FIXTURE,
+    runtimeStatus,
+    room: idleRoom(dataRoot, modes, ROLES_FIXTURE),
+    authorContextReference: UNREACHED_REFERENCE,
   })
 }
 

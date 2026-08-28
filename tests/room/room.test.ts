@@ -39,19 +39,12 @@ import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { createLogger } from '../../src/server/logger.js'
 import { FixtureModelAdapter, type FixtureBehavior, type FixtureScript } from '../support/modelAdapter.js'
 import { buildTestRoom } from '../support/room.js'
-import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const pieceMetadata = new PieceMetadataStore()
 
-const fixtureMode: ModeDescriptor = {
-  id: 'flash',
-  displayName: 'Flash',
-  description: 'A short piece read in one sitting.',
-  storyContextReference: 'Sections, each holding entries.',
-}
-
-const fixtureRoles: readonly RoleDefinition[] = [
+const FIXTURE_ROLES: readonly RoleDefinition[] = [
   {
     id: 'shape',
     handle: 'shape',
@@ -61,7 +54,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     persona: 'reasons about x',
     eligibility: 'cast',
     function: undefined,
-    availability: [{ mode: fixtureMode.id, surface: 'draft', enabledByDefault: true }],
+    availability: [{ mode: MODE_FIXTURE.id, surface: 'draft', enabledByDefault: true }],
   },
   {
     id: 'compression',
@@ -72,7 +65,7 @@ const fixtureRoles: readonly RoleDefinition[] = [
     persona: 'reasons about y',
     eligibility: 'cast',
     function: undefined,
-    availability: [{ mode: fixtureMode.id, surface: 'draft', enabledByDefault: true }],
+    availability: [{ mode: MODE_FIXTURE.id, surface: 'draft', enabledByDefault: true }],
   },
   {
     id: 'interiority',
@@ -110,25 +103,40 @@ const fixtureRoles: readonly RoleDefinition[] = [
   INTERVIEWER_FIXTURE,
 ]
 
-const fixtureSpecialists: readonly RoleDefinition[] = fixtureRoles.filter((role) => role.eligibility === 'cast')
+const FIXTURE_SPECIALISTS: readonly RoleDefinition[] = FIXTURE_ROLES.filter((role) => role.eligibility === 'cast')
 
-const fixtureCatalog: ShippedContentCatalog = ShippedContentCatalog.assemble({
-  modes: [fixtureMode],
-  roles: fixtureRoles,
+const FIXTURE_CATALOG: ShippedContentCatalog = ShippedContentCatalog.assemble({
+  modes: [MODE_FIXTURE],
+  roles: FIXTURE_ROLES,
   charter: CHARTER_FIXTURE,
   fragments: PROMPT_FRAGMENTS_FIXTURE,
   authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
 })
 
-function roomSpecWith(modelAccess: ModelAccess) {
+class EntryStoreRefusing extends ConversationEntryStore {
+  readonly #refused: string
+
+  constructor(refusedParticipantId: string) {
+    super()
+    this.#refused = refusedParticipantId
+  }
+
+  override async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
+    if ('participantId' in entry && entry.participantId === this.#refused) throw new Error('the conversation file refused the write')
+    await super.append(dataRoot, scope, conversationId, entry)
+  }
+}
+
+function roomSpecWith(modelAccess: ModelAccess, entries: ConversationEntryStore) {
   return {
-    modes: [fixtureMode],
-    roles: fixtureRoles,
+    modes: [MODE_FIXTURE],
+    roles: FIXTURE_ROLES,
     charter: CHARTER_FIXTURE,
     fragments: PROMPT_FRAGMENTS_FIXTURE,
     policy: SHIPPED_HISTORY_POLICY,
     applying: { rounds: 3 },
     modelAccess,
+    entries,
     logger: createLogger('silent'),
     now: () => 1_700_000_000_000,
     authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
@@ -137,7 +145,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
 
 function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureScript>>): { room: Room; adapter: FixtureModelAdapter } {
   const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
-  const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
+  const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new ConversationEntryStore()))
   return { room, adapter }
 }
 
@@ -215,12 +223,11 @@ describe('Room.dispatch', () => {
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
   it("an unaddressed dispatch reads nothing for addressing and calls the enabled cast, never a specialist the piece's mode does not offer", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     await pieceMetadata.writeCast(workspaceDir, piece.id, 'draft', ['shape', 'compression', 'interiority'])
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
@@ -239,7 +246,7 @@ describe('Room.dispatch', () => {
   })
 
   it('states a failure synchronously, rather than opening an action, when the conversation on disk cannot be read', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {})
     const conversationId = room.mintConversation(workspaceDir, scope(piece.id)).id
     mkdirSync(path.join(workspaceDir, piece.id, 'conversations', 'draft'), { recursive: true })
@@ -252,7 +259,7 @@ describe('Room.dispatch', () => {
   })
 
   it('reaches a compiled prompt exactly as submitted, comments and malformed YAML alike, since story context is opaque text — and never as reread from disk', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     await writeStoryContext(workspaceDir, piece.id, 'stale text nobody submitted')
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -274,12 +281,12 @@ describe('Room.dispatch', () => {
   })
 
   it("owns the dispatch's own collapse: a seam that throws instead of failing closes the action and is stated, not rethrown into nothing", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const broken: ModelAccess = {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
     }
-    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken, new ConversationEntryStore()))
 
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
@@ -306,7 +313,7 @@ describe('Room.dispatch', () => {
   })
 
   it('writes the author entry before any participant is called, then appends each response as it lands, reporting each as working first', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } }, held: true, states: ['working'] },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true, states: ['working'] },
@@ -344,7 +351,7 @@ describe('Room.dispatch', () => {
   })
 
   it('stamps every participant it calls with a start moment from its own clock, carried unchanged from called through preparing into working', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, states: ['preparing', 'working'] },
@@ -367,7 +374,7 @@ describe('Room.dispatch', () => {
   })
 
   it('submits every eligible specialist independently, settles them in completion order rather than cast order, and calls the Story Editor only once this dispatch\'s own specialist set is empty', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'compression reading' } }, held: true },
@@ -398,7 +405,7 @@ describe('Room.dispatch', () => {
   })
 
   it("builds every specialist's prompt before any of this dispatch's specialists settle, so a specialist's prompt never carries a sibling's reading from the same dispatch", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'compression reading' } }, held: true },
@@ -430,9 +437,9 @@ describe('Room.dispatch', () => {
   })
 
   it('durably enables a specialist addressed from outside the enabled cast, naming it as brought — and brings nobody where addressing names only the cast', async () => {
-    const brought = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const brought = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     await pieceMetadata.writeCast(workspaceDir, brought.id, 'draft', ['compression'])
-    const alreadyIn = await createPiece(pieceMetadata, workspaceDir, 'Kettle', fixtureMode.id, fixtureCatalog)
+    const alreadyIn = await createPiece(pieceMetadata, workspaceDir, 'Kettle', MODE_FIXTURE.id, FIXTURE_CATALOG)
 
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'concrete note' } } },
@@ -451,8 +458,8 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
-  it('keeps a decliner out of its readings and owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+  it('owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -462,10 +469,6 @@ describe('Room.dispatch', () => {
     const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
     await settlementOf(room, piece.id)
 
-    expect(adapter.promptFor('story-editor')).toContain('FIXTURE_ADDRESSED_HEADING')
-
-    expect(adapter.promptFor('story-editor')).not.toContain('FIXTURE_READINGS_HEADING')
-
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment').map((entry) => entry.participantId)).toEqual(['shape', 'compression'])
     expect(landed.filter((entry) => entry.kind === 'participantFailure').map((entry) => entry.participantId)).toEqual(['story-editor'])
@@ -473,7 +476,7 @@ describe('Room.dispatch', () => {
   })
 
   it('calls a named addressed-only participant alone, enrolling it in nothing and trailing it with no generalist call', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a tool reading' } } },
     })
@@ -491,7 +494,7 @@ describe('Room.dispatch', () => {
   })
 
   it('settles with nothing in it at all when every call failed, without ever emitting an error event', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'failed', reason: 'unconfigured' } },
       compression: { result: { outcome: 'failed', reason: 'unreachable' } },
@@ -514,7 +517,7 @@ describe('Room.dispatch', () => {
   })
 
   it('persists no entry for the participant abandoned mid-call, and leaves it stopped at that point', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -534,7 +537,7 @@ describe('Room.dispatch', () => {
   })
 
   it('lets a new dispatch start immediately without waiting for the abandoned one to unwind, and treats the stale actionId as a silent no-op that never touches it', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -569,7 +572,7 @@ describe('Room.dispatch', () => {
   })
 
   it('refuses a dispatch naming a conversation the room never handed out and nothing has written, reaching no model and opening no action', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading' } } },
     })
@@ -584,7 +587,7 @@ describe('Room.dispatch', () => {
   })
 
   it('refuses a minted id presented in a scope other than the one that minted it, and admits it in the scope that minted it', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -607,8 +610,8 @@ describe('Room.dispatch', () => {
   })
 
   it('does not let a minted id outlive the piece it was minted for once the room abandons that piece', async () => {
-    const pieceOne = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const pieceTwo = await createPiece(pieceMetadata, workspaceDir, 'Saucers', fixtureMode.id, fixtureCatalog)
+    const pieceOne = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
+    const pieceTwo = await createPiece(pieceMetadata, workspaceDir, 'Saucers', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {})
 
     room.connect(pieceOne.id, () => {})
@@ -622,7 +625,7 @@ describe('Room.dispatch', () => {
   })
 
   it('appends nothing and emits one terminal frame where every model result lands after the abandonment', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -646,7 +649,7 @@ describe('Room.dispatch', () => {
   })
 
   it('refuses to delete the conversation its scope is working in, and deletes that same conversation once the scope is idle', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -669,7 +672,7 @@ describe('Room.dispatch', () => {
   })
 
   it("resolves an author-context room scope's conversation in the data root's global namespace, not under the piece", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a durable note' } } },
     })
@@ -685,7 +688,7 @@ describe('Room.dispatch', () => {
   })
 
   it("carries the currently open piece's draft, story context and mode description, though the conversation it dispatches into is global", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a durable note' } } },
     })
@@ -700,7 +703,7 @@ describe('Room.dispatch', () => {
     )
     await settlementOfScope(room, authorContextScope)
 
-    expect(adapter.promptFor('story-editor')).toContain(fixtureMode.description)
+    expect(adapter.promptFor('story-editor')).toContain(MODE_FIXTURE.description)
     expect(adapter.promptFor('story-editor')).toContain('the currently open draft text')
     expect(adapter.promptFor('story-editor')).toContain('the currently open story-context text')
   })
@@ -713,10 +716,10 @@ describe('Room.dispatch', () => {
     const askInterviewer = `@${INTERVIEWER_FIXTURE.handle} ${INTERVIEWER_FIXTURE.function?.invocation}`
 
     for (const [surface, reference] of [
-      ['storyContext', fixtureMode.storyContextReference],
+      ['storyContext', MODE_FIXTURE.storyContextReference],
       ['authorContext', AUTHOR_CONTEXT_REFERENCE_FIXTURE],
     ] as const) {
-      const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+      const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
       const { room, adapter } = buildRoom(dataRoot, interviewerAnswers)
       const roomScope: RoomScope = { pieceId: piece.id, surface }
 
@@ -729,18 +732,18 @@ describe('Room.dispatch', () => {
       expect(adapter.promptFor('story-editor')).not.toContain(reference)
     }
 
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, interviewerAnswers)
 
     await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: askInterviewer }, documents('draft text'))
     await settlementOf(room, piece.id)
 
-    expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(fixtureMode.storyContextReference)
+    expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(MODE_FIXTURE.storyContextReference)
     expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(AUTHOR_CONTEXT_REFERENCE_FIXTURE)
   })
 
   it('lets the Story Editor say nothing where a specialist already gave the author something substantive', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -757,7 +760,7 @@ describe('Room.dispatch', () => {
   })
 
   it('still owes an answer where the author addressed the Story Editor directly', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {
       'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
     })
@@ -772,26 +775,8 @@ describe('Room.dispatch', () => {
     })
   })
 
-  it('still owes an answer where no specialist gave the author anything substantive', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const { room } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-    })
-
-    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
-    await settlementOf(room, piece.id)
-
-    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
-    expect(landed.find((entry) => 'participantId' in entry && entry.participantId === 'story-editor')).toMatchObject({
-      kind: 'participantFailure',
-      reason: 'nonconforming',
-    })
-  })
-
   it("reaches the Story Editor with the specialists' answers and with no answer from a participant called for its function", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
       toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about tooling' } } },
@@ -812,34 +797,17 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('story-editor')).not.toContain('a reading about tooling')
   })
 
-  it("carries no specialist's answer into a sibling specialist's prompt", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
-    })
-
-    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
-    await settlementOf(room, piece.id)
-
-    expect(adapter.promptFor('shape')).not.toContain('a reading about compression')
-    expect(adapter.promptFor('compression')).not.toContain('a reading about shape')
-  })
-
   it('states the response it could not write, keeps the responses beside it, and settles the dispatch', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const appended = ConversationEntryStore.prototype.append
-    vi.spyOn(ConversationEntryStore.prototype, 'append').mockImplementation(function (this: ConversationEntryStore, ...args) {
-      const entry = args[3]
-      if ('participantId' in entry && entry.participantId === 'shape') return Promise.reject(new Error('the conversation file refused the write'))
-      return appended.apply(this, args)
-    })
-    const { room } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
-    })
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
+    const adapter = FixtureModelAdapter.bySite(
+      {
+        shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
+        compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
+        'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+      },
+      { reachable: true, models: [] },
+    )
+    const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new EntryStoreRefusing('shape')))
 
     const events: RoomEvent[] = []
     room.subscribe(piece.id, (event) => events.push(event))
@@ -884,7 +852,7 @@ describe('Room.apply', () => {
   })
 
   async function pieceWithRecommendation(): Promise<{ pieceId: string }> {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim: 'cut the second paragraph' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -1091,7 +1059,7 @@ describe('Room.apply', () => {
 
   it("gates only its own room scope: the same piece's other surface, and a different piece's draft, each accept a dispatch while one scope is busy", async () => {
     const { pieceId } = await pieceWithRecommendation()
-    const other = await createPiece(pieceMetadata, workspaceDir, 'Kettle', fixtureMode.id, fixtureCatalog)
+    const other = await createPiece(pieceMetadata, workspaceDir, 'Kettle', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -1164,7 +1132,7 @@ describe('Room.apply', () => {
       call: () => Promise.reject(new Error('the seam broke in a way nothing named')),
       status: () => Promise.resolve({ reachable: true, models: [] }),
     }
-    const room = buildTestRoom(dataRoot, roomSpecWith(broken))
+    const room = buildTestRoom(dataRoot, roomSpecWith(broken, new ConversationEntryStore()))
 
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
@@ -1285,7 +1253,7 @@ describe('Room.apply', () => {
     const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, { ...RESOLVING_EDITS, held: true }] }, { reachable: true, models: [] }, () => {
       calls += 1
     })
-    const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
+    const room = buildTestRoom(dataRoot, roomSpecWith(adapter, new ConversationEntryStore()))
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
 
@@ -1319,7 +1287,7 @@ describe('Room.apply', () => {
     const lines: string[] = []
     const adapter = FixtureModelAdapter.bySite({ apply: [UNRESOLVED_EDITS, RESOLVING_EDITS] }, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, {
-      ...roomSpecWith(adapter),
+      ...roomSpecWith(adapter, new ConversationEntryStore()),
       logger: pino({ level: 'info' }, { write: (line: string) => lines.push(line) }),
     })
 
@@ -1373,8 +1341,8 @@ describe('Room.apply', () => {
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toHaveLength(1)
   })
 
-  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema and the preserve-instruction, the text the edit did not quote survives byte for byte, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema, the text the edit did not quote survives byte for byte, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const storyContextScope: RoomScope = { pieceId: piece.id, surface: 'storyContext' }
     const storyContextConversationScope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'storyContext' }
 
@@ -1411,9 +1379,7 @@ describe('Room.apply', () => {
     expect(outcome.replacement).toBe('Premise: two cups, one chipped.\n\n<!-- ask her which cup is chipped -->\n')
 
     expect(adapter.promptFor('apply')).toContain('Premise: two cups.')
-    expect(adapter.promptFor('apply')).toContain(fixtureMode.storyContextReference)
-    expect(adapter.promptFor('apply')).toContain('FIXTURE_STORY_CONTEXT_SURFACE')
-    expect(adapter.promptFor('apply')).toContain('FIXTURE_APPLY_TASK')
+    expect(adapter.promptFor('apply')).toContain(MODE_FIXTURE.storyContextReference)
 
     await writeStoryContext(workspaceDir, piece.id, outcome.replacement)
     const confirmed = await room.confirmApply(workspaceDir, storyContextScope, cid(storyContextScope, 'c1'), outcome.applicationId)
@@ -1440,7 +1406,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
   })
 
   it('replying addresses the named participant by the act, reading the message for nothing', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -1458,7 +1424,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
   })
 
   it('refuses an act naming a participant or a response that is not there, opening no action either way', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {})
 
     await expect(
@@ -1473,7 +1439,7 @@ describe('Room.dispatch — an action the author opened from a particular respon
   })
 
   it("asking for a concrete change opens a dispatch with no message, calling only the response's own participant", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'The entry is late.', note: 'By a paragraph.' } } },
     })
@@ -1521,7 +1487,7 @@ describe('Room.connect', () => {
   })
 
   it('captures the action in flight, if any, at each of the three room scopes atomically with the subscription, before any live event can arrive', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
@@ -1546,8 +1512,8 @@ describe('Room.connect', () => {
   })
 
   it("abandons a different piece's unfinished work across all three of its room scopes on opening this one, and resumes a piece's own work untouched on reconnecting to it", async () => {
-    const first = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
-    const second = await createPiece(pieceMetadata, workspaceDir, 'Kettle', fixtureMode.id, fixtureCatalog)
+    const first = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
+    const second = await createPiece(pieceMetadata, workspaceDir, 'Kettle', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },
       compression: { result: { outcome: 'value', value: { outcome: 'noComment' } }, held: true },

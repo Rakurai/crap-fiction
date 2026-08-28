@@ -26,6 +26,99 @@ function castParticipant(availability: string): string {
 }
 
 const AVAILABLE_IN_FLASH = 'availability:\n  - mode: flash\n    surface: draft\n    enabledByDefault: true\n'
+const AVAILABLE_IN_NOVELLA = 'availability:\n  - mode: novella\n    surface: draft\n    enabledByDefault: true\n'
+const AVAILABLE_IN_FLASH_TWICE = `${AVAILABLE_IN_FLASH}  - mode: flash\n    surface: draft\n    enabledByDefault: false\n`
+const SHARES_SHAPES_MARK = `---\nhandle: compression\ndisplayName: Compression\ndescription: w\nmark: SH\neligibility: cast\n${AVAILABLE_IN_FLASH}---\nReasons about compression.\n`
+
+const WELL_FORMED = { shape: castParticipant(AVAILABLE_IN_FLASH), 'story-editor': STORY_EDITOR, interview: INTERVIEWER }
+
+type Refusal = Readonly<{
+  defect: string
+  participants: Readonly<Record<string, string>>
+  modes: readonly string[]
+  named: readonly (RegExp | (new (...args: never[]) => Error))[]
+}>
+
+const REFUSALS: readonly Refusal[] = [
+  {
+    defect: 'no participant declares a function the studio acts on',
+    participants: { shape: castParticipant(AVAILABLE_IN_FLASH), 'story-editor': STORY_EDITOR },
+    modes: ['flash'],
+    named: [ParticipantFunctionCardinalityError, /found 0/],
+  },
+  {
+    defect: 'more than one participant declares the same function',
+    participants: { ...WELL_FORMED, asker: addressedOnlyParticipant('asker', DECLARES_INTERVIEWER) },
+    modes: ['flash'],
+    named: [ParticipantFunctionCardinalityError, /found 2/],
+  },
+  {
+    defect: 'a declared function is not one the studio knows',
+    participants: { ...WELL_FORMED, interview: addressedOnlyParticipant('interview', 'function:\n  name: proofreader\n  invocation: read it back\n') },
+    modes: ['flash'],
+    named: [ShippedDataError, /interview\.md/],
+  },
+  {
+    defect: 'a declared function arrives without its invocation',
+    participants: { ...WELL_FORMED, interview: addressedOnlyParticipant('interview', `function:\n  name: ${INTERVIEWER_FUNCTION}\n`) },
+    modes: ['flash'],
+    named: [ShippedDataError, /interview\.md/],
+  },
+  {
+    defect: 'a participant of another kind declares a function at all',
+    participants: { ...WELL_FORMED, shape: castParticipant(`${AVAILABLE_IN_FLASH}${DECLARES_INTERVIEWER}`) },
+    modes: ['flash'],
+    named: [ShippedDataError, /shape\.md/],
+  },
+  {
+    defect: 'a participant document has no frontmatter block',
+    participants: { broken: 'not a frontmatter document at all' },
+    modes: [],
+    named: [ShippedDataError, /broken\.md/],
+  },
+  {
+    defect: 'the participants do not declare exactly one generalist',
+    participants: { shape: castParticipant(AVAILABLE_IN_FLASH), interview: INTERVIEWER },
+    modes: ['flash'],
+    named: [GeneralistCardinalityError, /found 0/],
+  },
+  {
+    defect: 'two participants share the handle the author addresses them by',
+    participants: { ...WELL_FORMED, compression: castParticipant(AVAILABLE_IN_FLASH) },
+    modes: ['flash'],
+    named: [/duplicate handle/],
+  },
+  {
+    defect: 'two participants declare the same mark',
+    participants: { ...WELL_FORMED, compression: SHARES_SHAPES_MARK },
+    modes: ['flash'],
+    named: [/duplicate mark/],
+  },
+  {
+    defect: 'availability names a mode that did not load',
+    participants: { ...WELL_FORMED, shape: castParticipant(AVAILABLE_IN_NOVELLA) },
+    modes: ['flash'],
+    named: [ShippedDataError, /shape\.md/],
+  },
+  {
+    defect: 'availability repeats a mode and surface',
+    participants: { ...WELL_FORMED, shape: castParticipant(AVAILABLE_IN_FLASH_TWICE) },
+    modes: ['flash'],
+    named: [/duplicate availability/],
+  },
+  {
+    defect: 'a cast participant declares no availability',
+    participants: { ...WELL_FORMED, shape: castParticipant('') },
+    modes: ['flash'],
+    named: [ShippedDataError, /shape\.md/],
+  },
+  {
+    defect: 'a participant of another kind declares availability',
+    participants: { ...WELL_FORMED, 'story-editor': STORY_EDITOR.replace('---\nReasons', `${AVAILABLE_IN_FLASH}---\nReasons`) },
+    modes: ['flash'],
+    named: [ShippedDataError, /story-editor\.md/],
+  },
+]
 
 describe('loadRoles', () => {
   let contentRoot: string
@@ -39,14 +132,14 @@ describe('loadRoles', () => {
     rmSync(contentRoot, { recursive: true, force: true })
   })
 
-  function writeParticipant(id: string, text: string): void {
-    writeFileSync(path.join(contentRoot, 'participants', `${id}.md`), text, 'utf8')
+  function ship(participants: Readonly<Record<string, string>>): void {
+    for (const [id, text] of Object.entries(participants)) {
+      writeFileSync(path.join(contentRoot, 'participants', `${id}.md`), text, 'utf8')
+    }
   }
 
   it('loads each participant a fixture content root ships, by the identity, eligibility, availability and prose its document carries', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('story-editor', STORY_EDITOR)
-    writeParticipant('interview', INTERVIEWER)
+    ship(WELL_FORMED)
 
     expect(loadRoles(contentRoot, new Set(['flash']))).toEqual([
       {
@@ -85,91 +178,11 @@ describe('loadRoles', () => {
     ])
   })
 
-  it('fails startup naming the count when no participant, or more than one, declares a function the studio acts on', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('story-editor', STORY_EDITOR)
+  it.each(REFUSALS)('fails startup, naming what it read, where $defect', ({ participants, modes, named }) => {
+    ship(participants)
 
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ParticipantFunctionCardinalityError)
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/found 0/)
-
-    writeParticipant('interview', INTERVIEWER)
-    writeParticipant('asker', addressedOnlyParticipant('asker', DECLARES_INTERVIEWER))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/found 2/)
-  })
-
-  it('fails startup naming the file when a declared function is not one the studio knows, or arrives without its invocation', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('story-editor', STORY_EDITOR)
-
-    writeParticipant('interview', addressedOnlyParticipant('interview', 'function:\n  name: proofreader\n  invocation: read it back\n'))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/interview\.md/)
-
-    writeParticipant('interview', addressedOnlyParticipant('interview', `function:\n  name: ${INTERVIEWER_FUNCTION}\n`))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
-  })
-
-  it('fails startup naming the file when a participant of another kind declares a function at all', () => {
-    writeParticipant('story-editor', STORY_EDITOR)
-    writeParticipant('interview', INTERVIEWER)
-    writeParticipant('shape', castParticipant(`${AVAILABLE_IN_FLASH}${DECLARES_INTERVIEWER}`))
-
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/shape\.md/)
-  })
-
-  it('fails startup naming the file when a participant document has no frontmatter block', () => {
-    writeParticipant('broken', 'not a frontmatter document at all')
-
-    expect(() => loadRoles(contentRoot, new Set())).toThrowError(ShippedDataError)
-    expect(() => loadRoles(contentRoot, new Set())).toThrowError(/broken\.md/)
-  })
-
-  it('fails startup naming the count when the shipped participants do not declare exactly one generalist', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(GeneralistCardinalityError)
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/found 0/)
-  })
-
-  it('fails startup naming the file when two participants share the handle the author addresses them by', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('compression', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('story-editor', STORY_EDITOR)
-
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/duplicate handle/)
-  })
-
-  it('fails startup naming the file when two participants declare the same mark', () => {
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant(
-      'compression',
-      '---\nhandle: compression\ndisplayName: Compression\ndescription: w\nmark: SH\neligibility: cast\n' +
-        AVAILABLE_IN_FLASH +
-        '---\nReasons about compression.\n',
-    )
-    writeParticipant('story-editor', STORY_EDITOR)
-
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/duplicate mark/)
-  })
-
-  it('fails startup naming the file when availability names a mode that did not load, or repeats a mode and surface', () => {
-    writeParticipant('story-editor', STORY_EDITOR)
-    writeParticipant('shape', castParticipant('availability:\n  - mode: novella\n    surface: draft\n    enabledByDefault: true\n'))
-
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/shape\.md/)
-
-    writeParticipant('shape', castParticipant(`${AVAILABLE_IN_FLASH}  - mode: flash\n    surface: draft\n    enabledByDefault: false\n`))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(/duplicate availability/)
-  })
-
-  it('fails startup when a cast participant declares no availability, or a participant of another kind declares any', () => {
-    writeParticipant('story-editor', STORY_EDITOR)
-    writeParticipant('shape', castParticipant(''))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
-
-    writeParticipant('shape', castParticipant(AVAILABLE_IN_FLASH))
-    writeParticipant('story-editor', STORY_EDITOR.replace('---\nReasons', `${AVAILABLE_IN_FLASH}---\nReasons`))
-    expect(() => loadRoles(contentRoot, new Set(['flash']))).toThrowError(ShippedDataError)
+    for (const matcher of named) {
+      expect(() => loadRoles(contentRoot, new Set(modes))).toThrowError(matcher)
+    }
   })
 })
