@@ -117,6 +117,21 @@ describe('LMStudioAdapter.call', () => {
     expect(Object.keys(result)).toEqual(['outcome', 'reason'])
   })
 
+  it('fails as internal, distinctly from unreachable, when the studio itself threw, and logs what threw', async () => {
+    modelFn.mockResolvedValue({ respond: respondFn })
+    respondFn.mockResolvedValue({ nonReasoningContent: JSON.stringify({ claim: 'x' }) })
+    const thrown = new Error('the caller could not take the state')
+    const logged = vi.spyOn(silent, 'error')
+
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const result = await adapter.call('shape', prompt, schema, new AbortController().signal, () => {
+      throw thrown
+    })
+
+    expect(result).toEqual({ outcome: 'failed', reason: 'internal' })
+    expect(logged).toHaveBeenCalledWith(expect.objectContaining({ err: thrown }), expect.any(String))
+  })
+
   // `AbortSignal.timeout` is timed inside the platform rather than on the JavaScript timer
   // queue, so fake timers do not reach it and the factory itself is substituted.
   it('fails as timeout, distinctly from unreachable, when its own bound elapses', async () => {

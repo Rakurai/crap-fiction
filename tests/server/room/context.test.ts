@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assertSpecialistIndependence,
   compileApplyContext,
   compileSpecialistContext,
   compileStoryEditorContext,
   renderApplyPrompt,
   renderPrompt,
-  SpecialistIndependenceViolation,
   type ApplyContextInput,
-  type Context,
   type ContextInput,
   type HistoryPolicy,
 } from '../../../src/server/room/context.js'
@@ -507,35 +504,5 @@ describe('the order the two halves compose in', () => {
         ]),
       ),
     ).toBe(true)
-  })
-})
-
-describe('specialist independence', () => {
-  const ordinaryContext: Context = {
-    role: shape,
-    modeDescription: MODE_DESCRIPTION,
-    owesAnswer: false,
-    message: undefined,
-    ask: undefined,
-    authorContext: undefined,
-    storyContext: undefined,
-    draft: 'text',
-    surface: 'draft',
-    referenceSchema: undefined,
-    history: [],
-    evidence: [],
-  }
-
-  it('accepts a compiled specialist context, which carries no evidence from the dispatch being formed', () => {
-    expect(() => assertSpecialistIndependence([ordinaryContext])).not.toThrow()
-  })
-
-  it('rejects a compiled context that carries a reading from the dispatch being formed, before it is rendered', () => {
-    const contaminated: Context = {
-      ...ordinaryContext,
-      evidence: [{ participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }],
-    }
-
-    expect(() => assertSpecialistIndependence([contaminated])).toThrow(SpecialistIndependenceViolation)
   })
 })

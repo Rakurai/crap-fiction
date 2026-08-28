@@ -9,6 +9,7 @@ import type { ModeDescriptor } from '../../../src/server/modes.js'
 import { ConversationNotFoundError, createPiece } from '../../../src/server/pieces.js'
 import type { ConversationScope, RoomScope } from '../../../src/server/scope.js'
 import {
+  ConversationEntryStore,
   DraftStore,
   PieceMetadataStore,
   readAppliedChanges,
@@ -210,6 +211,7 @@ describe('Room.dispatch', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
@@ -731,6 +733,128 @@ describe('Room.dispatch', () => {
 
     expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(fixtureMode.storyContextReference)
     expect(adapter.promptFor(INTERVIEWER_FIXTURE.id)).not.toContain(AUTHOR_CONTEXT_REFERENCE_FIXTURE)
+  })
+
+  it('lets the Story Editor say nothing where a specialist already gave the author something substantive', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'the entry is late' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
+    expect(landed.find((entry) => 'participantId' in entry && entry.participantId === 'story-editor')).toMatchObject({
+      kind: 'participantNoComment',
+    })
+  })
+
+  it('still owes an answer where the author addressed the Story Editor directly', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: '@editor what do you think' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
+    expect(landed.find((entry) => 'participantId' in entry && entry.participantId === 'story-editor')).toMatchObject({
+      kind: 'participantFailure',
+      reason: 'nonconforming',
+    })
+  })
+
+  it('still owes an answer where no specialist gave the author anything substantive', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
+    expect(landed.find((entry) => 'participantId' in entry && entry.participantId === 'story-editor')).toMatchObject({
+      kind: 'participantFailure',
+      reason: 'nonconforming',
+    })
+  })
+
+  it("reaches the Story Editor with the specialists' answers and with no answer from a participant called for its function", async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
+      toolsmith: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about tooling' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    await dispatch(room,
+      workspaceDir,
+      scope(piece.id),
+      'c1',
+      { kind: 'message', text: '@shape @toolsmith @editor a message' },
+      documents('draft text'),
+    )
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('toolsmith')).toBeDefined()
+    expect(adapter.promptFor('story-editor')).toContain('a reading about shape')
+    expect(adapter.promptFor('story-editor')).not.toContain('a reading about tooling')
+  })
+
+  it("carries no specialist's answer into a sibling specialist's prompt", async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    expect(adapter.promptFor('shape')).not.toContain('a reading about compression')
+    expect(adapter.promptFor('compression')).not.toContain('a reading about shape')
+  })
+
+  it('states the response it could not write, keeps the responses beside it, and settles the dispatch', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const appended = ConversationEntryStore.prototype.append
+    vi.spyOn(ConversationEntryStore.prototype, 'append').mockImplementation(function (this: ConversationEntryStore, ...args) {
+      const entry = args[3]
+      if ('participantId' in entry && entry.participantId === 'shape') return Promise.reject(new Error('the conversation file refused the write'))
+      return appended.apply(this, args)
+    })
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    const events: RoomEvent[] = []
+    room.subscribe(piece.id, (event) => events.push(event))
+
+    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    expect(events.find((event) => event.type === 'error')?.data).toMatchObject({
+      code: 'CONVERSATION_NOT_WRITTEN',
+      message: "Shape's response was not written to the conversation: the conversation file refused the write",
+    })
+    expect(events.find((event) => event.type === 'action.finished')?.data).toMatchObject({ outcome: 'settled' })
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
+    expect(landed.map((entry) => ('participantId' in entry ? entry.participantId : entry.kind))).toEqual([
+      'authorMessage',
+      'compression',
+      'story-editor',
+    ])
   })
 })
 

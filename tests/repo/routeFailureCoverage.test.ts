@@ -21,6 +21,7 @@ const THROWN_ONLY_OUTSIDE_REQUEST_HANDLING = new Set([
   'ModelRuntimeUrlError',
   'MalformedError',
   'NonConformingError',
+  'RuntimeCallError',
   'FragmentVariableMismatchError',
   'GeneralistCardinalityError',
   'ParticipantFunctionCardinalityError',
@@ -28,7 +29,6 @@ const THROWN_ONLY_OUTSIDE_REQUEST_HANDLING = new Set([
   'GeneralistNotInRosterError',
   'ShippedDataError',
   'PersistedWorkspaceUnusableError',
-  'SpecialistIndependenceViolation',
 ])
 
 describe('every class under src/server or src/shared declared as extending Error, a built-in Error subclass, or RouteFailure is classified: route-answerable, or never reaching a route', () => {

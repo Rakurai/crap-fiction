@@ -57,6 +57,21 @@ class NonConformingError extends Error {
   }
 }
 
+class RuntimeCallError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'the model runtime did not answer', { cause })
+    this.name = 'RuntimeCallError'
+  }
+}
+
+async function throughRuntime<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call()
+  } catch (error) {
+    throw new RuntimeCallError(error)
+  }
+}
+
 export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
@@ -137,7 +152,12 @@ export class LMStudioAdapter implements ModelAccess {
         return this.#logged(site, assignment, { outcome: 'failed', reason: 'nonconforming', returned: error.returned })
       }
       if (timeoutSignal.aborted) return this.#logged(site, assignment, { outcome: 'failed', reason: 'timeout' })
-      return this.#logged(site, assignment, { outcome: 'failed', reason: 'unreachable' })
+      if (error instanceof RuntimeCallError) {
+        this.#logger.error({ site, assignment, err: error.cause }, 'model runtime did not answer')
+        return this.#logged(site, assignment, { outcome: 'failed', reason: 'unreachable' })
+      }
+      this.#logger.error({ site, assignment, err: error }, 'model call failed inside the studio')
+      return this.#logged(site, assignment, { outcome: 'failed', reason: 'internal' })
     }
   }
 
@@ -151,9 +171,11 @@ export class LMStudioAdapter implements ModelAccess {
     announce: (state: CallState) => void,
   ): Promise<T> {
     announce('preparing')
-    const model = await this.#client.llm.model(assignment, { signal })
+    const model = await throughRuntime(() => this.#client.llm.model(assignment, { signal }))
     announce('working')
-    const result = await model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
+    const result = await throughRuntime(() =>
+      model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal }),
+    )
 
     const returned = result.nonReasoningContent
 

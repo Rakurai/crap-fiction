@@ -44,7 +44,6 @@ import {
 import type { ComputeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
 import {
-  assertSpecialistIndependence,
   compileApplyContext,
   compileSpecialistContext,
   compileStoryEditorContext,
@@ -466,10 +465,15 @@ export class Room {
     return { conversationId, actionId }
   }
 
-  #fail(scope: RoomScope, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+  #report(scope: RoomScope, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
     this.#logger.error({ pieceId: scope.pieceId, actionId, code, err: cause }, 'conversation action failed')
     if (!this.#owns(scope, actionId)) return
     this.#emit(scope.pieceId, { type: 'error', data: { code, message, surface: scope.surface } })
+  }
+
+  #fail(scope: RoomScope, actionId: string, code: ConversationFailureCode, message: string, cause: unknown): void {
+    this.#report(scope, actionId, code, message, cause)
+    if (!this.#owns(scope, actionId)) return
     this.#finish(scope, actionId, 'failed')
   }
 
@@ -523,25 +527,32 @@ export class Room {
       this.#emit(pieceId, { type: 'participant.activity', data: { actionId, participantId, state, startedAt, surface: roomScope.surface } })
     }
 
-    const compiled = [...eligibleSpecialists, ...eligibleAddressedOnly].map((role) => {
+    const compiled = [
+      ...eligibleSpecialists.map((role) => ({ role, contributesEvidence: true })),
+      ...eligibleAddressedOnly.map((role) => ({ role, contributesEvidence: false })),
+    ].map(({ role, contributesEvidence }) => {
       const owesAnswer = addressedIds.includes(role.id)
-      return { role, owesAnswer, context: compileSpecialistContext(contextFor(role, owesAnswer)) }
+      return { role, owesAnswer, contributesEvidence, context: compileSpecialistContext(contextFor(role, owesAnswer)) }
     })
-    assertSpecialistIndependence(compiled.map(({ context }) => context))
-    const calls = compiled.map(({ role, owesAnswer, context }) => ({
+    const calls = compiled.map(({ role, owesAnswer, contributesEvidence, context }) => ({
       role,
       owesAnswer,
+      contributesEvidence,
       prompt: renderPrompt(context, this.#catalog.fragments, this.#catalog.charter),
     }))
 
     const evidence: ParticipantEvidence[] = []
     let abandoned = false
-    let failed = false
 
-    const reportFailureOnce = (message: string, err: unknown): void => {
-      if (failed) return
-      failed = true
-      this.#fail(roomScope, actionId, 'CONVERSATION_NOT_WRITTEN', message, err)
+    const reportLostEntry = (role: RoleDefinition, err: unknown): void => {
+      const detail = err instanceof Error ? err.message : 'the entry could not be written'
+      this.#report(
+        roomScope,
+        actionId,
+        'CONVERSATION_NOT_WRITTEN',
+        `${role.displayName}'s response was not written to the conversation: ${detail}`,
+        err,
+      )
     }
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
@@ -555,7 +566,6 @@ export class Room {
         abandoned = true
         return
       }
-      if (failed) return
       if (!this.#owns(roomScope, actionId)) {
         abandoned = true
         return
@@ -564,49 +574,55 @@ export class Room {
       try {
         await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
       } catch (err) {
-        reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
+        reportLostEntry(call.role, err)
         return
       }
       if (!this.#owns(roomScope, actionId)) return
       this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
 
+      if (!call.contributesEvidence) return
       const gathered = evidenceFrom(outcome, call.role.displayName)
       if (gathered !== undefined) evidence.push(gathered)
     }
 
     await Promise.all(calls.map(settleSpecialist))
 
-    if (!abandoned && !failed && storyEditorIncluded) {
+    if (!abandoned && storyEditorIncluded) {
       if (signal.aborted) {
         abandoned = true
       } else {
         const storyEditor = this.#catalog.roster.storyEditor
-        const prompt = renderPrompt(compileStoryEditorContext(contextFor(storyEditor, true), evidence), this.#catalog.fragments, this.#catalog.charter)
+        const owesAnswer = addressedIds.includes(storyEditor.id) || evidence.length === 0
+        const prompt = renderPrompt(
+          compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence),
+          this.#catalog.fragments,
+          this.#catalog.charter,
+        )
         onState(storyEditor.id, 'called')
-        const outcome = await callParticipant(storyEditor, prompt, causeEntry.id, true, this.#modelAccess, signal, (state) =>
+        const outcome = await callParticipant(storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
           onState(storyEditor.id, state),
         )
         operation.states.delete(storyEditor.id)
         if (outcome.kind === 'abandoned' || !this.#owns(roomScope, actionId)) {
           abandoned = true
         } else {
+          let written = true
           try {
             await this.#entries.append(this.#dataRoot, conversationScope, conversationId, outcome.entry)
           } catch (err) {
-            reportFailureOnce(err instanceof Error ? err.message : 'the entry could not be written', err)
+            written = false
+            reportLostEntry(storyEditor, err)
           }
-          if (!failed && this.#owns(roomScope, actionId)) {
+          if (written && this.#owns(roomScope, actionId)) {
             this.#emit(pieceId, { type: 'entry.appended', data: { actionId, entry: outcome.entry, surface: roomScope.surface } })
           }
         }
       }
     }
 
-    if (!failed) {
-      const outcome = abandoned ? 'abandoned' : 'settled'
-      this.#finish(roomScope, actionId, outcome)
-      this.#logger.info({ pieceId, actionId, outcome }, 'conversation action closed')
-    }
+    const outcome = abandoned ? 'abandoned' : 'settled'
+    this.#finish(roomScope, actionId, outcome)
+    this.#logger.info({ pieceId, actionId, outcome }, 'conversation action closed')
   }
 
   async apply(

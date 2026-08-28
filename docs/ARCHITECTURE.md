@@ -569,7 +569,8 @@ standing alone conforms and nothing has to be invented to fill a field. Shrinkin
 always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
-one, and so does the Story Editor on every dispatch that calls it at all. Declaring it is then
+one, and so does the Story Editor on a dispatch where no specialist reading landed for it to work
+from. Declaring it is then
 a response that does not conform, which the module re-issues under its own policy before it becomes a
 failure. This is what makes an owed answer enforceable without inspecting what a response says —
 judging the content would take a second model call to do badly, and a model willing to declare silence
@@ -793,7 +794,10 @@ back, once the model layer's retries are exhausted, and there is no per-particip
 has nothing material: its no-comment outcome is recorded and is not shown, and it is never re-run under
 an obligation to speak. The Story Editor fails: the dispatch degrades to whatever readings landed rather
 than breaking, because the readings do not depend on it — and where nothing landed either, the dispatch
-produced no answer and says so. Abandonment: every call this dispatch has in flight shares one signal and
+produced no answer and says so. A response lands and cannot be written: the loss is reported naming whose
+response it was, and the dispatch settles with the entries that did reach disk — one unwritable entry
+discards neither the responses beside it nor the synthesis they were gathered for. Abandonment: every call
+this dispatch has in flight shares one signal and
 cancels through it, landed responses stand as ordinary entries, and no Story Editor call is attempted —
 asking for one more call is the wrong question at the moment the author stopped caring. A call abandoned
 mid-flight appends no entry of its own: an abandoned call said nothing, and nothing is the one outcome a

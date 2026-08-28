@@ -151,7 +151,7 @@ CallResult<T> =
   | { outcome: 'abandoned' }
   | { outcome: 'failed';    reason: FailureReason; returned?: string }
 
-FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
+FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming' | 'internal'
 ```
 
 `prompt` carries the durable half and the per-call half apart; no caller composes them into one string
@@ -165,6 +165,7 @@ that vendor's own accommodation.
 | `timeout` | the configured wait elapsed |
 | `malformed` | what came back was not the requested structure at all |
 | `nonconforming` | it was that structure and still failed the schema |
+| `internal` | the call broke on this side of the seam, and the runtime is not implicated |
 
 `returned` carries what came back verbatim where anything did. `onState` is how a call reports that it
 is preparing before it is working; an implementation that cannot tell setup from work never reports
@@ -235,7 +236,7 @@ its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
 generalist call. The obligation to answer a direct question is call-specific rather than intrinsic to
-the charter, and is composed only where a call addresses a participant directly.
+the charter, and is composed only where the call owes an answer.
 
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short

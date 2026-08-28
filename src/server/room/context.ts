@@ -120,19 +120,6 @@ export function compileStoryEditorContext(input: ContextInput, evidence: readonl
   return contextFrom(input, evidence)
 }
 
-export class SpecialistIndependenceViolation extends Error {
-  constructor(participant: string) {
-    super(`the compiled context for "${participant}" carries a reading from the dispatch being formed`)
-    this.name = 'SpecialistIndependenceViolation'
-  }
-}
-
-export function assertSpecialistIndependence(contexts: readonly Context[]): void {
-  for (const context of contexts) {
-    if (context.evidence.length > 0) throw new SpecialistIndependenceViolation(context.role.displayName)
-  }
-}
-
 export type ApplyContextInput = Readonly<{
   modeDescription: string
   recommendationClaim: string
