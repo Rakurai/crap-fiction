@@ -1,11 +1,11 @@
-import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
+import type { RosterMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import { machineWords } from './facts.js'
 import { Mark } from './Mark.js'
 import styles from './RoomEditor.module.css'
 import { Scrim } from './Scrim.js'
 
 type RoomEditorProps = {
-  readonly members: readonly CastMemberView[]
+  readonly members: readonly RosterMemberView[]
   readonly storyEditor: StoryEditorView
   readonly toggling: string | undefined
   readonly onToggle: (id: string) => void

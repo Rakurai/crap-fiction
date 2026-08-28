@@ -20,7 +20,7 @@ function roomHolding(): RoomAdapters {
   })
 }
 
-const ROSTER = { settled: true, identify: (id: string) => ({ displayName: id, handle: undefined, mark: null, ordinal: null }) }
+const ROSTER = { kind: 'ready' as const, identify: (id: string) => ({ displayName: id, handle: undefined, mark: null, ordinal: null }) }
 
 const BASE_PROPS = {
   pieceId: 'the-lighthouse',

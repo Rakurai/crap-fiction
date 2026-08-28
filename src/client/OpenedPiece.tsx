@@ -129,7 +129,7 @@ function Surfaces({
           initialText={piece.surfaces[surface].text}
           initialConversationId={piece.surfaces[surface].currentConversationId}
           conversationSelection={surface === 'authorContext' ? authorContextSelection : undefined}
-          initialCast={piece.surfaces[surface].cast}
+          initialCast={piece.surfaces[surface].roster}
           initialConversations={piece.surfaces[surface].conversations}
           storyEditor={piece.storyEditor}
           interviewer={piece.interviewer}

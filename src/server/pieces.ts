@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { CastMemberView, PieceDetail, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
+import type { PieceDetail, PieceSummary, RosterMemberView, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
@@ -72,11 +72,11 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
   return piece
 }
 
-function castView(
+function rosterView(
   specialists: readonly RoleDefinition[],
   enabled: readonly string[],
   ordinals: ReadonlyMap<string, number>,
-): readonly CastMemberView[] {
+): readonly RosterMemberView[] {
   return specialists.map((role) => {
     const ordinal = ordinals.get(role.id)
     if (ordinal === undefined) throw new Error(`no ordinal recorded for cast participant "${role.id}"`)
@@ -166,7 +166,7 @@ function surfaceDetail(
     referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
-    cast: castView(available, piece.metadata.cast[surface], catalog.markOrdinals),
+    roster: rosterView(available, piece.metadata.cast[surface], catalog.markOrdinals),
   }
 }
 
@@ -199,7 +199,7 @@ export async function setPieceCast(
   catalog: ShippedContentCatalog,
   surface: SurfaceId,
   cast: readonly string[],
-): Promise<readonly CastMemberView[]> {
+): Promise<readonly RosterMemberView[]> {
   const piece = requirePiece(workspaceDir, id)
   const available = catalog.specialistsFor(piece.metadata.mode, surface)
   const ceiling = new Set(available.map((role) => role.id))
@@ -207,7 +207,7 @@ export async function setPieceCast(
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
   await pieceMetadata.writeCast(workspaceDir, id, surface, cast)
-  return castView(available, cast, catalog.markOrdinals)
+  return rosterView(available, cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(

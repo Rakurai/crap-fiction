@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CastMemberView, StoryEditorView } from '../../../src/shared/pieceViews.js'
+import type { RosterMemberView, StoryEditorView } from '../../../src/shared/pieceViews.js'
 import { RoomEditor } from '../../../src/client/RoomEditor.js'
 
-const MEMBERS: readonly CastMemberView[] = [
+const MEMBERS: readonly RosterMemberView[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
   { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
 ]

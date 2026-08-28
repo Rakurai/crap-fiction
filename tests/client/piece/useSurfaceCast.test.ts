@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { CastMemberView, PieceDetail, SurfaceDetail } from '../../../src/shared/pieceViews.js'
+import type { PieceDetail, RosterMemberView, SurfaceDetail } from '../../../src/shared/pieceViews.js'
 import type { RequestResult } from '../../../src/client/request.js'
 import type { PieceAdapters } from '../../../src/client/usePiece.js'
 import { useSurfaceCast } from '../../../src/client/useSurfaceCast.js'
@@ -14,18 +14,18 @@ function adapters(updatePiece: PieceAdapters['updatePiece']): PieceAdapters {
   }
 }
 
-function member(id: string, enabled: boolean): CastMemberView {
+function member(id: string, enabled: boolean): RosterMemberView {
   return { id, handle: id, displayName: id, description: `about ${id}`, mark: id.slice(0, 2).toUpperCase(), ordinal: 0, enabled }
 }
 
 const SHAPE = member('shape', false)
 const READER = member('reader', false)
 
-function surface(cast: readonly CastMemberView[]): SurfaceDetail {
-  return { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], cast }
+function surface(roster: readonly RosterMemberView[]): SurfaceDetail {
+  return { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], roster }
 }
 
-function detailWith(cast: readonly CastMemberView[]): RequestResult<PieceDetail> {
+function detailWith(cast: readonly RosterMemberView[]): RequestResult<PieceDetail> {
   return {
     outcome: 'value',
     value: {

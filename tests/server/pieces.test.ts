@@ -126,7 +126,7 @@ describe('pieces', () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', flash.id, catalogFor([flash]))
     const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([flash]))
 
-    expect(opened.surfaces.draft.cast.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
+    expect(opened.surfaces.draft.roster.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
     await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([flash]), 'storyContext', [])
     await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([flash]), 'authorContext', [])
   })
@@ -180,21 +180,21 @@ describe('pieces', () => {
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', flash.id, catalogFor([flash]))
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
-    const cast = [
+    const roster = [
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: true },
     ]
     expect(opened).toEqual({
       ...created,
       surfaces: {
-        draft: { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], cast },
+        draft: { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], roster },
         storyContext: {
           text: '',
           location: 'story-context.yaml',
           referenceSchema: flash.storyContextReference,
           currentConversationId: null,
           conversations: [],
-          cast: [],
+          roster: [],
         },
         authorContext: {
           text: '',
@@ -202,7 +202,7 @@ describe('pieces', () => {
           referenceSchema: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
           currentConversationId: null,
           conversations: [],
-          cast: [],
+          roster: [],
         },
       },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
@@ -277,8 +277,8 @@ describe('pieces', () => {
     expect(openedFromFirst.surfaces.authorContext.conversations.map((c) => c.id)).toEqual(['shared-conversation'])
     expect(openedFromSecond.surfaces.authorContext.conversations).toEqual(openedFromFirst.surfaces.authorContext.conversations)
 
-    expect(openedFromFirst.surfaces.authorContext.cast.find((member) => member.id === 'archivist')?.enabled).toBe(true)
-    expect(openedFromSecond.surfaces.authorContext.cast.find((member) => member.id === 'archivist')?.enabled).toBe(false)
+    expect(openedFromFirst.surfaces.authorContext.roster.find((member) => member.id === 'archivist')?.enabled).toBe(true)
+    expect(openedFromSecond.surfaces.authorContext.roster.find((member) => member.id === 'archivist')?.enabled).toBe(false)
   })
 
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
@@ -316,7 +316,7 @@ describe('setPieceCast', () => {
       { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
       { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
     ])
-    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash])).surfaces.draft.cast).toEqual(disabled)
+    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash])).surfaces.draft.roster).toEqual(disabled)
 
     const reEnabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'draft', ['shape', 'compression'])
     expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
@@ -337,7 +337,7 @@ describe('setPieceCast', () => {
     await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([flash]), 'storyContext', [])
 
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([flash]))
-    expect(opened.surfaces.draft.cast.find((member) => member.id === 'shape')?.enabled).toBe(true)
+    expect(opened.surfaces.draft.roster.find((member) => member.id === 'shape')?.enabled).toBe(true)
   })
 })
 

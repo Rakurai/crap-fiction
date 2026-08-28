@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ConversationSummary } from '../shared/conversationEntries.js'
-import type { CastMemberView, InterviewerView, StoryEditorView } from '../shared/pieceViews.js'
+import type { InterviewerView, RosterMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
 import { ContextSurface, type ContextSurfaceId } from './ContextSurface.js'
@@ -31,7 +31,7 @@ type EditingSurfaceProps = {
   readonly initialText: string
   readonly initialConversationId: string | null
   readonly conversationSelection?: AuthorContextSelection | undefined
-  readonly initialCast: readonly CastMemberView[]
+  readonly initialCast: readonly RosterMemberView[]
   readonly initialConversations: readonly ConversationSummary[]
   readonly storyEditor: StoryEditorView
   readonly interviewer: InterviewerView
@@ -180,7 +180,7 @@ function MountedSurface({
           onReverseApplication={document.session.reverseApplication}
         />
       )}
-      {roster.settled && (
+      {roster.kind === 'ready' && (
         <div className={styles.surfacePane} hidden={reading} inert={reading}>
           <Conversation
             key={conversation.session}
@@ -202,6 +202,11 @@ function MountedSurface({
             onOpenConversations={openConversations}
           />
         </div>
+      )}
+      {roster.kind === 'error' && (
+        <p className={styles.error} role="alert">
+          {roster.message}
+        </p>
       )}
       {panel === 'room' && (
         <RoomEditor

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { readStoredAuthorContextConversationId, writeStoredAuthorContextConversationId } from './authorContextSelection.js'
 import { assignModel, fetchCallSites, fetchRuntimeStatus } from './callSitesClient.js'
 import { EmptyPair } from './EmptyPair.js'
 import { ModelsWindow } from './ModelsWindow.js'
@@ -50,7 +51,14 @@ export function Studio({ workspace }: StudioProps) {
   const [showModels, setShowModels] = useState(false)
   const [switchTargetId, setSwitchTargetId] = useState<string | undefined>(undefined)
   const [leaveBlocked, setLeaveBlocked] = useState(false)
-  const [authorContextConversationId, setAuthorContextConversationId] = useState<string | null | undefined>(undefined)
+  const [authorContextConversationId, setAuthorContextConversationId] = useState<string | null | undefined>(() =>
+    readStoredAuthorContextConversationId(),
+  )
+
+  const changeAuthorContextConversationId = useCallback((conversationId: string | null) => {
+    writeStoredAuthorContextConversationId(conversationId)
+    setAuthorContextConversationId(conversationId)
+  }, [])
 
   const openPieces = useCallback(() => {
     setShowPieces(true)
@@ -92,7 +100,7 @@ export function Studio({ workspace }: StudioProps) {
           pieceAdapters={PIECE_ADAPTERS}
           room={ROOM_ADAPTERS}
           callSites={CALL_SITE_ADAPTERS}
-          authorContextSelection={{ value: authorContextConversationId, onChange: setAuthorContextConversationId }}
+          authorContextSelection={{ value: authorContextConversationId, onChange: changeAuthorContextConversationId }}
           onOpenPieces={openPieces}
           onOpenModels={openModels}
           onLeaveBlockedChange={setLeaveBlocked}

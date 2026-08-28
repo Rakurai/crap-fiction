@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
-import type { CastMemberView } from '../shared/pieceViews.js'
+import type { RosterMemberView } from '../shared/pieceViews.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import { failureMessage } from './request.js'
 import type { PieceAdapters } from './usePiece.js'
 import { useWriteSerializer } from './useWriteSerializer.js'
 
 export type SurfaceCastViewModel = Readonly<{
-  members: readonly CastMemberView[]
+  members: readonly RosterMemberView[]
   toggling: string | undefined
   error: string | undefined
   toggle: (memberId: string) => void
@@ -15,7 +15,7 @@ export type SurfaceCastViewModel = Readonly<{
 export function useSurfaceCast(
   pieceId: string,
   surface: SurfaceId,
-  initialMembers: readonly CastMemberView[],
+  initialMembers: readonly RosterMemberView[],
   { updatePiece }: PieceAdapters,
 ): SurfaceCastViewModel {
   const [members, setMembers] = useState(initialMembers)
@@ -38,7 +38,7 @@ export function useSurfaceCast(
       void serializer.run((signal) => updatePiece(pieceId, { cast: { surface, ids } }, signal)).then((result) => {
         if (result === undefined) return
         if (result.outcome === 'value') {
-          confirmed.current = result.value.surfaces[surface].cast
+          confirmed.current = result.value.surfaces[surface].roster
           if (serializer.isCurrent(targetRevision)) {
             desired.current = confirmed.current
             setMembers(confirmed.current)

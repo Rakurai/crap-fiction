@@ -12,7 +12,7 @@ const pieceSummaryShape = z.object({
 export const pieceSummarySchema = pieceSummaryShape.readonly()
 export type PieceSummary = z.infer<typeof pieceSummarySchema>
 
-export const castMemberViewSchema = z
+export const rosterMemberViewSchema = z
   .object({
     id: z.string(),
     handle: z.string(),
@@ -23,7 +23,7 @@ export const castMemberViewSchema = z
     enabled: z.boolean(),
   })
   .readonly()
-export type CastMemberView = z.infer<typeof castMemberViewSchema>
+export type RosterMemberView = z.infer<typeof rosterMemberViewSchema>
 
 export const storyEditorViewSchema = z
   .object({
@@ -52,7 +52,7 @@ export const surfaceDetailSchema = z
     referenceSchema: z.string().nullable(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
-    cast: z.array(castMemberViewSchema).readonly(),
+    roster: z.array(rosterMemberViewSchema).readonly(),
   })
   .readonly()
 export type SurfaceDetail = z.infer<typeof surfaceDetailSchema>

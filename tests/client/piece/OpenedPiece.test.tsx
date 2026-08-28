@@ -23,7 +23,7 @@ const PIECE: PieceDetail = {
         { id: 'd1', opening: 'what isn’t working', lastActivity: 2 },
         { id: 'd2', opening: 'try a different opening', lastActivity: 1 },
       ],
-      cast: [],
+      roster: [],
     },
     storyContext: {
       location: 'story-context.yaml',
@@ -31,7 +31,7 @@ const PIECE: PieceDetail = {
       referenceSchema: 'Sections, each holding entries.',
       currentConversationId: null,
       conversations: [],
-      cast: [],
+      roster: [],
     },
     authorContext: {
       location: 'config/author-context.yaml',
@@ -39,7 +39,7 @@ const PIECE: PieceDetail = {
       referenceSchema: 'What this test calls the author-context reference; the studio\'s own wording is the server\'s.',
       currentConversationId: null,
       conversations: [],
-      cast: [],
+      roster: [],
     },
   },
   storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'weighs the whole', mark: 'SE' },

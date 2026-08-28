@@ -112,11 +112,11 @@ describe('the piece routes', () => {
           draft: {
             text: 'Two small words.',
             referenceSchema: null,
-            cast: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
+            roster: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
             conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
           },
-          storyContext: { text: '', referenceSchema: MODE.storyContextReference, cast: [], conversations: [] },
-          authorContext: { text: '', cast: [], conversations: [] },
+          storyContext: { text: '', referenceSchema: MODE.storyContextReference, roster: [], conversations: [] },
+          authorContext: { text: '', roster: [], conversations: [] },
         },
       },
     })
@@ -144,7 +144,7 @@ describe('the piece routes', () => {
     const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', cast: { surface: 'draft', ids: [] } }) })
     expect(await patched.json()).toMatchObject({
       success: true,
-      data: { title: 'Cups', surfaces: { draft: { cast: [{ id: 'shape', enabled: false }] } } },
+      data: { title: 'Cups', surfaces: { draft: { roster: [{ id: 'shape', enabled: false }] } } },
     })
 
     const saved = await app.request('/pieces/the-cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'text' }) })
