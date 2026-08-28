@@ -72,8 +72,8 @@ export function Manuscript({
           surface="draft"
           onSwitchTo={onSwitchTo}
           draftControls={{
-            viewLabel: manuscript.view === 'source' ? 'rendered' : 'source',
-            onToggleView: manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource,
+            view: manuscript.view === 'source' ? 'source' : 'rendered',
+            onShowView: (view) => (view === 'source' ? manuscript.showSource() : manuscript.showRendered()),
             onReading: manuscript.showReading,
           }}
         />
