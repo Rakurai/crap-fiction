@@ -1,4 +1,5 @@
 import { NewPieceForm, offeredModes } from './NewPieceForm.js'
+import { PanelHeader } from './PanelHeader.js'
 import { PieceList } from './PieceList.js'
 import styles from './PiecesWindow.module.css'
 import { Scrim } from './Scrim.js'
@@ -20,12 +21,7 @@ export function PiecesWindow({ workspace, pieces, openedId, leaveBlocked, onOpen
     <>
       <Scrim onDismiss={onClose} />
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Pieces">
-        <div className={styles.header}>
-          <span className={styles.name}>crap fiction</span>
-          <button type="button" className={styles.done} onClick={onClose}>
-            close
-          </button>
-        </div>
+        <PanelHeader title="crap fiction" tone="wordmark" onDismiss={onClose} />
         <p className={styles.what}>A studio for writing fiction with a room of specialized collaborators.</p>
         {pieces.status === 'ready' && <PieceList pieces={pieces.pieces} openedId={openedId} leaveBlocked={leaveBlocked} onOpen={onOpen} />}
         {pieces.status === 'error' && (

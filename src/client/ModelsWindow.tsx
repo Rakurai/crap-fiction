@@ -2,6 +2,7 @@ import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import { CallSiteList } from './CallSiteList.js'
 import { machineWords } from './facts.js'
 import styles from './ModelsWindow.module.css'
+import { PanelHeader } from './PanelHeader.js'
 import { Scrim } from './Scrim.js'
 import { ThemeToggle } from './ThemeToggle.js'
 import type { CallSitesViewModel } from './useCallSites.js'
@@ -25,14 +26,12 @@ export function ModelsWindow({ callSites, theme, onClose }: ModelsWindowProps) {
     <>
       <Scrim onDismiss={onClose} />
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Models">
-        <div className={styles.header}>
-          <span className={styles.title}>Models</span>
-          {callSites.status === 'ready' && <span className={styles.runtime}>{runtimeFacts(callSites.runtime)}</span>}
-          <span className={styles.spacer} />
-          <button type="button" className={styles.close} onClick={onClose}>
-            close
-          </button>
-        </div>
+        <PanelHeader
+          title="Models"
+          tone="panel"
+          aside={callSites.status === 'ready' ? <span className={styles.runtime}>{runtimeFacts(callSites.runtime)}</span> : undefined}
+          onDismiss={onClose}
+        />
         {callSites.status === 'error' && (
           <p className={styles.error} role="alert">
             {callSites.message}

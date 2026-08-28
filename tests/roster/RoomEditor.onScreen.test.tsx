@@ -58,7 +58,7 @@ describe('editing the room', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={onToggle} onClose={onClose} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'enable' }))
-    fireEvent.click(screen.getByRole('button', { name: 'done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'close' }))
 
     expect(onToggle).toHaveBeenCalledWith('compression')
     expect(onToggle).toHaveBeenCalledTimes(1)
