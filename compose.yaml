@@ -13,6 +13,7 @@ services:
       STUDIO_PORT: ${STUDIO_PORT:?the port served, and the port published}
       STUDIO_MODEL_RUNTIME_URL: ${STUDIO_CONTAINER_MODEL_RUNTIME_URL:?where the container reaches LM Studio, through host.docker.internal rather than its own loopback}
       STUDIO_LOG_LEVEL: ${STUDIO_LOG_LEVEL:?the logger's level}
+      STUDIO_TRACE: ${STUDIO_TRACE:?on to write every model request and response under the data root, off to keep none}
       # Change notification over a Docker Desktop bind mount is not dependable,
       # so the watcher polls.
       CHOKIDAR_USEPOLLING: "true"

@@ -24,7 +24,7 @@ export function studioConfig(entry: string): UserConfig {
         // stylesheets but no binary asset, so a font request would otherwise
         // reach the Hono application and come back a 404. Everything else not
         // excluded is a candidate for a Hono route.
-        exclude: [...defaultOptions.exclude, /^\/$/, /\.woff2$/],
+        exclude: [...defaultOptions.exclude, /^\/$/, /\.woff2$/, /\.yaml($|\?)/],
       }),
     ],
     server: {

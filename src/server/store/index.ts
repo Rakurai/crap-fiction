@@ -336,6 +336,59 @@ export async function deleteAppliedChange(dataRoot: string, scope: ConversationS
   await deleteFile(changeFile(dir, changeId))
 }
 
+const TRACES_DIR = 'traces'
+
+export type ModelTraceRecord = Readonly<{
+  site: string
+  assignment: string
+  attempt: number
+  durablePrompt: string
+  perCallPrompt: string
+  returned: string
+  reading: 'value' | 'malformed' | 'nonconforming'
+  runtimeStopReason: string
+  promptTokens: number | undefined
+  predictedTokens: number | undefined
+}>
+
+function traceFile(dataRoot: string, at: number, site: string): string {
+  const instant = new Date(at).toISOString().replaceAll(':', '-')
+  return path.join(dataRoot, TRACES_DIR, `${instant}-${site}.md`)
+}
+
+function reportedCount(count: number | undefined): string {
+  return count === undefined ? 'the runtime did not report one' : String(count)
+}
+
+function traceText(record: ModelTraceRecord): string {
+  return [
+    `# ${record.site}, attempt ${record.attempt}`,
+    '',
+    `model: ${record.assignment}`,
+    `read as: ${record.reading}`,
+    `runtime stop reason: ${record.runtimeStopReason}`,
+    `prompt tokens: ${reportedCount(record.promptTokens)}`,
+    `predicted tokens: ${reportedCount(record.predictedTokens)}`,
+    '',
+    '## Durable prompt',
+    '',
+    record.durablePrompt,
+    '',
+    '## Per-call prompt',
+    '',
+    record.perCallPrompt,
+    '',
+    '## Returned',
+    '',
+    record.returned,
+    '',
+  ].join('\n')
+}
+
+export async function writeModelTrace(dataRoot: string, at: number, record: ModelTraceRecord): Promise<void> {
+  await writeTextArtifact(traceFile(dataRoot, at, record.site), traceText(record))
+}
+
 export function readShippedModes<T>(
   contentRoot: string,
   schema: z.ZodType<T>,

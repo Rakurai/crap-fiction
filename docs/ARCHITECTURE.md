@@ -59,11 +59,23 @@ accumulate in a pure reducer the client feeds events to, over the framework's ow
 library would be a second state authority above the one the framework already supplies.
 
 **The logger writes to stderr and nowhere else.** No file transport, no log directory and no second
-destination, so nothing the logger emits outlives the process — which makes the refusal to keep a
-durable record of model traffic structural rather than a rule remembered at each call site. A line
-may carry the call site, the outcome, the elapsed time, the model identity and the identifiers of
-the piece and conversation, but never a prompt, a participant's response, manuscript text or the
-contents of either durable context. The author's story is not diagnostic data.
+destination, so nothing the logger emits outlives the process. A line may carry the call site, the
+outcome, the elapsed time, the model identity and the identifiers of the piece and conversation, but
+never a prompt, a participant's response, manuscript text or the contents of either durable context.
+The author's story is not diagnostic data, and no amount of trouble makes a log line the place to put
+it.
+
+**Model traffic is kept verbatim only for a run the maintainer asked to trace.** Telling a weakly
+written role apart from a weak model, and either apart from a participant whose replies never parse,
+needs the request and the reply as they actually crossed the seam — which no log line may carry and no
+settled response keeps. So a traced run writes one file per attempt, holding the compiled prompt, the
+text that came back unread, and what the runtime said about stopping; every attempt of a retried call
+gets its own, because the interesting one is usually not the last. The environment decides whether a
+run traces, and a run nobody is diagnosing does not. The refusal being suspended is the author's
+rather than the studio's: a trace holds the author's own prose, it lives under the data root where the
+rest of their work already lives, and it is theirs to read and theirs to delete. A trace is written
+where the model seam is crossed, by the module that owns the disk, and it is the only place the studio
+keeps a prompt or an unread reply.
 
 **One piece is open at a time, and the application state is singular** — each editing surface's own
 document, conversation and operation. Switching pieces replaces that state rather than accumulating
@@ -1239,7 +1251,9 @@ Stated so they do not accrete.
 - **No validation of a declared outcome against a response's content**, which would take a second model call
   to do badly.
 - **No dev mode, no demo mode, no seeded content, and no default model output.**
-- **No recorder of model traffic**, and no durable store of model inputs and outputs.
+- **No recorder of model traffic in an untraced run**, no model input or output anywhere but a trace,
+  and nothing read back out of one: a trace is written and never parsed, and no studio behaviour
+  depends on whether any exists.
 - **No in-product role editor.** Role definitions are files, and rewriting prompts to fix weak
   differentiation belongs in the diagnostic path rather than in the studio the author writes in.
 - **No vendor-specific model concepts above the seam.** The implementation may use everything its runtime

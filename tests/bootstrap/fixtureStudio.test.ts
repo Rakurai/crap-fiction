@@ -18,6 +18,7 @@ describe('the fixture studio', () => {
     process.env.STUDIO_PORT = '5274'
     process.env.STUDIO_MODEL_RUNTIME_URL = 'ws://127.0.0.1:5275'
     process.env.STUDIO_LOG_LEVEL = 'silent'
+    process.env.STUDIO_TRACE = 'off'
     app = (await import('../support/fixtureStudio.js')).default
   })
 
