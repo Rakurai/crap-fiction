@@ -8,7 +8,7 @@ Read in this order, each more specific than the last: `docs/VISION.md` → `CONT
 
 `CONTEXT.md` is at the repository root and is the only one: one domain model, one glossary. There is no `docs/adr/` and none is wanted — a settled technical decision goes in `ARCHITECTURE.md`, which is an ADR set in all but filename.
 
-Those six and the two standards below are the canon. Every other path under `docs/` governs nothing: `docs/audits/` holds audit reports, and `docs/agents/` is configuration external skills read — leave it untouched, and take nothing in it as authoritative here. Noncanonical material says so in its own opening lines.
+Those six and the two standards below are the canon. Every other path under `docs/` governs nothing: `docs/audits/` holds audit reports, `docs/mockup/` is a rendered appearance reference carrying no engineering claim, and `docs/agents/` is configuration external skills read — leave it untouched, and take nothing in it as authoritative here. Noncanonical material says so in its own opening lines.
 
 ## Documentation discipline
 
