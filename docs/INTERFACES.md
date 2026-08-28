@@ -175,6 +175,20 @@ preparing. A caller may submit a further call without awaiting the one before it
 guarantees nothing about their relative start order, completion order, latency, progress or
 cancellation.
 
+An application can fail for a reason no call can report about itself, so applying answers from a wider
+set of its own:
+
+```ts
+ApplyFailureReason = FailureReason | 'inapplicable'
+```
+
+| Reason | Means |
+|---|---|
+| `inapplicable` | the answer conformed and could not be applied to the document as it arrived |
+
+A call result and a durable participant failure carry `FailureReason`. The reply to an Apply and the
+settlement a surface reports carry `ApplyFailureReason`, and `inapplicable` carries no `returned`.
+
 ## The context seam
 
 One compilation per kind of call, each returning the whole of what its prompt is rendered from.

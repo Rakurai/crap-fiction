@@ -501,6 +501,12 @@ because what came back was not the structure it was asked for at all, or because
 structure and still did not conform — and each of those means something different to the author or to
 the room.
 
+**A caller that can fail for a reason of its own carries its own wider set rather than widening this
+one.** The model's set is closed to the ways a call can fail, and it is what a call result and a
+durable participant failure carry. Admitting into it a reason no call could produce would make a
+nonsense state legal and persistable — a specialist's answer recorded as having failed for something
+that was never in reach of that call.
+
 **A malformed answer and a nonconforming one are two reasons, not one.** Text that is not the
 requested structure says the runtime is not honouring the constraint it was given — the wrong model,
 or one whose reasoning ran into the answer — while a value that parsed and then failed the schema
@@ -846,7 +852,9 @@ author's own surface holds it.
 the document its own editor writes, so a replacement in some other equivalent spelling of the same prose
 is text that surface can never save and a confirmation that can never match. Reading it in once, where the
 replacement is formed, is also what makes the before-and-after and the answer that nothing changed describe
-the text that will land rather than the text the model happened to type.
+the text that will land rather than the text the model happened to type. What is read in is the assembled
+document and never a piece of one: a fragment is not a document, and reading half a paragraph in on its own
+gets it back as a block.
 
 **A replacement is provisional until the client confirms it was saved.** The room retains it — the
 document, the change computed from it, and a provisional identity — as the one pending application its
@@ -872,12 +880,36 @@ surface stays held and states why.
 input does not imply restrained output: a model asked to cut one sentence will otherwise renormalize
 punctuation, reflow paragraphs and revise text nobody asked about.
 
-**The representation the model returns is an implementation choice** — revised Markdown, replacement
-ranges, or structured operations — and the author experience does not depend on it. What bounds it: the
-result reaches its target surface as one atomic replacement — a single transaction where that surface is
-the document's editor, so it participates in the editor's own undo as one action — and the application
-computes the before-and-after presented to the author from the two states of that document rather than
-trusting the model to describe its own edit. That before-and-after is the changed passages with a little
+**What the model returns is a set of bounded edits against verbatim anchors.** Each edit quotes text as
+it stands in the target document and supplies what stands in its place. Every anchor resolves against the
+document as it arrived, each edit resolves to exactly one span or is a defect, and the whole set resolves
+before any of it is applied. Two edits resolving to spans that overlap is a defect on both edges of the
+intersection, because the correction the model needs is that the pair conflicts, not that one of them is
+fine. Since every span resolves against the document as it arrived, the order of the edits carries no
+meaning, and an edit quoting what another edit would produce quotes text that does not exist. An anchor
+quoting the whole document conforms and is deliberately not refused: an author may ask for a broad
+change, and a model that obeyed would otherwise be told its answer was inapplicable. What makes an
+element this small viable is that the runtime enforces the structure strictly — a hand-parsed patch
+format would have to tolerate a weak model's spelling of it, and every tolerance is a way for an edit to
+mean something other than what it said.
+
+**This inverts the economics of unrequested change rather than adding a rule against it.** Breadth stops
+being free: a model that wants to reflow a paragraph nobody mentioned has to quote that paragraph, in
+full and exactly.
+
+**An unresolvable set fails as inapplicable, and that reason belongs to applying's set rather than to
+the model's.** The answer conformed and could not be applied to the document, which is a thing no call
+can report about itself. It carries nothing back — what a failure carries verbatim exists for what a
+runtime returned when it was not the structure asked for, and here the answer was well formed and its
+content is the author's prose. The reason reaches the author as machine words, so it is named for what
+happened to the document rather than for which representation the model returns.
+
+**The result reaches its target surface as one atomic replacement** — a single transaction where that
+surface is the document's editor, so it participates in the editor's own undo as one action — and the
+application computes the before-and-after presented to the author from the two states of that document
+rather than trusting the model to describe its own edit. Building it from the edits instead would hide a
+respelling or a stripped construct from the review the author trusts: the edits describe intent, and the
+two states describe what landed. That before-and-after is the changed passages with a little
 text around them and no positions of any kind — enough to show what happened, not enough to reapply it anywhere — and where
 the change is unbounded it is the statement that the piece was rewritten whole. That last case is a rule
 about what the file may hold, not about how much the surface may show: what it prevents is storing the
@@ -900,7 +932,10 @@ from an entry is that a recommendation was applied, and nothing was.
 
 **Nothing is stored that would let an application be replayed.** A recommendation is interpreted afresh
 against whatever that document is at the moment it is applied, which is what makes an old
-recommendation applicable at all. **A failed application changes nothing** — no partial write, no
+recommendation applicable at all. The edit set is the case this most obviously names: a quotation paired
+with its replacement is precisely a positionless replayable edit, so it lives in what was sent and nowhere
+else — not in the pending replacement, not in the change record, not in the entry, and not in a log line,
+where an anchor or a replacement would be manuscript text. **A failed application changes nothing** — no partial write, no
 half-applied document, and the recommendation stays applicable. A replacement whose confirmation is
 refused changes nothing by the same rule: the change record and the entry naming it are written together
 or not at all.

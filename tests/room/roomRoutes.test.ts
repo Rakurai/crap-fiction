@@ -174,7 +174,7 @@ describe('the room over HTTP', () => {
   it('reports an application in flight naming the response it came from, then answers with a pending replacement that becomes the change on that response once confirmed', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'them.', replace: 'them, revised.' }] } }, held: true },
     })
     const responseId = await respondedTo(app, room, conversationId, { target: 'shape', message: 'a direct question' })
 
@@ -214,7 +214,7 @@ describe('the room over HTTP', () => {
   it('answers the pending replacement to a client asking for it by its provisional identity, and states the room\'s refusal of a confirmation the save has not caught up with', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'them.', replace: 'them, revised.' }] } }, held: true },
     })
     const responseId = await respondedTo(app, room, conversationId, { target: 'shape', message: 'a direct question' })
 

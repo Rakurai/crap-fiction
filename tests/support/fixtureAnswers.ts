@@ -4,7 +4,13 @@ const CALL_MS = 400
 
 const STILL_IN_FLIGHT_MS = 6 * CALL_MS
 
-export const APPLIED_TEXT = 'The cups sat where she had left them, and the light came up behind the harbour.'
+export const APPLY_ANCHOR = 'harbour'
+
+const APPLY_REPLACEMENT = 'harbour, and the light coming up behind it'
+
+export function applied(text: string): string {
+  return text.replace(APPLY_ANCHOR, APPLY_REPLACEMENT)
+}
 
 export const SUGGESTION_CLAIM = 'the opening holds two beats where one would carry it'
 
@@ -27,5 +33,5 @@ export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
   reader: commentary('a reading from the fixture model implementation', STILL_IN_FLIGHT_MS),
   'story-editor': applicableSuggestion(EDITOR_SUGGESTION_CLAIM, 'an answer from the fixture model implementation', CALL_MS),
   interview: commentary(INTERVIEWER_QUESTION, CALL_MS),
-  apply: { result: { outcome: 'value', value: { replacement: APPLIED_TEXT } }, delayMs: 4 * CALL_MS },
+  apply: { result: { outcome: 'value', value: { edits: [{ find: APPLY_ANCHOR, replace: APPLY_REPLACEMENT }] } }, delayMs: 4 * CALL_MS },
 }

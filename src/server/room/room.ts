@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid'
 import { canonicalMarkdown } from '../../document/markdown.js'
 import type { AppliedChange, AppliedChangeContent } from '../../shared/appliedChange.js'
 import { appliedChangeSchema } from '../../shared/appliedChange.js'
-import type { ApplyOutcome } from '../../shared/applyViews.js'
+import { INAPPLICABLE, type ApplyOutcome } from '../../shared/applyViews.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { ModelAccess } from '../model/types.js'
@@ -38,6 +38,7 @@ import {
 } from '../store/index.js'
 import type { ComputeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
+import { resolveEdits } from './edits.js'
 import {
   compileApplyContext,
   compileSpecialistContext,
@@ -674,7 +675,14 @@ export class Room {
         }
       }
 
-      const replacement = roomScope.surface === 'draft' ? canonicalMarkdown(result.value.replacement) : result.value.replacement
+      const resolution = resolveEdits(target, result.value.edits)
+      if (resolution.outcome === 'defective') {
+        closeOut('failed')
+        this.#logger.info({ pieceId, actionId, defects: resolution.defects }, 'application inapplicable')
+        return { actionId, outcome: { outcome: 'failed', actionId, reason: INAPPLICABLE } }
+      }
+
+      const replacement = roomScope.surface === 'draft' ? canonicalMarkdown(resolution.text) : resolution.text
       if (replacement === target) {
         closeOut('settled')
         return { actionId, outcome: { outcome: 'noChange', actionId } }

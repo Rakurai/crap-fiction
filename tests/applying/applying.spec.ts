@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { APPLIED_TEXT, SUGGESTION_CLAIM } from '../support/fixtureAnswers.js'
+import { applied, SUGGESTION_CLAIM } from '../support/fixtureAnswers.js'
 import { answerControl, manuscript, openPiece, sendToRoom } from '../support/studio.js'
 
-const OPENING = 'The cups sat where she had left them.'
+const OPENING = 'The cups sat where she had left them, above the harbour.'
 
 const MARKER = ' Still hers to write.'
 
@@ -28,7 +28,7 @@ test('applying a recommendation rewrites the manuscript, holds it, releases it, 
   await page.keyboard.type(REFUSED)
   await expect(editor).toHaveText(OPENING)
 
-  await expect(editor).toHaveText(APPLIED_TEXT)
+  await expect(editor).toHaveText(applied(OPENING))
   await expect(page.getByText('READ-ONLY')).toBeHidden()
 
   await expect(editor).toHaveAttribute('contenteditable', 'true')

@@ -35,7 +35,7 @@ import {
 } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
-import { FixtureModelAdapter, type FixtureBehavior } from '../support/modelAdapter.js'
+import { FixtureModelAdapter, type FixtureBehavior, type FixtureScript } from '../support/modelAdapter.js'
 import { buildTestRoom } from '../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
@@ -131,7 +131,7 @@ function roomSpecWith(modelAccess: ModelAccess) {
   }
 }
 
-function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureBehavior>>): { room: Room; adapter: FixtureModelAdapter } {
+function buildRoom(dataRoot: string, behaviors: Readonly<Record<string, FixtureScript>>): { room: Room; adapter: FixtureModelAdapter } {
   const adapter = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
   const room = buildTestRoom(dataRoot, roomSpecWith(adapter))
   return { room, adapter }
@@ -858,6 +858,8 @@ describe('Room.dispatch', () => {
   })
 })
 
+const STORY_CONTEXT_WITH_A_COMMENT = 'Premise: two cups.\n\n<!-- ask her which cup is chipped -->\n'
+
 describe('Room.apply', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -894,7 +896,7 @@ describe('Room.apply', () => {
   it('produces the manuscript the model returned as a pending application, calling no participant, and writes nothing until confirmed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: ', twice.', replace: '.' }] } } },
     })
 
     const { outcome } = await room.apply(
@@ -921,7 +923,7 @@ describe('Room.apply', () => {
     const modelWrote = 'She left them *there*.\n\nBoth cups.\n'
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: modelWrote } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'Two cups.', replace: modelWrote }] } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('Two cups.'))
@@ -936,7 +938,7 @@ describe('Room.apply', () => {
   it('answers that nothing changed where the model rewrote the manuscript in another spelling of the same prose', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'She left them *there*.\n' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: '_there_', replace: '*there*' }] } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('She left them _there_.'))
@@ -948,7 +950,7 @@ describe('Room.apply', () => {
   it("the activity snapshot names the pending application's own identity once the model has answered, and carries no document", async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: ', twice.', replace: '.' }] } } },
     })
 
     const { outcome } = await room.apply(
@@ -969,7 +971,7 @@ describe('Room.apply', () => {
   it('retrieves the pending replacement by its provisional identity, and refuses an identity that is not this scope’s pending Apply', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: ', twice.', replace: '.' }] } } },
     })
 
     const { outcome } = await room.apply(
@@ -1005,7 +1007,7 @@ describe('Room.apply', () => {
     await writeAuthorContext(dataRoot, 'stale author context nobody submitted')
 
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'revised' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised' }] } } },
     })
 
     await room.apply(
@@ -1063,7 +1065,7 @@ describe('Room.apply', () => {
     await settled
 
     const { room: applyRoom, adapter: applyAdapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft', replace: 'revised' }] } }, held: true },
     })
     const applying = applyRoom.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft'))
 
@@ -1120,7 +1122,7 @@ describe('Room.apply', () => {
     const { pieceId } = await pieceWithRecommendation()
 
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'revised' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised' }] } }, held: true },
     })
     const events: RoomEvent[] = []
     room.subscribe(pieceId, (event) => events.push(event))
@@ -1167,7 +1169,7 @@ describe('Room.apply', () => {
   it('confirmed against the document as saved, persists the change and the entry that names the response it came from, and frees the scope', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them.' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: ', twice.', replace: '.' }] } } },
     })
     const source = responseId(pieceId)
 
@@ -1186,10 +1188,10 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
-  it('carries no change where the application returned the manuscript unchanged, and creates nothing pending or durable', async () => {
+  it('carries no change where every edit replaced text with itself, and creates nothing pending or durable', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'unchanged text' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'unchanged text', replace: 'unchanged text' }] } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('unchanged text'))
@@ -1200,10 +1202,31 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
   })
 
+  it('fails as inapplicable, carrying nothing back, where an anchor does not resolve — the target document untouched and the recommendation still applicable', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: [
+        { result: { outcome: 'value', value: { edits: [{ find: 'a line that was never in the draft', replace: 'anything at all' }] } } },
+        { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised text' }] } } },
+      ],
+    })
+
+    const { actionId, outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+
+    expect(outcome).toEqual({ outcome: 'failed', actionId, reason: 'inapplicable' })
+    expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
+    expect(room.activitySnapshot(scope(pieceId))).toBeUndefined()
+
+    const retried = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+    expect(retried.outcome).toMatchObject({ outcome: 'pending', replacement: 'revised text' })
+  })
+
   it('refuses confirmation as not-pending for an unknown identity, and as document-not-saved while the target does not yet match — either refusal records nothing but frees the scope for a fresh application', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'revised text' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised text' }] } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
@@ -1225,7 +1248,7 @@ describe('Room.apply', () => {
   it('confirming an already-committed identity a second time is a no-op that answers with what it already committed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'revised text' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: 'revised text' }] } } },
     })
 
     const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
@@ -1239,7 +1262,7 @@ describe('Room.apply', () => {
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toHaveLength(1)
   })
 
-  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema and the preserve-instruction, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
+  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema and the preserve-instruction, the text the edit did not quote survives byte for byte, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const storyContextScope: RoomScope = { pieceId: piece.id, surface: 'storyContext' }
     const storyContextConversationScope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'storyContext' }
@@ -1252,7 +1275,7 @@ describe('Room.apply', () => {
       storyContextScope,
       'c1',
       { kind: 'targeted', target: 'story-editor', text: 'what should the story context say' },
-      documents('the draft, untouched', { storyContext: 'Premise: two cups.' }),
+      documents('the draft, untouched', { storyContext: STORY_CONTEXT_WITH_A_COMMENT }),
     )
     await settlementOfScope(settingUp, storyContextScope)
 
@@ -1262,7 +1285,7 @@ describe('Room.apply', () => {
     if (response === undefined) throw new Error('expected a landed response')
 
     const { room, adapter } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { replacement: 'Premise: two cups, one chipped.' } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'two cups.', replace: 'two cups, one chipped.' }] } } },
     })
 
     const { outcome } = await room.apply(
@@ -1271,10 +1294,10 @@ describe('Room.apply', () => {
       cid(storyContextScope, 'c1'),
       response.id,
       undefined,
-      documents('the draft, untouched', { storyContext: 'Premise: two cups.' }),
+      documents('the draft, untouched', { storyContext: STORY_CONTEXT_WITH_A_COMMENT }),
     )
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
-    expect(outcome.replacement).toBe('Premise: two cups, one chipped.')
+    expect(outcome.replacement).toBe('Premise: two cups, one chipped.\n\n<!-- ask her which cup is chipped -->\n')
 
     expect(adapter.promptFor('apply')).toContain('Premise: two cups.')
     expect(adapter.promptFor('apply')).toContain(fixtureMode.storyContextReference)

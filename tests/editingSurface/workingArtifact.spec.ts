@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { APPLIED_TEXT, SUGGESTION_CLAIM } from '../support/fixtureAnswers.js'
+import { applied, SUGGESTION_CLAIM } from '../support/fixtureAnswers.js'
 import {
   answerControl,
   answerOf,
@@ -69,7 +69,7 @@ test('each surface holds its own work, a context change applies and persists, an
   await expect(page.getByText("Held while Story Editor's change is applied.")).toBeVisible()
   await expect(storyContext).toBeDisabled()
 
-  await expect(storyContext).toHaveValue(APPLIED_TEXT)
+  await expect(storyContext).toHaveValue(applied(STORY_NOTE))
   await expect(page.getByText('READ-ONLY')).toBeHidden()
   await expect(storyContext).toBeEnabled()
 
@@ -94,5 +94,5 @@ test('each surface holds its own work, a context change applies and persists, an
   await expect(editor).toHaveText(OPENING)
 
   await control(page, 'story').click()
-  await expect(storyContext).toHaveValue(APPLIED_TEXT)
+  await expect(storyContext).toHaveValue(applied(STORY_NOTE))
 })
