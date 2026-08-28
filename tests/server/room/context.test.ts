@@ -5,6 +5,8 @@ import {
   compileStoryEditorContext,
   renderApplyPrompt,
   renderPrompt,
+  AppliedResponseUnknownError,
+  ParticipantNameUnknownError,
   type ApplyContextInput,
   type ContextInput,
   type HistoryPolicy,
@@ -153,7 +155,7 @@ const entriesWithApplication: readonly ConversationEntry[] = [
 const WHOLE_CONVERSATION_WITH_APPLICATION = [
   { kind: 'message', text: 'first question' },
   { kind: 'response', participant: 'Shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
-  { kind: 'application', participant: 'Shape' },
+  { kind: 'application', participant: 'Shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
   { kind: 'message', text: 'a later question' },
   { kind: 'response', participant: 'Compression', claim: 'the ending still drags', note: undefined },
 ]
@@ -218,7 +220,7 @@ describe('compiling a context', () => {
     )
     expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithApplication, policy: stricter })).history).toEqual([
       { kind: 'message', text: 'first question' },
-      { kind: 'application', participant: 'Shape' },
+      { kind: 'application', participant: 'Shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
       { kind: 'message', text: 'a later question' },
       { kind: 'response', participant: 'Compression', claim: 'the ending still drags', note: undefined },
     ])
@@ -256,6 +258,33 @@ describe('compiling a context', () => {
     expect(compileSpecialistContext(contextInput({ role: shape, entries: afterAbandonment })).history).toEqual([
       { kind: 'message', text: 'the question that went unanswered' },
     ])
+  })
+
+  it("carries the author's request for a concrete change into every history, with the clarification where one was given", () => {
+    const entriesWithRequests: readonly ConversationEntry[] = [
+      { id: 'e1', kind: 'concreteChangeRequest', target: 'shape', respondingTo: 'e0' },
+      { id: 'e2', kind: 'concreteChangeRequest', target: 'compression', respondingTo: 'e0', clarification: 'keep the last line' },
+    ]
+    const expected = [
+      { kind: 'request', participant: 'Shape', clarification: undefined },
+      { kind: 'request', participant: 'Compression', clarification: 'keep the last line' },
+    ]
+
+    expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithRequests })).history).toEqual(expected)
+    expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithRequests, policy: 'stricter' })).history).toEqual(expected)
+    expect(compileApplyContext(applyContextInput({ entries: entriesWithRequests })).history).toEqual(expected)
+  })
+
+  it('refuses to compile where the conversation names a participant it has no name for, or applies a response it does not hold', () => {
+    const namingAStranger: readonly ConversationEntry[] = [
+      { id: 'e1', kind: 'participantResponse', participantId: 'a-participant-with-no-name', causeId: 'e0', outcome: 'commentary', claim: 'a reading' },
+    ]
+    const applyingNothing: readonly ConversationEntry[] = [{ id: 'e1', kind: 'application', responseId: 'a-response-not-in-this-conversation', changeId: 'c' }]
+
+    expect(() => compileSpecialistContext(contextInput({ role: shape, entries: namingAStranger }))).toThrow(ParticipantNameUnknownError)
+    expect(() => compileApplyContext(applyContextInput({ entries: namingAStranger }))).toThrow(ParticipantNameUnknownError)
+    expect(() => compileSpecialistContext(contextInput({ role: shape, entries: applyingNothing }))).toThrow(AppliedResponseUnknownError)
+    expect(() => compileApplyContext(applyContextInput({ entries: applyingNothing }))).toThrow(AppliedResponseUnknownError)
   })
 
   it("the story editor alone weighs the dispatch's own readings, beside the history every call gets", () => {
@@ -323,6 +352,15 @@ describe('rendering a prompt', () => {
 
     const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
     expect(wholeOf(renderApplyPrompt(unconstrained, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+  })
+
+  it('substitutes text the author supplied exactly as it was typed, and renders no section at all for one holding only whitespace', () => {
+    const typed = '  keep the last line\n\tand the title'
+    const withWhitespace = compileApplyContext(applyContextInput({ constraint: typed, entries: [] }))
+    expect(wholeOf(renderApplyPrompt(withWhitespace, fragments))).toContain(`FIXTURE_CONSTRAINT_HEADING\n\n${typed}`)
+
+    const blank = compileApplyContext(applyContextInput({ constraint: '   \n ', entries: [] }))
+    expect(wholeOf(renderApplyPrompt(blank, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
   it('carries the reference schema for the document a context Apply targets, only where the surface has one', () => {

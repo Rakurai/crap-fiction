@@ -1,5 +1,6 @@
 ---
 variables:
   - participant
+  - reading
 ---
-{{participant}}'s recommendation was applied.
+{{participant}}'s recommendation was applied: {{reading}}

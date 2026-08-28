@@ -84,8 +84,18 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
   },
   lines: {
     historyMessage: variableFragment('lines/historyMessage', ['text'], 'Author: {{text}}'),
+    historyRequest: variableFragment('lines/historyRequest', ['participant'], 'Author asked {{participant}} for a concrete change.'),
+    historyRequestClarified: variableFragment(
+      'lines/historyRequestClarified',
+      ['participant', 'clarification'],
+      'Author asked {{participant}} for a concrete change, adding: {{clarification}}',
+    ),
     historyResponse: variableFragment('lines/historyResponse', ['participant', 'reading'], '{{participant}}: {{reading}}'),
-    historyApplication: variableFragment('lines/historyApplication', ['participant'], "{{participant}}'s recommendation was applied."),
+    historyApplication: variableFragment(
+      'lines/historyApplication',
+      ['participant', 'reading'],
+      "{{participant}}'s recommendation was applied: {{reading}}",
+    ),
     readingSubstantive: variableFragment('lines/readingSubstantive', ['participant', 'reading'], '{{participant}}: {{reading}}'),
   },
   tasks: {

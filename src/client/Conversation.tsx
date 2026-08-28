@@ -69,8 +69,7 @@ function ResponseActions({
   readonly onReply: (participantId: string, message: string) => void
 }) {
   const [text, setText] = useState('')
-  const trimmed = text.trim()
-  const withText = trimmed.length > 0
+  const withText = text.trim().length > 0
 
   function reply(): void {
     if (!withText) {
@@ -78,19 +77,19 @@ function ResponseActions({
       return
     }
     if (disabled) return
-    onReply(participantId, trimmed)
+    onReply(participantId, text)
     setText('')
   }
 
   function apply(): void {
     if (disabled) return
-    onApply(responseId, withText ? trimmed : undefined)
+    onApply(responseId, withText ? text : undefined)
     setText('')
   }
 
   function ask(): void {
     if (disabled) return
-    onAsk(responseId, withText ? trimmed : undefined)
+    onAsk(responseId, withText ? text : undefined)
     setText('')
   }
 
@@ -564,9 +563,8 @@ export function Conversation({
   }
 
   function submit() {
-    const text = message.trim()
-    if (text.length === 0 || roomBusy) return
-    conversation.sendMessage(text)
+    if (message.trim().length === 0 || roomBusy) return
+    conversation.sendMessage(message)
     setMessage('')
   }
 

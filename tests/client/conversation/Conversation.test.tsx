@@ -418,6 +418,46 @@ describe('one response-local field shared by every action on the response', () =
 
     await waitFor(() => expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, 'keep the last line', expect.any(AbortSignal)))
   })
+
+  it('sends the text exactly as typed, whitespace and all', async () => {
+    const applyRecommendation = vi.fn(() =>
+      Promise.resolve({
+        outcome: 'value' as const,
+        value: { outcome: 'noChange' as const, actionId: 'a1' },
+      }),
+    )
+    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_RECOMMENDATION]), applyRecommendation }
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+
+    const field = await screen.findByLabelText('Reply or apply, in your own words')
+    fireEvent.change(field, { target: { value: '  keep the last line  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'apply' }))
+
+    await waitFor(() =>
+      expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, '  keep the last line  ', expect.any(AbortSignal)),
+    )
+  })
+
+  it('leaves a field holding only whitespace out of the action entirely', async () => {
+    const applyRecommendation = vi.fn(() =>
+      Promise.resolve({
+        outcome: 'value' as const,
+        value: { outcome: 'noChange' as const, actionId: 'a1' },
+      }),
+    )
+    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_RECOMMENDATION]), applyRecommendation }
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+
+    const field = await screen.findByLabelText('Reply or apply, in your own words')
+    fireEvent.change(field, { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'apply' }))
+
+    await waitFor(() =>
+      expect(applyRecommendation).toHaveBeenCalledWith('the-lighthouse', 'draft', 'c1', 'e1', DOCUMENTS, undefined, expect.any(AbortSignal)),
+    )
+  })
 })
 
 describe('handle completion at the composer', () => {

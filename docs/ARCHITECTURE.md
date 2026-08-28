@@ -613,10 +613,10 @@ per-call half is the task and the material a particular request carries. No head
 or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
 prompt language of its own.
 
-**Compilation is a pure function**, so the invariant is asserted against the constructed object rather
+**Compilation is a pure function**, so the invariant is readable on the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
-has its own prompt and its own compilation, and the independence invariant is asserted over the
-participant kinds, which are the ones the bet lives in.
+has its own prompt and its own compilation, and the independence invariant governs the participant
+kinds, which are the ones the bet lives in.
 
 Every participant call receives the author context, the story context, the current draft whole and
 unexcerpted, and the current author message. At flash length a whole draft is cheaper to include than
@@ -624,9 +624,11 @@ any excerpting scheme is to specify, and excerpting would put a second inference
 
 **Conversation history is supplied by policy**, and the seam is the whole of the difference between
 the policies. **Shared history is the default**: a specialist sees the conversation as it happened —
-author messages, prior dispatches' participant responses, and the applications that changed the
-surface's document. **Stricter independence is the alternative** and filters other specialists' historical
-responses that the author did not act on, leaving author messages, applied recommendations and the
+author messages, the author's requests for a concrete change, prior dispatches' participant responses,
+and the applications that changed the surface's document. An application is carried by the
+recommendation it applied, so the history says what changed and on whose reading. **Stricter
+independence is the alternative** and filters other specialists' historical
+responses that the author did not act on, leaving everything the author said or did and the
 participant's own prior responses. Which policy produces better collaboration is an empirical
 question, so switching between them must remain a configuration change rather than a redesign.
 
@@ -1122,7 +1124,7 @@ load-bearing ones are below; the rest of the orchestration is internal.
 
 | Boundary | Why it is real |
 |---|---|
-| **context** | current-dispatch independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
+| **context** | current-dispatch independence is the product's central bet, and is readable on the constructed object rather than inferred from a prompt; two history policies are required |
 | **model** | the runtime implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
 Further interfaces are expected and useful without being doctrine. A **store** boundary concentrates atomic
