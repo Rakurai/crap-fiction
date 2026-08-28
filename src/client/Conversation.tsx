@@ -48,6 +48,8 @@ type ConversationProps = {
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
 
+const STILL_AT_THE_NEWEST = 24
+
 function ResponseActions({
   responseId,
   participantId,
@@ -455,6 +457,8 @@ export function Conversation({
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
   const [caretOffset, setCaretOffset] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
+  const pinnedToNewest = useRef(true)
   const wasBusy = useRef(false)
   const combobox = Ariakit.useComboboxStore()
   const token = Ariakit.useStoreState(combobox, 'inputValue')
@@ -538,6 +542,32 @@ export function Conversation({
   const conversationActionInFlight = activity !== undefined
   const opening = conversationName(conversation.projection.entries)
 
+  function scrollToNewest(): void {
+    const transcript = transcriptRef.current
+    if (transcript === null) return
+    transcript.scrollTop = transcript.scrollHeight
+  }
+
+  function followTheNewestFromHere(): void {
+    pinnedToNewest.current = true
+    scrollToNewest()
+  }
+
+  function holdWhereTheAuthorLeftIt(): void {
+    const transcript = transcriptRef.current
+    if (transcript === null) return
+    pinnedToNewest.current = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight <= STILL_AT_THE_NEWEST
+  }
+
+  useLayoutEffect(() => {
+    if (pinnedToNewest.current) scrollToNewest()
+  }, [conversation.projection.entries, pendingParticipants])
+
+  useLayoutEffect(() => {
+    pinnedToNewest.current = true
+    scrollToNewest()
+  }, [conversation.conversationId])
+
   useEffect(() => {
     if (roomBusy) {
       wasBusy.current = true
@@ -556,6 +586,7 @@ export function Conversation({
   function askTheInterviewer(): void {
     if (roomBusy) return
     conversation.sendMessage(`@${interviewer.handle} ${interviewer.invocation}`)
+    followTheNewestFromHere()
   }
 
   function replyEmpty(participantId: string): void {
@@ -582,6 +613,7 @@ export function Conversation({
     if (message.trim().length === 0 || roomBusy) return
     conversation.sendMessage(message)
     setMessage('')
+    followTheNewestFromHere()
   }
 
   function selectHandle(handle: string) {
@@ -624,7 +656,7 @@ export function Conversation({
           </button>
         </div>
       </div>
-      <div className={styles.transcript}>
+      <div ref={transcriptRef} className={styles.transcript} onScroll={holdWhereTheAuthorLeftIt}>
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
