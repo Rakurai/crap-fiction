@@ -545,6 +545,44 @@ describe('Room.dispatch', () => {
     expect(entries(dataRoot, workspaceDir, piece.id, 'no-such-conversation')).toEqual([])
   })
 
+  it('refuses a minted id presented in a scope other than the one that minted it, and admits it in the scope that minted it', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    const draftScope = scope(piece.id)
+    const storyContextScope: RoomScope = { pieceId: piece.id, surface: 'storyContext' }
+    const { id: conversationId } = room.mintConversation(workspaceDir, draftScope)
+
+    await expect(
+      room.dispatch(workspaceDir, storyContextScope, conversationId, { kind: 'message', text: 'a message' }, documents('draft text')),
+    ).rejects.toThrowError(ConversationNotFoundError)
+    expect(adapter.promptFor('shape')).toBeUndefined()
+
+    await room.dispatch(workspaceDir, draftScope, conversationId, { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    expect(entries(dataRoot, workspaceDir, piece.id, conversationId)[0]).toMatchObject({ kind: 'authorMessage', text: 'a message' })
+  })
+
+  it('does not let a minted id outlive the piece it was minted for once the room abandons that piece', async () => {
+    const pieceOne = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const pieceTwo = await createPiece(pieceMetadata, workspaceDir, 'Saucers', fixtureMode.id, fixtureCatalog)
+    const { room } = buildRoom(dataRoot, {})
+
+    room.connect(pieceOne.id, () => {})
+    const { id: conversationId } = room.mintConversation(workspaceDir, scope(pieceOne.id))
+
+    room.connect(pieceTwo.id, () => {})
+
+    await expect(
+      room.dispatch(workspaceDir, scope(pieceOne.id), conversationId, { kind: 'message', text: 'a message' }, documents('draft text')),
+    ).rejects.toThrowError(ConversationNotFoundError)
+  })
+
   it('appends nothing and emits one terminal frame where every model result lands after the abandonment', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     const { room, adapter } = buildRoom(dataRoot, {

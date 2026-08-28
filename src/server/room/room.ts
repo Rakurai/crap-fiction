@@ -25,7 +25,7 @@ import {
   type ParticipantState,
   type RoomActivitySnapshot,
 } from '../../shared/conversationEvents.js'
-import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
+import { SURFACE_IDS, type DocumentSnapshot, type SurfaceId } from '../../shared/surfaces.js'
 import { ConversationNotFoundError, deleteConversation, PieceNotFoundError, startConversation } from '../pieces.js'
 import type { RoleDefinition } from '../model/roles.js'
 import { RouteFailure } from '../routeFailure.js'
@@ -189,7 +189,7 @@ export class Room {
   readonly #policy: HistoryPolicy
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
-  readonly #minted = new Set<string>()
+  readonly #minted = new Map<string, Set<string>>()
   #currentPieceId: string | undefined
 
   constructor(
@@ -237,6 +237,7 @@ export class Room {
     for (const operation of [...this.#operations.values()]) {
       if (operation.roomScope.pieceId === pieceId) this.abandon(operation.roomScope, operation.actionId)
     }
+    for (const surface of SURFACE_IDS) this.#minted.delete(roomScopeKey({ pieceId, surface }))
   }
 
   #emit(pieceId: string, event: RoomEvent): void {
@@ -263,14 +264,17 @@ export class Room {
 
   mintConversation(workspaceDir: string, roomScope: RoomScope): { readonly id: string } {
     const minted = startConversation(workspaceDir, roomScope.pieceId)
-    this.#minted.add(minted.id)
+    const key = roomScopeKey(roomScope)
+    const ids = this.#minted.get(key) ?? new Set<string>()
+    ids.add(minted.id)
+    this.#minted.set(key, ids)
     return minted
   }
 
   async deleteConversation(workspaceDir: string, roomScope: RoomScope, conversationId: string): Promise<void> {
     const operation = this.#operationFor(roomScope)
     if (operation?.conversationId === conversationId) throw new RoomBusyError(roomScope.pieceId, roomScope.surface)
-    this.#minted.delete(conversationId)
+    this.#minted.get(roomScopeKey(roomScope))?.delete(conversationId)
     await deleteConversation(this.#dataRoot, workspaceDir, roomScope.pieceId, roomScope.surface, conversationId)
   }
 
@@ -326,7 +330,9 @@ export class Room {
 
     const conversationScope = conversationScopeFor(workspaceDir, roomScope)
     const onDisk = readConversationEntries(this.#dataRoot, conversationScope, conversationId)
-    if (onDisk === undefined && !this.#minted.has(conversationId)) throw new ConversationNotFoundError(pieceId, conversationId)
+    if (onDisk === undefined && !this.#minted.get(roomScopeKey(roomScope))?.has(conversationId)) {
+      throw new ConversationNotFoundError(pieceId, conversationId)
+    }
     const existingEntries = onDisk?.entries ?? []
     const modeDescription = this.#catalog.mode(piece.metadata.mode).description
     const modeSpecialists = this.#catalog.specialistsFor(piece.metadata.mode, roomScope.surface)
@@ -429,7 +435,7 @@ export class Room {
         cause,
         brought.length > 0 ? { workspaceDir, pieceId, surface: roomScope.surface, members: [...enabledCast, ...brought] } : undefined,
       )
-      this.#minted.delete(conversationId)
+      this.#minted.get(roomScopeKey(roomScope))?.delete(conversationId)
     })()
 
     void written
