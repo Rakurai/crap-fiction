@@ -7,14 +7,18 @@ import { usePaneWidth } from './usePaneWidth.js'
 
 const SHORT_LABEL_THRESHOLD = 640
 
-const SHORT_VIEW_LABEL: Readonly<Record<'source' | 'rendered', string>> = {
+const VIEW_IDS = ['source', 'rendered'] as const
+
+type ViewId = (typeof VIEW_IDS)[number]
+
+const SHORT_VIEW_LABEL: Readonly<Record<ViewId, string>> = {
   source: 'src',
   rendered: 'prose',
 }
 
 export type DraftControls = Readonly<{
-  viewLabel: 'source' | 'rendered'
-  onToggleView: () => void
+  view: ViewId
+  onShowView: (view: ViewId) => void
   onReading: () => void
 }>
 
@@ -48,6 +52,27 @@ export function DocumentHeader({ onOpenPieces, onOpenModels, title, lifecycle, l
       {length !== undefined && <span className={styles.length}>{length}</span>}
       <span className={styles.spacer} />
       <div className={styles.controls}>
+        {draftControls !== undefined && (
+          <>
+            <div className={styles.switcher}>
+              {VIEW_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={styles.switcherOption}
+                  aria-current={id === draftControls.view}
+                  onClick={() => draftControls.onShowView(id)}
+                >
+                  {shortLabels ? SHORT_VIEW_LABEL[id] : id}
+                </button>
+              ))}
+            </div>
+            <button type="button" className={styles.viewControl} onClick={draftControls.onReading}>
+              {shortLabels ? 'read' : 'reading'}
+            </button>
+            <span className={styles.rule} />
+          </>
+        )}
         <div className={styles.switcher}>
           {SURFACE_IDS.map((id) => (
             <button
@@ -61,17 +86,6 @@ export function DocumentHeader({ onOpenPieces, onOpenModels, title, lifecycle, l
             </button>
           ))}
         </div>
-        {draftControls !== undefined && (
-          <>
-            <span className={styles.rule} />
-            <button type="button" className={styles.viewControl} onClick={draftControls.onToggleView}>
-              {shortLabels ? SHORT_VIEW_LABEL[draftControls.viewLabel] : draftControls.viewLabel}
-            </button>
-            <button type="button" className={styles.viewControl} onClick={draftControls.onReading}>
-              {shortLabels ? 'read' : 'reading'}
-            </button>
-          </>
-        )}
       </div>
     </div>
   )

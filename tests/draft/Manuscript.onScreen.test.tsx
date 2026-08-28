@@ -80,6 +80,42 @@ describe('the piece header', () => {
   })
 })
 
+describe('the draft view controls', () => {
+  afterEach(cleanup)
+
+  it('offers source and rendered as one two-way control marking the view in force', () => {
+    renderManuscript()
+
+    expect(screen.getByRole('button', { name: 'rendered' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: 'source' }).getAttribute('aria-current')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'source' }))
+
+    expect(screen.getByRole('button', { name: 'source' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: 'rendered' }).getAttribute('aria-current')).toBe('false')
+  })
+
+  it('holds the surface switcher after every draft-only control, so the surfaces sit where leaving the draft leaves them', () => {
+    renderManuscript()
+
+    const order = screen.getAllByRole('button').map((button) => button.textContent)
+
+    expect(order.indexOf('draft')).toBeGreaterThan(order.indexOf('rendered'))
+    expect(order.indexOf('draft')).toBeGreaterThan(order.indexOf('reading'))
+  })
+
+  it('returns from reading through the hint that names the keystroke', () => {
+    renderManuscript()
+
+    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
+    expect(screen.queryByRole('button', { name: 'reading' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'ESC · RETURN' }))
+
+    expect(screen.getByRole('button', { name: 'reading' })).toBeTruthy()
+  })
+})
+
 describe('the piece title', () => {
   afterEach(cleanup)
 

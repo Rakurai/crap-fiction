@@ -40,12 +40,12 @@ export function Manuscript({
   applying,
 }: ManuscriptProps) {
   const reading = manuscript.view === 'reading'
-  const [paneRef, paneWidth] = usePaneWidth<HTMLDivElement>()
-  const [widthBesideConversation, setWidthBesideConversation] = useState<number | undefined>(undefined)
+  const [measureRef, measureWidth] = usePaneWidth<HTMLDivElement>()
+  const [measureBesideConversation, setMeasureBesideConversation] = useState<number | undefined>(undefined)
 
   useEffect(() => {
-    if (!reading && Number.isFinite(paneWidth)) setWidthBesideConversation(paneWidth)
-  }, [reading, paneWidth])
+    if (!reading && Number.isFinite(measureWidth)) setMeasureBesideConversation(measureWidth)
+  }, [reading, measureWidth])
 
   useEffect(() => {
     if (manuscript.view !== 'reading') return
@@ -61,7 +61,7 @@ export function Manuscript({
   }, [manuscript.editor, reading, applying])
 
   return (
-    <div ref={paneRef} className={styles.wrapper}>
+    <div className={styles.wrapper}>
       {!reading && (
         <DocumentHeader
           onOpenPieces={onOpenPieces}
@@ -72,8 +72,8 @@ export function Manuscript({
           surface="draft"
           onSwitchTo={onSwitchTo}
           draftControls={{
-            viewLabel: manuscript.view === 'source' ? 'rendered' : 'source',
-            onToggleView: manuscript.view === 'source' ? manuscript.showRendered : manuscript.showSource,
+            view: manuscript.view === 'source' ? 'source' : 'rendered',
+            onShowView: (view) => (view === 'source' ? manuscript.showSource() : manuscript.showRendered()),
             onReading: manuscript.showReading,
           }}
         />
@@ -90,9 +90,12 @@ export function Manuscript({
       <div
         ref={manuscript.containerRef}
         className={reading ? `${styles.scroll} ${styles.readingScroll}` : styles.scroll}
-        style={reading && widthBesideConversation !== undefined ? { maxWidth: widthBesideConversation } : undefined}
       >
-        <div className={styles.measure}>
+        <div
+          ref={measureRef}
+          className={styles.measure}
+          style={reading && measureBesideConversation !== undefined ? { maxWidth: measureBesideConversation } : undefined}
+        >
           {reading && <h1 className={styles.readingTitle}>{title}</h1>}
           {manuscript.view === 'source' ? (
             <textarea
@@ -110,7 +113,11 @@ export function Manuscript({
         </div>
       </div>
 
-      {reading && <div className={styles.wayBack}>{facts(machineWords('esc'), machineWords('return'))}</div>}
+      {reading && (
+        <button type="button" className={styles.wayBack} onClick={manuscript.leaveReading}>
+          {facts(machineWords('esc'), machineWords('return'))}
+        </button>
+      )}
 
       {!reading && autosave.state.failed && <SaveFailure failure={autosave.state} location={location} title={title} />}
     </div>
