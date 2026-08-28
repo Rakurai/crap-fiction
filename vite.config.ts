@@ -1,19 +1,21 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { parse } from 'yaml'
 import react from '@vitejs/plugin-react'
+import yaml from '@rollup/plugin-yaml'
 import devServer, { defaultOptions } from '@hono/vite-dev-server'
-import { defineConfig, type UserConfig } from 'vite'
+import { defineConfig, type PluginOption, type UserConfig } from 'vite'
 import { loadEnv } from './src/server/env.js'
+import { validateConfig } from './src/shared/config.js'
 
-/**
- * Vite serving the client with a Hono application inside it. The entry is a
- * parameter because there is a second studio — the one answering from the
- * fixture model implementation, named by `vite.fixture.config.ts` — and
- * everything else about how a studio is served is the same for both. Stated
- * once here so the two cannot drift.
- */
+const CONFIG_PATH = path.join(import.meta.dirname, 'config.yaml')
+
 export function studioConfig(entry: string): UserConfig {
   const env = loadEnv()
+  validateConfig(parse(readFileSync(CONFIG_PATH, 'utf8')), CONFIG_PATH)
   return {
     plugins: [
+      yaml() as PluginOption,
       react(),
       devServer({
         entry,
@@ -26,9 +28,6 @@ export function studioConfig(entry: string): UserConfig {
       }),
     ],
     server: {
-      // The namespace the deployment container supplies is the boundary;
-      // binding every interface here is what makes the published-loopback
-      // bind in the container's docker-compose reachable.
       host: true,
       port: env.port,
       strictPort: true,

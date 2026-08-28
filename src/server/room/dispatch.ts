@@ -5,7 +5,7 @@ import type {
   ParticipantResponseEntry,
 } from '../../shared/conversationEntries.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { CallPrompt, ModelAccess } from '../model/types.js'
+import type { CallPrompt, CallState, ModelAccess } from '../model/types.js'
 import { normalizeResponse, responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
@@ -13,10 +13,6 @@ export type ParticipantOutcome =
   | Readonly<{ kind: 'entry'; entry: ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry }>
   | Readonly<{ kind: 'abandoned' }>
 
-/**
- * Only a substantive reading is evidence. A declined or failed call is recorded in the conversation
- * and stops there: what it would tell the Story Editor is who spoke, not anything about the story.
- */
 export function evidenceFrom(outcome: ParticipantOutcome, participant: string): ParticipantEvidence | undefined {
   if (outcome.kind !== 'entry') return undefined
   if (outcome.entry.kind !== 'participantResponse') return undefined
@@ -30,7 +26,7 @@ export async function callParticipant(
   owesAnswer: boolean,
   modelAccess: ModelAccess,
   signal: AbortSignal,
-  onState: (state: 'preparing' | 'working') => void,
+  onState: (state: CallState) => void,
 ): Promise<ParticipantOutcome> {
   const schema = responseValueSchema(owesAnswer)
   const result = await modelAccess.call(role.id, prompt, schema, signal, onState)

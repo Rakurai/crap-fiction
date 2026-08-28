@@ -9,6 +9,13 @@ describe('the shipped content catalog', () => {
   it('boots: every loader accepts the real content directory', () => {
     expect(() => ShippedContentCatalog.load(CONTENT_ROOT)).not.toThrow()
   })
+
+  it('boots with a non-empty author-context roster for every loaded mode', () => {
+    const catalog = ShippedContentCatalog.load(CONTENT_ROOT)
+    for (const mode of catalog.modes) {
+      expect(catalog.specialistsFor(mode.id, 'authorContext').length).toBeGreaterThan(0)
+    }
+  })
 })
 
 describe('content a release must refuse', () => {

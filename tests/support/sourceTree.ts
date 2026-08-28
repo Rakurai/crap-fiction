@@ -3,7 +3,6 @@ import path from 'node:path'
 
 export const REPO_ROOT = path.join(import.meta.dirname, '..', '..')
 
-/** Every TypeScript source under `dir`, at any depth, as absolute paths. */
 export function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name)
@@ -12,7 +11,6 @@ export function sourceFiles(dir: string): string[] {
   })
 }
 
-/** The same, named from the repository root rather than from the caller. */
 export function sourcesUnder(...segments: readonly string[]): string[] {
   return sourceFiles(path.join(REPO_ROOT, ...segments))
 }

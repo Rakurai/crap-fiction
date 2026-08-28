@@ -8,7 +8,9 @@ presentation, the declared surfaces, engineering discipline.
 A statement belongs here only if it would still be true after the code implementing it was
 rewritten. A fact whose accuracy can only be established by reading the source is the source's,
 not this document's. Values that are tuning rather than decision — a retry count, a timeout, a
-debounce interval, a colour — live where they are used and are absent here.
+debounce interval — live in one maintainer-facing application configuration, validated at
+startup, and are absent here. An appearance value, such as a colour, lives in the token layer
+instead.
 
 Where this document appears to decide product behaviour, it is recording what the behaviour above
 it forces.
@@ -342,9 +344,10 @@ is never an error, because nothing may be derived from it in order to be true. D
 deletes the change files its applications name.
 
 **There is one representation for a structured file, so it carries no version and no compatibility
-layer.** Piece metadata and settings are validated on read, and nothing the author wrote is silently
-discarded. Both rules of representation reach structured files alone, and neither context document is
-one.
+layer.** A structured file is validated whenever it is read and whenever it is written, against the
+same declaration and with the same tolerance, so the studio never writes a file it would refuse to
+read back, and nothing the author wrote is silently discarded. Both rules of representation reach
+structured files alone, and neither context document is one.
 
 **What a tolerant read of a hand-edited structured file tolerates is a closed list**: a key the
 current schema does not know is kept and survives a write; a scalar where a list is expected reads as
@@ -477,9 +480,9 @@ values, maintainer-facing, in one place — never author configuration and never
 interface, which several callers could then disagree about.
 
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
-it can answer makes the author wait for a reason the interface can state. An implementation that
-cannot tell setup from work simply never reports preparing — the interface admits the richer state
-and a weaker implementation under-reports. Load progress as a fraction is deliberately not carried:
+it can answer makes the author wait for a reason the interface can state. The interface admits the
+richer state and lets a weaker implementation under-report, rather than levelling down to what every
+implementation can distinguish. Load progress as a fraction is deliberately not carried:
 the author's next move is the same at forty percent as at sixty, and a number on the interface is a
 progress bar the composition then owes.
 
@@ -567,7 +570,8 @@ standing alone conforms and nothing has to be invented to fill a field. Shrinkin
 always preferred to adding machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
-one, and so does the Story Editor on every dispatch that calls it at all. Declaring it is then
+one, and so does the Story Editor on a dispatch where no specialist reading landed for it to work
+from. Declaring it is then
 a response that does not conform, which the module re-issues under its own policy before it becomes a
 failure. This is what makes an owed answer enforceable without inspecting what a response says —
 judging the content would take a second model call to do badly, and a model willing to declare silence
@@ -610,10 +614,10 @@ per-call half is the task and the material a particular request carries. No head
 or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
 prompt language of its own.
 
-**Compilation is a pure function**, so the invariant is asserted against the constructed object rather
+**Compilation is a pure function**, so the invariant is readable on the constructed object rather
 than inferred from a prompt. Nothing else assembles a call's input, for any kind of call — each kind
-has its own prompt and its own compilation, and the independence invariant is asserted over the
-participant kinds, which are the ones the bet lives in.
+has its own prompt and its own compilation, and the independence invariant governs the participant
+kinds, which are the ones the bet lives in.
 
 Every participant call receives the author context, the story context, the current draft whole and
 unexcerpted, and the current author message. At flash length a whole draft is cheaper to include than
@@ -621,9 +625,11 @@ any excerpting scheme is to specify, and excerpting would put a second inference
 
 **Conversation history is supplied by policy**, and the seam is the whole of the difference between
 the policies. **Shared history is the default**: a specialist sees the conversation as it happened —
-author messages, prior dispatches' participant responses, and the applications that changed the
-surface's document. **Stricter independence is the alternative** and filters other specialists' historical
-responses that the author did not act on, leaving author messages, applied recommendations and the
+author messages, the author's requests for a concrete change, prior dispatches' participant responses,
+and the applications that changed the surface's document. An application is carried by the
+recommendation it applied, so the history says what changed and on whose reading. **Stricter
+independence is the alternative** and filters other specialists' historical
+responses that the author did not act on, leaving everything the author said or did and the
 participant's own prior responses. Which policy produces better collaboration is an empirical
 question, so switching between them must remain a configuration change rather than a redesign.
 
@@ -791,7 +797,10 @@ back, once the model layer's retries are exhausted, and there is no per-particip
 has nothing material: its no-comment outcome is recorded and is not shown, and it is never re-run under
 an obligation to speak. The Story Editor fails: the dispatch degrades to whatever readings landed rather
 than breaking, because the readings do not depend on it — and where nothing landed either, the dispatch
-produced no answer and says so. Abandonment: every call this dispatch has in flight shares one signal and
+produced no answer and says so. A response lands and cannot be written: the loss is reported naming whose
+response it was, and the dispatch settles with the entries that did reach disk — one unwritable entry
+discards neither the responses beside it nor the synthesis they were gathered for. Abandonment: every call
+this dispatch has in flight shares one signal and
 cancels through it, landed responses stand as ordinary entries, and no Story Editor call is attempted —
 asking for one more call is the wrong question at the moment the author stopped caring. A call abandoned
 mid-flight appends no entry of its own: an abandoned call said nothing, and nothing is the one outcome a
@@ -926,7 +935,7 @@ identities.
 **Nothing in the event set is a queue: there is no waiting count and no place in an order**, for a
 specialist or for the Story Editor. A started action's resolved audience is a durable fact about what the
 dispatch will call, and naming those participants from it asserts nothing beyond that fact. What a client
-may not do is read a stage out of it that the model layer has not reported, or an order the room never
+may not do is read a stage out of it that has not been reported, or an order the room never
 promised. Each call's progress is reported for that call alone, and the moment it was submitted is part of
 what is reported, so elapsed time is a number the server stated rather than one the client began counting.
 
@@ -1077,6 +1086,11 @@ ships none of them with a value.** An absent or malformed value is a startup fai
 deployment value defaulted in an image is a value nobody chose and the author would be the one to discover
 it.
 
+**An environment variable is a deployment value; application tuning is a configuration value.** The
+environment carries what differs by where the process runs. A retry count, a timeout or a debounce
+interval is the same for every deployment, so it travels in the repository's own configuration instead,
+validated at startup with the same failure discipline.
+
 **What counts as malformed is settled where the value is used, not where it is read.** The environment
 loader knows that the runtime location is a URL and nothing further: which schemes actually reach the
 runtime is the model module's fact, so the model module validates what it is handed before it calls
@@ -1111,7 +1125,7 @@ load-bearing ones are below; the rest of the orchestration is internal.
 
 | Boundary | Why it is real |
 |---|---|
-| **context** | current-dispatch independence is the product's central bet, and is asserted on the constructed object rather than inferred from a prompt; two history policies are required |
+| **context** | current-dispatch independence is the product's central bet, and is readable on the constructed object rather than inferred from a prompt; two history policies are required |
 | **model** | the runtime implementation and the test fixture are two real adapters, and a third runtime is a module replacement rather than a redesign |
 
 Further interfaces are expected and useful without being doctrine. A **store** boundary concentrates atomic

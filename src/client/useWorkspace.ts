@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoaded } from './load.js'
 import { failureMessage } from './request.js'
 import { chooseWorkspace, fetchWorkspace } from './workspaceClient.js'
@@ -18,11 +18,19 @@ export function useWorkspace(): WorkspaceViewModel {
   const [load, setLoad] = useLoaded(fetchWorkspace, [])
   const [error, setError] = useState<string | undefined>(undefined)
   const [submitting, setSubmitting] = useState(false)
+  const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   const submit = useCallback((candidate: string) => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setSubmitting(true)
     setError(undefined)
-    void chooseWorkspace(candidate).then((result) => {
+    void chooseWorkspace(candidate, controller.signal).then((result) => {
+      if (controllerRef.current !== controller) return
+      controllerRef.current = undefined
       setSubmitting(false)
       if (result.outcome === 'value') {
         setLoad({ kind: 'ready', value: { workspace: result.value.workspace } })

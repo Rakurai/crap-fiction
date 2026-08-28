@@ -1,4 +1,5 @@
 import type { CallSiteAssignmentView } from '../../shared/callSiteViews.js'
+import { RouteFailure } from '../routeFailure.js'
 import { markOrdinals, type RoleDefinition } from './roles.js'
 
 export const APPLY_CALL_SITE = 'apply'
@@ -14,9 +15,9 @@ export class DuplicateCallSiteError extends Error {
   }
 }
 
-export class UnknownCallSiteError extends Error {
+export class UnknownCallSiteError extends RouteFailure {
   constructor(site: string) {
-    super(`no call site "${site}"`)
+    super('CALL_SITE_NOT_FOUND', 'not_found', `no call site "${site}"`)
     this.name = 'UnknownCallSiteError'
   }
 }
@@ -30,11 +31,6 @@ export type CallSiteDescriptor = Readonly<{
   ordinal: number | null
 }>
 
-/**
- * An operation is only a place a model is called from, so it has no handle and no role — but it
- * is also the entry the author understands least, and the one that explains itself least, so it
- * says what the model it is given will be asked to do.
- */
 const OPERATIONS: readonly CallSiteDescriptor[] = [
   {
     site: APPLY_CALL_SITE,

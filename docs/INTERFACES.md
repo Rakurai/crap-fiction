@@ -112,14 +112,14 @@ The set is closed.
 | `activity.snapshot` | The action in flight, if there is one, at each of the piece's three room scopes, each with the audience it is waiting on and the stage and start moment of every participant whose call has reached one — delivered once, atomically with the subscription, before any other frame |
 | `action.started` | The room scope, the action's identifier, its kind — dispatch or apply — the entry that caused it, and for a dispatch the audience it resolved to |
 | `apply.pending` | The room scope, action, the entry applied, and the provisional identity of the replacement the model has just answered with |
-| `participant.activity` | The room scope, action, participant, the stage its call has reached — having its model prepared, or working — and the moment that call began. A participant the action is waiting on but has not yet called reaches no stage, and is carried by the absence of any activity for it |
+| `participant.activity` | The room scope, action, participant, the stage its call has reached, and the moment that call began. A participant the action addresses whose call the room has not yet submitted carries no stage, and is carried by the absence of any activity for it |
 | `entry.appended` | The room scope, action, and the durable entry that just landed — an author message, a concrete-change request, a participant outcome, or an application |
 | `action.finished` | The room scope, action, and how it ended — settled, abandoned, or failed |
 | `error` | The room scope, and a room failure belonging to no participant, in terms the author can act on |
 
 A call's start moment is the server's, stamped once when the call is submitted and repeated unchanged
-on every later frame about that call and on the snapshot. It does not advance when the call moves from
-waiting to prepared to working, because those are stages of one wait. A client that stamped its own
+on every later frame about that call and on the snapshot. It does not advance as the call moves from
+one stage to the next, because those are stages of one wait. A client that stamped its own
 arrival time instead would restart the number on every reload and disagree with a second client on the
 same piece.
 
@@ -151,7 +151,7 @@ CallResult<T> =
   | { outcome: 'abandoned' }
   | { outcome: 'failed';    reason: FailureReason; returned?: string }
 
-FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming'
+FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming' | 'internal'
 ```
 
 `prompt` carries the durable half and the per-call half apart; no caller composes them into one string
@@ -165,6 +165,7 @@ that vendor's own accommodation.
 | `timeout` | the configured wait elapsed |
 | `malformed` | what came back was not the requested structure at all |
 | `nonconforming` | it was that structure and still failed the schema |
+| `internal` | the call broke on this side of the seam, and the runtime is not implicated |
 
 `returned` carries what came back verbatim where anything did. `onState` is how a call reports that it
 is preparing before it is working; an implementation that cannot tell setup from work never reports
@@ -224,8 +225,8 @@ those as absent would invite something to read them.
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them. The draft and the story context each
 keep their own conversations and changes, nested under the piece by surface; the author context's live
-once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
-validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention.
+once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is a
+structured file; `author-context.yaml` and `story-context.yaml` keep the name by convention.
 
 Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
 reference schema — travels with the application and not under the data root, under a content root
@@ -235,7 +236,7 @@ its form and scale and a sibling story-context reference.
 
 The **charter** is one Markdown document under the content root, composed whole into a specialist or
 generalist call. The obligation to answer a direct question is call-specific rather than intrinsic to
-the charter, and is composed only where a call addresses a participant directly.
+the charter, and is composed only where the call owes an answer.
 
 A **participant** carries its display name and its single-token handle, which are different things — a
 display name of more than one word cannot be recovered from a message — and two distinct texts: a short
@@ -283,3 +284,11 @@ The set is closed, and the image ships none of them with a value.
 
 An absent or malformed value is a startup failure naming it, on every path the studio is started by. A
 data root that is not an existing directory is malformed.
+
+## Application configuration
+
+`config.yaml`, at the repository root, carries application tuning: the maintainer's own decisions,
+the same for every deployment and travelling with the repository rather than the environment. It is
+validated once, on the server at startup and in the client at build time, against one shared schema.
+An absent or malformed value is a startup failure naming the file and the value; nothing in it is
+defaulted. No value it carries is transcribed here.

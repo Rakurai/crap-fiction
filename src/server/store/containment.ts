@@ -1,9 +1,10 @@
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
+import { RouteFailure } from '../routeFailure.js'
 
-export class PathEscapesRootError extends Error {
+export class PathEscapesRootError extends RouteFailure {
   constructor(root: string, candidate: string) {
-    super(`path escapes root: "${candidate}" is not inside "${root}"`)
+    super('PATH_ESCAPES_ROOT', 'invalid', `path escapes root: "${candidate}" is not inside "${root}"`)
     this.name = 'PathEscapesRootError'
   }
 }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import type { RuntimeStatus } from '../shared/runtimeStatus.js'
 import type { assignModel as assignModelFn, fetchCallSites as fetchCallSitesFn, fetchRuntimeStatus as fetchRuntimeStatusFn } from './callSitesClient.js'
+import { config } from './config.js'
 import { useLoaded } from './load.js'
 import { failureMessage } from './request.js'
 
@@ -11,15 +12,11 @@ export type CallSiteAdapters = Readonly<{
   assignModel: typeof assignModelFn
 }>
 
-/** How long the acknowledgement of a written assignment stands before it goes away again. */
-const SAVED_STANDS_MS = 2600
-
 export type CallSitesViewModel =
   | { readonly status: 'loading' }
   | { readonly status: 'error'; readonly message: string }
   | {
       readonly status: 'ready'
-      /** The room's participants, and the operations the studio calls a model from itself. */
       readonly room: readonly CallSiteAssignmentView[]
       readonly operations: readonly CallSiteAssignmentView[]
       readonly runtime: RuntimeStatus | undefined
@@ -37,17 +34,25 @@ export function useCallSites(adapters: CallSiteAdapters): CallSitesViewModel {
   const [assigning, setAssigning] = useState<string | undefined>(undefined)
   const [saved, setSaved] = useState<string | undefined>(undefined)
   const [assignError, setAssignError] = useState<string | undefined>(undefined)
+  const controllerRef = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => () => controllerRef.current?.abort(), [])
 
   useEffect(() => {
     if (saved === undefined) return
-    const timer = setTimeout(() => setSaved(undefined), SAVED_STANDS_MS)
+    const timer = setTimeout(() => setSaved(undefined), config.callSiteAssignment.savedStandsMs)
     return () => clearTimeout(timer)
   }, [saved])
 
   const assign = useCallback((site: string, model: string) => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setAssigning(site)
     setAssignError(undefined)
-    void assignModel(site, model).then((result) => {
+    void assignModel(site, model, controller.signal).then((result) => {
+      if (controllerRef.current !== controller) return
+      controllerRef.current = undefined
       setAssigning(undefined)
       if (result.outcome === 'value') {
         const { assignment } = result.value

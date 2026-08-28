@@ -8,24 +8,35 @@ export type ParticipantIdentity = Readonly<{
   ordinal: number | null
 }>
 
-export type RosterViewModel = Readonly<{
-  settled: boolean
-  identify: (participantId: string) => ParticipantIdentity
-}>
+const UNKNOWN_PARTICIPANT: ParticipantIdentity = Object.freeze({
+  displayName: 'Unknown participant',
+  handle: undefined,
+  mark: null,
+  ordinal: null,
+})
+
+export type RosterViewModel =
+  | Readonly<{ kind: 'loading' }>
+  | Readonly<{ kind: 'error'; message: string }>
+  | Readonly<{ kind: 'ready'; identify: (participantId: string) => ParticipantIdentity }>
 
 export function useRoster(fetchCallSites: typeof fetchCallSitesFn): RosterViewModel {
   const [sites] = useLoaded(fetchCallSites, [])
-  const named = sites.kind === 'ready' ? sites.value : []
 
+  if (sites.kind === 'loading') return { kind: 'loading' }
+  if (sites.kind === 'error') return { kind: 'error', message: sites.message }
+
+  const named = sites.value
   return {
-    settled: sites.kind !== 'loading',
+    kind: 'ready',
     identify: (participantId) => {
       const site = named.find((candidate) => candidate.site === participantId)
+      if (site === undefined) return UNKNOWN_PARTICIPANT
       return {
-        displayName: site?.displayName ?? participantId,
-        handle: site?.handle ?? undefined,
-        mark: site?.mark ?? null,
-        ordinal: site?.ordinal ?? null,
+        displayName: site.displayName,
+        handle: site.handle ?? undefined,
+        mark: site.mark,
+        ordinal: site.ordinal,
       }
     },
   }

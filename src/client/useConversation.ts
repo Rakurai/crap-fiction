@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
-import type { ActionKind, ConversationActivitySnapshot } from '../shared/conversationEvents.js'
+import type { ActionKind, ConversationActivitySnapshot, RoomActivitySnapshot } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
-import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection, type RoomEvent } from './entryProjection.js'
+import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
+import type { RoomEvent } from '../shared/conversationEvents.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,
@@ -22,19 +23,8 @@ const UNSENT = 'the message was not sent'
 
 const STAYS_LOCKED = 'this surface stays locked until it is reopened'
 
-/**
- * The Apply this surface's activity reported already in flight when its stream connected.
- * `applicationId` is present only once the model has answered and a replacement is pending
- * confirmation — the one case a reconnecting client can resume installation and confirmation for;
- * absent it, the model call itself is still running and there is nothing yet to retrieve.
- */
 export type ResumedApply = Readonly<{ actionId: string; responseId: string; applicationId: string | undefined }>
 
-/**
- * The one action this surface's room scope is running, whichever of its conversations opened it.
- * Every fact a control needs about it is held here once, so no part of it can be released while
- * another part stays set.
- */
 type SurfaceOperation = Readonly<{
   actionId: string
   conversationId: string
@@ -162,27 +152,15 @@ function reduce(state: SurfaceState, change: SurfaceChange): SurfaceState {
 
 export type ConversationViewModel = Readonly<{
   projection: ConversationProjection
-  /**
-   * Whether the room is the author's to address. False only while this surface knows its room scope
-   * is idle: an action in flight, activity not yet learned, and activity that could not be learned
-   * all read the same way to a control, because none of them is an idle room.
-   */
   busy: boolean
-  /** Whether this surface's authoritative room scope is applying, whichever conversation owns it. */
   applyingInRoom: boolean
   error: string | undefined
   sendMessage: (message: string) => void
   reply: (participantId: string, message: string) => void
   askForConcreteChange: (respondingTo: string, clarification: string | undefined) => void
-  /**
-   * Abandons whatever this surface's room scope is running, from whichever of its conversations is
-   * mounted. Resolves true only when the room authoritatively released it.
-   */
   abandon: () => Promise<boolean>
-  /** The same, for a caller holding the identity of its own action and a failure to state with it. */
   abandonAction: (conversationId: string, actionId: string, after: string | undefined) => Promise<boolean>
   conversationId: string | null
-  /** The Apply this conversation was mid-flight on when its stream connected, if any. */
   resumedApplying: ResumedApply | undefined
 }>
 
@@ -216,6 +194,15 @@ export function useConversation(
     error: undefined,
   })
   const abandoningRef = useRef(false)
+  const mounted = useRef(true)
+  const actionController = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => {
+    return () => {
+      mounted.current = false
+      actionController.current?.abort()
+    }
+  }, [])
   // Held rather than read from the prop: this hook mints an id on a fresh conversation's first
   // dispatch and reports it upward, and depending on the prop would rebuild the event stream in the
   // moment that dispatch is opening. The author switching is a remount, not a changed prop.
@@ -223,9 +210,10 @@ export function useConversation(
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
 
     if (openedWithConversationId !== null) {
-      void fetchConversation(pieceId, surface, openedWithConversationId).then((result) => {
+      void fetchConversation(pieceId, surface, openedWithConversationId, controller.signal).then((result) => {
         if (!active) return
         if (result.outcome === 'value') {
           update({ type: 'entriesRead', entries: result.value.entries })
@@ -236,38 +224,35 @@ export function useConversation(
       })
     }
 
+    function unlearnable(message: string): void {
+      update({ type: 'activityUnlearnable', message: `${message} — ${STAYS_LOCKED}` })
+    }
+
     const { snapshot, unsubscribe } = subscribeToRoom(
       pieceId,
       (event) => {
         if (!active || event.data.surface !== surface) return
         update({ type: 'event', event })
       },
-      // A frame this client cannot read is reported and otherwise passed over. Only the snapshot's
-      // own failure locks the surface, and it says so where it is awaited: a malformed frame of any
-      // other kind leaves what the room is doing already learned.
       (message) => {
-        if (active) update({ type: 'reported', message })
+        if (!active) return
+        unlearnable(message)
       },
     )
 
-    // A surface admits one operation at a time, so whatever the room reports in flight here holds
-    // this surface's controls whichever conversation opened it — the room would refuse a dispatch
-    // from this one either way. Only an action opened in this conversation is shown in it, or
-    // resumed by it.
     void snapshot
       .then((activity) => {
         if (!active) return
         update({ type: 'activityLearned', activity: activity[surface] })
       })
-      // Terminal: the surface never learns what its room scope is doing, so it stays locked for the
-      // life of this mount and says why in the studio's own words rather than a substitute of ours.
       .catch((err: unknown) => {
         if (!active) return
-        update({ type: 'activityUnlearnable', message: `${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}` })
+        unlearnable(err instanceof Error ? err.message : String(err))
       })
 
     return () => {
       active = false
+      controller.abort()
       unsubscribe()
     }
   }, [pieceId, surface, openedWithConversationId])
@@ -276,15 +261,16 @@ export function useConversation(
 
   function openDispatch(opening: DispatchOpening): void {
     if (roomBusy) return
-    // Started, not waited on: the current documents travel in the request either way, so the
-    // dispatch never depends on this write having landed before it opens.
     void flushDocument()
     update({ type: 'opening' })
+    const controller = new AbortController()
+    actionController.current = controller
 
     async function run(): Promise<void> {
       let conversationId = state.mine
       if (conversationId === null) {
-        const created = await createConversation(pieceId, surface)
+        const created = await createConversation(pieceId, surface, controller.signal)
+        if (!mounted.current) return
         if (created.outcome !== 'value') {
           update({ type: 'stopped', message: failureMessage(created) })
           return
@@ -293,11 +279,13 @@ export function useConversation(
         update({ type: 'minted', conversationId })
       }
 
-      const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments())
+      const result = await dispatch(pieceId, surface, conversationId, opening, getDocuments(), controller.signal)
+      if (!mounted.current) return
       if (result.outcome !== 'value') update({ type: 'stopped', message: failureMessage(result) })
     }
 
     void run().catch((err: unknown) => {
+      if (!mounted.current) return
       update({ type: 'stopped', message: err instanceof Error ? err.message : UNSENT })
     })
   }
@@ -314,14 +302,14 @@ export function useConversation(
     openDispatch({ respondingTo, clarification })
   }
 
-  // The controls are the author's again only once the studio has answered that it let the action go.
-  // Releasing them on the request would show an idle surface the room is still working on, and a
-  // failed abandonment would leave that surface addressable and every dispatch from it refused.
   async function abandonAction(conversationId: string, actionId: string, after: string | undefined): Promise<boolean> {
     if (abandoningRef.current) return false
     abandoningRef.current = true
-    const result = await abandonOperation(pieceId, surface, conversationId, actionId)
+    const controller = new AbortController()
+    actionController.current = controller
+    const result = await abandonOperation(pieceId, surface, conversationId, actionId, controller.signal)
     abandoningRef.current = false
+    if (!mounted.current) return false
     const unfreed = failureMessage(result)
     if (unfreed !== undefined) {
       update({ type: 'reported', message: after === undefined ? unfreed : `${after} — ${unfreed}` })

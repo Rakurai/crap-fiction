@@ -11,6 +11,9 @@ availability:
   - mode: flash
     surface: storyContext
     enabledByDefault: true
+  - mode: flash
+    surface: authorContext
+    enabledByDefault: false
 ---
 ## Responsibility
 

@@ -3,8 +3,9 @@ import type { Fragment, PromptFragments, SectionName } from '../model/prompts.js
 import { renderFragment } from '../model/prompts.js'
 import type { RoleDefinition } from '../model/roles.js'
 import type { CallPrompt } from '../model/types.js'
-import type { ConversationEntry } from '../../shared/conversationEntries.js'
+import type { ConversationEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import { RouteFailure } from '../routeFailure.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
 
@@ -12,8 +13,9 @@ export const SHIPPED_HISTORY_POLICY: HistoryPolicy = 'shared'
 
 export type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
+  | Readonly<{ kind: 'request'; participant: string; clarification: string | undefined }>
   | Readonly<{ kind: 'response'; participant: string; claim: string; note: string | undefined }>
-  | Readonly<{ kind: 'application'; participant: string }>
+  | Readonly<{ kind: 'application'; participant: string; claim: string; note: string | undefined }>
 
 export type ParticipantEvidence = Readonly<{ participant: string; claim: string; note: string | undefined }>
 
@@ -50,49 +52,86 @@ export type Context = Readonly<{
   evidence: readonly ParticipantEvidence[]
 }>
 
-function displayNameFor(participants: ReadonlyMap<string, string>, id: string): string {
-  return participants.get(id) ?? id
-}
-
-function respondingParticipantId(entries: readonly ConversationEntry[], responseId: string): string | undefined {
-  for (const entry of entries) {
-    if (entry.kind === 'participantResponse' && entry.id === responseId) return entry.participantId
+export class ParticipantNameUnknownError extends RouteFailure {
+  constructor(participantId: string) {
+    super('PROMPT_NOT_COMPILED', 'internal', `the conversation names a participant "${participantId}" the studio has no name for`)
+    this.name = 'ParticipantNameUnknownError'
   }
-  return undefined
 }
 
-function applicationHistoryEntry(
+export class AppliedResponseUnknownError extends RouteFailure {
+  constructor(responseId: string) {
+    super('PROMPT_NOT_COMPILED', 'internal', `the conversation records an application of a response "${responseId}" it does not hold`)
+    this.name = 'AppliedResponseUnknownError'
+  }
+}
+
+function displayNameFor(participants: ReadonlyMap<string, string>, id: string): string {
+  const displayName = participants.get(id)
+  if (displayName === undefined) throw new ParticipantNameUnknownError(id)
+  return displayName
+}
+
+function appliedResponse(entries: readonly ConversationEntry[], responseId: string): ParticipantResponseEntry {
+  for (const entry of entries) {
+    if (entry.kind === 'participantResponse' && entry.id === responseId) return entry
+  }
+  throw new AppliedResponseUnknownError(responseId)
+}
+
+function historyEntryFor(
+  entry: ConversationEntry,
   entries: readonly ConversationEntry[],
-  responseId: string,
   participants: ReadonlyMap<string, string>,
-): HistoryEntry {
-  const participantId = respondingParticipantId(entries, responseId)
-  return { kind: 'application', participant: displayNameFor(participants, participantId ?? responseId) }
+): HistoryEntry | undefined {
+  switch (entry.kind) {
+    case 'authorMessage':
+      return { kind: 'message', text: entry.text }
+    case 'concreteChangeRequest':
+      return { kind: 'request', participant: displayNameFor(participants, entry.target), clarification: entry.clarification }
+    case 'participantResponse':
+      return { kind: 'response', participant: displayNameFor(participants, entry.participantId), claim: entry.claim, note: entry.note }
+    case 'application': {
+      const applied = appliedResponse(entries, entry.responseId)
+      return {
+        kind: 'application',
+        participant: displayNameFor(participants, applied.participantId),
+        claim: applied.claim,
+        note: applied.note,
+      }
+    }
+    case 'participantNoComment':
+    case 'participantFailure':
+      return undefined
+    default: {
+      const exhaustive: never = entry
+      return exhaustive
+    }
+  }
 }
 
 function deriveHistory(
   entries: readonly ConversationEntry[] | undefined,
-  policy: HistoryPolicy,
-  roleId: string,
+  keeps: (entry: ConversationEntry) => boolean,
   participants: ReadonlyMap<string, string>,
 ): readonly HistoryEntry[] {
   const all = entries ?? []
   const result: HistoryEntry[] = []
   for (const entry of all) {
-    if (entry.kind === 'authorMessage') {
-      result.push({ kind: 'message', text: entry.text })
-      continue
-    }
-    if (entry.kind === 'application') {
-      result.push(applicationHistoryEntry(all, entry.responseId, participants))
-      continue
-    }
-    if (entry.kind !== 'participantResponse') continue
-    if (policy === 'shared' || entry.participantId === roleId) {
-      result.push({ kind: 'response', participant: displayNameFor(participants, entry.participantId), claim: entry.claim, note: entry.note })
-    }
+    if (!keeps(entry)) continue
+    const line = historyEntryFor(entry, all, participants)
+    if (line !== undefined) result.push(line)
   }
   return result
+}
+
+function keepsEverything(): boolean {
+  return true
+}
+
+function keepsUnder(policy: HistoryPolicy, roleId: string): (entry: ConversationEntry) => boolean {
+  if (policy === 'shared') return keepsEverything
+  return (entry) => entry.kind !== 'participantResponse' || entry.participantId === roleId
 }
 
 function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
@@ -107,7 +146,7 @@ function contextFrom(input: ContextInput, evidence: readonly ParticipantEvidence
     draft: input.draft,
     surface: input.surface,
     referenceSchema: input.referenceSchema,
-    history: deriveHistory(input.entries, input.policy, input.role.id, input.participants),
+    history: deriveHistory(input.entries, keepsUnder(input.policy, input.role.id), input.participants),
     evidence,
   }
 }
@@ -118,19 +157,6 @@ export function compileSpecialistContext(input: ContextInput): Context {
 
 export function compileStoryEditorContext(input: ContextInput, evidence: readonly ParticipantEvidence[]): Context {
   return contextFrom(input, evidence)
-}
-
-export class SpecialistIndependenceViolation extends Error {
-  constructor(participant: string) {
-    super(`the compiled context for "${participant}" carries a reading from the dispatch being formed`)
-    this.name = 'SpecialistIndependenceViolation'
-  }
-}
-
-export function assertSpecialistIndependence(contexts: readonly Context[]): void {
-  for (const context of contexts) {
-    if (context.evidence.length > 0) throw new SpecialistIndependenceViolation(context.role.displayName)
-  }
 }
 
 export type ApplyContextInput = Readonly<{
@@ -160,17 +186,6 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
-function fullHistory(entries: readonly ConversationEntry[], participants: ReadonlyMap<string, string>): readonly HistoryEntry[] {
-  const result: HistoryEntry[] = []
-  for (const entry of entries) {
-    if (entry.kind === 'authorMessage') result.push({ kind: 'message', text: entry.text })
-    else if (entry.kind === 'participantResponse')
-      result.push({ kind: 'response', participant: displayNameFor(participants, entry.participantId), claim: entry.claim, note: entry.note })
-    else if (entry.kind === 'application') result.push(applicationHistoryEntry(entries, entry.responseId, participants))
-  }
-  return result
-}
-
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
     modeDescription: input.modeDescription,
@@ -182,7 +197,7 @@ export function compileApplyContext(input: ApplyContextInput): ApplyContext {
     draft: input.draft,
     surface: input.surface,
     referenceSchema: input.referenceSchema,
-    history: fullHistory(input.entries, input.participants),
+    history: deriveHistory(input.entries, keepsEverything, input.participants),
   }
 }
 
@@ -201,7 +216,6 @@ function fixedSection(fragment: Fragment): string {
   return renderFragment(fragment, {})
 }
 
-/** What a task instruction calls the document it targets, so an Apply or a reading task names the surface it was actually issued for. */
 const TARGET_DOCUMENT: Readonly<Record<SurfaceId, string>> = {
   draft: 'manuscript',
   storyContext: 'story context',
@@ -214,13 +228,29 @@ function taskSection(fragment: Fragment, surface: SurfaceId): string {
 
 function section(fragments: PromptFragments, name: SectionName, variable: string, value: string | undefined): string {
   if (value === undefined || value.trim().length === 0) return ''
-  return renderFragment(fragments.sections[name], { [variable]: value.trim() })
+  return renderFragment(fragments.sections[name], { [variable]: value })
 }
 
 function historyLine(fragments: PromptFragments, entry: HistoryEntry): string {
-  if (entry.kind === 'message') return renderFragment(fragments.lines.historyMessage, { text: entry.text })
-  if (entry.kind === 'application') return renderFragment(fragments.lines.historyApplication, { participant: entry.participant })
-  return renderFragment(fragments.lines.historyResponse, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) })
+  switch (entry.kind) {
+    case 'message':
+      return renderFragment(fragments.lines.historyMessage, { text: entry.text })
+    case 'request':
+      return entry.clarification === undefined
+        ? renderFragment(fragments.lines.historyRequest, { participant: entry.participant })
+        : renderFragment(fragments.lines.historyRequestClarified, { participant: entry.participant, clarification: entry.clarification })
+    case 'application':
+      return renderFragment(fragments.lines.historyApplication, {
+        participant: entry.participant,
+        reading: readingValue(entry.claim, entry.note),
+      })
+    case 'response':
+      return renderFragment(fragments.lines.historyResponse, { participant: entry.participant, reading: readingValue(entry.claim, entry.note) })
+    default: {
+      const exhaustive: never = entry
+      return exhaustive
+    }
+  }
 }
 
 function historyLines(fragments: PromptFragments, history: readonly HistoryEntry[]): string | undefined {
@@ -236,7 +266,7 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
 }
 
 export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallPrompt {
-  const durable = compose([context.modeDescription.trim(), fixedSection(fragments.roles.apply)])
+  const durable = compose([context.modeDescription, fixedSection(fragments.roles.apply)])
   const perCall = compose([
     taskSection(fragments.tasks.apply, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
@@ -256,8 +286,8 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
     context.ask !== undefined ? fragments.tasks.concreteChange : context.role.eligibility === 'generalist' ? fragments.tasks.generalist : fragments.tasks.specialist
 
   const durable = compose([
-    context.modeDescription.trim(),
-    renderFragment(fragments.sections.charter, { charter: charter.trim() }),
+    context.modeDescription,
+    renderFragment(fragments.sections.charter, { charter }),
     renderFragment(fragments.sections.role, { persona: context.role.persona }),
   ])
 

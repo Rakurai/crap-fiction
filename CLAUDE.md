@@ -16,7 +16,7 @@ The five canonical labels are used unchanged: `needs-triage`, `needs-info`, `rea
 
 Single-context: one `CONTEXT.md` at the repo root, holding the domain model and the authoritative glossary. The design doc set (`VISION.md` → `CONTEXT.md` → `PRD.md` → `UX_DESIGN.md` → `ARCHITECTURE.md` → `INTERFACES.md`) is read in that order, each more specific than the last; where two appear to conflict, the earlier governs. There is no `docs/adr/` and none is wanted: a settled technical decision goes in `ARCHITECTURE.md`, which is an ADR set in all but filename. See `docs/agents/domain.md`.
 
-`ARCHITECTURE.md` holds only what would still be true after the code implementing it was rewritten; `INTERFACES.md` holds the declared surfaces — routes, events, seam interfaces, persisted artifacts, environment — as names, meanings and guarantees, never as transcribed shapes. Values that are tuning rather than decision, and appearance values of every kind, live where they are used and appear in no document.
+`ARCHITECTURE.md` holds only what would still be true after the code implementing it was rewritten; `INTERFACES.md` holds the declared surfaces — routes, events, seam interfaces, persisted artifacts, environment — as names, meanings and guarantees, never as transcribed shapes. Values that are tuning rather than decision live in one maintainer-facing application configuration, which `INTERFACES.md` declares as an artifact while no document carries its values. Appearance values of every kind live where they are used and appear in no document.
 
 ### Editing the design documents
 

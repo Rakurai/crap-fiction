@@ -1,16 +1,18 @@
 import type { Hono } from 'hono'
 import { createApp } from '../../src/server/app.js'
 import type { StudioEnv } from '../../src/server/env.js'
+import { InterfaceTheme } from '../../src/server/interfaceTheme.js'
 import { createLogger } from '../../src/server/logger.js'
+import { CallSiteAssignments } from '../../src/server/model/assignments.js'
 import type { Charter } from '../../src/server/model/charter.js'
 import type { Fragment, PromptFragments } from '../../src/server/model/prompts.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
-import { PieceDocumentWriter } from '../../src/server/pieces.js'
+import { PieceDocumentWriter, PieceStore } from '../../src/server/pieces.js'
 import type { Room } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
-import { AuthorContextStore, DraftStore, StoryContextStore } from '../../src/server/store/index.js'
+import { AuthorContextStore, DraftStore, PieceMetadataStore, SettingsStore, StoryContextStore } from '../../src/server/store/index.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
@@ -20,22 +22,13 @@ import { buildTestRoom } from './room.js'
 export type AppSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
-  /** Scripted, never defaulted: a test that never asks for it passes `undefined`. */
   runtimeStatus: RuntimeStatus | undefined
-  /** A room the test drives itself, or `idleRoom` where the scenario asks the room for nothing. */
   room: Room
-  /** The studio's one author-context reference, or `UNREACHED_REFERENCE` where nothing reads it. */
   authorContextReference: string
 }>
 
 export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
 
-/**
- * Every value only a prompt or a dispatch could read is left unusable rather than
- * plausible, so a scenario that reaches one fails at the reach instead of passing on
- * harness data. The roster comes from the mode and roles the test itself stated,
- * because the routes report it.
- */
 const UNREACHED = 'unreached: no prompt is rendered in this scenario'
 
 const UNREACHED_CHARTER: Charter = UNREACHED
@@ -55,10 +48,8 @@ function unreachedFragments(): PromptFragments {
   }
 }
 
-/** The author-context reference for a scenario that renders no prompt and reads no reference. */
 export const UNREACHED_REFERENCE = UNREACHED
 
-/** A room that can answer nothing, for a scenario that opens no operation through it. */
 export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[]): Room {
   return buildTestRoom(dataRoot, {
     modes,
@@ -82,14 +73,15 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     logLevel: 'silent' as const,
   })
 
-  const workspace = WorkspaceRegistry.openAt(dataRoot)
+  const settingsStore = new SettingsStore()
+  const workspace = WorkspaceRegistry.openAt(dataRoot, settingsStore)
   const modelAccess = FixtureModelAdapter.bySite({}, spec.runtimeStatus)
   const catalog = ShippedContentCatalog.assemble({
     modes: spec.modes,
     roles: spec.roles,
     charter: UNREACHED_CHARTER,
     fragments: unreachedFragments(),
-    authorContextReference: spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
+    authorContextReference: spec.authorContextReference,
   })
 
   const app = createApp(
@@ -97,6 +89,9 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     workspace,
     catalog,
     new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), dataRoot),
+    new PieceStore(dataRoot, new PieceMetadataStore()),
+    new InterfaceTheme(dataRoot, settingsStore),
+    new CallSiteAssignments(dataRoot, catalog.callSites, settingsStore),
     modelAccess,
     spec.room,
     createLogger(env.logLevel),

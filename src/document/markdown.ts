@@ -81,7 +81,6 @@ export function documentToMarkdown(document: Node): string {
   return serializer.serialize(document)
 }
 
-/** The spelling this serializer writes, whichever equivalent Markdown the same prose arrived as. */
 export function canonicalMarkdown(markdown: string): string {
   return documentToMarkdown(markdownToDocument(markdown))
 }

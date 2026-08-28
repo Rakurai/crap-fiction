@@ -6,10 +6,12 @@ import type { ApplicationEntryView, ConversationEntryView } from '../shared/conv
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import type { InterviewerView } from '../shared/pieceViews.js'
+import type { SubstantiveOutcome } from '../shared/participantResponse.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
 import { isChangeDisclosed, setChangeDisclosed } from './appliedChangeDisclosure.js'
+import { config } from './config.js'
 import { elapsed, facts, machineWords, messageWhen, passageCount, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
 import { Mark } from './Mark.js'
@@ -23,8 +25,6 @@ import { type RoomAdapters, useConversation } from './useConversation.js'
 
 const REVIEW_CHANGE_MESSAGE = 'Take a look at the change I just made and tell me what you think.'
 
-const MAX_MENTION_MATCHES = 8
-
 export type HandleEntry = Readonly<{ handle: string; displayName: string }>
 
 type ConversationProps = {
@@ -36,11 +36,9 @@ type ConversationProps = {
   readonly room: RoomAdapters
   readonly identify: (participantId: string) => ParticipantIdentity
   readonly handles: readonly HandleEntry[]
-  /** Whom the composer's own affordance addresses, and in what words — both content, neither this module's. */
   readonly interviewer: InterviewerView
   readonly runtime: { readonly reachable: boolean } | undefined
   readonly clock: Clock
-  /** The surface's one persistence writer: what an Apply installs its replacement through. */
   readonly onApplied: (text: string) => Promise<AutosaveState>
   readonly onApplyingChange: (applying: ApplyingHold | undefined) => void
   readonly onConversationIdChange: (conversationId: string) => void
@@ -64,7 +62,7 @@ function ResponseActions({
   readonly responseId: string
   readonly participantId: string
   readonly participantName: string
-  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed' | 'applied'
+  readonly outcome: SubstantiveOutcome | 'failed' | 'applied'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void
@@ -72,8 +70,7 @@ function ResponseActions({
   readonly onReply: (participantId: string, message: string) => void
 }) {
   const [text, setText] = useState('')
-  const trimmed = text.trim()
-  const withText = trimmed.length > 0
+  const withText = text.trim().length > 0
 
   function reply(): void {
     if (!withText) {
@@ -81,19 +78,19 @@ function ResponseActions({
       return
     }
     if (disabled) return
-    onReply(participantId, trimmed)
+    onReply(participantId, text)
     setText('')
   }
 
   function apply(): void {
     if (disabled) return
-    onApply(responseId, withText ? trimmed : undefined)
+    onApply(responseId, withText ? text : undefined)
     setText('')
   }
 
   function ask(): void {
     if (disabled) return
-    onAsk(responseId, withText ? trimmed : undefined)
+    onAsk(responseId, withText ? text : undefined)
     setText('')
   }
 
@@ -259,11 +256,6 @@ function IdentityLine({ identity, status }: { readonly identity: ParticipantIden
   )
 }
 
-/**
- * A conforming claim is not a short one, so the column's scannability cannot depend on the
- * participant's restraint: the claim has a ceiling and the rest is one action away. Nothing is
- * rewritten, nothing moves to the note, and the ceiling only shows itself where it is reached.
- */
 function Claim({ text }: { readonly text: string }) {
   const [open, setOpen] = useState(false)
   const [beyondTheCeiling, setBeyondTheCeiling] = useState(false)
@@ -415,7 +407,7 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
 }
 
 function participantStatus(state: DispatchActivitySnapshot['states'][string] | undefined, nowMs: number): string {
-  if (state === undefined) return machineWords('queued')
+  if (state === undefined) return machineWords('waiting')
   return facts(machineWords(state.state), elapsed(state.startedAt, nowMs))
 }
 
@@ -463,7 +455,7 @@ export function Conversation({
   const token = Ariakit.useStoreState(combobox, 'inputValue')
 
   const matches = useMemo(
-    () => (query === undefined ? [] : handles.filter((entry) => entry.handle.startsWith(token.toLowerCase())).slice(0, MAX_MENTION_MATCHES)),
+    () => (query === undefined ? [] : handles.filter((entry) => entry.handle.startsWith(token.toLowerCase())).slice(0, config.mentions.maxMatches)),
     [handles, query, token],
   )
 
@@ -546,7 +538,6 @@ export function Conversation({
     conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
   }
 
-  // The message an author could have typed by hand, sent and recorded on the same terms as any other.
   function askTheInterviewer(): void {
     if (roomBusy) return
     conversation.sendMessage(`@${interviewer.handle} ${interviewer.invocation}`)
@@ -573,9 +564,8 @@ export function Conversation({
   }
 
   function submit() {
-    const text = message.trim()
-    if (text.length === 0 || roomBusy) return
-    conversation.sendMessage(text)
+    if (message.trim().length === 0 || roomBusy) return
+    conversation.sendMessage(message)
     setMessage('')
   }
 
@@ -650,17 +640,11 @@ export function Conversation({
           event.preventDefault()
           submit()
         }}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey || event.defaultPrevented) return
-          event.preventDefault()
-          submit()
-        }}
       >
         <label className={styles.visuallyHidden} htmlFor={`conversation-message-${surface}`}>
           Message the room
         </label>
         <div className={styles.field}>
-          {/* `value` carries the whole message; the store's own `inputValue` holds only the live `@token`. */}
           <Ariakit.Combobox
             id={`conversation-message-${surface}`}
             store={combobox}
@@ -684,6 +668,10 @@ export function Conversation({
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') combobox.hide()
+                  if (event.key === 'Enter' && !event.shiftKey && !event.defaultPrevented) {
+                    event.preventDefault()
+                    submit()
+                  }
                 }}
               />
             }

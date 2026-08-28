@@ -33,8 +33,6 @@ export function PiecesWindow({ workspace, pieces, openedId, leaveBlocked, onOpen
             {pieces.message}
           </p>
         )}
-        {/* A listing that failed carries no mode to create in, and a create control that cannot
-            create is worse than an absent one, so the form is absent until there is one. */}
         {pieces.status === 'ready' && modes !== undefined && (
           <div className={styles.creating}>
             <NewPieceForm submitting={pieces.creating} error={pieces.createError} modes={modes} onSubmit={pieces.create} />

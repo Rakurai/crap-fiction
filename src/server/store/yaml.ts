@@ -4,12 +4,20 @@ import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { Document, parse, parseDocument } from 'yaml'
 import { z } from 'zod'
-import { firstSchemaIssue } from '../schemaIssue.js'
+import { firstSchemaIssue } from '../../shared/schemaIssue.js'
+import { RouteFailure } from '../routeFailure.js'
 
-export class TolerantReadError extends Error {
+export class TolerantReadError extends RouteFailure {
   constructor(file: string, entry: string, reason: string) {
-    super(`${file}: ${entry}: ${reason}`)
+    super('ARTIFACT_INVALID', 'internal', `${file}: ${entry}: ${reason}`)
     this.name = 'TolerantReadError'
+  }
+}
+
+export class ArtifactWriteRefusedError extends RouteFailure {
+  constructor(file: string, entry: string, reason: string) {
+    super('ARTIFACT_INVALID', 'internal', `${file}: ${entry}: ${reason}`)
+    this.name = 'ArtifactWriteRefusedError'
   }
 }
 
@@ -20,7 +28,6 @@ export class ShippedDataError extends Error {
   }
 }
 
-// `ZodDefault` is deliberately not unwrapped here.
 function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
   let core: z.core.$ZodType = schema
   let optionalSection = false
@@ -102,9 +109,16 @@ function setPaths(document: Document, prefix: readonly string[], values: Record<
   }
 }
 
-export async function writeYamlArtifact(filePath: string, values: Record<string, unknown>): Promise<void> {
+export async function writeYamlArtifact(filePath: string, values: Record<string, unknown>, schema: z.ZodType): Promise<void> {
   const document = existsSync(filePath) ? parseDocument(readFileSync(filePath, 'utf8')) : new Document({})
   setPaths(document, [], values)
+
+  const merged = schema.safeParse(tolerate(schema, document.toJS() ?? {}))
+  if (!merged.success) {
+    const { entry, message } = firstSchemaIssue(merged.error)
+    throw new ArtifactWriteRefusedError(filePath, entry, message)
+  }
+
   mkdirSync(path.dirname(filePath), { recursive: true })
   await writeFileAtomic(filePath, document.toString())
 }
@@ -229,9 +243,15 @@ export function readJsonArtifact<T>(filePath: string, schema: z.ZodType<T>): T |
   return result.data
 }
 
-export async function writeJsonArtifact(filePath: string, value: unknown): Promise<void> {
+export async function writeJsonArtifact<T>(filePath: string, value: T, schema: z.ZodType<T>): Promise<void> {
+  const validated = schema.safeParse(value)
+  if (!validated.success) {
+    const { entry, message } = firstSchemaIssue(validated.error)
+    throw new ArtifactWriteRefusedError(filePath, entry, message)
+  }
+
   mkdirSync(path.dirname(filePath), { recursive: true })
-  await writeFileAtomic(filePath, JSON.stringify(value, null, 2))
+  await writeFileAtomic(filePath, JSON.stringify(validated.data, null, 2))
 }
 
 export async function deleteFile(filePath: string): Promise<void> {

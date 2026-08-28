@@ -36,7 +36,7 @@ export function renderFragment(fragment: Fragment, values: Readonly<Record<strin
   if (!sameNames(new Set(fragment.variables), new Set(Object.keys(values)))) {
     throw new FragmentVariableMismatchError(fragment.name, 'the declared variables and the supplied values disagree')
   }
-  return fragment.variables.reduce((text, name) => text.split(`{{${name}}}`).join(values[name] as string), fragment.template).trim()
+  return fragment.variables.reduce((text, name) => text.split(`{{${name}}}`).join(values[name] as string), fragment.template.trim())
 }
 
 export type SectionName =
@@ -55,7 +55,14 @@ export type SectionName =
   | 'constraint'
   | 'referenceSchema'
 
-export type LineName = 'historyMessage' | 'historyResponse' | 'historyApplication' | 'readingSubstantive'
+export type LineName =
+  | 'historyMessage'
+  | 'historyRequest'
+  | 'historyRequestClarified'
+  | 'historyResponse'
+  | 'historyApplication'
+  | 'readingSubstantive'
+
 export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
 export type OperationRoleName = 'apply'
 
@@ -75,7 +82,14 @@ const SECTION_NAMES: readonly SectionName[] = [
   'constraint',
   'referenceSchema',
 ]
-const LINE_NAMES: readonly LineName[] = ['historyMessage', 'historyResponse', 'historyApplication', 'readingSubstantive']
+const LINE_NAMES: readonly LineName[] = [
+  'historyMessage',
+  'historyRequest',
+  'historyRequestClarified',
+  'historyResponse',
+  'historyApplication',
+  'readingSubstantive',
+]
 const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply']
 const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply']
 

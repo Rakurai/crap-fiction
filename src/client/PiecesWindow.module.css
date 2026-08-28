@@ -1,18 +1,6 @@
 .panel {
-  position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
+  composes: panel from './panel.module.css';
   width: 460px;
-  max-height: calc(100% - 96px);
-  overflow: auto;
-  background: var(--paper);
-  border: 1px solid var(--rule2);
-  border-radius: 6px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
-  padding: 22px 26px 20px;
-  z-index: 10;
-  animation: dr-in .14s ease-out;
 }
 
 .header {
@@ -49,7 +37,6 @@
   margin: 16px 0 0;
 }
 
-/* Where the pieces are kept is a fact about the machine, and reads as one. */
 .workspace {
   font: 400 10px/1 var(--font-facts);
   color: var(--ink4);

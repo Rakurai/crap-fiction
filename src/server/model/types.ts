@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { participantStageSchema } from '../../shared/conversationEvents.js'
 import type { FailureReason } from '../../shared/modelResult.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 
@@ -9,9 +10,10 @@ export type CallResult<T> =
   | { readonly outcome: 'abandoned' }
   | { readonly outcome: 'failed'; readonly reason: FailureReason; readonly returned?: string }
 
-export type CallState = 'preparing' | 'working'
+export const callStateSchema = participantStageSchema.exclude(['called'])
 
-/** What is true of the call site before a request, and the task and material a particular request carries. */
+export type CallState = z.infer<typeof callStateSchema>
+
 export type CallPrompt = Readonly<{ durable: string; perCall: string }>
 
 export type ModelAccess = {

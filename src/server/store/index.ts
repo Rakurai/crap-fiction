@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { Mutex } from 'async-mutex'
 import { z } from 'zod'
-import type { AppliedChange } from '../../shared/appliedChange.js'
+import { appliedChangeSchema, type AppliedChange } from '../../shared/appliedChange.js'
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
@@ -28,7 +28,7 @@ import {
 } from './yaml.js'
 
 export { PathEscapesRootError } from './containment.js'
-export { ShippedDataError, TolerantReadError } from './yaml.js'
+export { ArtifactWriteRefusedError, ShippedDataError, TolerantReadError } from './yaml.js'
 
 export function isAbsoluteLocation(value: string): boolean {
   return path.isAbsolute(value)
@@ -49,8 +49,14 @@ export function readSettingsSection<T>(dataRoot: string, section: SettingsSectio
   return settings?.[section]
 }
 
-export async function writeSettingsSection(dataRoot: string, section: SettingsSection, value: unknown): Promise<void> {
-  await writeYamlArtifact(settingsFile(dataRoot), { [section]: value })
+export class SettingsStore {
+  readonly #lock = new Mutex()
+
+  async writeSection<T>(dataRoot: string, section: SettingsSection, value: T, schema: z.ZodType<T>): Promise<void> {
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(settingsFile(dataRoot), { [section]: value }, z.object({ [section]: schema })),
+    )
+  }
 }
 
 const CONFIG_DIR = 'config'
@@ -159,12 +165,32 @@ export function readPiece(workspaceDir: string, id: string): StoredPiece | undef
   }
 }
 
-export async function writePieceMetadata(
-  workspaceDir: string,
-  id: string,
-  metadata: PieceMetadata,
-): Promise<void> {
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata })
+export class PieceMetadataStore {
+  readonly #lock = new Mutex()
+
+  async write(workspaceDir: string, id: string, metadata: PieceMetadata): Promise<void> {
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata }, pieceMetadataSchema),
+    )
+  }
+
+  async writeCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(
+        pieceMetadataFile(resolveWithinRoot(workspaceDir, id)),
+        { cast: { [surface]: [...cast] } },
+        pieceMetadataSchema,
+      ),
+    )
+  }
+
+  async writeDetails(workspaceDir: string, id: string, patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>): Promise<void> {
+    const values: Record<string, unknown> = {}
+    if (patch.title !== undefined) values.title = patch.title
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values, pieceMetadataSchema),
+    )
+  }
 }
 
 export class DraftStore {
@@ -176,7 +202,6 @@ export class DraftStore {
   }
 }
 
-/** Story context's own writer, serialized independently of the draft's so neither write waits on the other. */
 export class StoryContextStore {
   readonly #lock = new Mutex()
 
@@ -185,7 +210,6 @@ export class StoryContextStore {
   }
 }
 
-/** Author context's own writer: global, so serialized independently of any piece's own documents. */
 export class AuthorContextStore {
   readonly #lock = new Mutex()
 
@@ -194,29 +218,8 @@ export class AuthorContextStore {
   }
 }
 
-export async function writePieceCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } })
-}
-
-export async function writePieceDetails(
-  workspaceDir: string,
-  id: string,
-  patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>,
-): Promise<void> {
-  // An `undefined` entry is still a key `setPaths` writes, blanking a field the caller did not name.
-  const values: Record<string, unknown> = {}
-  if (patch.title !== undefined) values.title = patch.title
-  await writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values)
-}
-
 type ScopedNamespace = 'conversations' | 'changes'
 
-/**
- * A conversation scope's own directory: under the piece and its surface, or under the data
- * root's global author-context namespace. The two read/write variants differ only in how they
- * treat an escaping or absent piece — the same asymmetry `pieceDirectory` and
- * `resolveWithinRoot` already carry for every other piece-relative artifact.
- */
 function namespaceDirectoryForRead(dataRoot: string, scope: ConversationScope, namespace: ScopedNamespace): string | undefined {
   if (scope.kind === 'global') return path.join(dataRoot, 'author-context', namespace)
   const pieceDir = pieceDirectory(scope.workspaceDir, scope.pieceId)
@@ -264,7 +267,6 @@ export function readConversationEntries(dataRoot: string, scope: ConversationSco
 export class ConversationEntryStore {
   readonly #lock = new Mutex()
 
-  /** Appending an entry whose id is already on file is a no-op: retrying a write is safe. */
   async append(dataRoot: string, scope: ConversationScope, conversationId: string, entry: ConversationEntry): Promise<void> {
     const dir = namespaceDirectoryForWrite(dataRoot, scope, 'conversations')
     const file = conversationFile(dir, conversationId)
@@ -272,9 +274,22 @@ export class ConversationEntryStore {
       const existing = readJsonArtifact(file, entryConversationSchema)
       if (existing?.entries.some((candidate) => candidate.id === entry.id) === true) return
       const next: EntryConversation = { id: conversationId, entries: [...(existing?.entries ?? []), entry] }
-      await writeJsonArtifact(file, next)
+      await writeJsonArtifact(file, next, entryConversationSchema)
     })
   }
+}
+
+export async function writeDispatchCause(
+  entries: ConversationEntryStore,
+  pieceMetadata: PieceMetadataStore,
+  dataRoot: string,
+  scope: ConversationScope,
+  conversationId: string,
+  cause: ConversationEntry,
+  cast: Readonly<{ workspaceDir: string; pieceId: string; surface: SurfaceId; members: readonly string[] }> | undefined,
+): Promise<void> {
+  await entries.append(dataRoot, scope, conversationId, cause)
+  if (cast !== undefined) await pieceMetadata.writeCast(cast.workspaceDir, cast.pieceId, cast.surface, cast.members)
 }
 
 /**
@@ -303,7 +318,7 @@ function changeFile(dir: string, changeId: string): string {
 
 export async function writeAppliedChange(dataRoot: string, scope: ConversationScope, change: AppliedChange): Promise<void> {
   const dir = namespaceDirectoryForWrite(dataRoot, scope, 'changes')
-  await writeJsonArtifact(changeFile(dir, change.id), change)
+  await writeJsonArtifact(changeFile(dir, change.id), change, appliedChangeSchema)
 }
 
 export function readAppliedChanges<T>(dataRoot: string, scope: ConversationScope, schema: z.ZodType<T>): readonly T[] {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Replacement } from '../shared/applyResult.js'
 import type { AutosaveState } from './autosave.js'
 import type { FailureReason } from '../shared/modelResult.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
@@ -47,36 +48,37 @@ export function useApply(
   const [settlement, setSettlement] = useState<ApplySettlement | undefined>(undefined)
   const startedHere = useRef(false)
   const resumingApplication = useRef<string | undefined>(undefined)
+  const mounted = useRef(true)
+  const applyController = useRef<AbortController | undefined>(undefined)
+
+  useEffect(() => {
+    return () => {
+      mounted.current = false
+      applyController.current?.abort()
+    }
+  }, [])
 
   function stop(message: string | undefined): void {
     startedHere.current = false
     resumingApplication.current = undefined
+    if (!mounted.current) return
     setApplying(undefined)
     if (message !== undefined) setError(message)
   }
 
-  // A save, confirmation or retrieval failure leaves the server's pending Apply sitting at its room
-  // scope; abandoning it through the surface's one operation owner is what frees that scope and
-  // closes out the action, same as the author doing so by hand. The document is released only once
-  // the room has answered that it is free: an abandonment that failed leaves the room still holding
-  // the Apply, and unlocking here would invite an edit the room's own pending replacement is about
-  // to contradict.
   async function stopAndAbandon(cid: string, actionId: string, message: string | undefined): Promise<void> {
     if (!(await abandonAction(cid, actionId, message))) return
     stop(message)
   }
 
-  // Shared by a fresh Apply's 'pending' outcome and a resumed one's retrieved result: install
-  // through the surface's one persistence owner, then confirm only once that write has durably
-  // settled — the model is never called again to reach this point.
-  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string): Promise<void> {
+  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: Replacement, signal: AbortSignal): Promise<void> {
     const saved = await install(replacement)
     if (saved.failed) {
       await stopAndAbandon(cid, actionId, saved.message)
       return
     }
 
-    const confirmed = await confirmApplication(pieceId, surface, cid, applicationId)
+    const confirmed = await confirmApplication(pieceId, surface, cid, applicationId, signal)
     if (confirmed.outcome !== 'value') {
       await stopAndAbandon(cid, actionId, failureMessage(confirmed))
       return
@@ -84,11 +86,6 @@ export function useApply(
     stop(undefined)
   }
 
-  // `resumed` can arrive after mount — the room reports it once the piece's event stream
-  // connects, not synchronously with this hook's own render. Its `applicationId` is present only
-  // once the model has already answered and left a replacement pending; while it is still
-  // calling, there is nothing yet to retrieve and this surface simply stays busy until either the
-  // room reports the call finished or the author abandons it.
   useEffect(() => {
     if (resumed === undefined || conversationId === null) return
     if (startedHere.current) return
@@ -101,15 +98,16 @@ export function useApply(
     resumingApplication.current = applicationId
 
     let active = true
+    const controller = new AbortController()
 
     async function resume(): Promise<void> {
-      const result = await retrievePendingApply(pieceId, surface, cid, applicationId)
+      const result = await retrievePendingApply(pieceId, surface, cid, applicationId, controller.signal)
       if (!active) return
       if (result.outcome !== 'value') {
         await stopAndAbandon(cid, actionId, failureMessage(result))
         return
       }
-      await installAndConfirm(cid, actionId, applicationId, result.value.replacement)
+      await installAndConfirm(cid, actionId, applicationId, result.value.replacement, controller.signal)
     }
 
     void resume().catch((err: unknown) => {
@@ -119,6 +117,7 @@ export function useApply(
 
     return () => {
       active = false
+      controller.abort()
       if (resumingApplication.current === applicationId) resumingApplication.current = undefined
     }
   }, [resumed, conversationId])
@@ -130,9 +129,11 @@ export function useApply(
     setError(undefined)
     setSettlement(undefined)
     setApplying({ responseId })
+    const controller = new AbortController()
+    applyController.current = controller
 
     async function run(): Promise<void> {
-      const result = await applyRecommendation(pieceId, surface, cid, responseId, getDocuments(), constraint)
+      const result = await applyRecommendation(pieceId, surface, cid, responseId, getDocuments(), constraint, controller.signal)
       if (result.outcome !== 'value') {
         stop(failureMessage(result))
         return
@@ -144,17 +145,17 @@ export function useApply(
         return
       }
       if (outcome.outcome === 'abandoned') {
-        setSettlement({ kind: 'abandoned', responseId })
+        if (mounted.current) setSettlement({ kind: 'abandoned', responseId })
         stop(undefined)
         return
       }
       if (outcome.outcome === 'failed') {
-        setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
+        if (mounted.current) setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
         stop(undefined)
         return
       }
 
-      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement)
+      await installAndConfirm(cid, outcome.actionId, outcome.applicationId, outcome.replacement, controller.signal)
     }
 
     void run().catch((err: unknown) => {

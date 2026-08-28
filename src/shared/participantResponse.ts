@@ -4,13 +4,19 @@ export const responseOutcomeSchema = z.enum(['noComment', 'commentary', 'applica
 
 export type ResponseOutcome = z.infer<typeof responseOutcomeSchema>
 
+export const substantiveOutcomeSchema = responseOutcomeSchema.exclude(['noComment'])
+
+export type SubstantiveOutcome = z.infer<typeof substantiveOutcomeSchema>
+
+export const noCommentOutcomeSchema = responseOutcomeSchema.extract(['noComment'])
+
 const substantiveValueSchema = z.object({
-  outcome: z.enum(['commentary', 'applicableSuggestion']),
+  outcome: substantiveOutcomeSchema,
   claim: z.string().trim().min(1),
   note: z.string().trim().optional(),
 })
 
-const noCommentValueSchema = z.object({ outcome: z.literal('noComment') })
+const noCommentValueSchema = z.object({ outcome: noCommentOutcomeSchema })
 
 export const eligibleResponseValueSchema = z.union([noCommentValueSchema, substantiveValueSchema])
 
@@ -25,8 +31,8 @@ export function responseValueSchema(owesAnswer: boolean): ResponseValueSchema {
 }
 
 export type NormalizedResponse =
-  | Readonly<{ outcome: 'noComment' }>
-  | Readonly<{ outcome: 'commentary' | 'applicableSuggestion'; claim: string; note: string | undefined }>
+  | Readonly<{ outcome: z.infer<typeof noCommentOutcomeSchema> }>
+  | Readonly<{ outcome: SubstantiveOutcome; claim: string; note: string | undefined }>
 
 function said(text: string | undefined): string | undefined {
   if (text === undefined) return undefined

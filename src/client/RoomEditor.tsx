@@ -1,11 +1,11 @@
-import type { CastMemberView, StoryEditorView } from '../shared/pieceViews.js'
+import type { RosterMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import { machineWords } from './facts.js'
 import { Mark } from './Mark.js'
 import styles from './RoomEditor.module.css'
 import { Scrim } from './Scrim.js'
 
 type RoomEditorProps = {
-  readonly members: readonly CastMemberView[]
+  readonly members: readonly RosterMemberView[]
   readonly storyEditor: StoryEditorView
   readonly toggling: string | undefined
   readonly onToggle: (id: string) => void
@@ -33,7 +33,6 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
                 <Mark mark={member.mark} ordinal={member.ordinal} />
                 <span className={styles.handle}>@{member.handle}</span>
                 <span className={styles.name}>{member.displayName}</span>
-                {/* Present is the panel's own premise, so only absence is stamped. */}
                 {!member.enabled && <span className={styles.absent}>{ABSENT}</span>}
               </div>
               <button
@@ -47,7 +46,6 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
               <p className={styles.role}>{member.description}</p>
             </li>
           ))}
-          {/* The room is the cast and the Story Editor. It is here because it is always here. */}
           <li className={styles.item}>
             <div className={styles.identity}>
               <Mark mark={storyEditor.mark} ordinal={null} />

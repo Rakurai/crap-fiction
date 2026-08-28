@@ -21,7 +21,8 @@ export type ManuscriptViewModel = {
   readonly showRendered: () => void
   readonly showSource: () => void
   readonly showReading: () => void
-  readonly applyRecommendation: (markdown: string) => void
+  readonly leaveReading: () => void
+  readonly applyRecommendation: (markdown: string) => () => void
 }
 
 function applySourceText(editor: Editor, text: string) {
@@ -48,6 +49,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollRatio = useRef<number | null>(null)
+  const enteredReadingFrom = useRef<'rendered' | 'source'>('rendered')
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -103,17 +105,29 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     if (view === 'source') {
       applySourceText(editor, sourceText)
     }
+    enteredReadingFrom.current = view === 'source' ? 'source' : 'rendered'
     editor.setEditable(false)
     setView('reading')
   }, [editor, view, sourceText, captureScrollRatio])
 
+  const leaveReading = useCallback(() => {
+    if (enteredReadingFrom.current === 'source') showSource()
+    else showRendered()
+  }, [showSource, showRendered])
+
   const applyRecommendation = useCallback(
-    (text: string) => {
-      if (editor === null) return
+    (text: string): (() => void) => {
+      if (editor === null) return () => {}
+      const previousSourceText = sourceText
+      const wasSourceView = view === 'source'
       applyRecommendationText(editor, text)
-      if (view === 'source') setSourceText(text)
+      if (wasSourceView) setSourceText(text)
+      return () => {
+        editor.commands.undo()
+        if (wasSourceView) setSourceText(previousSourceText)
+      }
     },
-    [editor, view],
+    [editor, view, sourceText],
   )
 
   return {
@@ -127,6 +141,7 @@ export function useManuscript(initialMarkdown: string): ManuscriptViewModel {
     showRendered,
     showSource,
     showReading,
+    leaveReading,
     applyRecommendation,
   }
 }

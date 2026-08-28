@@ -5,10 +5,6 @@ type ScrimProps = {
   readonly onDismiss: () => void
 }
 
-/**
- * The ground under a surface that arrived: it accounts for what the surface covers, and it is
- * how the surface is left — by clicking away from it or by the keystroke that leaves anything.
- */
 export function Scrim({ onDismiss }: ScrimProps) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

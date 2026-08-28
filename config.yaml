@@ -1,0 +1,25 @@
+# Application tuning: the maintainer's own decisions, the same for every deployment.
+# Deployment values (data root, port, model runtime URL, log level) are environment
+# variables, not here — see the studio's .env.
+
+model:
+  retries: 2                 # additional attempts after a malformed or nonconforming response, before failing
+  timeoutMs: 120000           # a call is abandoned as a timeout after this many milliseconds
+  responseMaxTokens: 2000     # generation bound for an ordinary specialist or Story Editor reply
+  manuscriptMaxTokens: 32000  # generation bound for an Apply call, which returns a whole manuscript
+
+appliedChange:
+  contextWords: 8            # words of unchanged prose kept before and after a change, for context
+  unboundedFraction: 0.5     # a change touching more than this fraction of a passage is reported as a whole rewrite
+
+autosave:
+  debounceMs: 1000           # milliseconds of no typing before the draft is saved
+
+elapsedTime:
+  tickMs: 1000                # how often a displayed elapsed time advances
+
+callSiteAssignment:
+  savedStandsMs: 2600         # how long the "saved" confirmation stands after a model assignment is saved
+
+mentions:
+  maxMatches: 8               # how many @-mention candidates the composer offers at once

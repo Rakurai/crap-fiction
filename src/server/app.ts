@@ -6,38 +6,19 @@ import type { Logger } from './logger.js'
 import { fail, ok } from '../shared/envelope.js'
 import { documentSnapshotSchema, surfaceIdSchema } from '../shared/surfaces.js'
 import { themeSchema } from '../shared/theme.js'
-import { getTheme, setTheme } from './interfaceTheme.js'
-import { listAssignments, setAssignment } from './model/assignments.js'
-import { UnknownCallSiteError, withAssignments } from './model/callSites.js'
+import type { InterfaceTheme } from './interfaceTheme.js'
+import type { CallSiteAssignments } from './model/assignments.js'
 import type { ModelAccess } from './model/types.js'
 import { originGuard } from './originGuard.js'
-import {
-  ConversationNotFoundError,
-  createPiece,
-  getConversation,
-  getPiece,
-  listPieces,
-  type PieceDocumentWriter,
-  PieceNotFoundError,
-  UnknownCastMemberError,
-  updatePiece,
-} from './pieces.js'
+import { listPieces, type PieceDocumentWriter, type PieceStore } from './pieces.js'
 import { dispatchOpening, dispatchRequestSchema } from './room/dispatchRequest.js'
-import {
-  ApplicationDocumentNotSavedError,
-  ApplicationNotPendingError,
-  CommentaryNotFoundError,
-  ParticipantNotFoundError,
-  RecommendationNotFoundError,
-  RoomBusyError,
-  type Room,
-} from './room/room.js'
+import type { Room } from './room/room.js'
+import { RouteFailure, statusFor } from './routeFailure.js'
 import type { RoomScope } from './scope.js'
 import { sseStream } from './sse.js'
-import { UnknownModeError, type ShippedContentCatalog } from './shippedContent.js'
-import { TolerantReadError } from './store/index.js'
+import type { ShippedContentCatalog } from './shippedContent.js'
 import { validateJson, validateParam } from './validate.js'
-import { WorkspaceNotSetError, WorkspaceOutsideRootError, type WorkspaceRegistry } from './workspace.js'
+import type { WorkspaceRegistry } from './workspace.js'
 
 const putWorkspaceSchema = z.object({ workspace: z.string().min(1) })
 const postPieceSchema = z.object({ title: z.string().min(1), mode: z.string().min(1) })
@@ -60,6 +41,9 @@ export function createApp(
   workspace: WorkspaceRegistry,
   catalog: ShippedContentCatalog,
   documentWriter: PieceDocumentWriter,
+  pieceStore: PieceStore,
+  interfaceTheme: InterfaceTheme,
+  callSiteAssignments: CallSiteAssignments,
   modelAccess: ModelAccess,
   room: Room,
   logger: Logger,
@@ -90,22 +74,17 @@ export function createApp(
 
   app.post('/pieces', body(postPieceSchema), async (c) => {
     const { title, mode } = c.req.valid('json')
-    const piece = await createPiece(workspace.require(), title, mode, catalog)
+    const piece = await pieceStore.create(workspace.require(), title, mode, catalog)
     return c.json(ok(piece))
   })
 
   app.get('/pieces/:id', (c) => {
-    const id = c.req.param('id')
-    return c.json(ok(getPiece(env.dataRoot, workspace.require(), id, catalog)))
+    return c.json(ok(pieceStore.detail(workspace.require(), c.req.param('id'), catalog)))
   })
 
   app.patch('/pieces/:id', body(patchPieceSchema), async (c) => {
-    const id = c.req.param('id')
-    const workspaceDir = workspace.require()
-
-    await updatePiece(workspaceDir, id, catalog, c.req.valid('json'))
-
-    return c.json(ok(getPiece(env.dataRoot, workspaceDir, id, catalog)))
+    const detail = await pieceStore.update(workspace.require(), c.req.param('id'), catalog, c.req.valid('json'))
+    return c.json(ok(detail))
   })
 
   const param = validateParam(surfaceParamSchema, logger)
@@ -122,7 +101,7 @@ export function createApp(
   })
 
   app.get('/pieces/:id/surfaces/:surface/conversations/:cid', param, (c) => {
-    return c.json(ok(getConversation(env.dataRoot, workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
+    return c.json(ok(pieceStore.conversation(workspace.require(), c.req.param('id'), c.req.valid('param').surface, c.req.param('cid'))))
   })
 
   app.delete('/pieces/:id/surfaces/:surface/conversations/:cid', param, async (c) => {
@@ -166,34 +145,43 @@ export function createApp(
 
   app.get('/pieces/:id/events', (c) => {
     const pieceId = c.req.param('id')
-    return streamSSE(c, async (stream) => {
-      const events = sseStream(stream)
-      const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
-      events.write('activity.snapshot', snapshot)
-      await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
-      unsubscribe()
-      await events.drain()
-    })
+    return streamSSE(
+      c,
+      async (stream) => {
+        const events = sseStream(stream)
+        const { snapshot, unsubscribe } = room.connect(pieceId, (event) => events.write(event.type, event.data))
+        try {
+          events.write('activity.snapshot', snapshot)
+          await new Promise<void>((resolve) => stream.onAbort(() => resolve()))
+        } finally {
+          unsubscribe()
+          await events.drain()
+        }
+      },
+      async (err) => {
+        logger.error({ err, pieceId }, 'the event stream failed')
+      },
+    )
   })
 
   app.get('/theme', (c) => {
-    return c.json(ok({ theme: getTheme(env.dataRoot) ?? null }))
+    return c.json(ok({ theme: interfaceTheme.get() ?? null }))
   })
 
   app.put('/theme', body(putThemeSchema), async (c) => {
     const { theme } = c.req.valid('json')
-    await setTheme(env.dataRoot, theme)
+    await interfaceTheme.set(theme)
     return c.json(ok({ theme }))
   })
 
   app.get('/call-sites', (c) => {
-    return c.json(ok(withAssignments(catalog.callSites, listAssignments(env.dataRoot))))
+    return c.json(ok(callSiteAssignments.list()))
   })
 
   app.put('/call-sites/:site/assignment', body(putAssignmentSchema), async (c) => {
     const site = c.req.param('site')
     const { model } = c.req.valid('json')
-    await setAssignment(env.dataRoot, catalog.callSites, site, model)
+    await callSiteAssignments.assign(site, model)
     return c.json(ok({ site, assignment: model }))
   })
 
@@ -202,28 +190,13 @@ export function createApp(
   })
 
   app.onError((err, c) => {
-    const refused = (code: string, status: 400 | 404 | 409 | 500) => {
-      logger.warn({ code, method: c.req.method, path: c.req.path }, 'request refused')
-      return c.json(fail(code, err.message), status)
+    if (err instanceof RouteFailure) {
+      logger.warn({ code: err.code, method: c.req.method, path: c.req.path }, 'request refused')
+      return c.json(fail(err.code, err.message), statusFor(err))
     }
 
-    if (err instanceof WorkspaceNotSetError) return refused('WORKSPACE_NOT_SET', 400)
-    if (err instanceof WorkspaceOutsideRootError) return refused('WORKSPACE_OUTSIDE_ROOT', 400)
-    if (err instanceof UnknownCallSiteError) return refused('CALL_SITE_NOT_FOUND', 404)
-    if (err instanceof PieceNotFoundError) return refused('PIECE_NOT_FOUND', 404)
-    if (err instanceof UnknownCastMemberError) return refused('CAST_MEMBER_UNKNOWN', 400)
-    if (err instanceof UnknownModeError) return refused('MODE_UNKNOWN', 400)
-    if (err instanceof ConversationNotFoundError) return refused('CONVERSATION_NOT_FOUND', 404)
-    if (err instanceof RoomBusyError) return refused('ROOM_BUSY', 409)
-    if (err instanceof RecommendationNotFoundError) return refused('RECOMMENDATION_NOT_FOUND', 404)
-    if (err instanceof ApplicationNotPendingError) return refused('APPLICATION_NOT_PENDING', 404)
-    if (err instanceof ApplicationDocumentNotSavedError) return refused('APPLICATION_DOCUMENT_NOT_SAVED', 409)
-    if (err instanceof CommentaryNotFoundError) return refused('COMMENTARY_NOT_FOUND', 404)
-    if (err instanceof ParticipantNotFoundError) return refused('PARTICIPANT_NOT_FOUND', 404)
-    if (err instanceof TolerantReadError) return refused('ARTIFACT_INVALID', 500)
-
     logger.error({ err, method: c.req.method, path: c.req.path }, 'request failed')
-    throw err
+    return c.json(fail('INTERNAL_ERROR', 'the studio failed to answer this request'), 500)
   })
 
   return app

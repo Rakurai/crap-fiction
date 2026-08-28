@@ -1,10 +1,10 @@
 import type { z } from 'zod'
-import { apiResponseSchema } from '../shared/envelope.js'
+import { responseEnvelopeSchema, type FailureCode } from '../shared/envelope.js'
 
 export type RequestResult<T> =
   | { readonly outcome: 'value'; readonly value: T }
   | { readonly outcome: 'abandoned' }
-  | { readonly outcome: 'refused'; readonly code: string; readonly message: string }
+  | { readonly outcome: 'refused'; readonly code: FailureCode; readonly message: string }
   | { readonly outcome: 'unreachable'; readonly message: string }
 
 const UNREACHABLE = 'the studio did not answer'
@@ -36,7 +36,7 @@ export async function requestJson<T>(
     return { outcome: 'unreachable', message: UNREADABLE }
   }
 
-  const parsed = apiResponseSchema(payload).safeParse(body)
+  const parsed = responseEnvelopeSchema(payload).safeParse(body)
   if (!parsed.success) return { outcome: 'unreachable', message: UNREADABLE }
   if (!parsed.data.success) {
     return { outcome: 'refused', code: parsed.data.error.code, message: parsed.data.error.message }

@@ -26,7 +26,11 @@
 }
 
 .bar {
-  composes: bar from './DocumentHeader.module.css';
+  composes: bar from './chrome.module.css';
+}
+
+.reopen {
+  composes: door from './controls.module.css';
 }
 
 .status {

@@ -3,10 +3,11 @@ import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { CastMemberView, PieceDetail, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
+import type { PieceDetail, PieceSummary, RosterMemberView, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
+import { RouteFailure } from './routeFailure.js'
 import type { ShippedContentCatalog } from './shippedContent.js'
 import { conversationScopeFor, type ConversationScope } from './scope.js'
 import {
@@ -22,11 +23,9 @@ import {
   readPiece,
   readStoryContext,
   SURFACE_LOCATIONS,
-  writePieceCast,
-  writePieceDetails,
-  writePieceMetadata,
   type AuthorContextStore,
   type DraftStore,
+  type PieceMetadataStore,
   type StoredPiece,
   type StoryContextStore,
 } from './store/index.js'
@@ -35,23 +34,23 @@ function surfaceScope(workspaceDir: string, pieceId: string, surface: SurfaceId)
   return conversationScopeFor(workspaceDir, { pieceId, surface })
 }
 
-export class PieceNotFoundError extends Error {
+export class PieceNotFoundError extends RouteFailure {
   constructor(id: string) {
-    super(`no piece "${id}"`)
+    super('PIECE_NOT_FOUND', 'not_found', `no piece "${id}"`)
     this.name = 'PieceNotFoundError'
   }
 }
 
-export class ConversationNotFoundError extends Error {
+export class ConversationNotFoundError extends RouteFailure {
   constructor(pieceId: string, conversationId: string) {
-    super(`no conversation "${conversationId}" for piece "${pieceId}"`)
+    super('CONVERSATION_NOT_FOUND', 'not_found', `no conversation "${conversationId}" for piece "${pieceId}"`)
     this.name = 'ConversationNotFoundError'
   }
 }
 
-export class UnknownCastMemberError extends Error {
+export class UnknownCastMemberError extends RouteFailure {
   constructor(pieceId: string, memberId: string) {
-    super(`piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
+    super('CAST_MEMBER_UNKNOWN', 'invalid', `piece "${pieceId}" has no specialist "${memberId}" to enable or disable`)
     this.name = 'UnknownCastMemberError'
   }
 }
@@ -73,11 +72,11 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
   return piece
 }
 
-function castView(
+function rosterView(
   specialists: readonly RoleDefinition[],
   enabled: readonly string[],
   ordinals: ReadonlyMap<string, number>,
-): readonly CastMemberView[] {
+): readonly RosterMemberView[] {
   return specialists.map((role) => {
     const ordinal = ordinals.get(role.id)
     if (ordinal === undefined) throw new Error(`no ordinal recorded for cast participant "${role.id}"`)
@@ -117,12 +116,18 @@ function uniquePieceId(existing: ReadonlySet<string>, title: string): string {
   return `${base}-${n}`
 }
 
-export async function createPiece(workspaceDir: string, title: string, modeId: string, catalog: ShippedContentCatalog): Promise<PieceSummary> {
+export async function createPiece(
+  pieceMetadata: PieceMetadataStore,
+  workspaceDir: string,
+  title: string,
+  modeId: string,
+  catalog: ShippedContentCatalog,
+): Promise<PieceSummary> {
   catalog.mode(modeId)
 
   const id = uniquePieceId(new Set(pieceIds(workspaceDir)), title)
 
-  await writePieceMetadata(workspaceDir, id, {
+  await pieceMetadata.write(workspaceDir, id, {
     title,
     mode: modeId,
     cast: {
@@ -161,7 +166,7 @@ function surfaceDetail(
     referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
-    cast: castView(available, piece.metadata.cast[surface], catalog.markOrdinals),
+    roster: rosterView(available, piece.metadata.cast[surface], catalog.markOrdinals),
   }
 }
 
@@ -188,50 +193,53 @@ export function getPiece(dataRoot: string, workspaceDir: string, id: string, cat
 }
 
 export async function setPieceCast(
+  pieceMetadata: PieceMetadataStore,
   workspaceDir: string,
   id: string,
   catalog: ShippedContentCatalog,
   surface: SurfaceId,
   cast: readonly string[],
-): Promise<readonly CastMemberView[]> {
+): Promise<readonly RosterMemberView[]> {
   const piece = requirePiece(workspaceDir, id)
   const available = catalog.specialistsFor(piece.metadata.mode, surface)
   const ceiling = new Set(available.map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
-  await writePieceCast(workspaceDir, id, surface, cast)
-  return castView(available, cast, catalog.markOrdinals)
+  await pieceMetadata.writeCast(workspaceDir, id, surface, cast)
+  return rosterView(available, cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(
+  pieceMetadata: PieceMetadataStore,
   workspaceDir: string,
   id: string,
   patch: Readonly<{ title?: string }>,
 ): Promise<PieceSummary> {
   requirePiece(workspaceDir, id)
-  await writePieceDetails(workspaceDir, id, patch)
+  await pieceMetadata.writeDetails(workspaceDir, id, patch)
   return summarize(id, requirePiece(workspaceDir, id))
 }
 
-/**
- * What an author may change about a piece in one act. Which of them arrived, and so which
- * writes it takes, is this module's decision rather than the route's: a change naming nothing is
- * a change, and it writes nothing.
- */
 export type PieceChanges = Readonly<{
   title?: string | undefined
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
-export async function updatePiece(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<void> {
+export async function updatePiece(
+  pieceMetadata: PieceMetadataStore,
+  workspaceDir: string,
+  id: string,
+  catalog: ShippedContentCatalog,
+  changes: PieceChanges,
+): Promise<void> {
   const { title, cast } = changes
 
   if (title !== undefined) {
-    await updatePieceDetails(workspaceDir, id, { title })
+    await updatePieceDetails(pieceMetadata, workspaceDir, id, { title })
   }
   if (cast !== undefined) {
-    await setPieceCast(workspaceDir, id, catalog, cast.surface, cast.ids)
+    await setPieceCast(pieceMetadata, workspaceDir, id, catalog, cast.surface, cast.ids)
   }
 }
 
@@ -280,7 +288,33 @@ export async function deleteConversation(
   await deleteConversationFile(dataRoot, scope, conversationId)
 }
 
-/** Every document's own writer, each serialized independently of the others. */
+export class PieceStore {
+  readonly #dataRoot: string
+  readonly #pieceMetadata: PieceMetadataStore
+
+  constructor(dataRoot: string, pieceMetadata: PieceMetadataStore) {
+    this.#dataRoot = dataRoot
+    this.#pieceMetadata = pieceMetadata
+  }
+
+  detail(workspaceDir: string, id: string, catalog: ShippedContentCatalog): PieceDetail {
+    return getPiece(this.#dataRoot, workspaceDir, id, catalog)
+  }
+
+  conversation(workspaceDir: string, pieceId: string, surface: SurfaceId, conversationId: string): EntryConversationView {
+    return getConversation(this.#dataRoot, workspaceDir, pieceId, surface, conversationId)
+  }
+
+  async create(workspaceDir: string, title: string, modeId: string, catalog: ShippedContentCatalog): Promise<PieceSummary> {
+    return createPiece(this.#pieceMetadata, workspaceDir, title, modeId, catalog)
+  }
+
+  async update(workspaceDir: string, id: string, catalog: ShippedContentCatalog, changes: PieceChanges): Promise<PieceDetail> {
+    await updatePiece(this.#pieceMetadata, workspaceDir, id, catalog, changes)
+    return this.detail(workspaceDir, id, catalog)
+  }
+}
+
 export class PieceDocumentWriter {
   readonly #draft: DraftStore
   readonly #storyContext: StoryContextStore

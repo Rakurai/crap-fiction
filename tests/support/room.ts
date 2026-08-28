@@ -5,12 +5,12 @@ import type { PromptFragments } from '../../src/server/model/prompts.js'
 import type { ModelAccess } from '../../src/server/model/types.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
+import { createComputeAppliedChangeContent } from '../../src/server/room/appliedChange.js'
 import type { HistoryPolicy } from '../../src/server/room/context.js'
 import { Room } from '../../src/server/room/room.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
-import { ConversationEntryStore } from '../../src/server/store/index.js'
+import { ConversationEntryStore, PieceMetadataStore } from '../../src/server/store/index.js'
 
-/** Every value a Room's behaviour turns on, stated by the test rather than assumed here. */
 export type RoomSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
@@ -30,5 +30,15 @@ export function buildTestRoom(dataRoot: string, spec: RoomSpec): Room {
     fragments: spec.fragments,
     authorContextReference: spec.authorContextReference,
   })
-  return new Room(spec.modelAccess, new ConversationEntryStore(), dataRoot, catalog, spec.policy, createLogger('silent'), spec.now)
+  return new Room(
+    spec.modelAccess,
+    new ConversationEntryStore(),
+    new PieceMetadataStore(),
+    dataRoot,
+    catalog,
+    spec.policy,
+    createLogger('silent'),
+    spec.now,
+    createComputeAppliedChangeContent({ contextWords: 8, unboundedFraction: 0.5 }),
+  )
 }

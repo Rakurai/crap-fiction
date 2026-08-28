@@ -1,17 +1,23 @@
+import type { KeyboardEvent } from 'react'
 import { type SurfaceId } from '../shared/surfaces.js'
+import { ApplyingBanner } from './ApplyingBanner.js'
 import styles from './ContextSurface.module.css'
 import { DocumentHeader } from './DocumentHeader.js'
-import { facts, machineWords, timeOfDay } from './facts.js'
+import { facts, machineWords } from './facts.js'
 import type { LifecycleProps } from './pieceLifecycle.js'
+import { SaveFailure } from './SaveFailure.js'
 import type { ApplyingHold } from './useConversationSession.js'
 import type { AutosaveViewModel } from './useAutosave.js'
 
-/** The surfaces this component draws: a plain text document beside a reference schema. */
 export type ContextSurfaceId = Exclude<SurfaceId, 'draft'>
 
 const LABEL: Readonly<Record<ContextSurfaceId, string>> = {
   storyContext: 'Story context',
   authorContext: 'Author context',
+}
+
+function isUndoKeystroke(event: KeyboardEvent): boolean {
+  return event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey
 }
 
 type ContextSurfaceProps = {
@@ -27,6 +33,7 @@ type ContextSurfaceProps = {
   readonly onSwitchTo: (surface: SurfaceId) => void
   readonly lifecycle: LifecycleProps
   readonly applying: ApplyingHold | undefined
+  readonly onReverseApplication: () => boolean
 }
 
 export function ContextSurface({
@@ -42,6 +49,7 @@ export function ContextSurface({
   onSwitchTo,
   lifecycle,
   applying,
+  onReverseApplication,
 }: ContextSurfaceProps) {
 
   return (
@@ -61,17 +69,7 @@ export function ContextSurface({
         </p>
       )}
 
-      {applying !== undefined && (
-        <div className={styles.applyingBanner}>
-          <span className={styles.applyingBannerFacts}>READ-ONLY</span>
-          <span className={styles.applyingBannerWords}>
-            {applying.participantName === undefined ? 'Held while a change is applied.' : `Held while ${applying.participantName}'s change is applied.`}
-          </span>
-          <button type="button" className={styles.applyingBannerAbandon} onClick={applying.abandon}>
-            abandon
-          </button>
-        </div>
-      )}
+      {applying !== undefined && <ApplyingBanner applying={applying} />}
 
       <div className={styles.scroll}>
         <div className={styles.measure}>
@@ -82,6 +80,9 @@ export function ContextSurface({
             value={text}
             disabled={applying !== undefined}
             onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (isUndoKeystroke(event) && onReverseApplication()) event.preventDefault()
+            }}
           />
         </div>
       </div>
@@ -93,16 +94,7 @@ export function ContextSurface({
         </details>
       )}
 
-      {autosave.state.failed && (
-        <div className={styles.saveFailed}>
-          <span className={styles.saveFailedStamp}>{facts('NOT SAVED', timeOfDay(autosave.state.atMs))}</span>
-          <p className={styles.saveFailedMessage} role="status">
-            The last write to {location} failed. Nothing has been discarded — keep writing. Leaving for another piece is
-            unavailable while “{title}” is unsaved.
-          </p>
-          <span className={styles.saveFailedCause}>{machineWords(autosave.state.message)}</span>
-        </div>
-      )}
+      {autosave.state.failed && <SaveFailure failure={autosave.state} location={location} title={title} />}
     </div>
   )
 }

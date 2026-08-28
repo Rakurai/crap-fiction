@@ -11,17 +11,11 @@ export function fetchPiece(id: string, signal?: AbortSignal): Promise<RequestRes
   return requestJson(`/pieces/${encodeURIComponent(id)}`, pieceDetailSchema, { signal: signal ?? null })
 }
 
-export function saveSurfaceDocument(
-  id: string,
-  surface: SurfaceId,
-  text: string,
-  signal?: AbortSignal,
-): Promise<RequestResult<null>> {
+export function saveSurfaceDocument(id: string, surface: SurfaceId, text: string): Promise<RequestResult<null>> {
   return requestJson(`/pieces/${encodeURIComponent(id)}/surfaces/${surface}/document`, z.null(), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text }),
-    signal: signal ?? null,
   })
 }
 

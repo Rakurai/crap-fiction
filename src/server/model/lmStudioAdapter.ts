@@ -1,16 +1,11 @@
 import { LMStudioClient } from '@lmstudio/sdk'
 import pRetry from 'p-retry'
 import { z } from 'zod'
+import type { StudioConfig } from '../../shared/config.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
 import type { CallPrompt, CallResult, CallState, ModelAccess } from './types.js'
-
-const RETRIES = 2
-const TIMEOUT_MS = 120_000
-
-const RESPONSE_MAX_TOKENS = 2_000
-const MANUSCRIPT_MAX_TOKENS = 32_000
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -62,15 +57,32 @@ class NonConformingError extends Error {
   }
 }
 
+class RuntimeCallError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'the model runtime did not answer', { cause })
+    this.name = 'RuntimeCallError'
+  }
+}
+
+async function throughRuntime<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call()
+  } catch (error) {
+    throw new RuntimeCallError(error)
+  }
+}
+
 export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
+  readonly #config: StudioConfig['model']
   readonly #logger: Logger
   #queue: Promise<unknown> = Promise.resolve()
 
-  constructor(baseUrl: string, getAssignment: GetAssignment, logger: Logger) {
+  constructor(baseUrl: string, getAssignment: GetAssignment, config: StudioConfig['model'], logger: Logger) {
     this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
     this.#getAssignment = getAssignment
+    this.#config = config
     this.#logger = logger
   }
 
@@ -111,10 +123,10 @@ export class LMStudioAdapter implements ModelAccess {
     const assignment = this.#getAssignment(site)
     if (assignment === undefined) return this.#logged(site, undefined, { outcome: 'failed', reason: 'unconfigured' })
 
-    const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS)
+    const timeoutSignal = AbortSignal.timeout(this.#config.timeoutMs)
     const combined = AbortSignal.any([signal, timeoutSignal])
     const jsonSchema = z.toJSONSchema(schema)
-    const maxTokens = site === APPLY_CALL_SITE ? MANUSCRIPT_MAX_TOKENS : RESPONSE_MAX_TOKENS
+    const maxTokens = site === APPLY_CALL_SITE ? this.#config.manuscriptMaxTokens : this.#config.responseMaxTokens
 
     let preparing = false
     const announce = (state: CallState): void => {
@@ -127,7 +139,7 @@ export class LMStudioAdapter implements ModelAccess {
 
     try {
       const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, maxTokens, combined, announce), {
-        retries: RETRIES,
+        retries: this.#config.retries,
         signal: combined,
       })
       return this.#logged(site, assignment, { outcome: 'value', value })
@@ -140,7 +152,12 @@ export class LMStudioAdapter implements ModelAccess {
         return this.#logged(site, assignment, { outcome: 'failed', reason: 'nonconforming', returned: error.returned })
       }
       if (timeoutSignal.aborted) return this.#logged(site, assignment, { outcome: 'failed', reason: 'timeout' })
-      return this.#logged(site, assignment, { outcome: 'failed', reason: 'unreachable' })
+      if (error instanceof RuntimeCallError) {
+        this.#logger.error({ site, assignment, err: error.cause }, 'model runtime did not answer')
+        return this.#logged(site, assignment, { outcome: 'failed', reason: 'unreachable' })
+      }
+      this.#logger.error({ site, assignment, err: error }, 'model call failed inside the studio')
+      return this.#logged(site, assignment, { outcome: 'failed', reason: 'internal' })
     }
   }
 
@@ -154,9 +171,11 @@ export class LMStudioAdapter implements ModelAccess {
     announce: (state: CallState) => void,
   ): Promise<T> {
     announce('preparing')
-    const model = await this.#client.llm.model(assignment, { signal })
+    const model = await throughRuntime(() => this.#client.llm.model(assignment, { signal }))
     announce('working')
-    const result = await model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal })
+    const result = await throughRuntime(() =>
+      model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal }),
+    )
 
     const returned = result.nonReasoningContent
 

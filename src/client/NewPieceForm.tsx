@@ -1,11 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { ModeSummary } from '../shared/modeViews.js'
 import styles from './NewPieceForm.module.css'
 
-/** The modes a piece can be created in, at least one, so the form always has one to submit. */
 export type OfferedModes = readonly [ModeSummary, ...ModeSummary[]]
 
-/** `undefined` where nothing is offered, which is the form's own absent case rather than an empty form. */
 export function offeredModes(modes: readonly ModeSummary[]): OfferedModes | undefined {
   const [first, ...rest] = modes
   return first === undefined ? undefined : [first, ...rest]
@@ -22,14 +20,22 @@ export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFor
   const [naming, setNaming] = useState(false)
   const [title, setTitle] = useState('')
   const [mode, setMode] = useState<string | undefined>(undefined)
-  const chosen = mode ?? modes[0].id
+  const chosen = modes.length === 1 ? modes[0].id : mode
+  const wasSubmitting = useRef(false)
+
+  useEffect(() => {
+    if (wasSubmitting.current && !submitting && error === undefined) {
+      setTitle('')
+      setMode(undefined)
+      setNaming(false)
+    }
+    wasSubmitting.current = submitting
+  }, [submitting, error])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (chosen === undefined) return
     onSubmit(title, chosen)
-    setTitle('')
-    setMode(undefined)
-    setNaming(false)
   }
 
   if (!naming) {
@@ -63,9 +69,12 @@ export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFor
           <select
             aria-label="mode"
             className={styles.select}
-            value={chosen}
+            value={mode ?? ''}
             onChange={(event) => setMode(event.target.value)}
           >
+            <option value="" disabled hidden>
+              choose mode
+            </option>
             {modes.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.displayName}
@@ -73,7 +82,7 @@ export function NewPieceForm({ submitting, error, modes, onSubmit }: NewPieceFor
             ))}
           </select>
         )}
-        <button type="submit" className={styles.submit} disabled={submitting}>
+        <button type="submit" className={styles.submit} disabled={submitting || chosen === undefined}>
           create
         </button>
       </form>

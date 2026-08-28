@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { failureReasonSchema } from './modelResult.js'
+import { substantiveOutcomeSchema } from './participantResponse.js'
 
 export const authorMessageEntrySchema = z.object({
   id: z.string().min(1),
@@ -29,7 +30,7 @@ export const participantResponseEntrySchema = z.object({
   kind: z.literal('participantResponse'),
   participantId: z.string().min(1),
   causeId: z.string().min(1),
-  outcome: z.enum(['commentary', 'applicableSuggestion']),
+  outcome: substantiveOutcomeSchema,
   claim: z.string().min(1),
   note: z.string().optional(),
 })

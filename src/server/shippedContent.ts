@@ -5,19 +5,19 @@ import { loadCharter, type Charter } from './model/charter.js'
 import { loadPromptFragments, type PromptFragments } from './model/prompts.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
+import { RouteFailure } from './routeFailure.js'
 import { defaultCastFor, resolveRoster, specialistsFor, type RoomRoster } from './room/roster.js'
 import { readShippedAuthorContextReference } from './store/index.js'
 
 export const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
 
-export class UnknownModeError extends Error {
+export class UnknownModeError extends RouteFailure {
   constructor(modeId: string) {
-    super(`no loaded mode "${modeId}"`)
+    super('MODE_UNKNOWN', 'invalid', `no loaded mode "${modeId}"`)
     this.name = 'UnknownModeError'
   }
 }
 
-/** The parsed, not-yet-related shape shipped content boils down to, however it was obtained. */
 export type ShippedContentParts = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
@@ -26,13 +26,6 @@ export type ShippedContentParts = Readonly<{
   authorContextReference: string
 }>
 
-/**
- * The one owner of the relationships among modes, participants, prompt material and model call
- * sites: the studio's whole shipped-content package, loaded and validated once, then held
- * immutable for every domain question a consumer asks of it. Bootstrap, piece creation and
- * opening, and room operation all ask this catalog rather than reconstructing mode lookup,
- * roster derivation or reference selection for themselves.
- */
 export class ShippedContentCatalog {
   readonly #modes: ReadonlyMap<string, ModeDescriptor>
   readonly #roster: RoomRoster
@@ -54,7 +47,6 @@ export class ShippedContentCatalog {
     )
   }
 
-  /** Loads and validates the complete shipped-content package rooted at `contentRoot`. */
   static load(contentRoot: string): ShippedContentCatalog {
     const modes = loadModes(contentRoot)
     const roles = loadRoles(contentRoot, new Set(modes.map((mode) => mode.id)))
@@ -64,7 +56,6 @@ export class ShippedContentCatalog {
     return new ShippedContentCatalog({ modes, roles, charter, fragments, authorContextReference })
   }
 
-  /** Assembles a catalog from already-parsed parts, for fixtures that state shipped content in memory rather than on disk. */
   static assemble(parts: ShippedContentParts): ShippedContentCatalog {
     return new ShippedContentCatalog(parts)
   }
@@ -95,7 +86,6 @@ export class ShippedContentCatalog {
     return this.#fragments
   }
 
-  /** Every cast, generalist and addressed-only participant's display name, by id. */
   get participantDisplayNames(): ReadonlyMap<string, string> {
     return this.#displayNames
   }
@@ -112,7 +102,6 @@ export class ShippedContentCatalog {
     return defaultCastFor(this.#roster.specialists, modeId, surface)
   }
 
-  /** The reference guidance for a mode and surface: none for the draft, the mode's own for story context, the one global reference for author context. */
   referenceFor(modeId: string, surface: SurfaceId): string | null {
     if (surface === 'draft') return null
     if (surface === 'authorContext') return this.#authorContextReference

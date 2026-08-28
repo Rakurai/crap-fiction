@@ -1,19 +1,6 @@
-/* A surface that arrived, over the whole window, on a ground of its own. */
 .panel {
-  position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
+  composes: panel from './panel.module.css';
   width: 480px;
-  max-height: calc(100% - 96px);
-  overflow: auto;
-  background: var(--panel);
-  border: 1px solid var(--rule2);
-  border-radius: 6px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
-  padding: 18px 22px 20px;
-  z-index: 10;
-  animation: dr-in .14s ease-out;
 }
 
 .header {
@@ -100,11 +87,13 @@
   letter-spacing: .06em;
 }
 
-/* Asking to delete is out of the scan path until the row is under the pointer or the caret. */
 .arm {
   composes: view from './controls.module.css';
   flex: none;
   opacity: 0;
+}
+
+.item .arm {
   font-size: 13px;
   line-height: 1;
   padding: 6px 8px;

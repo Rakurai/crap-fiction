@@ -2,7 +2,7 @@ import type { FixtureBehavior } from './modelAdapter.js'
 
 const CALL_MS = 400
 
-const SLOW_CALL_MS = 6 * CALL_MS
+const STILL_IN_FLIGHT_MS = 6 * CALL_MS
 
 export const APPLIED_TEXT = 'The cups sat where she had left them, and the light came up behind the harbour.'
 
@@ -24,11 +24,8 @@ export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
   change: applicableSuggestion(SUGGESTION_CLAIM, 'a suggestion from the fixture model implementation', CALL_MS),
   character: commentary('a reading from the fixture model implementation', CALL_MS),
   economy: commentary('a reading from the fixture model implementation', CALL_MS),
-  // Slow, so a draft dispatch is still in flight while a journey acts elsewhere in the studio.
-  reader: commentary('a reading from the fixture model implementation', SLOW_CALL_MS),
-  // The only participant a context surface has, so its answer is what a context Apply acts on.
+  reader: commentary('a reading from the fixture model implementation', STILL_IN_FLIGHT_MS),
   'story-editor': applicableSuggestion(EDITOR_SUGGESTION_CLAIM, 'an answer from the fixture model implementation', CALL_MS),
-  // Reached only by being addressed, whether the author typed the mention or the composer's own control did.
   interview: commentary(INTERVIEWER_QUESTION, CALL_MS),
   apply: { result: { outcome: 'value', value: { replacement: APPLIED_TEXT } }, delayMs: 4 * CALL_MS },
 }

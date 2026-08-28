@@ -1,4 +1,3 @@
-/* One control with two segments, so the two faces read as one exclusive choice. */
 .group {
   display: flex;
   flex: none;
@@ -8,21 +7,11 @@
 }
 
 .toggle {
-  font: 500 10.5px/1 var(--font-ui);
-  color: var(--ink2);
-  background: none;
-  border: none;
-  padding: 7px 10px;
-  cursor: pointer;
+  composes: segment from './controls.module.css';
 }
 
 .toggle + .toggle {
   border-left: 1px solid var(--rule2);
-}
-
-.toggle:hover {
-  color: var(--ink);
-  background: var(--tint);
 }
 
 .toggle[aria-pressed='true'] {

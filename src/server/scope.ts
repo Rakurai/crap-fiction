@@ -1,27 +1,15 @@
 import type { PieceSurfaceId, SurfaceId } from '../shared/surfaces.js'
 
-/**
- * What the room owns for one piece's one editing surface: its cast, its gating and its
- * in-flight work. Author context's room scope still names the piece its evidence and cast
- * come from, even though the conversation it dispatches into is global.
- */
 export type RoomScope = Readonly<{ pieceId: string; surface: SurfaceId }>
 
-/**
- * The identity a conversation and its applied changes are addressed by. A piece surface's
- * conversations live under that piece; author context's live in the data root's global
- * namespace and name no piece.
- */
 export type ConversationScope =
   | Readonly<{ kind: 'piece'; workspaceDir: string; pieceId: string; surface: PieceSurfaceId }>
   | Readonly<{ kind: 'global' }>
 
-/** The room's own mapping from what it gates to where a scope's conversation lives. */
 export function conversationScopeFor(workspaceDir: string, room: RoomScope): ConversationScope {
   return room.surface === 'authorContext' ? { kind: 'global' } : { kind: 'piece', workspaceDir, pieceId: room.pieceId, surface: room.surface }
 }
 
-// A byte no piece id can hold, so no pair of scopes can collide on their joined key.
 const KEY_SEPARATOR = '\u0000'
 
 export function roomScopeKey(scope: RoomScope): string {
