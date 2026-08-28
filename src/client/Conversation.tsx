@@ -136,7 +136,7 @@ function ApplyingFlight() {
 }
 
 function changeSummary(passages: readonly ChangedPassage[]): string {
-  const words = passages.reduce((sum, passage) => sum + countWords(passage.after), 0)
+  const words = passages.reduce((sum, passage) => sum + Math.max(countWords(passage.before), countWords(passage.after)), 0)
   return passages.length > 1
     ? facts(machineWords('applied'), wordCount(words), passageCount(passages.length))
     : facts(machineWords('applied'), wordCount(words))
@@ -176,8 +176,8 @@ function AppliedChangeView({
             <div className={styles.changeDiff}>
               {content.passages.map((passage, index) => (
                 <div key={index} className={styles.changePassage}>
-                  <p className={styles.changeBefore}>{passage.before}</p>
-                  <p className={styles.changeAfter}>{passage.after}</p>
+                  <p className={styles.changeBefore}>{passage.leading + passage.before + passage.trailing}</p>
+                  <p className={styles.changeAfter}>{passage.leading + passage.after + passage.trailing}</p>
                 </div>
               ))}
             </div>

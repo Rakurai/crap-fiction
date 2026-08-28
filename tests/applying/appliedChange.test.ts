@@ -15,8 +15,9 @@ describe('computeAppliedChangeContent', () => {
     expect(content.passages).toHaveLength(1)
     expect(content.passages[0]?.before).toContain('Ruth stood looking at them for a while.')
     expect(content.passages[0]?.after).not.toContain('Ruth stood')
-    expect(content.passages[0]?.before).toContain('upside down on a towel.')
-    expect(content.passages[0]?.after).toContain('upside down on a towel.')
+    expect(content.passages[0]?.leading).toContain('upside down on a towel.')
+    expect(content.passages[0]?.before).not.toContain('upside down on a towel.')
+    expect(content.passages[0]?.after).not.toContain('upside down on a towel.')
 
     const twoPlaces = computeAppliedChangeContent(
       'The lighthouse stood on the point. Ruth walked the beach alone. The gulls circled overhead.',
