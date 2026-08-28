@@ -81,7 +81,7 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     roles: spec.roles,
     charter: UNREACHED_CHARTER,
     fragments: unreachedFragments(),
-    authorContextReference: spec.authorContextReference ?? 'Notes about the author that generalize beyond any single piece.',
+    authorContextReference: spec.authorContextReference,
   })
 
   const app = createApp(
