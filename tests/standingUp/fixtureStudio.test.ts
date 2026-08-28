@@ -65,5 +65,4 @@ describe('the fixture studio', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).data).toMatchObject({ conversationId })
   })
-
 })
