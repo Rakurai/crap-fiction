@@ -13,39 +13,20 @@ function roundTripsThrough(built: ReturnType<typeof doc.createChecked>): void {
 }
 
 describe('markdown round-trip over the constrained schema', () => {
-  it('round-trips a paragraph with strong and emphasis', () => {
+  it('round-trips every node and mark the schema admits, headings at each level and overlapping marks among them', () => {
     const built = doc.createChecked(null, [
+      ...[1, 2, 3, 4, 5, 6].map((level) => heading.createChecked({ level }, [text(`Level ${level}`)])),
       paragraph.createChecked(null, [
         text('plain, '),
         text('strong', [bold.create()]),
         text(', and '),
         text('emphatic', [italic.create()]),
+        text(', and '),
+        text('both', [bold.create(), italic.create()]),
         text('.'),
       ]),
-    ])
-    roundTripsThrough(built)
-  })
-
-  it('round-trips headings at every admitted level', () => {
-    const built = doc.createChecked(
-      null,
-      [1, 2, 3, 4, 5, 6].map((level) => heading.createChecked({ level }, [text(`Level ${level}`)])),
-    )
-    roundTripsThrough(built)
-  })
-
-  it('round-trips a thematic break between paragraphs', () => {
-    const built = doc.createChecked(null, [
-      paragraph.createChecked(null, [text('before the break')]),
       horizontalRule.createChecked(),
       paragraph.createChecked(null, [text('after the break')]),
-    ])
-    roundTripsThrough(built)
-  })
-
-  it('round-trips overlapping strong and emphasis in one run', () => {
-    const built = doc.createChecked(null, [
-      paragraph.createChecked(null, [text('both', [bold.create(), italic.create()])]),
     ])
     roundTripsThrough(built)
   })

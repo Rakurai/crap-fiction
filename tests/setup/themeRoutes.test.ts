@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
-import { MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
+import { idleStudio } from '../support/harness.js'
+import { MODE_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 describe('the theme routes', () => {
@@ -18,13 +18,7 @@ describe('the theme routes', () => {
   })
 
   function studio() {
-    return buildTestApp(dataRoot, {
-      modes: [MODE_FIXTURE],
-      roles: ROLES_FIXTURE,
-      runtimeStatus: undefined,
-      room: idleRoom(dataRoot, [MODE_FIXTURE], ROLES_FIXTURE),
-      authorContextReference: UNREACHED_REFERENCE,
-    }).app
+    return idleStudio(dataRoot, [MODE_FIXTURE], undefined).app
   }
 
   it('reports a theme never chosen as null, and the chosen one on every read after', async () => {

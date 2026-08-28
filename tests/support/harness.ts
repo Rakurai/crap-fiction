@@ -16,7 +16,7 @@ import { AuthorContextStore, DraftStore, PieceMetadataStore, SettingsStore, Stor
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { WorkspaceRegistry } from '../../src/server/workspace.js'
 import { FixtureModelAdapter } from './modelAdapter.js'
-import { PROMPT_FRAGMENTS_FIXTURE } from './roomFixtures.js'
+import { PROMPT_FRAGMENTS_FIXTURE, ROLES_FIXTURE } from './roomFixtures.js'
 import { buildTestRoom } from './room.js'
 
 export type AppSpec = Readonly<{
@@ -64,6 +64,16 @@ export function idleRoom(dataRoot: string, modes: readonly ModeDescriptor[], rol
       throw new Error('this scenario opened no operation, so nothing should have read the clock')
     },
     authorContextReference: UNREACHED,
+  })
+}
+
+export function idleStudio(dataRoot: string, modes: readonly ModeDescriptor[], runtimeStatus: RuntimeStatus | undefined): TestApp {
+  return buildTestApp(dataRoot, {
+    modes,
+    roles: ROLES_FIXTURE,
+    runtimeStatus,
+    room: idleRoom(dataRoot, modes, ROLES_FIXTURE),
+    authorContextReference: UNREACHED_REFERENCE,
   })
 }
 

@@ -4,8 +4,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
-import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
-import { INTERVIEWER_FIXTURE, MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
+import { idleStudio } from '../support/harness.js'
+import { INTERVIEWER_FIXTURE, MODE_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 describe('the call-site and model routes', () => {
@@ -20,13 +20,7 @@ describe('the call-site and model routes', () => {
   })
 
   function studio(runtimeStatus?: RuntimeStatus) {
-    return buildTestApp(dataRoot, {
-      modes: [MODE_FIXTURE],
-      roles: ROLES_FIXTURE,
-      runtimeStatus,
-      room: idleRoom(dataRoot, [MODE_FIXTURE], ROLES_FIXTURE),
-      authorContextReference: UNREACHED_REFERENCE,
-    }).app
+    return idleStudio(dataRoot, [MODE_FIXTURE], runtimeStatus).app
   }
 
   it('carries every call site the roles compose to, in the order the studio names them', async () => {

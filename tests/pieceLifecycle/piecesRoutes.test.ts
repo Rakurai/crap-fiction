@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../src/server/store/index.js'
-import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
+import { idleStudio } from '../support/harness.js'
 import { MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
 
@@ -34,13 +34,7 @@ describe('the piece routes', () => {
   })
 
   function studio(modes: readonly ModeDescriptor[] = [MODE_FIXTURE]) {
-    return buildTestApp(dataRoot, {
-      modes,
-      roles: ROLES_FIXTURE,
-      runtimeStatus: undefined,
-      room: idleRoom(dataRoot, modes, ROLES_FIXTURE),
-      authorContextReference: UNREACHED_REFERENCE,
-    })
+    return idleStudio(dataRoot, modes, undefined)
   }
 
   async function withWorkspace(modes?: readonly ModeDescriptor[]) {
