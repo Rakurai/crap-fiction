@@ -103,6 +103,17 @@ describe('the draft view controls', () => {
     expect(order.indexOf('draft')).toBeGreaterThan(order.indexOf('rendered'))
     expect(order.indexOf('draft')).toBeGreaterThan(order.indexOf('reading'))
   })
+
+  it('returns from reading through the hint that names the keystroke', () => {
+    renderManuscript()
+
+    fireEvent.click(screen.getByRole('button', { name: 'reading' }))
+    expect(screen.queryByRole('button', { name: 'reading' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'ESC · RETURN' }))
+
+    expect(screen.getByRole('button', { name: 'reading' })).toBeTruthy()
+  })
 })
 
 describe('the piece title', () => {

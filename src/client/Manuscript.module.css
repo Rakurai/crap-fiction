@@ -23,9 +23,7 @@
 
 /* The top bar's height, added back as padding: the first line stays where the author left it. */
 .readingScroll {
-  box-sizing: border-box;
   padding-top: 90px;
-  margin-inline: auto;
 }
 
 .measure {
@@ -50,7 +48,13 @@
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 8px 10px;
+  cursor: pointer;
   animation: global(dr-in) .14s ease-out;
+}
+
+.wayBack:hover {
+  color: var(--ink2);
+  border-color: var(--rule2);
 }
 
 .source {
