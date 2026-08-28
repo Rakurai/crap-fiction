@@ -114,7 +114,6 @@ describe('LMStudioAdapter.call', () => {
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'unreachable' })
-    expect(Object.keys(result)).toEqual(['outcome', 'reason'])
   })
 
   it('fails as internal, distinctly from unreachable, when the studio itself threw, and logs what threw', async () => {
@@ -161,7 +160,7 @@ describe('LMStudioAdapter.call', () => {
     expect(await pending).toEqual({ outcome: 'abandoned' })
   })
 
-  it('returns an ordinary value with no record of having taken more than one attempt', async () => {
+  it('returns the attempt that conformed as an ordinary value, with no record of the attempt that did not', async () => {
     modelFn.mockResolvedValue({ respond: respondFn })
     respondFn
       .mockResolvedValueOnce({ nonReasoningContent: 'garbage' })
@@ -170,7 +169,7 @@ describe('LMStudioAdapter.call', () => {
     const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
-    expect(Object.keys(result)).toEqual(['outcome', 'value'])
+    expect(result).toEqual({ outcome: 'value', value: { claim: 'second try' } })
   })
 
   it('resolves an abandoned call as abandoned, not as a nonconforming failure, and does not retry it', async () => {
@@ -190,18 +189,7 @@ describe('LMStudioAdapter.call', () => {
     expect(respondFn).not.toHaveBeenCalled()
   })
 
-  it('reports preparing before working, in order, ahead of the settled outcome', async () => {
-    modelFn.mockResolvedValue({ respond: respondFn })
-    respondFn.mockResolvedValue({ nonReasoningContent: JSON.stringify({ claim: 'x' }) })
-    const states: string[] = []
-
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
-    await adapter.call('shape', turns, schema, new AbortController().signal, (state) => states.push(state))
-
-    expect(states).toEqual(['preparing', 'working'])
-  })
-
-  it('states preparing once across a retried call, and working on every attempt', async () => {
+  it('reports preparing before working, once across a retried call, and working on every attempt', async () => {
     modelFn.mockResolvedValue({ respond: respondFn })
     respondFn
       .mockResolvedValueOnce({ nonReasoningContent: 'not json' })

@@ -478,23 +478,14 @@ describe('one response-local field shared by every action on the response', () =
 describe('handle completion at the composer', () => {
   afterEach(cleanup)
 
-  it('offers every handle the token prefix-matches, as the author types one', async () => {
-    renderConversation([RESPONSE_WITH_COMMENTARY])
-
-    const composer = await screen.findByLabelText('Message the room')
-    fireEvent.change(composer, { target: { value: '@sh' } })
-
-    expect(await screen.findByRole('option', { name: /@shape/ })).toBeTruthy()
-    expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
-  })
-
-  it('completes the token into the message, and closes the offer', async () => {
+  it('offers only the handles the token prefix-matches, completes the one chosen into the message, and closes the offer', async () => {
     renderConversation([RESPONSE_WITH_COMMENTARY])
 
     const composer = await screen.findByLabelText('Message the room')
     fireEvent.change(composer, { target: { value: '@sh' } })
 
     const suggestion = await screen.findByRole('option', { name: /@shape/ })
+    expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
     fireEvent.click(suggestion)
 
     await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
