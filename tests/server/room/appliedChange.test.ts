@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { computeAppliedChangeContent } from '../../../src/server/room/appliedChange.js'
+import { createComputeAppliedChangeContent } from '../../../src/server/room/appliedChange.js'
+
+const computeAppliedChangeContent = createComputeAppliedChangeContent({ contextWords: 8, unboundedFraction: 0.5 })
 
 describe('computeAppliedChangeContent', () => {
   it('reports one passage per place a bounded edit touches, each carrying the unchanged prose around it', () => {

@@ -1,9 +1,9 @@
 import { diffWordsWithSpace, type Change } from 'diff'
 import type { AppliedChangeContent } from '../../shared/appliedChange.js'
+import type { StudioConfig } from '../../shared/config.js'
 import { countWords } from '../../shared/storyLength.js'
-import { loadConfig } from '../config.js'
 
-const { contextWords: CONTEXT_WORDS, unboundedFraction: UNBOUNDED_FRACTION } = loadConfig().appliedChange
+export type ComputeAppliedChangeContent = (before: string, after: string) => AppliedChangeContent
 
 function wordsOf(parts: readonly Change[], select: (part: Change) => boolean | undefined): number {
   return parts.filter(select).reduce((sum, part) => sum + countWords(part.value), 0)
@@ -37,7 +37,7 @@ function headWords(text: string, maxWords: number): string {
 
 type Hunk = { removed: string; added: string; leading: string; trailing: string }
 
-function hunksFrom(parts: readonly Change[]): readonly Hunk[] {
+function hunksFrom(parts: readonly Change[], contextWords: number): readonly Hunk[] {
   const hunks: Hunk[] = []
   let i = 0
   while (i < parts.length) {
@@ -63,32 +63,36 @@ function hunksFrom(parts: readonly Change[]): readonly Hunk[] {
     hunks.push({
       removed,
       added,
-      leading: before !== undefined && !before.added && !before.removed ? tailWords(before.value, CONTEXT_WORDS) : '',
-      trailing: after !== undefined && !after.added && !after.removed ? headWords(after.value, CONTEXT_WORDS) : '',
+      leading: before !== undefined && !before.added && !before.removed ? tailWords(before.value, contextWords) : '',
+      trailing: after !== undefined && !after.added && !after.removed ? headWords(after.value, contextWords) : '',
     })
     i = j
   }
   return hunks
 }
 
-export function computeAppliedChangeContent(before: string, after: string): AppliedChangeContent {
-  const parts = diffWordsWithSpace(before, after)
+export function createComputeAppliedChangeContent(config: StudioConfig['appliedChange']): ComputeAppliedChangeContent {
+  const { contextWords, unboundedFraction } = config
 
-  const beforeWords = countWords(before)
-  const afterWords = countWords(after)
-  const removedWords = wordsOf(parts, (part) => part.removed)
-  const addedWords = wordsOf(parts, (part) => part.added)
+  return function computeAppliedChangeContent(before: string, after: string): AppliedChangeContent {
+    const parts = diffWordsWithSpace(before, after)
 
-  const unbounded =
-    (beforeWords > 0 && removedWords / beforeWords > UNBOUNDED_FRACTION) ||
-    (afterWords > 0 && addedWords / afterWords > UNBOUNDED_FRACTION)
+    const beforeWords = countWords(before)
+    const afterWords = countWords(after)
+    const removedWords = wordsOf(parts, (part) => part.removed)
+    const addedWords = wordsOf(parts, (part) => part.added)
 
-  if (unbounded) return { kind: 'rewrittenWhole' }
+    const unbounded =
+      (beforeWords > 0 && removedWords / beforeWords > unboundedFraction) ||
+      (afterWords > 0 && addedWords / afterWords > unboundedFraction)
 
-  const passages = hunksFrom(parts).map((hunk) => ({
-    before: hunk.leading + hunk.removed + hunk.trailing,
-    after: hunk.leading + hunk.added + hunk.trailing,
-  }))
+    if (unbounded) return { kind: 'rewrittenWhole' }
 
-  return { kind: 'passages', passages }
+    const passages = hunksFrom(parts, contextWords).map((hunk) => ({
+      before: hunk.leading + hunk.removed + hunk.trailing,
+      after: hunk.leading + hunk.added + hunk.trailing,
+    }))
+
+    return { kind: 'passages', passages }
+  }
 }

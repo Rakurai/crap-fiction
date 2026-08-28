@@ -1,14 +1,11 @@
 import { LMStudioClient } from '@lmstudio/sdk'
 import pRetry from 'p-retry'
 import { z } from 'zod'
+import type { StudioConfig } from '../../shared/config.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
-import { loadConfig } from '../config.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
 import type { CallPrompt, CallResult, CallState, ModelAccess } from './types.js'
-
-const { retries: RETRIES, timeoutMs: TIMEOUT_MS, responseMaxTokens: RESPONSE_MAX_TOKENS, manuscriptMaxTokens: MANUSCRIPT_MAX_TOKENS } =
-  loadConfig().model
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -63,12 +60,14 @@ class NonConformingError extends Error {
 export class LMStudioAdapter implements ModelAccess {
   readonly #client: LMStudioClient
   readonly #getAssignment: GetAssignment
+  readonly #config: StudioConfig['model']
   readonly #logger: Logger
   #queue: Promise<unknown> = Promise.resolve()
 
-  constructor(baseUrl: string, getAssignment: GetAssignment, logger: Logger) {
+  constructor(baseUrl: string, getAssignment: GetAssignment, config: StudioConfig['model'], logger: Logger) {
     this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
     this.#getAssignment = getAssignment
+    this.#config = config
     this.#logger = logger
   }
 
@@ -109,10 +108,10 @@ export class LMStudioAdapter implements ModelAccess {
     const assignment = this.#getAssignment(site)
     if (assignment === undefined) return this.#logged(site, undefined, { outcome: 'failed', reason: 'unconfigured' })
 
-    const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS)
+    const timeoutSignal = AbortSignal.timeout(this.#config.timeoutMs)
     const combined = AbortSignal.any([signal, timeoutSignal])
     const jsonSchema = z.toJSONSchema(schema)
-    const maxTokens = site === APPLY_CALL_SITE ? MANUSCRIPT_MAX_TOKENS : RESPONSE_MAX_TOKENS
+    const maxTokens = site === APPLY_CALL_SITE ? this.#config.manuscriptMaxTokens : this.#config.responseMaxTokens
 
     let preparing = false
     const announce = (state: CallState): void => {
@@ -125,7 +124,7 @@ export class LMStudioAdapter implements ModelAccess {
 
     try {
       const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, maxTokens, combined, announce), {
-        retries: RETRIES,
+        retries: this.#config.retries,
         signal: combined,
       })
       return this.#logged(site, assignment, { outcome: 'value', value })

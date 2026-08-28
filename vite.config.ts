@@ -1,11 +1,18 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { parse } from 'yaml'
 import react from '@vitejs/plugin-react'
 import yaml from '@rollup/plugin-yaml'
 import devServer, { defaultOptions } from '@hono/vite-dev-server'
 import { defineConfig, type PluginOption, type UserConfig } from 'vite'
 import { loadEnv } from './src/server/env.js'
+import { validateConfig } from './src/shared/config.js'
+
+const CONFIG_PATH = path.join(import.meta.dirname, 'config.yaml')
 
 export function studioConfig(entry: string): UserConfig {
   const env = loadEnv()
+  validateConfig(parse(readFileSync(CONFIG_PATH, 'utf8')), CONFIG_PATH)
   return {
     plugins: [
       yaml() as PluginOption,

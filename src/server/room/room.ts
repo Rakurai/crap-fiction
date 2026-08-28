@@ -41,7 +41,7 @@ import {
   writeApplication,
   writeDispatchCause,
 } from '../store/index.js'
-import { computeAppliedChangeContent } from './appliedChange.js'
+import type { ComputeAppliedChangeContent } from './appliedChange.js'
 import { parseAddressing } from './addressing.js'
 import {
   assertSpecialistIndependence,
@@ -187,6 +187,7 @@ export class Room {
   readonly #now: Clock
   readonly #catalog: ShippedContentCatalog
   readonly #policy: HistoryPolicy
+  readonly #computeAppliedChangeContent: ComputeAppliedChangeContent
   readonly #listeners = new Map<string, Set<Listener>>()
   readonly #operations = new Map<string, ActiveOperation>()
   readonly #minted = new Map<string, Set<string>>()
@@ -201,6 +202,7 @@ export class Room {
     policy: HistoryPolicy,
     logger: Logger,
     now: Clock,
+    computeAppliedChangeContent: ComputeAppliedChangeContent,
   ) {
     this.#modelAccess = modelAccess
     this.#entries = entries
@@ -210,6 +212,7 @@ export class Room {
     this.#now = now
     this.#catalog = catalog
     this.#policy = policy
+    this.#computeAppliedChangeContent = computeAppliedChangeContent
   }
 
   subscribe(pieceId: string, listener: Listener): () => void {
@@ -679,7 +682,7 @@ export class Room {
         responseId,
         constraint,
         replacement,
-        change: { id: nanoid(), content: computeAppliedChangeContent(target, replacement) },
+        change: { id: nanoid(), content: this.#computeAppliedChangeContent(target, replacement) },
       }
       const current = this.#operations.get(key)
       if (current?.kind === 'apply' && current.actionId === actionId) this.#operations.set(key, { ...current, pending })
