@@ -13,6 +13,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--ink4) transparent;
+}
+
 [contenteditable] {
   outline: none;
 }

@@ -4,6 +4,7 @@ import type { Clock } from '../shared/clock.js'
 import { NO_AUTHOR_MESSAGE } from './conversationNaming.js'
 import styles from './ConversationSwitcher.module.css'
 import { machineWords, whenChanged } from './facts.js'
+import { PanelHeader } from './PanelHeader.js'
 import { Scrim } from './Scrim.js'
 
 type ConversationSwitcherProps = {
@@ -35,13 +36,7 @@ export function ConversationSwitcher({
     <>
       <Scrim onDismiss={onClose} />
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Conversations">
-        <div className={styles.header}>
-          <span className={styles.title}>Conversations</span>
-          <span className={styles.spacer} />
-          <button type="button" className={styles.close} onClick={onClose}>
-            close
-          </button>
-        </div>
+        <PanelHeader title="Conversations" tone="panel" onDismiss={onClose} />
         {conversations.length === 0 && <p className={styles.empty}>No conversations yet.</p>}
         <ul className={styles.list}>
           {conversations.map((conversation) => (

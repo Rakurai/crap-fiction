@@ -58,5 +58,5 @@
 }
 
 .viewControl {
-  composes: view from './controls.module.css';
+  composes: action from './controls.module.css';
 }

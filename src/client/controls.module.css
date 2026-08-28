@@ -1,4 +1,18 @@
-.view {
+.door {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.door:hover {
+  color: var(--ink2);
+}
+
+.quiet {
   font: 500 10.5px/1 var(--font-ui);
   color: var(--ink2);
   background: none;
@@ -8,12 +22,12 @@
   cursor: pointer;
 }
 
-.view:hover:enabled {
+.quiet:hover:enabled {
   color: var(--ink);
   background: var(--tint);
 }
 
-.view:disabled {
+.quiet:disabled {
   color: var(--ink4);
   cursor: default;
 }
@@ -32,7 +46,7 @@
   background: var(--tint);
 }
 
-.surface {
+.action {
   font: 500 10.5px/1 var(--font-ui);
   color: var(--ink2);
   background: none;
@@ -42,12 +56,12 @@
   cursor: pointer;
 }
 
-.surface:hover:enabled {
+.action:hover:enabled {
   color: var(--ink);
   border-color: var(--ink3);
 }
 
-.surface:disabled {
+.action:disabled {
   color: var(--ink4);
   border-color: var(--rule);
   cursor: default;
@@ -88,18 +102,4 @@
   background: none;
   border-color: var(--rule2);
   cursor: default;
-}
-
-.door {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: .07em;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.door:hover {
-  color: var(--ink2);
 }

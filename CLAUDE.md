@@ -18,15 +18,9 @@ Single-context: one `CONTEXT.md` at the repo root, holding the domain model and 
 
 `ARCHITECTURE.md` holds only what would still be true after the code implementing it was rewritten; `INTERFACES.md` holds the declared surfaces — routes, events, seam interfaces, persisted artifacts, environment — as names, meanings and guarantees, never as transcribed shapes. Values that are tuning rather than decision live in one maintainer-facing application configuration, which `INTERFACES.md` declares as an artifact while no document carries its values. Appearance values of every kind live where they are used and appear in no document.
 
-### Editing the design documents
+## Documentation discipline
 
-**One home per fact.** Every fact has exactly one owning document, and everywhere else it is absent — not summarized, not paraphrased, not restated for local readability. A document may describe machinery that operates on a fact another owns, so long as it makes no new claim about the fact itself. When a fact moves, find every copy and delete them all.
-
-**Current state only.** Documentation states what is true now. No migration commentary, no "this used to be" prose, no narration of positions the design has passed through. A reader should never have to subtract history to find the truth.
-
-**Know which hat a sentence wears.** A statement is domain truth, engineering mechanism, or the mapping between them. A mechanism narrated in domain language reads as a domain law and gets implemented as a constraint the architecture never imposed; a domain truth carrying mechanism words has absorbed a decision that belongs elsewhere. Where a document must span layers, mark the sections and make the mapping explicit.
-
-**No cross-references between documents**, no counted lists or numbered sections, and no issue numbers. Roles are clear enough that a pointer adds nothing and goes stale.
+`docs/DOC_STANDARDS.md` is binding on every documentation edit: whether the edit is warranted at all, which kind of truth a statement carries, one home per fact, current truth only, cross-references, retrieval-safe wording, near-code prose, what is left to executable artifacts, and how a conflict is handled. It owns no ownership assignment — which document owns which kind of truth is declared here — and it names no document of this repository. Read it before editing prose, not after review.
 
 ## Engineering discipline
 

@@ -3,26 +3,10 @@
   width: 460px;
 }
 
-.header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.name {
-  font: 400 20px/1.2 var(--font-prose);
-  color: var(--ink);
-  flex: 1;
-}
-
-.done {
-  composes: surface from './controls.module.css';
-}
-
 .what {
   font: 400 11.5px/1.5 var(--font-ui);
   color: var(--ink2);
-  margin: 7px 0 18px;
+  margin: 0 0 18px;
 }
 
 .creating {

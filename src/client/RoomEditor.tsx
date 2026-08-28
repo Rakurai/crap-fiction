@@ -1,6 +1,7 @@
 import type { RosterMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import { machineWords } from './facts.js'
 import { Mark } from './Mark.js'
+import { PanelHeader } from './PanelHeader.js'
 import styles from './RoomEditor.module.css'
 import { Scrim } from './Scrim.js'
 
@@ -20,12 +21,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
     <>
       <Scrim onDismiss={onClose} />
       <div className={styles.panel} role="dialog" aria-modal="true" aria-label="The room">
-        <div className={styles.header}>
-          <span className={styles.title}>The room</span>
-          <button type="button" className={styles.done} onClick={onClose}>
-            done
-          </button>
-        </div>
+        <PanelHeader title="The room" tone="panel" onDismiss={onClose} />
         <ul className={styles.list}>
           {members.map((member) => (
             <li key={member.id} className={styles.item}>

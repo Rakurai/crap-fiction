@@ -3,27 +3,6 @@
   width: 480px;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.title {
-  font: 500 12.5px/1 var(--font-ui);
-  color: var(--ink);
-  flex: 1;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.close {
-  composes: view from './controls.module.css';
-}
-
 .foot {
   border-top: 1px solid var(--rule);
   margin-top: 4px;
@@ -31,7 +10,7 @@
 }
 
 .start {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
 }
 
 .empty {
@@ -88,7 +67,7 @@
 }
 
 .arm {
-  composes: view from './controls.module.css';
+  composes: quiet from './controls.module.css';
   flex: none;
   opacity: 0;
 }
@@ -105,13 +84,13 @@
 }
 
 .confirmDelete {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }
 
 .keep {
-  composes: view from './controls.module.css';
+  composes: quiet from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }

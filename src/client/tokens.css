@@ -48,6 +48,8 @@
 
 :root,
 [data-theme='dark'] {
+  color-scheme: dark;
+
   --bg:      #171614;
   --paper:   #1e1c1a;
   --panel:   #24221f;
@@ -81,6 +83,8 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
+    color-scheme: light;
+
     --bg:      #eae6e0;
     --paper:   #fbf9f6;
     --panel:   #f4f1ec;
@@ -110,6 +114,8 @@
 }
 
 [data-theme='light'] {
+  color-scheme: light;
+
   --bg:      #eae6e0;
   --paper:   #fbf9f6;
   --panel:   #f4f1ec;

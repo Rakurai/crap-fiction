@@ -37,7 +37,7 @@
 }
 
 .headerControl {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
 }
 
 .transcript {
@@ -212,7 +212,7 @@
 }
 
 .actionButton {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
   flex: none;
 }
 
@@ -305,7 +305,7 @@
 }
 
 .changeAsk {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
 }
 
 .error {
@@ -400,7 +400,7 @@
 }
 
 .interview {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
   flex: none;
   height: 34px;
 }
