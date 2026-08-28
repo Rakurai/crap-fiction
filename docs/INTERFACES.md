@@ -14,21 +14,17 @@ surface is an edit here.
 ## The response envelope
 
 Every JSON response carries the same envelope, so a route that succeeded and a route that failed are
-one shape to the client and unwrapping happens once rather than per route.
+one shape to the client and unwrapping happens once rather than per route. It is a discriminated union
+over a success flag rather than a record with a nullable payload beside a nullable error: the
+successful branch carries the payload, the failed branch carries a code and a message, and narrowing
+makes the other's absence a fact the compiler knows rather than one every caller re-checks. A route
+with nothing to return answers over an empty payload, so no route decides for itself whether the
+field is there.
 
-```ts
-type ApiError = { code: string; message: string }
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: ApiError }
-```
-
-It is a discriminated union over the success flag rather than a record with a nullable payload beside
-a nullable error: two outcomes deserve two shapes, and narrowing makes the other field's presence a
-fact the compiler knows rather than one every caller re-checks. A route with nothing to return
-answers over an empty payload, so no route decides for itself whether the field is there.
-
-`code` is `UPPER_SNAKE_CASE` and names a failure in this product's own terms — an operation refused
-because the room is not idle, a call site with no assignment, a write that failed — rather than a
-transport code. `message` is text safe to show.
+The failure code is drawn from a closed set, declared once as a schema in the code. It is
+`UPPER_SNAKE_CASE` and names a failure in this product's own terms — an operation refused because the
+room is not idle, a call site with no assignment, a write that failed — rather than a transport code.
+The message is text safe to show.
 
 The envelope is how a failure is shaped, never a second place one is reported. Event frames and raw
 byte streams are not wrapped.
@@ -140,25 +136,18 @@ Connecting to a piece's stream is what opens it.
 
 ## The model seam
 
-```ts
-call(site, turns, schema, signal, onState?) → CallResult<T>
-status()                                    → whether the runtime is reachable, and what it holds
-
-Turn = { role, content }                    role is system, user or assistant; see Context compilation
-
-CallResult<T> =
-  | { outcome: 'value';     value: T }
-  | { outcome: 'abandoned' }
-  | { outcome: 'failed';    reason: FailureReason; returned?: string }
-
-FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming' | 'internal'
-```
+The seam offers two operations. A **call** takes the call site, an ordered sequence of turns, the
+schema its answer must satisfy, an abandon signal, and optionally `onState`; it answers with a value,
+with abandonment, or with a failure. **Status** answers whether the runtime is reachable and what it
+holds. A turn carries a role — system, user or assistant — and its content; see Context compilation.
 
 `turns` is an ordered sequence, and the sequence a call site sends is declared rather than an
 implementation's choice: every call site's first call is the standing material as a system turn
 followed by its request as a user turn. An implementation delivers them with their roles intact and in
 that order, and only one constrained to a single-string vendor call joins them, as that vendor's own
 accommodation.
+
+A failure carries a reason drawn from a closed set.
 
 | Reason | Means |
 |---|---|
@@ -176,18 +165,15 @@ guarantees nothing about their relative start order, completion order, latency, 
 cancellation.
 
 An application can fail for a reason no call can report about itself, so applying answers from a wider
-set of its own:
-
-```ts
-ApplyFailureReason = FailureReason | 'inapplicable'
-```
+set of its own: every reason a call can give, and one more.
 
 | Reason | Means |
 |---|---|
 | `inapplicable` | the answer conformed and could not be applied to the document as it arrived |
 
-A call result and a durable participant failure carry `FailureReason`. The reply to an Apply and the
-settlement a surface reports carry `ApplyFailureReason`, and `inapplicable` carries no `returned`.
+A call result and a durable participant failure carry a reason from the call's own set. The reply to an
+Apply and the settlement a surface reports carry one from the wider set, and `inapplicable` carries no
+`returned`.
 
 ## The context seam
 

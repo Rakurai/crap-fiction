@@ -275,8 +275,8 @@ composition, not reimplemented component internals.
 Where a library owns a capability, use it and do not reimplement it. This applies hardest to the
 editor: history, keymaps, selection, input rules and transactions belong to it.
 
-A capability assigned to a package is not written here, and a package nothing assigns a capability to
-is not reached for. Either is a design change, argued as one before any code is written.
+A capability assigned to a package is not written here. Where no package is assigned one, reach for a
+package rather than write the capability.
 
 Application state does not enter another library's data model — no document attributes, marks or
 decorations carrying product concepts.
@@ -466,40 +466,3 @@ Prohibited, each reached by an argument that resembles the test above:
 - Console writes used as logging, floating promises, polling loops.
 - In-code history of any kind.
 - A comment outside the admitted kinds, in any shipped file.
-
----
-
-## Checklist
-
-- [ ] Greenfield: no legacy, migration or bridging code.
-- [ ] Every module passes the deletion test.
-- [ ] Interfaces are small relative to the behaviour behind them.
-- [ ] Seams exist only where something concretely varies.
-- [ ] Strict typing; no `any`, no `!`, no escape-hatch `as`.
-- [ ] Schemas declared once, types derived, validated at the seam and trusted behind it.
-- [ ] Schemas as small as the call allows.
-- [ ] Dependencies injected at seams; no globals, no dynamic import to swap.
-- [ ] Startup validates configuration and shipped data and crashes usefully.
-- [ ] Failure modes declared in the product's vocabulary; nothing vendor-shaped crosses a seam.
-- [ ] Failure, absence and cancellation stay distinct.
-- [ ] Retry and timeout owned by the module that calls the unreliable thing.
-- [ ] Abort signals threaded and honoured; cleanup on every path.
-- [ ] Disk access concentrated; paths resolved and contained; a failed write reported as failed.
-- [ ] Routes validate, delegate, translate — no logic, no ad-hoc JSON.
-- [ ] Presentational components shallow; depth in hooks and reducers; no invented client state.
-- [ ] Library machinery used rather than reimplemented; nothing written that a package is assigned;
-      no product state in a library's model.
-- [ ] Structured logs at the owning seam, through the project's logger; nothing written to the console.
-- [ ] Log lines carry operational facts only, never the content the work consists of.
-- [ ] Process configuration read once at startup; user-editable data re-read at use.
-- [ ] Tests cross a directory-module's index, never a sibling behind it.
-- [ ] Each property asserted once, at the deepest boundary able to state it; each test names a
-      distinct failure; no schema re-stated as a behaviour; closed sets and regexes imported, not copied.
-- [ ] Harnesses and fixtures kept distinct; a fixture is local to the test that needs it; a module
-      reading the clock takes it as a parameter.
-- [ ] Every assertion can fail against a nameable defect; expected values arrived at independently of
-      the code under test.
-- [ ] No test changes when a refactor changes no observable behaviour; nothing committed skipped or
-      marked to do.
-- [ ] Every comment in every shipped file is one of the admitted kinds; deleting it would leave the
-      reader wrong.

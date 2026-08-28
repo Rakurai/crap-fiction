@@ -108,6 +108,14 @@ Good: Requests are rate limited to 10/s until config `provider_burst_v2`
 
 ---
 
+## Noncanonical material
+
+Working material that governs nothing declares that in its own opening lines, never only in a header a retrieval may arrive without. Name what it is, and what governs instead.
+
+Spent working material is deleted, not marked. An implementation plan whose decisions have landed, and any record of how a decision was reached, is history and belongs to version control alone.
+
+---
+
 ## Cross-references
 
 Canonical content documents do not cross-reference other canonical documents for navigation or explanation. Each states its owned facts completely; use the ownership model to locate another owner. No courtesy pointers and no restated fact beside a pointer.
@@ -127,6 +135,12 @@ Prefer explicit subjects over `the above`, `the former`, `this approach`, or `as
 Use `must` and `must not` only where the current artifact owns the constraint. Describe elsewhere.
 
 Never preserve obsolete claims to explain history; isolated retrieval can present them as current truth.
+
+---
+
+## Density
+
+Only agents read this corpus, and they read it under a limited context window. Every sentence carries a decision, a constraint, or a reason an agent could not derive from the code. Write a contrast only where the rejected option is one an agent would otherwise choose. Do not restate a decision inside its own rationale, and do not close a section with a sentence that adds nothing.
 
 ---
 
