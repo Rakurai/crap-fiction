@@ -50,22 +50,29 @@
   gap: 18px;
 }
 
+.messageLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
 .message {
+  flex: 1;
+  min-width: 0;
   font: 400 13.5px/1.6 var(--font-prose);
   color: var(--ink);
   padding: 0 11px;
   border-left: 2px solid var(--ink3);
   border-right: 2px solid var(--ink3);
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .messageWhen {
-  display: block;
+  flex: none;
   font: 400 9.5px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.07em;
-  padding: 0 11px;
-  margin: 0 0 4px;
 }
 
 .roomChanged {
@@ -130,40 +137,47 @@
 }
 
 .claim {
-  font: 400 15px/1.55 var(--font-prose);
+  --clamp-line: 23.25px;
+  font: 400 15px/var(--clamp-line) var(--font-prose);
   color: var(--ink);
   margin: 0;
   text-wrap: pretty;
 }
 
-.claimClamped {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
+.note {
+  --clamp-line: 20.8px;
+  font: 400 13px/var(--clamp-line) var(--font-ui);
+  color: var(--ink2);
+  margin: 0;
+}
+
+.clamped {
+  --clamp-lines: 4;
+  max-height: calc(var(--clamp-lines) * var(--clamp-line));
   overflow: hidden;
 }
 
-.claimMore {
-  align-self: flex-start;
+.disclosure {
+  float: right;
+  width: 40%;
+  text-align: right;
   font: 400 9.5px/1 var(--font-facts);
   color: var(--ink4);
   letter-spacing: 0.07em;
   background: none;
   border: none;
-  padding: 7px 8px;
-  margin: -3px -8px 0;
+  padding: 0;
   cursor: pointer;
 }
 
-.claimMore:hover {
-  color: var(--ink2);
+.clamped > .disclosure {
+  height: var(--clamp-line);
+  line-height: var(--clamp-line);
+  margin-top: calc((var(--clamp-lines) - 1) * var(--clamp-line));
 }
 
-.note {
-  font: 400 13px/1.6 var(--font-ui);
+.disclosure:hover {
   color: var(--ink2);
-  margin: 0;
 }
 
 .failed {

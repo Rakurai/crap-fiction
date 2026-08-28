@@ -134,6 +134,60 @@ describe('a landed response in the conversation', () => {
   })
 })
 
+const LONG_CLAIM = 'The ending arrives before the fear does, and the fear is the only thing the scene was ever about.'
+
+const LONG_NOTE = 'Three paragraphs earlier the light is already gone, which is where the dread should have started to gather.'
+
+function everythingOverflows(): () => void {
+  const was = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 200 })
+  return () => {
+    if (was === undefined) {
+      Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+      return
+    }
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', was)
+  }
+}
+
+describe('a response too long to show whole', () => {
+  afterEach(cleanup)
+
+  it('truncates the claim and the note alike, each behind a toggle inside the text it cuts, and offers no toggle where nothing is cut', async () => {
+    const restore = everythingOverflows()
+    try {
+      renderConversation([
+        { id: 'e1', kind: 'participantResponse', participantId: 'reader', causeId: 'e0', outcome: 'commentary', claim: LONG_CLAIM, note: LONG_NOTE },
+      ])
+
+      const [claimToggle, noteToggle] = await screen.findAllByRole('button', { name: '… MORE' })
+      expect(claimToggle?.parentElement?.textContent).toContain(LONG_CLAIM)
+      expect(noteToggle?.parentElement?.textContent).toContain(LONG_NOTE)
+      expect(screen.getAllByRole('button', { name: '… MORE' })).toHaveLength(2)
+
+      if (claimToggle === undefined) throw new Error('the claim was drawn with nothing to disclose it')
+      fireEvent.click(claimToggle)
+
+      const opened = screen.getByRole('button', { name: 'LESS' })
+      expect(opened.getAttribute('aria-expanded')).toBe('true')
+      expect(opened.parentElement?.textContent).toContain(LONG_CLAIM)
+
+      fireEvent.click(opened)
+
+      expect(screen.getAllByRole('button', { name: '… MORE' })).toHaveLength(2)
+    } finally {
+      restore()
+    }
+  })
+
+  it('leaves a claim that fits with no toggle at all', async () => {
+    renderConversation([RESPONSE_WITH_COMMENTARY])
+
+    await screen.findByText('It holds.')
+    expect(screen.queryByRole('button', { name: /MORE/ })).toBeNull()
+  })
+})
+
 describe('a room that cannot be reached', () => {
   afterEach(cleanup)
 
