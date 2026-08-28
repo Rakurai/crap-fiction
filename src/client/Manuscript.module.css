@@ -97,7 +97,7 @@
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 8px 10px;
-  animation: dr-in .14s ease-out;
+  animation: global(dr-in) .14s ease-out;
 }
 
 .source {

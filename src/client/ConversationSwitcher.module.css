@@ -91,6 +91,9 @@
   composes: view from './controls.module.css';
   flex: none;
   opacity: 0;
+}
+
+.item .arm {
   font-size: 13px;
   line-height: 1;
   padding: 6px 8px;
