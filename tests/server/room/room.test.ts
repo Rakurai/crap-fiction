@@ -391,6 +391,38 @@ describe('Room.dispatch', () => {
     expect(landed.map((entry) => entry.participantId)).toEqual(['compression', 'shape', 'story-editor'])
   })
 
+  it("builds every specialist's prompt before any of this dispatch's specialists settle, so a specialist's prompt never carries a sibling's reading from the same dispatch", async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
+    const { room, adapter } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'shape reading' } }, held: true },
+      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'compression reading' } }, held: true },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } }, held: true },
+    })
+
+    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    const settled = settlementOf(room, piece.id)
+
+    const shapePrompt = adapter.promptFor('shape')
+    const compressionPrompt = adapter.promptFor('compression')
+    expect(shapePrompt).not.toContain('compression reading')
+    expect(compressionPrompt).not.toContain('shape reading')
+
+    const compressionLanded = nextEntryAppended(room, piece.id, 'compression')
+    adapter.release('compression')
+    await compressionLanded
+
+    const shapeLanded = nextEntryAppended(room, piece.id, 'shape')
+    adapter.release('shape')
+    await shapeLanded
+    await vi.waitFor(() => expect(adapter.promptFor('story-editor')).toBeDefined())
+
+    expect(adapter.promptFor('shape')).toBe(shapePrompt)
+    expect(adapter.promptFor('compression')).toBe(compressionPrompt)
+
+    adapter.release('story-editor')
+    await settled
+  })
+
   it('durably enables a specialist addressed from outside the enabled cast, naming it as brought — and brings nobody where addressing names only the cast', async () => {
     const brought = await createPiece(pieceMetadata, workspaceDir, 'Cups', fixtureMode.id, fixtureCatalog)
     await pieceMetadata.writeCast(workspaceDir, brought.id, 'draft', ['compression'])
