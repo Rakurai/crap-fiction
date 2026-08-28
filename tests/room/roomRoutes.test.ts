@@ -4,7 +4,6 @@ import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createLogger } from '../../src/server/logger.js'
-import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RoomScope } from '../../src/server/scope.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
@@ -12,41 +11,8 @@ import type { Room } from '../../src/server/room/room.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../support/modelAdapter.js'
 import { buildTestApp } from '../support/harness.js'
 import { buildTestRoom } from '../support/room.js'
-import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
+import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
-
-const MODE: ModeDescriptor = {
-  id: 'flash',
-  displayName: 'Flash',
-  description: 'A short piece read in one sitting.',
-  storyContextReference: 'Sections, each holding entries.',
-}
-
-const ROLES: readonly RoleDefinition[] = [
-  {
-    id: 'shape',
-    handle: 'shape',
-    displayName: 'Shape',
-    description: 'x',
-    mark: 'SH',
-    persona: 'reasons about x',
-    eligibility: 'cast',
-    function: undefined,
-    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
-  },
-  {
-    id: 'story-editor',
-    handle: 'editor',
-    displayName: 'Story Editor',
-    description: 'y',
-    mark: 'SE',
-    persona: 'reasons about y',
-    eligibility: 'generalist',
-    function: undefined,
-    availability: [],
-  },
-  INTERVIEWER_FIXTURE,
-]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
 const COMMENTARY: FixtureBehavior = { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading' } } }
@@ -73,8 +39,8 @@ describe('the room over HTTP', () => {
   ): Promise<{ app: Hono; modelAccess: FixtureModelAdapter; room: Room; conversationId: string }> {
     const modelAccess = FixtureModelAdapter.bySite(behaviors, { reachable: true, models: [] })
     const room = buildTestRoom(dataRoot, {
-      modes: [MODE],
-      roles: ROLES,
+      modes: [MODE_FIXTURE],
+      roles: ROLES_FIXTURE,
       charter: CHARTER_FIXTURE,
       fragments: PROMPT_FRAGMENTS_FIXTURE,
       policy: SHIPPED_HISTORY_POLICY,
@@ -85,8 +51,8 @@ describe('the room over HTTP', () => {
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
     })
     const { app, workspace } = buildTestApp(dataRoot, {
-      modes: [MODE],
-      roles: ROLES,
+      modes: [MODE_FIXTURE],
+      roles: ROLES_FIXTURE,
       runtimeStatus: undefined,
       room,
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,

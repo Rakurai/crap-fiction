@@ -2,20 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../src/server/store/index.js'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
-import { INTERVIEWER_FIXTURE } from '../support/roomFixtures.js'
+import { MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
-
-const MODE: ModeDescriptor = {
-  id: 'flash',
-  displayName: 'Flash',
-  description: 'A short piece read in one sitting.',
-  storyContextReference: 'Sections, each holding entries.',
-}
 
 const EPIC: ModeDescriptor = {
   id: 'epic',
@@ -23,32 +15,6 @@ const EPIC: ModeDescriptor = {
   description: 'A piece read over several sittings.',
   storyContextReference: 'Sections, each holding entries.',
 }
-
-const ROLES: readonly RoleDefinition[] = [
-  {
-    id: 'shape',
-    handle: 'shape',
-    displayName: 'Shape',
-    description: 'reads for the shape of the whole',
-    mark: 'SH',
-    persona: 'reasons about the shape of the whole',
-    eligibility: 'cast',
-    function: undefined,
-    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
-  },
-  {
-    id: 'story-editor',
-    handle: 'editor',
-    displayName: 'Story Editor',
-    description: 'weighs what the room said',
-    mark: 'SE',
-    persona: 'reasons about what the room said',
-    eligibility: 'generalist',
-    function: undefined,
-    availability: [],
-  },
-  INTERVIEWER_FIXTURE,
-]
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
 
@@ -67,12 +33,12 @@ describe('the piece routes', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  function studio(modes: readonly ModeDescriptor[] = [MODE]) {
+  function studio(modes: readonly ModeDescriptor[] = [MODE_FIXTURE]) {
     return buildTestApp(dataRoot, {
       modes,
-      roles: ROLES,
+      roles: ROLES_FIXTURE,
       runtimeStatus: undefined,
-      room: idleRoom(dataRoot, modes, ROLES),
+      room: idleRoom(dataRoot, modes, ROLES_FIXTURE),
       authorContextReference: UNREACHED_REFERENCE,
     })
   }
@@ -113,10 +79,10 @@ describe('the piece routes', () => {
           draft: {
             text: 'Two small words.',
             referenceSchema: null,
-            roster: [{ id: 'shape', displayName: 'Shape', description: ROLES[0]?.description, enabled: true }],
+            roster: [{ id: 'shape', displayName: 'Shape', description: ROLES_FIXTURE[0]?.description, enabled: true }],
             conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
           },
-          storyContext: { text: '', referenceSchema: MODE.storyContextReference, roster: [], conversations: [] },
+          storyContext: { text: '', referenceSchema: MODE_FIXTURE.storyContextReference, roster: [], conversations: [] },
           authorContext: { text: '', roster: [], conversations: [] },
         },
       },
@@ -215,7 +181,7 @@ describe('the piece routes', () => {
   })
 
   it('lists every loaded mode, and persists whichever the author chooses at creation', async () => {
-    const { app } = await withWorkspace([MODE, EPIC])
+    const { app } = await withWorkspace([MODE_FIXTURE, EPIC])
 
     const listed = await app.request('/modes')
     expect(await listed.json()).toMatchObject({
