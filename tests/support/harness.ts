@@ -73,6 +73,7 @@ export function buildTestApp(dataRoot: string, spec: AppSpec): TestApp {
     port: 4000,
     modelRuntimeUrl: 'http://localhost:1234',
     logLevel: 'silent' as const,
+    trace: 'off' as const,
   })
 
   const settingsStore = new SettingsStore()

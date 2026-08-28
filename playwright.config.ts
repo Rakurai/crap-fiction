@@ -51,6 +51,7 @@ export default defineConfig({
         // to parse and is never reached.
         STUDIO_MODEL_RUNTIME_URL: `ws://127.0.0.1:${PORT + 100}`,
         STUDIO_LOG_LEVEL: 'silent',
+        STUDIO_TRACE: 'off',
       },
     },
     {
@@ -64,6 +65,7 @@ export default defineConfig({
         // answers from the fixture implementation, which contacts nothing.
         STUDIO_MODEL_RUNTIME_URL: `ws://127.0.0.1:${FIXTURE_PORT + 100}`,
         STUDIO_LOG_LEVEL: 'silent',
+        STUDIO_TRACE: 'off',
       },
     },
   ],

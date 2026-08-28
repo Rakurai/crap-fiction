@@ -20,6 +20,20 @@ export type Turn = Readonly<{ role: TurnRole; content: string }>
 
 export type CallTurns = readonly Turn[]
 
+export type ModelTraceRecord = Readonly<{
+  site: string
+  assignment: string
+  attempt: number
+  turns: CallTurns
+  returned: string
+  reading: 'value' | 'malformed' | 'nonconforming'
+  runtimeStopReason: string
+  promptTokens: number | undefined
+  predictedTokens: number | undefined
+}>
+
+export type ModelTrace = (record: ModelTraceRecord) => Promise<void>
+
 export type ModelAccess = {
   call<T>(
     site: string,

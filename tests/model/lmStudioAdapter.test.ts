@@ -41,19 +41,19 @@ beforeEach(() => {
 
 describe('the runtime URL the adapter is constructed with', () => {
   it('accepts the two schemes the runtime is reachable over, and refuses anything else naming the variable and what was wrong', () => {
-    expect(() => new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)).not.toThrow()
-    expect(() => new LMStudioAdapter('wss://studio.local:1234', assigned, MODEL_CONFIG, silent)).not.toThrow()
+    expect(() => new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)).not.toThrow()
+    expect(() => new LMStudioAdapter('wss://studio.local:1234', assigned, MODEL_CONFIG, silent, undefined)).not.toThrow()
 
-    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, MODEL_CONFIG, silent)).toThrowError(/must be ws or wss, not http/)
-    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, MODEL_CONFIG, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
-    expect(() => new LMStudioAdapter('localhost:1234', assigned, MODEL_CONFIG, silent)).toThrowError(ModelRuntimeUrlError)
-    expect(() => new LMStudioAdapter('localhost:1234', assigned, MODEL_CONFIG, silent)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
+    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)).toThrowError(/must be ws or wss, not http/)
+    expect(() => new LMStudioAdapter('http://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
+    expect(() => new LMStudioAdapter('localhost:1234', assigned, MODEL_CONFIG, silent, undefined)).toThrowError(ModelRuntimeUrlError)
+    expect(() => new LMStudioAdapter('localhost:1234', assigned, MODEL_CONFIG, silent, undefined)).toThrowError(/STUDIO_MODEL_RUNTIME_URL/)
   })
 
   it('refuses before anything vendor-owned is constructed, so no vendor message reaches the author', () => {
     let thrown: unknown
     try {
-      new LMStudioAdapter('http://localhost:4000', assigned, MODEL_CONFIG, silent)
+      new LMStudioAdapter('http://localhost:4000', assigned, MODEL_CONFIG, silent, undefined)
     } catch (error) {
       thrown = error
     }
@@ -65,7 +65,7 @@ describe('the runtime URL the adapter is constructed with', () => {
 
 describe('which model a call site is assigned', () => {
   it('fails an unassigned site as unconfigured without contacting the runtime, never falling back to another site\'s assignment', async () => {
-    const adapter = new LMStudioAdapter('ws://localhost:1234', (site) => (site === 'story-editor' ? 'qwen-14b' : undefined), MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', (site) => (site === 'story-editor' ? 'qwen-14b' : undefined), MODEL_CONFIG, silent, undefined)
 
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
@@ -77,7 +77,7 @@ describe('which model a call site is assigned', () => {
     modelFn.mockResolvedValue({ respond: respondFn })
     respondFn.mockResolvedValue({ nonReasoningContent: JSON.stringify({ claim: 'x' }) })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', (site) => (site === 'shape' ? 'qwen-14b' : undefined), MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', (site) => (site === 'shape' ? 'qwen-14b' : undefined), MODEL_CONFIG, silent, undefined)
     await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(modelFn).toHaveBeenCalledWith('qwen-14b', expect.anything())
@@ -91,7 +91,7 @@ describe('LMStudioAdapter.call', () => {
       .mockResolvedValueOnce({ nonReasoningContent: 'not json' })
       .mockResolvedValueOnce({ nonReasoningContent: JSON.stringify({ claim: 'the room agrees' }) })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'value', value: { claim: 'the room agrees' } })
@@ -101,7 +101,7 @@ describe('LMStudioAdapter.call', () => {
     modelFn.mockResolvedValue({ respond: respondFn })
     respondFn.mockResolvedValue({ nonReasoningContent: 'still not json' })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'malformed', returned: 'still not json' })
@@ -110,7 +110,7 @@ describe('LMStudioAdapter.call', () => {
   it('fails as unreachable, and only after exhausting its retry policy, when the runtime never answers', async () => {
     modelFn.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'))
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'unreachable' })
@@ -123,7 +123,7 @@ describe('LMStudioAdapter.call', () => {
     const thrown = new Error('the caller could not take the state')
     const logged = vi.spyOn(silent, 'error')
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal, () => {
       throw thrown
     })
@@ -139,7 +139,7 @@ describe('LMStudioAdapter.call', () => {
     const spy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal)
     modelFn.mockImplementation(() => new Promise(() => {}))
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const pending = adapter.call('shape', turns, schema, new AbortController().signal)
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(120_000))
     timeout.abort()
@@ -153,7 +153,7 @@ describe('LMStudioAdapter.call', () => {
     modelFn.mockImplementation(() => new Promise(() => {}))
     const author = new AbortController()
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const pending = adapter.call('shape', turns, schema, author.signal)
     author.abort()
     timeout.abort()
@@ -167,7 +167,7 @@ describe('LMStudioAdapter.call', () => {
       .mockResolvedValueOnce({ nonReasoningContent: 'garbage' })
       .mockResolvedValueOnce({ nonReasoningContent: JSON.stringify({ claim: 'second try' }) })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(Object.keys(result)).toEqual(['outcome', 'value'])
@@ -182,7 +182,7 @@ describe('LMStudioAdapter.call', () => {
         }),
     )
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const pending = adapter.call('shape', turns, schema, controller.signal)
     controller.abort()
 
@@ -195,7 +195,7 @@ describe('LMStudioAdapter.call', () => {
     respondFn.mockResolvedValue({ nonReasoningContent: JSON.stringify({ claim: 'x' }) })
     const states: string[] = []
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.call('shape', turns, schema, new AbortController().signal, (state) => states.push(state))
 
     expect(states).toEqual(['preparing', 'working'])
@@ -208,7 +208,7 @@ describe('LMStudioAdapter.call', () => {
       .mockResolvedValueOnce({ nonReasoningContent: JSON.stringify({ claim: 'x' }) })
     const states: string[] = []
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.call('shape', turns, schema, new AbortController().signal, (state) => states.push(state))
 
     expect(states).toEqual(['preparing', 'working', 'working'])
@@ -220,7 +220,7 @@ describe('LMStudioAdapter.call', () => {
     respondFn.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
     respondFn.mockResolvedValueOnce({ nonReasoningContent: JSON.stringify({ claim: 'second' }) })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const first = adapter.call('shape', [{ role: 'system', content: 'standing one' }], schema, new AbortController().signal)
     const second = adapter.call('compression', [{ role: 'system', content: 'standing two' }], schema, new AbortController().signal)
 
@@ -242,7 +242,7 @@ describe('what the adapter asks the runtime to generate', () => {
   })
 
   it('constrains generation with the schema converted to JSON Schema, not with the schema object itself', async () => {
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.call('shape', turns, schema, new AbortController().signal)
 
     const [, options] = respondFn.mock.calls[0] as [string, { structured: { type: string; jsonSchema: object } }]
@@ -250,8 +250,8 @@ describe('what the adapter asks the runtime to generate', () => {
     expect(options.structured.jsonSchema).toMatchObject({ type: 'object', properties: { claim: { type: 'string' } }, required: ['claim'] })
   })
 
-  it('bounds generation, allowing the site that returns a manuscript far more than the sites that return a reply', async () => {
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+  it('bounds generation, allowing the site that returns an edit set far more than the sites that return a reply', async () => {
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.call('shape', turns, schema, new AbortController().signal)
     await adapter.call(APPLY_CALL_SITE, turns, schema, new AbortController().signal)
 
@@ -261,7 +261,7 @@ describe('what the adapter asks the runtime to generate', () => {
   })
 
   it('hands the runtime the turns with their roles intact and in order, never joined into one string', async () => {
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.call(
       'shape',
       [
@@ -288,7 +288,7 @@ describe('what the adapter asks the runtime to generate', () => {
       nonReasoningContent: JSON.stringify({ claim: 'the opening is late' }),
     })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, schema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'value', value: { claim: 'the opening is late' } })
@@ -302,7 +302,7 @@ describe('LMStudioAdapter.call against the participant response schemas', () => 
     const returned = JSON.stringify({ outcome: 'commentary', note: 'the opening is late' })
     respondFn.mockResolvedValue({ nonReasoningContent: returned })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, eligibleResponseValueSchema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned })
@@ -314,7 +314,7 @@ describe('LMStudioAdapter.call against the participant response schemas', () => 
     modelFn.mockResolvedValue({ respond: respondFn })
     respondFn.mockResolvedValue({ nonReasoningContent: returned })
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     const result = await adapter.call('shape', turns, owedResponseValueSchema, new AbortController().signal)
 
     expect(result).toEqual({ outcome: 'failed', reason: 'nonconforming', returned })
@@ -325,7 +325,7 @@ describe('LMStudioAdapter.status', () => {
   it('reports the runtime unreachable rather than throwing', async () => {
     listModelsFn.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'))
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
 
     expect(await adapter.status()).toEqual({ reachable: false })
   })
@@ -336,7 +336,7 @@ describe('LMStudioAdapter.status', () => {
       { modelKey: 'qwen2.5-14b', displayName: 'Qwen2.5 14B' },
     ])
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
 
     expect(await adapter.status()).toEqual({ reachable: true, models: ['llama-3.2-3b', 'qwen2.5-14b'] })
   })
@@ -344,7 +344,7 @@ describe('LMStudioAdapter.status', () => {
   it('asks the runtime only for the models a call can be assigned', async () => {
     listModelsFn.mockResolvedValue([])
 
-    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent)
+    const adapter = new LMStudioAdapter('ws://localhost:1234', assigned, MODEL_CONFIG, silent, undefined)
     await adapter.status()
 
     expect(listModelsFn).toHaveBeenCalledWith('llm')

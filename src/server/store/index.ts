@@ -5,6 +5,7 @@ import { appliedChangeSchema, type AppliedChange } from '../../shared/appliedCha
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import type { ModelTraceRecord } from '../model/types.js'
 import type { ConversationScope } from '../scope.js'
 import { PathEscapesRootError, resolveWithinRoot } from './containment.js'
 import {
@@ -334,6 +335,39 @@ export function readAppliedChanges<T>(dataRoot: string, scope: ConversationScope
 export async function deleteAppliedChange(dataRoot: string, scope: ConversationScope, changeId: string): Promise<void> {
   const dir = namespaceDirectoryForWrite(dataRoot, scope, 'changes')
   await deleteFile(changeFile(dir, changeId))
+}
+
+const TRACES_DIR = 'traces'
+
+function traceFile(dataRoot: string, at: number, site: string): string {
+  const instant = new Date(at).toISOString().replaceAll(':', '-')
+  return path.join(dataRoot, TRACES_DIR, `${instant}-${site}.md`)
+}
+
+function reportedCount(count: number | undefined): string {
+  return count === undefined ? 'the runtime did not report one' : String(count)
+}
+
+function traceText(record: ModelTraceRecord): string {
+  return [
+    `# ${record.site}, attempt ${record.attempt}`,
+    '',
+    `model: ${record.assignment}`,
+    `read as: ${record.reading}`,
+    `runtime stop reason: ${record.runtimeStopReason}`,
+    `prompt tokens: ${reportedCount(record.promptTokens)}`,
+    `predicted tokens: ${reportedCount(record.predictedTokens)}`,
+    '',
+    ...record.turns.flatMap((turn) => [`## ${turn.role}`, '', turn.content, '']),
+    '## Returned',
+    '',
+    record.returned,
+    '',
+  ].join('\n')
+}
+
+export async function writeModelTrace(dataRoot: string, at: number, record: ModelTraceRecord): Promise<void> {
+  await writeTextArtifact(traceFile(dataRoot, at, record.site), traceText(record))
 }
 
 export function readShippedModes<T>(

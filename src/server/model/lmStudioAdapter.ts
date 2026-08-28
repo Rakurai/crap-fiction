@@ -5,7 +5,7 @@ import type { StudioConfig } from '../../shared/config.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
-import type { CallResult, CallState, CallTurns, ModelAccess } from './types.js'
+import type { CallResult, CallState, CallTurns, ModelAccess, ModelTrace, ModelTraceRecord } from './types.js'
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -77,13 +77,21 @@ export class LMStudioAdapter implements ModelAccess {
   readonly #getAssignment: GetAssignment
   readonly #config: StudioConfig['model']
   readonly #logger: Logger
+  readonly #trace: ModelTrace | undefined
   #queue: Promise<unknown> = Promise.resolve()
 
-  constructor(baseUrl: string, getAssignment: GetAssignment, config: StudioConfig['model'], logger: Logger) {
+  constructor(
+    baseUrl: string,
+    getAssignment: GetAssignment,
+    config: StudioConfig['model'],
+    logger: Logger,
+    trace: ModelTrace | undefined,
+  ) {
     this.#client = new LMStudioClient({ baseUrl: requireReachable(baseUrl) })
     this.#getAssignment = getAssignment
     this.#config = config
     this.#logger = logger
+    this.#trace = trace
   }
 
   #logged<T>(site: string, assignment: string | undefined, result: CallResult<T>): CallResult<T> {
@@ -138,7 +146,7 @@ export class LMStudioAdapter implements ModelAccess {
     }
 
     try {
-      const value = await pRetry(() => this.#attempt(assignment, turns, schema, jsonSchema, maxTokens, combined, announce), {
+      const value = await pRetry((attempt) => this.#attempt(site, attempt, assignment, turns, schema, jsonSchema, maxTokens, combined, announce), {
         retries: this.#config.retries,
         signal: combined,
       })
@@ -162,6 +170,8 @@ export class LMStudioAdapter implements ModelAccess {
   }
 
   async #attempt<T>(
+    site: string,
+    attempt: number,
     assignment: string,
     turns: CallTurns,
     schema: z.ZodType<T>,
@@ -178,17 +188,35 @@ export class LMStudioAdapter implements ModelAccess {
 
     const returned = result.nonReasoningContent
 
+    const traced = async (reading: ModelTraceRecord['reading']): Promise<void> => {
+      if (this.#trace === undefined) return
+      await this.#trace({
+        site,
+        assignment,
+        attempt,
+        turns,
+        returned,
+        reading,
+        runtimeStopReason: result.stats.stopReason,
+        promptTokens: result.stats.promptTokensCount,
+        predictedTokens: result.stats.predictedTokensCount,
+      })
+    }
+
     let raw: unknown
     try {
       raw = JSON.parse(returned)
     } catch {
+      await traced('malformed')
       throw new MalformedError(returned)
     }
 
     const parsed = schema.safeParse(raw)
     if (!parsed.success) {
+      await traced('nonconforming')
       throw new NonConformingError(returned)
     }
+    await traced('value')
     return parsed.data
   }
 
