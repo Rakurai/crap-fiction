@@ -27,6 +27,25 @@ describe('computeAppliedChangeContent', () => {
     expect(twoPlaces.kind).toBe('passages')
     if (twoPlaces.kind !== 'passages') return
     expect(twoPlaces.passages).toHaveLength(2)
+    expect(twoPlaces.passages[0]).toMatchObject({ before: 'stood', after: 'leaned' })
+    expect(twoPlaces.passages[0]?.leading).toContain('The lighthouse')
+    expect(twoPlaces.passages[0]?.trailing).toContain('on the point.')
+    expect(twoPlaces.passages[0]?.before).not.toContain('on the point.')
+    expect(twoPlaces.passages[0]?.after).not.toContain('on the point.')
+  })
+
+  it('keeps the prose on both sides of an insertion out of the passage it frames', () => {
+    const content = computeAppliedChangeContent(
+      'She set the cups down. The gulls circled overhead. Ruth walked the beach alone.',
+      'She set the cups down. The gulls circled overhead, screaming. Ruth walked the beach alone.',
+    )
+
+    expect(content.kind).toBe('passages')
+    if (content.kind !== 'passages') return
+    expect(content.passages[0]?.before).toBe('')
+    expect(content.passages[0]?.after).toContain('screaming')
+    expect(content.passages[0]?.leading).toContain('circled overhead')
+    expect(content.passages[0]?.trailing).toContain('Ruth walked')
   })
 
   it('reports a whole rewrite where a change kept no prose on either side, including a draft that was empty', () => {

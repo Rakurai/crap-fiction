@@ -126,7 +126,7 @@ export class LMStudioAdapter implements ModelAccess {
     const timeoutSignal = AbortSignal.timeout(this.#config.timeoutMs)
     const combined = AbortSignal.any([signal, timeoutSignal])
     const jsonSchema = z.toJSONSchema(schema)
-    const maxTokens = site === APPLY_CALL_SITE ? this.#config.manuscriptMaxTokens : this.#config.responseMaxTokens
+    const maxTokens = site === APPLY_CALL_SITE ? this.#config.editSetMaxTokens : this.#config.responseMaxTokens
 
     let preparing = false
     const announce = (state: CallState): void => {

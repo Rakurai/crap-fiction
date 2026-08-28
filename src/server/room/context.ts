@@ -4,7 +4,7 @@ import { renderFragment } from '../model/prompts.js'
 import type { RoleDefinition } from '../model/roles.js'
 import type { CallTurns } from '../model/types.js'
 import type { ConversationEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
-import type { Edit } from '../../shared/applyResult.js'
+import { applyResultSchema, type ApplyResult } from '../../shared/applyResult.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import type { EditVerdict } from './edits.js'
 import { RouteFailure } from '../routeFailure.js'
@@ -188,7 +188,7 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
-export type RejectedAttempt = Readonly<{ edits: readonly Edit[]; verdicts: readonly EditVerdict[] }>
+export type RejectedAttempt = Readonly<{ returned: ApplyResult; verdicts: readonly EditVerdict[] }>
 
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
@@ -299,7 +299,7 @@ function diagnosisLine(fragments: PromptFragments, verdict: EditVerdict): string
 function attemptTurns(fragments: PromptFragments, attempt: RejectedAttempt): CallTurns {
   const diagnoses = attempt.verdicts.map((verdict) => diagnosisLine(fragments, verdict)).join('\n')
   return [
-    { role: 'assistant', content: JSON.stringify({ edits: attempt.edits }) },
+    { role: 'assistant', content: JSON.stringify(applyResultSchema.parse(attempt.returned)) },
     { role: 'user', content: renderFragment(fragments.sections.rejectedAttempt, { diagnoses }) },
   ]
 }

@@ -743,9 +743,10 @@ export class Room {
         { pieceId, actionId, round, diagnoses: diagnosisCounts(resolution.verdicts) },
         'application edits did not resolve',
       )
-      rejected.push({ edits: result.value.edits, verdicts: resolution.verdicts })
+      rejected.push({ returned: result.value, verdicts: resolution.verdicts })
     }
 
+    this.#logger.info({ pieceId, actionId, rounds: rejected.length }, 'application found no applicable edit set')
     return { outcome: 'inapplicable' }
   }
 

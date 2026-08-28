@@ -14,6 +14,7 @@ import {
 } from '../../src/server/room/context.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { CallTurns, TurnRole } from '../../src/server/model/types.js'
+import { applyResultSchema } from '../../src/shared/applyResult.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
@@ -567,19 +568,21 @@ describe('the rejected attempts a correction round carries', () => {
   const applyContext = compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: [] }))
 
   const firstAttempt: RejectedAttempt = {
-    edits: [{ find: 'the cups', replace: 'the mugs' }],
+    returned: { edits: [{ find: 'the cups', replace: 'the mugs' }] },
     verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis: 'unmatched' }],
   }
   const secondAttempt: RejectedAttempt = {
-    edits: [{ find: 'sat', replace: 'stood' }],
+    returned: { edits: [{ find: 'sat', replace: 'stood' }] },
     verdicts: [{ outcome: 'defective', find: 'sat', diagnosis: 'ambiguous' }],
   }
 
-  it('gives each attempt as the returned edits in an assistant turn and the room\'s diagnosis in a user turn that follows it', () => {
+  it('gives each attempt as the answer the model returned in an assistant turn, in the shape it was asked to answer in, and the room\'s diagnosis in a user turn that follows it', () => {
     const rendered = renderApplyPrompt(applyContext, fragments, [firstAttempt])
 
     expect(rendered.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user'])
-    expect(rendered[2]?.content).toBe(JSON.stringify({ edits: firstAttempt.edits }))
+    const answer = rendered[2]
+    if (answer === undefined) throw new Error('the correction carries no assistant turn')
+    expect(applyResultSchema.parse(JSON.parse(answer.content))).toEqual(firstAttempt.returned)
     expect(rendered[3]?.content).toContain('FIXTURE_REJECTED_ATTEMPT_HEADING')
     expect(rendered[3]?.content).toContain('FIXTURE_EDIT_UNMATCHED the cups')
   })
@@ -606,7 +609,7 @@ describe('the rejected attempts a correction round carries', () => {
 
   it.each(DIAGNOSIS_CASES)('carries the $diagnosis diagnosis as its own fragment', ({ diagnosis, marker }) => {
     const rendered = renderApplyPrompt(applyContext, fragments, [
-      { edits: [{ find: 'the cups', replace: 'the mugs' }], verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis }] },
+      { returned: { edits: [{ find: 'the cups', replace: 'the mugs' }] }, verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis }] },
     ])
 
     expect(contentOf(rendered.slice(2), 'user')).toContain(marker)
@@ -615,10 +618,12 @@ describe('the rejected attempts a correction round carries', () => {
   it('says of an edit that resolved that it resolved, beside the sibling that did not', () => {
     const rendered = renderApplyPrompt(applyContext, fragments, [
       {
-        edits: [
-          { find: 'she left', replace: 'she had left' },
-          { find: 'the saucers', replace: 'the plates' },
-        ],
+        returned: {
+          edits: [
+            { find: 'she left', replace: 'she had left' },
+            { find: 'the saucers', replace: 'the plates' },
+          ],
+        },
         verdicts: [
           { outcome: 'resolved', find: 'she left' },
           { outcome: 'defective', find: 'the saucers', diagnosis: 'unmatched' },

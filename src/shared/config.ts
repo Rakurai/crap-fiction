@@ -6,7 +6,7 @@ const configSchema = z.object({
     retries: z.number().int().nonnegative(),
     timeoutMs: z.number().int().positive(),
     responseMaxTokens: z.number().int().positive(),
-    manuscriptMaxTokens: z.number().int().positive(),
+    editSetMaxTokens: z.number().int().positive(),
   }),
   applying: z.object({
     rounds: z.number().int().positive(),

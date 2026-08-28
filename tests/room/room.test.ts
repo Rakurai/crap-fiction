@@ -928,18 +928,21 @@ describe('Room.apply', () => {
     expect(room.activitySnapshot(scope(pieceId))).toMatchObject({ kind: 'apply' })
   })
 
-  it('pends the manuscript in the prose surface\'s own spelling, so a model that wrote equivalent Markdown still reaches a document that surface can save', async () => {
-    const modelWrote = 'She left them *there*.\n\nBoth cups.\n'
+  it('pends the manuscript in the prose surface\'s own spelling, reading the spliced document in whole rather than each replacement where it stands, so a fragment is never read in as a document of its own', async () => {
+    const target = 'She left them there.\n\nTwo cups, both chipped, and a saucer.\n'
+    const replacement = '- both of them *chipped* -'
+    const spliced = 'She left them there.\n\nTwo cups, - both of them *chipped* -, and a saucer.\n'
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {
-      apply: { result: { outcome: 'value', value: { edits: [{ find: 'Two cups.', replace: modelWrote }] } } },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'both chipped', replace: replacement }] } } },
     })
 
-    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('Two cups.'))
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents(target))
     if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
 
-    expect(outcome.replacement).not.toBe(modelWrote)
-    expect(outcome.replacement).toBe(canonicalMarkdown(modelWrote))
+    expect(outcome.replacement).not.toBe(spliced)
+    expect(outcome.replacement).toBe(canonicalMarkdown(spliced))
+    expect(outcome.replacement).toContain('- both of them')
     await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
     await expect(room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)).resolves.toMatchObject({ entryId: outcome.applicationId })
   })

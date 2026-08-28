@@ -30,7 +30,7 @@ const assigned = () => 'llama-3'
 
 const silent = createLogger('silent')
 
-const MODEL_CONFIG = { retries: 2, timeoutMs: 120000, responseMaxTokens: 2000, manuscriptMaxTokens: 32000 }
+const MODEL_CONFIG = { retries: 2, timeoutMs: 120000, responseMaxTokens: 2000, editSetMaxTokens: 32000 }
 
 beforeEach(() => {
   modelFn.mockReset()

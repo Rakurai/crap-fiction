@@ -628,8 +628,9 @@ states nothing about any one participant's responsibility; each interprets what 
 through its own persona, so the Story Editor receives the same description as every specialist and
 applies it through a different persona rather than being exempted from it.
 
-**A call's input is a standing turn and a request turn, each composed from loaded fragments in a
-fixed order.** The standing turn is what is true of the call site before a request — the mode
+**A call's input opens with a standing turn and a request turn, each composed from loaded fragments in
+a fixed order**, and where a caller re-asks, what it re-asks with follows that pair rather than
+displacing it. The standing turn is what is true of the call site before a request — the mode
 description, the charter, a participant's persona, or a non-participant call's operation role; the
 request turn is the task and the material a particular request carries. No heading, task instruction
 or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no

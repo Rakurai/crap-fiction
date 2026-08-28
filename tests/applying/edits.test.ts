@@ -91,6 +91,21 @@ describe('an anchor against the document as it arrived', () => {
     expect(textOf('', [{ find: '', replace: 'the first line' }])).toBe('the first line')
     expect(diagnosesOf('a story already written', [{ find: '', replace: 'another story' }])).toEqual({ emptyAnchor: 1 })
   })
+
+  it('is a defect where a sibling edit quotes the very same span, an empty document written twice included', () => {
+    expect(
+      diagnosesOf('', [
+        { find: '', replace: 'one opening' },
+        { find: '', replace: 'another opening' },
+      ]),
+    ).toEqual({ overlapping: 2 })
+    expect(
+      diagnosesOf('a cup, a cup', [
+        { find: 'a cup', replace: 'a mug', occurrence: 0 },
+        { find: 'a cup', replace: 'a glass', occurrence: 0 },
+      ]),
+    ).toEqual({ overlapping: 2 })
+  })
 })
 
 describe('two edits quoting text that overlaps', () => {

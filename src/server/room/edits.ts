@@ -29,7 +29,7 @@ function occurrencesOf(target: string, find: string): readonly number[] {
 function spanFor(target: string, edit: Edit): Span | EditDiagnosis {
   if (edit.find === '') {
     if (target !== '') return 'emptyAnchor'
-    if ((edit.occurrence ?? 0) !== 0) return 'occurrenceOutOfRange'
+    if (edit.occurrence !== undefined && edit.occurrence !== 0) return 'occurrenceOutOfRange'
     return { start: 0, end: 0, replace: edit.replace }
   }
 
@@ -46,6 +46,7 @@ function spanFor(target: string, edit: Edit): Span | EditDiagnosis {
 }
 
 function overlaps(one: Span, other: Span): boolean {
+  if (one.start === other.start && one.end === other.end) return true
   return one.start < other.end && other.start < one.end
 }
 
