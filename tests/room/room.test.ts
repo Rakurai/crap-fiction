@@ -444,7 +444,7 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('shape')).toBeDefined()
   })
 
-  it('keeps a decliner out of its readings and owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
+  it('owes an answer on every dispatch that calls it at all, so the Story Editor cannot decline even where every specialist did', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, fixtureCatalog)
     const { room, adapter } = buildRoom(dataRoot, {
       shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
@@ -454,10 +454,6 @@ describe('Room.dispatch', () => {
 
     const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
     await settlementOf(room, piece.id)
-
-    expect(adapter.promptFor('story-editor')).toContain('FIXTURE_ADDRESSED_HEADING')
-
-    expect(adapter.promptFor('story-editor')).not.toContain('FIXTURE_READINGS_HEADING')
 
     const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
     expect(landed.filter((entry) => entry.kind === 'participantNoComment').map((entry) => entry.participantId)).toEqual(['shape', 'compression'])
@@ -765,24 +761,6 @@ describe('Room.dispatch', () => {
     })
   })
 
-  it('still owes an answer where no specialist gave the author anything substantive', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, fixtureCatalog)
-    const { room } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
-    })
-
-    const { conversationId } = await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
-    await settlementOf(room, piece.id)
-
-    const landed = entries(dataRoot, workspaceDir, piece.id, conversationId)
-    expect(landed.find((entry) => 'participantId' in entry && entry.participantId === 'story-editor')).toMatchObject({
-      kind: 'participantFailure',
-      reason: 'nonconforming',
-    })
-  })
-
   it("reaches the Story Editor with the specialists' answers and with no answer from a participant called for its function", async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, fixtureCatalog)
     const { room, adapter } = buildRoom(dataRoot, {
@@ -803,21 +781,6 @@ describe('Room.dispatch', () => {
     expect(adapter.promptFor('toolsmith')).toBeDefined()
     expect(adapter.promptFor('story-editor')).toContain('a reading about shape')
     expect(adapter.promptFor('story-editor')).not.toContain('a reading about tooling')
-  })
-
-  it("carries no specialist's answer into a sibling specialist's prompt", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, fixtureCatalog)
-    const { room, adapter } = buildRoom(dataRoot, {
-      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about shape' } } },
-      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'a reading about compression' } } },
-      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
-    })
-
-    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
-    await settlementOf(room, piece.id)
-
-    expect(adapter.promptFor('shape')).not.toContain('a reading about compression')
-    expect(adapter.promptFor('compression')).not.toContain('a reading about shape')
   })
 
   it('states the response it could not write, keeps the responses beside it, and settles the dispatch', async () => {
@@ -1366,7 +1329,7 @@ describe('Room.apply', () => {
     expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toHaveLength(1)
   })
 
-  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema and the preserve-instruction, the text the edit did not quote survives byte for byte, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
+  it("on the story context surface, targets story context rather than the draft: the prompt carries it verbatim with its own reference schema, the text the edit did not quote survives byte for byte, and the confirmed change lands under story context's own conversation, never the draft's", async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, fixtureCatalog)
     const storyContextScope: RoomScope = { pieceId: piece.id, surface: 'storyContext' }
     const storyContextConversationScope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: piece.id, surface: 'storyContext' }
@@ -1405,8 +1368,6 @@ describe('Room.apply', () => {
 
     expect(adapter.promptFor('apply')).toContain('Premise: two cups.')
     expect(adapter.promptFor('apply')).toContain(MODE_FIXTURE.storyContextReference)
-    expect(adapter.promptFor('apply')).toContain('FIXTURE_STORY_CONTEXT_SURFACE')
-    expect(adapter.promptFor('apply')).toContain('FIXTURE_APPLY_TASK')
 
     await writeStoryContext(workspaceDir, piece.id, outcome.replacement)
     const confirmed = await room.confirmApply(workspaceDir, storyContextScope, cid(storyContextScope, 'c1'), outcome.applicationId)

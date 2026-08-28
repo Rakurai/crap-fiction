@@ -120,8 +120,8 @@ describe('pieces', () => {
     const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE]))
 
     expect(opened.surfaces.draft.roster.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
-    await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([MODE_FIXTURE]), 'storyContext', [])
-    await setPieceCast(pieceMetadata, workspaceDir, piece.id, catalogFor([MODE_FIXTURE]), 'authorContext', [])
+    expect(opened.surfaces.storyContext.roster.map((member) => member.id)).toEqual([])
+    expect(opened.surfaces.authorContext.roster.map((member) => member.id)).toEqual([])
   })
 
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
@@ -330,7 +330,11 @@ describe('setPieceCast', () => {
     await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'storyContext', [])
 
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
-    expect(opened.surfaces.draft.roster.find((member) => member.id === 'shape')?.enabled).toBe(true)
+    expect(opened.surfaces.draft.roster.map((member) => ({ id: member.id, enabled: member.enabled }))).toEqual([
+      { id: 'shape', enabled: true },
+      { id: 'compression', enabled: false },
+    ])
+    expect(opened.surfaces.storyContext.roster).toEqual([])
   })
 })
 
@@ -373,20 +377,21 @@ describe('PieceDocumentWriter', () => {
     return new PieceDocumentWriter(new DraftStore(), new StoryContextStore(), new AuthorContextStore(), workspaceDir)
   }
 
-  it("writes an existing piece's draft through to the store", async () => {
+  it('routes each surface to the artifact it is kept in: the draft and story context under the piece, the author context beside the workspace', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
+    const writer = documentWriter()
 
-    await documentWriter().save(workspaceDir, piece.id, 'draft', 'Two small words.')
+    await writer.save(workspaceDir, piece.id, 'draft', 'Two small words.')
+    await writer.save(workspaceDir, piece.id, 'storyContext', 'Premise: two cups, one left behind\n')
+    await writer.save(workspaceDir, piece.id, 'authorContext', 'Prefers the plainer word.\n')
 
-    expect(readFileSync(path.join(workspaceDir, piece.id, 'draft.md'), 'utf8')).toBe('Two small words.')
-  })
+    function written(...segments: readonly string[]): string {
+      return readFileSync(path.join(workspaceDir, ...segments), 'utf8')
+    }
 
-  it("writes an existing piece's story context through to the store, independently of the draft", async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
-
-    await documentWriter().save(workspaceDir, piece.id, 'storyContext', 'Premise: two cups, one left behind\n')
-
-    expect(readFileSync(path.join(workspaceDir, piece.id, 'story-context.yaml'), 'utf8')).toBe('Premise: two cups, one left behind\n')
+    expect(written(piece.id, 'draft.md')).toBe('Two small words.')
+    expect(written(piece.id, 'story-context.yaml')).toBe('Premise: two cups, one left behind\n')
+    expect(written('config', 'author-context.yaml')).toBe('Prefers the plainer word.\n')
   })
 })
 
