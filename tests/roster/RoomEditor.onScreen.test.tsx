@@ -23,6 +23,7 @@ describe('editing the room', () => {
 
     expect(screen.getByText('@shape')).toBeTruthy()
     expect(screen.getByText('Shape')).toBeTruthy()
+    expect(screen.getByText('Shape').compareDocumentPosition(screen.getByText('@shape'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(screen.getByText('the shape of it')).toBeTruthy()
     expect(screen.getByText('@comp')).toBeTruthy()
     expect(screen.getByText('what earns its space')).toBeTruthy()

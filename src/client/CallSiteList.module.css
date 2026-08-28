@@ -46,16 +46,6 @@
   gap: 8px;
 }
 
-.handle {
-  font: 600 12px/1 var(--font-ui);
-  color: var(--ink3);
-}
-
-.name {
-  font: 400 11.5px/1 var(--font-ui);
-  color: var(--ink);
-}
-
 .saved {
   font: 400 9.5px/1 var(--font-facts);
   color: var(--ink4);

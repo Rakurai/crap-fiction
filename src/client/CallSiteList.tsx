@@ -2,7 +2,7 @@ import type { ChangeEvent } from 'react'
 import type { CallSiteAssignmentView } from '../shared/callSiteViews.js'
 import styles from './CallSiteList.module.css'
 import { machineWords } from './facts.js'
-import { Mark } from './Mark.js'
+import { Identity } from './Identity.js'
 
 type CallSiteListProps = {
   readonly heading: string
@@ -33,9 +33,7 @@ export function CallSiteList({ heading, what, sites, known, assigning, saved, on
           return (
             <li key={site.site} className={styles.item}>
               <div className={styles.identity}>
-                <Mark mark={site.mark} ordinal={site.ordinal} />
-                {site.handle !== null && <span className={styles.handle}>@{site.handle}</span>}
-                <span className={styles.name}>{site.displayName}</span>
+                <Identity mark={site.mark} ordinal={site.ordinal} displayName={site.displayName} handle={site.handle ?? undefined} />
                 {saved === site.site && <span className={styles.saved}>{machineWords('saved')}</span>}
               </div>
               <p className={styles.role}>{site.description}</p>
