@@ -319,7 +319,17 @@ would become a durable record nobody decided to keep.
 test never imports a sibling behind it.
 
 **A test's path says what is protected, never which runtime it needs.** The runner selects an
-environment by matching paths, so grouping comes first and the environment follows it.
+environment by matching paths, so grouping comes first and the environment follows it, and a test
+declaring an environment does so in its own name rather than by where it sits.
+
+**A test names the capability it protects in the product's own vocabulary.** A group of tests over one
+production symbol is registered by that symbol; a group spanning collaborators is registered by a
+sentence saying what the product does. Each case states the property, not the arrangement that
+produced it, and reads as a claim a reader could disagree with.
+
+**Data a whole test file shares is a module-level constant in upper snake case; what one case varies is
+a local in lower camel case.** A reader can then tell the scenery from the subject without following
+either to its definition.
 
 **Each property is asserted at exactly one boundary** — the deepest able to state it in the product's
 own vocabulary. Asserted at two, it will be changed at one.
@@ -339,17 +349,46 @@ fix is to stop the arrangement being visible to it.
 **A schema is not a behaviour** — that a value parses is a different claim from what the code does with
 it. A closed set or pattern the product declares is imported, never retyped.
 
+**A relation a combinator constructs is not a relation a test can find.** Where one declaration is
+derived from another — a set narrowed, extended, or spread into a second shape — no drift between them
+can be written, so asserting the agreement asserts the library. The agreements worth holding are
+between declarations written independently of each other.
+
+**A property of the repository rather than of the product is a check, not a test.** Which area may
+import which, what a shipped artifact's language may not leak into code, whether a declaration is
+classified: none of these is observable through any interface, and a test that scans source for one
+needs a self-test of its own scanner, which is the tell. Such a rule lives in a maintainer-facing check
+that names every violation and refuses to pass when it found nothing to scan.
+
 **Modelling what the environment would compute asserts the mechanism, not the property.** Legitimate
 where the arithmetic is the risk, but the property stays unprotected until something supplies the real
 environment, however green the model reads.
 
 **Mock only adapters at seams**, and use the real or local-substitute implementation for anything that
-has one.
+has one. Never patch a prototype, a module or a global: where a collaborator is constructed and handed
+in, a substitute that misbehaves is handed in the same way, and nothing is left to restore afterwards.
 
 **A harness is plumbing; a fixture is data.** A harness stands a scenario up and supplies no default
 the product would not; a fixture is the value one test hands it, and belongs to that test.
 
+**A value the test makes a claim about is written where the claim is; a value the scenario merely needs
+is shared.** Spelling out scenery buries the subject among things no assertion mentions, and sharing the
+subject puts a test's own evidence where an unrelated test can edit it.
+
 **A module that reads the clock takes it as a parameter.**
+
+**A modelled DOM is for what a component itself decides, and not for what only the running application
+settles.** It is asked for per test rather than imposed on the suite, since the server and the pure rules
+are the larger part and have no use for one.
+
+**A browser earns a test only where the thing that can break is a browser** — real layout, real
+keystrokes, and a surface reacting to a state a real stream delivered. Where a component can state the
+property against a modelled DOM it owns the property, and the browser does not repeat it. Beside those,
+one journey through the deployed arrangement, because nothing below the browser can say the parts were
+assembled at all.
+
+**How an interface composes is design work, not a thing tests assert.** No screenshot comparison, and no
+browser test per state a response can arrive in.
 
 **Every existing test is a liability, and the burden of proof is retention.** Passing, age and having
 shipped beside its feature earn nothing — a test written with a feature encodes its bugs as readily as
