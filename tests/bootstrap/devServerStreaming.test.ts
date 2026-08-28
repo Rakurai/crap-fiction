@@ -19,6 +19,7 @@ describe('a dispatch\'s events through the dev server', () => {
     process.env.STUDIO_PORT = '4000'
     process.env.STUDIO_MODEL_RUNTIME_URL = 'ws://127.0.0.1:1234'
     process.env.STUDIO_LOG_LEVEL = 'silent'
+    process.env.STUDIO_TRACE = 'off'
 
     server = await createServer({
       configFile: false,

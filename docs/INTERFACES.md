@@ -200,6 +200,8 @@ those as absent would invite something to read them.
   config/
     settings.yaml              model assignments, workspace path, the interface theme
     author-context.yaml
+  traces/                      present only where a run traced; one file per model attempt
+    <instant>-<call site>.md
   author-context/              the global namespace, reached identically from every piece
     conversations/
       <conversation-id>.json
@@ -221,6 +223,15 @@ those as absent would invite something to read them.
         storyContext/
           <change-id>.json
 ```
+
+A **trace** is one Markdown document per attempt at one model call, named by the instant the attempt
+settled and the call site it was made for, so the directory reads in the order the calls happened. It
+carries the attempt's ordinal, the model the site was assigned, whether the studio could read what came
+back, what the runtime said about stopping and how many tokens it counted, and then the two halves of
+the compiled prompt and the returned text, each verbatim and unabridged. It names no piece and no
+conversation, because the model seam knows neither. It is written and never read: nothing in the studio
+parses a trace, lists one, or behaves differently for one existing, and deleting the whole directory
+mid-run costs nothing.
 
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them. The draft and the story context each
@@ -281,6 +292,7 @@ The set is closed, and the image ships none of them with a value.
 | `STUDIO_PORT` | the port served, and the port published |
 | `STUDIO_MODEL_RUNTIME_URL` | where the model module reaches the runtime |
 | `STUDIO_LOG_LEVEL` | the logger's level |
+| `STUDIO_TRACE` | whether the run traces model traffic, on or off |
 
 An absent or malformed value is a startup failure naming it, on every path the studio is started by. A
 data root that is not an existing directory is malformed.
