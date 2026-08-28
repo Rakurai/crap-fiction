@@ -146,6 +146,7 @@ vite.config.ts.timestamp-*
 test-results/
 playwright-report/
 
-# Local working notes, not part of the design doc set
-docs/SPEC_GAPS.md
+# Project specific
 docs/.DS_Store
+.worktrees/
+.scratch/

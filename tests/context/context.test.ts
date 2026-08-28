@@ -18,7 +18,7 @@ import { applyResultSchema } from '../../src/shared/applyResult.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
-const shape: RoleDefinition = {
+const SHAPE: RoleDefinition = {
   id: 'shape',
   handle: 'shape',
   displayName: 'Shape',
@@ -29,7 +29,7 @@ const shape: RoleDefinition = {
   function: undefined,
   availability: [],
 }
-const compression: RoleDefinition = {
+const COMPRESSION: RoleDefinition = {
   id: 'compression',
   handle: 'compression',
   displayName: 'Compression',
@@ -41,8 +41,8 @@ const compression: RoleDefinition = {
   availability: [],
 }
 
-const charter = CHARTER_FIXTURE
-const fragments = PROMPT_FRAGMENTS_FIXTURE
+const CHARTER = CHARTER_FIXTURE
+const FRAGMENTS = PROMPT_FRAGMENTS_FIXTURE
 const PARTICIPANTS = new Map([
   ['shape', 'Shape'],
   ['compression', 'Compression'],
@@ -112,13 +112,13 @@ function sectionOf(prompt: string, marker: string): string {
   return body.split('\nFIXTURE_')[0] ?? body
 }
 
-const entriesWithMixedHistory: readonly ConversationEntry[] = [
+const ENTRIES_WITH_MIXED_HISTORY: readonly ConversationEntry[] = [
   { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
   { id: 'e2', kind: 'participantResponse', participantId: 'shape', causeId: 'e1', outcome: 'commentary', claim: 'the entry is late' },
   { id: 'e3', kind: 'participantNoComment', participantId: 'compression', causeId: 'e1' },
 ]
 
-const entriesWithTwoMessages: readonly ConversationEntry[] = [
+const ENTRIES_WITH_TWO_MESSAGES: readonly ConversationEntry[] = [
   { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
   {
     id: 'e2',
@@ -145,7 +145,7 @@ const SHARED_HISTORY = [
   { kind: 'response', participant: 'Shape', claim: 'the entry is late', note: undefined },
 ]
 
-const entriesWithApplication: readonly ConversationEntry[] = [
+const ENTRIES_WITH_APPLICATION: readonly ConversationEntry[] = [
   { id: 'e1', kind: 'authorMessage', text: 'first question', audience: [], brought: [] },
   {
     id: 'e2',
@@ -179,7 +179,7 @@ describe('compiling a context', () => {
         authorContext: 'prefers short sentences',
         storyContext: 'a flash piece about a breakup',
         draft: MANUSCRIPT,
-        entries: entriesWithTwoMessages,
+        entries: ENTRIES_WITH_TWO_MESSAGES,
       }),
     )
     expect(forApply).toMatchObject({
@@ -193,7 +193,7 @@ describe('compiling a context', () => {
 
     const forSpecialist = compileSpecialistContext(
       contextInput({
-        role: shape,
+        role: SHAPE,
         owesAnswer: true,
         message: 'does the opening earn its length',
         authorContext: 'prefers short sentences',
@@ -202,7 +202,7 @@ describe('compiling a context', () => {
       }),
     )
     expect(forSpecialist).toMatchObject({
-      role: shape,
+      role: SHAPE,
       owesAnswer: true,
       message: 'does the opening earn its length',
       authorContext: 'prefers short sentences',
@@ -210,33 +210,33 @@ describe('compiling a context', () => {
       draft: MANUSCRIPT,
     })
 
-    const bare = compileSpecialistContext(contextInput({ role: shape }))
+    const bare = compileSpecialistContext(contextInput({ role: SHAPE }))
     expect(bare.authorContext).toBeUndefined()
     expect(bare.storyContext).toBeUndefined()
-    expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).constraint).toBeUndefined()
+    expect(compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_TWO_MESSAGES })).constraint).toBeUndefined()
   })
 
   it('an apply reads the conversation whole, past any one response, and reports none where there is none yet', () => {
-    expect(compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages })).history).toEqual(WHOLE_CONVERSATION)
-    expect(compileSpecialistContext(contextInput({ role: shape, message: 'a message' })).history).toEqual([])
+    expect(compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_TWO_MESSAGES })).history).toEqual(WHOLE_CONVERSATION)
+    expect(compileSpecialistContext(contextInput({ role: SHAPE, message: 'a message' })).history).toEqual([])
   })
 
   it('carries an application in every history, naming the participant whose recommendation it was, and never a change file', () => {
     const stricter: HistoryPolicy = 'stricter'
 
-    expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithApplication })).history).toEqual(
+    expect(compileSpecialistContext(contextInput({ role: COMPRESSION, entries: ENTRIES_WITH_APPLICATION })).history).toEqual(
       WHOLE_CONVERSATION_WITH_APPLICATION,
     )
-    expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithApplication, policy: stricter })).history).toEqual([
+    expect(compileSpecialistContext(contextInput({ role: COMPRESSION, entries: ENTRIES_WITH_APPLICATION, policy: stricter })).history).toEqual([
       { kind: 'message', text: 'first question' },
       { kind: 'application', participant: 'Shape', claim: 'cut the second paragraph', note: 'it repeats the opening' },
       { kind: 'message', text: 'a later question' },
       { kind: 'response', participant: 'Compression', claim: 'the ending still drags', note: undefined },
     ])
-    expect(compileApplyContext(applyContextInput({ entries: entriesWithApplication })).history).toEqual(WHOLE_CONVERSATION_WITH_APPLICATION)
+    expect(compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_APPLICATION })).history).toEqual(WHOLE_CONVERSATION_WITH_APPLICATION)
 
     const rendered = wholeOf(
-      renderApplyPrompt(compileApplyContext(applyContextInput({ entries: entriesWithApplication })), fragments, []),
+      renderApplyPrompt(compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_APPLICATION })), FRAGMENTS, []),
     )
     expect(rendered).not.toContain('a-change-file-with-no-file-on-disk')
   })
@@ -244,18 +244,18 @@ describe('compiling a context', () => {
   it("gives a specialist every prior message and substantive response under the shared policy, and under the stricter one only its own", () => {
     const stricter: HistoryPolicy = 'stricter'
 
-    expect(compileSpecialistContext(contextInput({ role: compression, message: 'a second question', entries: entriesWithMixedHistory })).history).toEqual(
+    expect(compileSpecialistContext(contextInput({ role: COMPRESSION, message: 'a second question', entries: ENTRIES_WITH_MIXED_HISTORY })).history).toEqual(
       SHARED_HISTORY,
     )
-    expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithMixedHistory, policy: stricter })).history).toEqual(SHARED_HISTORY)
-    expect(compileSpecialistContext(contextInput({ role: compression, entries: entriesWithMixedHistory, policy: stricter })).history).toEqual([
+    expect(compileSpecialistContext(contextInput({ role: SHAPE, entries: ENTRIES_WITH_MIXED_HISTORY, policy: stricter })).history).toEqual(SHARED_HISTORY)
+    expect(compileSpecialistContext(contextInput({ role: COMPRESSION, entries: ENTRIES_WITH_MIXED_HISTORY, policy: stricter })).history).toEqual([
       { kind: 'message', text: 'first question' },
     ])
   })
 
   it('carries no reading from the dispatch being formed, under either policy, because a specialist call has nowhere for one to arrive', () => {
     for (const policy of ['shared', 'stricter'] as const) {
-      expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithMixedHistory, policy })).evidence).toEqual([])
+      expect(compileSpecialistContext(contextInput({ role: SHAPE, entries: ENTRIES_WITH_MIXED_HISTORY, policy })).evidence).toEqual([])
     }
   })
 
@@ -264,7 +264,7 @@ describe('compiling a context', () => {
       { id: 'e1', kind: 'authorMessage', text: 'the question that went unanswered', audience: [], brought: [] },
     ]
 
-    expect(compileSpecialistContext(contextInput({ role: shape, entries: afterAbandonment })).history).toEqual([
+    expect(compileSpecialistContext(contextInput({ role: SHAPE, entries: afterAbandonment })).history).toEqual([
       { kind: 'message', text: 'the question that went unanswered' },
     ])
   })
@@ -279,8 +279,8 @@ describe('compiling a context', () => {
       { kind: 'request', participant: 'Compression', clarification: 'keep the last line' },
     ]
 
-    expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithRequests })).history).toEqual(expected)
-    expect(compileSpecialistContext(contextInput({ role: shape, entries: entriesWithRequests, policy: 'stricter' })).history).toEqual(expected)
+    expect(compileSpecialistContext(contextInput({ role: SHAPE, entries: entriesWithRequests })).history).toEqual(expected)
+    expect(compileSpecialistContext(contextInput({ role: SHAPE, entries: entriesWithRequests, policy: 'stricter' })).history).toEqual(expected)
     expect(compileApplyContext(applyContextInput({ entries: entriesWithRequests })).history).toEqual(expected)
   })
 
@@ -290,9 +290,9 @@ describe('compiling a context', () => {
     ]
     const applyingNothing: readonly ConversationEntry[] = [{ id: 'e1', kind: 'application', responseId: 'a-response-not-in-this-conversation', changeId: 'c' }]
 
-    expect(() => compileSpecialistContext(contextInput({ role: shape, entries: namingAStranger }))).toThrow(ParticipantNameUnknownError)
+    expect(() => compileSpecialistContext(contextInput({ role: SHAPE, entries: namingAStranger }))).toThrow(ParticipantNameUnknownError)
     expect(() => compileApplyContext(applyContextInput({ entries: namingAStranger }))).toThrow(ParticipantNameUnknownError)
-    expect(() => compileSpecialistContext(contextInput({ role: shape, entries: applyingNothing }))).toThrow(AppliedResponseUnknownError)
+    expect(() => compileSpecialistContext(contextInput({ role: SHAPE, entries: applyingNothing }))).toThrow(AppliedResponseUnknownError)
     expect(() => compileApplyContext(applyContextInput({ entries: applyingNothing }))).toThrow(AppliedResponseUnknownError)
   })
 
@@ -300,7 +300,7 @@ describe('compiling a context', () => {
     const reading = { participant: 'Compression', claim: 'a reading from this very dispatch', note: undefined }
 
     const context = compileStoryEditorContext(
-      contextInput({ role: shape, message: 'a second question', entries: entriesWithMixedHistory }),
+      contextInput({ role: SHAPE, message: 'a second question', entries: ENTRIES_WITH_MIXED_HISTORY }),
       [reading],
     )
 
@@ -310,30 +310,30 @@ describe('compiling a context', () => {
 })
 
 describe('rendering a prompt', () => {
-  const bareSpecialist = compileSpecialistContext(contextInput({ role: shape, draft: MANUSCRIPT }))
+  const bareSpecialist = compileSpecialistContext(contextInput({ role: SHAPE, draft: MANUSCRIPT }))
 
   it('always carries the manuscript, unexcerpted, whichever call it is', () => {
-    expect(wholeOf(renderPrompt(bareSpecialist, fragments, charter))).toContain(MANUSCRIPT)
+    expect(wholeOf(renderPrompt(bareSpecialist, FRAGMENTS, CHARTER))).toContain(MANUSCRIPT)
     expect(
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments, [])),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: ENTRIES_WITH_TWO_MESSAGES })), FRAGMENTS, [])),
     ).toContain(MANUSCRIPT)
   })
 
   it('renders a line fragment once per supplied history entry, never collapsing or duplicating them', () => {
-    const applyContext = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    const prompt = wholeOf(renderApplyPrompt(applyContext, fragments, []))
+    const applyContext = compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_TWO_MESSAGES }))
+    const prompt = wholeOf(renderApplyPrompt(applyContext, FRAGMENTS, []))
     const lines = sectionOf(prompt, 'FIXTURE_HISTORY_HEADING')
       .split('\n')
       .filter((line) => line.length > 0)
-    expect(lines).toHaveLength(entriesWithTwoMessages.length)
+    expect(lines).toHaveLength(ENTRIES_WITH_TWO_MESSAGES.length)
   })
 
   it('carries a durable-context section, heading and body, only once the author has written one — never an empty heading', () => {
     const written = { authorContext: 'prefers short sentences', storyContext: 'a flash piece about a breakup' }
 
     for (const prompt of [
-      wholeOf(renderPrompt(compileSpecialistContext(contextInput({ role: shape, ...written })), fragments, charter)),
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ ...written, entries: [] })), fragments, [])),
+      wholeOf(renderPrompt(compileSpecialistContext(contextInput({ role: SHAPE, ...written })), FRAGMENTS, CHARTER)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ ...written, entries: [] })), FRAGMENTS, [])),
     ]) {
       expect(prompt).toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).toContain('prefers short sentences')
@@ -342,8 +342,8 @@ describe('rendering a prompt', () => {
     }
 
     for (const prompt of [
-      wholeOf(renderPrompt(bareSpecialist, fragments, charter)),
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments, [])),
+      wholeOf(renderPrompt(bareSpecialist, FRAGMENTS, CHARTER)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), FRAGMENTS, [])),
     ]) {
       expect(prompt).not.toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).not.toContain('FIXTURE_STORY_CONTEXT_HEADING')
@@ -352,83 +352,83 @@ describe('rendering a prompt', () => {
 
   it("states the recommendation to apply, and the author's constraint under its own section only where there is one", () => {
     const constrained = compileApplyContext(
-      applyContextInput({ recommendationClaim: 'cut the second paragraph', constraint: 'keep the last line', entries: entriesWithTwoMessages }),
+      applyContextInput({ recommendationClaim: 'cut the second paragraph', constraint: 'keep the last line', entries: ENTRIES_WITH_TWO_MESSAGES }),
     )
-    const prompt = wholeOf(renderApplyPrompt(constrained, fragments, []))
+    const prompt = wholeOf(renderApplyPrompt(constrained, FRAGMENTS, []))
     expect(prompt).toContain('cut the second paragraph')
     expect(prompt).toContain('FIXTURE_CONSTRAINT_HEADING')
     expect(prompt).toContain('keep the last line')
 
-    const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    expect(wholeOf(renderApplyPrompt(unconstrained, fragments, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+    const unconstrained = compileApplyContext(applyContextInput({ entries: ENTRIES_WITH_TWO_MESSAGES }))
+    expect(wholeOf(renderApplyPrompt(unconstrained, FRAGMENTS, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
   it('substitutes text the author supplied exactly as it was typed, and renders no section at all for one holding only whitespace', () => {
     const typed = '  keep the last line\n\tand the title'
     const withWhitespace = compileApplyContext(applyContextInput({ constraint: typed, entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withWhitespace, fragments, []))).toContain(`FIXTURE_CONSTRAINT_HEADING\n\n${typed}`)
+    expect(wholeOf(renderApplyPrompt(withWhitespace, FRAGMENTS, []))).toContain(`FIXTURE_CONSTRAINT_HEADING\n\n${typed}`)
 
     const blank = compileApplyContext(applyContextInput({ constraint: '   \n ', entries: [] }))
-    expect(wholeOf(renderApplyPrompt(blank, fragments, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+    expect(wholeOf(renderApplyPrompt(blank, FRAGMENTS, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
   it('carries the reference schema for the document a context Apply targets, only where the surface has one', () => {
     const withReference = compileApplyContext(applyContextInput({ referenceSchema: 'Sections, each holding entries.', entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withReference, fragments, []))).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
-    expect(wholeOf(renderApplyPrompt(withReference, fragments, []))).toContain('Sections, each holding entries.')
+    expect(wholeOf(renderApplyPrompt(withReference, FRAGMENTS, []))).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(wholeOf(renderApplyPrompt(withReference, FRAGMENTS, []))).toContain('Sections, each holding entries.')
 
     const withoutReference = compileApplyContext(applyContextInput({ entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withoutReference, fragments, []))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(wholeOf(renderApplyPrompt(withoutReference, FRAGMENTS, []))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
   it('carries a reference schema to a participant under its own section, only where the compiled context was given one', () => {
-    const withReference = compileSpecialistContext(contextInput({ role: shape, referenceSchema: 'Sections, each holding entries.' }))
-    const prompt = wholeOf(renderPrompt(withReference, fragments, charter))
+    const withReference = compileSpecialistContext(contextInput({ role: SHAPE, referenceSchema: 'Sections, each holding entries.' }))
+    const prompt = wholeOf(renderPrompt(withReference, FRAGMENTS, CHARTER))
     expect(prompt).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
     expect(prompt).toContain('Sections, each holding entries.')
 
-    const withoutReference = compileSpecialistContext(contextInput({ role: shape }))
-    expect(wholeOf(renderPrompt(withoutReference, fragments, charter))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    const withoutReference = compileSpecialistContext(contextInput({ role: SHAPE }))
+    expect(wholeOf(renderPrompt(withoutReference, FRAGMENTS, CHARTER))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
   it("gives the story editor the dispatch's readings as their own section, naming the participant by display name, and no section at all where nothing substantive landed", () => {
-    const withReading = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [
+    const withReading = compileStoryEditorContext(contextInput({ role: SHAPE, entries: ENTRIES_WITH_MIXED_HISTORY }), [
       { participant: 'Compression', claim: 'the third line carries nothing', note: undefined },
     ])
-    const prompt = wholeOf(renderPrompt(withReading, fragments, charter))
+    const prompt = wholeOf(renderPrompt(withReading, FRAGMENTS, CHARTER))
     expect(prompt).toContain('FIXTURE_READINGS_HEADING')
     expect(prompt).toContain('the third line carries nothing')
 
-    const withNothing = compileStoryEditorContext(contextInput({ role: shape, entries: entriesWithMixedHistory }), [])
-    expect(wholeOf(renderPrompt(withNothing, fragments, charter))).not.toContain('FIXTURE_READINGS_HEADING')
+    const withNothing = compileStoryEditorContext(contextInput({ role: SHAPE, entries: ENTRIES_WITH_MIXED_HISTORY }), [])
+    expect(wholeOf(renderPrompt(withNothing, FRAGMENTS, CHARTER))).not.toContain('FIXTURE_READINGS_HEADING')
   })
 
   it("states the mode's shared description of form and scale alongside the role's own persona in the standing turn, and selects the generalist task for the generalist in the request turn", () => {
-    const compiled = compileSpecialistContext(contextInput({ role: shape }))
-    const rendered = renderPrompt(compiled, fragments, charter)
+    const compiled = compileSpecialistContext(contextInput({ role: SHAPE }))
+    const rendered = renderPrompt(compiled, FRAGMENTS, CHARTER)
     expect(contentOf(rendered, 'system')).toContain(MODE_DESCRIPTION)
-    expect(sectionOf(contentOf(rendered, 'system'), 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
+    expect(sectionOf(contentOf(rendered, 'system'), 'FIXTURE_ROLE_HEADING')).toContain(SHAPE.persona)
     expect(contentOf(rendered, 'user')).toContain('FIXTURE_SPECIALIST_TASK')
 
-    const generalistRole: RoleDefinition = { ...shape, eligibility: 'generalist' }
-    const generalist = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
+    const generalistRole: RoleDefinition = { ...SHAPE, eligibility: 'generalist' }
+    const generalist = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), FRAGMENTS, CHARTER)
     expect(contentOf(generalist, 'user')).toContain('FIXTURE_GENERALIST_TASK')
     expect(contentOf(generalist, 'user')).not.toContain('FIXTURE_SPECIALIST_TASK')
   })
 
   it('states that an answer is owed only when the call owes one', () => {
-    const owed = compileSpecialistContext(contextInput({ role: shape, owesAnswer: true }))
-    const eligible = compileSpecialistContext(contextInput({ role: shape, owesAnswer: false }))
+    const owed = compileSpecialistContext(contextInput({ role: SHAPE, owesAnswer: true }))
+    const eligible = compileSpecialistContext(contextInput({ role: SHAPE, owesAnswer: false }))
 
-    expect(wholeOf(renderPrompt(owed, fragments, charter))).toContain('FIXTURE_ADDRESSED_HEADING')
-    expect(wholeOf(renderPrompt(eligible, fragments, charter))).not.toContain('FIXTURE_ADDRESSED_HEADING')
+    expect(wholeOf(renderPrompt(owed, FRAGMENTS, CHARTER))).toContain('FIXTURE_ADDRESSED_HEADING')
+    expect(wholeOf(renderPrompt(eligible, FRAGMENTS, CHARTER))).not.toContain('FIXTURE_ADDRESSED_HEADING')
   })
 
   it("carries the reading a concrete change was asked of, and the author's clarification where there was one, never as the author's own message", () => {
     const asked = compileSpecialistContext(
-      contextInput({ role: shape, ask: { claim: 'the entry is late', note: 'by a paragraph', clarification: 'what would you cut' } }),
+      contextInput({ role: SHAPE, ask: { claim: 'the entry is late', note: 'by a paragraph', clarification: 'what would you cut' } }),
     )
-    const prompt = wholeOf(renderPrompt(asked, fragments, charter))
+    const prompt = wholeOf(renderPrompt(asked, FRAGMENTS, CHARTER))
     expect(prompt).toContain('FIXTURE_CONCRETE_CHANGE_TASK')
     expect(prompt).toContain('the entry is late')
     expect(prompt).toContain('by a paragraph')
@@ -436,11 +436,11 @@ describe('rendering a prompt', () => {
     expect(prompt).not.toContain('FIXTURE_MESSAGE_HEADING')
 
     const unclarified = compileSpecialistContext(
-      contextInput({ role: shape, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
+      contextInput({ role: SHAPE, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
     )
-    expect(wholeOf(renderPrompt(unclarified, fragments, charter))).not.toContain('FIXTURE_CLARIFICATION_HEADING')
+    expect(wholeOf(renderPrompt(unclarified, FRAGMENTS, CHARTER))).not.toContain('FIXTURE_CLARIFICATION_HEADING')
 
-    const ordinary = wholeOf(renderPrompt(bareSpecialist, fragments, charter))
+    const ordinary = wholeOf(renderPrompt(bareSpecialist, FRAGMENTS, CHARTER))
     expect(ordinary).not.toContain('FIXTURE_READING_HEADING')
     expect(ordinary).not.toContain('FIXTURE_MESSAGE_HEADING')
   })
@@ -455,16 +455,16 @@ describe('the task instruction names the surface it was compiled for', () => {
       kind: 'specialist',
       marker: 'FIXTURE_SPECIALIST_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
-        renderPrompt(compileSpecialistContext(contextInput({ role: shape, surface, draft: MANUSCRIPT })), fragments, charter),
+        renderPrompt(compileSpecialistContext(contextInput({ role: SHAPE, surface, draft: MANUSCRIPT })), FRAGMENTS, CHARTER),
     },
     {
       kind: 'generalist',
       marker: 'FIXTURE_GENERALIST_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
         renderPrompt(
-          compileSpecialistContext(contextInput({ role: { ...shape, eligibility: 'generalist' }, surface, draft: MANUSCRIPT })),
-          fragments,
-          charter,
+          compileSpecialistContext(contextInput({ role: { ...SHAPE, eligibility: 'generalist' }, surface, draft: MANUSCRIPT })),
+          FRAGMENTS,
+          CHARTER,
         ),
     },
     {
@@ -473,17 +473,17 @@ describe('the task instruction names the surface it was compiled for', () => {
       render: (surface: (typeof SURFACES)[number]) =>
         renderPrompt(
           compileSpecialistContext(
-            contextInput({ role: shape, surface, draft: MANUSCRIPT, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
+            contextInput({ role: SHAPE, surface, draft: MANUSCRIPT, ask: { claim: 'the entry is late', note: undefined, clarification: undefined } }),
           ),
-          fragments,
-          charter,
+          FRAGMENTS,
+          CHARTER,
         ),
     },
     {
       kind: 'apply',
       marker: 'FIXTURE_APPLY_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
-        renderApplyPrompt(compileApplyContext(applyContextInput({ surface, draft: MANUSCRIPT, entries: [] })), fragments, []),
+        renderApplyPrompt(compileApplyContext(applyContextInput({ surface, draft: MANUSCRIPT, entries: [] })), FRAGMENTS, []),
     },
   ]
 
@@ -501,8 +501,8 @@ describe('the task instruction names the surface it was compiled for', () => {
 
 describe('the turns a call site sends', () => {
   it('sends the standing material as a system turn and the request as a user turn, in that order, for a participant call and for an application alike', () => {
-    const participant = renderPrompt(compileSpecialistContext(contextInput({ role: shape })), fragments, charter)
-    const application = renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments, [])
+    const participant = renderPrompt(compileSpecialistContext(contextInput({ role: SHAPE })), FRAGMENTS, CHARTER)
+    const application = renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), FRAGMENTS, [])
 
     expect(participant.map((turn) => turn.role)).toEqual(['system', 'user'])
     expect(application.map((turn) => turn.role)).toEqual(['system', 'user'])
@@ -513,14 +513,14 @@ describe('the order the two turns compose in', () => {
   it('orders a participant call widest-frame to narrowest-responsibility, and its request turn task through the current material', () => {
     const context = compileSpecialistContext(
       contextInput({
-        role: shape,
+        role: SHAPE,
         owesAnswer: true,
         message: 'does the opening earn its length',
         authorContext: 'prefers short sentences',
       }),
     )
 
-    const rendered = renderPrompt(context, fragments, charter)
+    const rendered = renderPrompt(context, FRAGMENTS, CHARTER)
 
     expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
     expect(
@@ -546,7 +546,7 @@ describe('the order the two turns compose in', () => {
       }),
     )
 
-    const rendered = renderApplyPrompt(context, fragments, [])
+    const rendered = renderApplyPrompt(context, FRAGMENTS, [])
 
     expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
     expect(
@@ -577,7 +577,7 @@ describe('the rejected attempts a correction round carries', () => {
   }
 
   it('gives each attempt as the answer the model returned in an assistant turn, in the shape it was asked to answer in, and the room\'s diagnosis in a user turn that follows it', () => {
-    const rendered = renderApplyPrompt(applyContext, fragments, [firstAttempt])
+    const rendered = renderApplyPrompt(applyContext, FRAGMENTS, [firstAttempt])
 
     expect(rendered.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user'])
     const answer = rendered[2]
@@ -588,9 +588,9 @@ describe('the rejected attempts a correction round carries', () => {
   })
 
   it('accumulates the pairs in the order they were rejected, and leaves the standing turn byte-identical in every round', () => {
-    const first = renderApplyPrompt(applyContext, fragments, [])
-    const second = renderApplyPrompt(applyContext, fragments, [firstAttempt])
-    const third = renderApplyPrompt(applyContext, fragments, [firstAttempt, secondAttempt])
+    const first = renderApplyPrompt(applyContext, FRAGMENTS, [])
+    const second = renderApplyPrompt(applyContext, FRAGMENTS, [firstAttempt])
+    const third = renderApplyPrompt(applyContext, FRAGMENTS, [firstAttempt, secondAttempt])
 
     expect(third.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user', 'assistant', 'user'])
     expect(third.slice(0, 4)).toEqual(second)
@@ -608,7 +608,7 @@ describe('the rejected attempts a correction round carries', () => {
   ] as const
 
   it.each(DIAGNOSIS_CASES)('carries the $diagnosis diagnosis as its own fragment', ({ diagnosis, marker }) => {
-    const rendered = renderApplyPrompt(applyContext, fragments, [
+    const rendered = renderApplyPrompt(applyContext, FRAGMENTS, [
       { returned: { edits: [{ find: 'the cups', replace: 'the mugs' }] }, verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis }] },
     ])
 
@@ -616,7 +616,7 @@ describe('the rejected attempts a correction round carries', () => {
   })
 
   it('says of an edit that resolved that it resolved, beside the sibling that did not', () => {
-    const rendered = renderApplyPrompt(applyContext, fragments, [
+    const rendered = renderApplyPrompt(applyContext, FRAGMENTS, [
       {
         returned: {
           edits: [

@@ -122,6 +122,7 @@ its own diff.
 | Test runner | `vitest` |
 | A DOM for tests that need one, without a browser | `jsdom`, with `@testing-library/react` |
 | Browser tests | `@playwright/test` |
+| Running a maintainer script written in the project's own language | `tsx` |
 
 **The roster names capabilities, not every line of `package.json`.** A package named here brings with
 it the type declarations it does not ship and the piece it is unusable without, and nothing further.
@@ -1144,11 +1145,13 @@ Change notification over a bind mount is not dependable, so the watcher polls. N
 author data, which is still watched by nothing at all.
 
 **A built client served by a plain Node process is deliberately not a second arrangement.** The author of
-this software is its only user, so two ways to run it would mean the one exercised daily is the one not
-tested, and packaging a build to serve a page to a browser on the same machine buys nothing here. That the
-studio's daily arrangement includes a development server is a consequence worth naming rather than hiding,
-and it is why streaming through that server is held by a test that puts frames through the real thing
-rather than through a mock of it.
+this software is its only user, so two ways to run it would mean maintaining an arrangement nobody runs, and
+packaging a build to serve a page to a browser on the same machine buys nothing here. That the studio's
+daily arrangement includes a development server is a consequence worth naming rather than hiding.
+
+**The one further way to stand the studio up substitutes the fixture at the model seam and nothing else**,
+so the arrangement is the real one down to that boundary. It is a development entry point rather than a mode
+of the application: nothing shipped reads it and nothing branches on it.
 
 **The model runtime stays on the host.** No GPU is passed through to the container on this platform, so a
 model served from inside it would answer from the CPU and the room would be too slow to consult — which is
@@ -1208,10 +1211,9 @@ load-bearing ones are below; the rest of the orchestration is internal.
 Further interfaces are expected and useful without being doctrine. A **store** boundary concentrates atomic
 writes and artifact access, and owns the file layout: its entry points name artifacts, so no module above it
 composes a path or holds a file handle, and containment against the workspace root is part of that ownership
-rather than a check a caller remembers to make. It is not a seam tests substitute: they cross the real
-implementation against a temporary directory, and a second implementation with no variation behind it would
-be a premature seam asserting nothing. A **room** boundary owns the operations the author starts, which is
-already the client's contract, so tests and the client cross the same surface.
+rather than a check a caller remembers to make. It is not a boundary anything substitutes at: a second
+implementation with no variation behind it would be a premature seam asserting nothing. A **room** boundary
+owns the operations the author starts, which is already the client's contract.
 
 **The room owns the dispatch and the application, but not as one shared operation.** A dispatch
 and an application share one state machine and one abandonment path, and a module each would leave two
@@ -1225,60 +1227,17 @@ is what makes the server's response shapes and the client's expectations one set
 drift — but a contract with one possible implementation is not a boundary anything could be substituted at,
 and declaring it one would invite an adapter with nothing on the other side of it. What it owes is
 independence rather than substitutability: nothing in it may import from either side, which is a property of
-the import graph and is asserted there.
+the import graph and is checked as one.
 
 Behind those, the dispatch loop, the application call, the state machine, per-call
 abort, the tolerant parser and the role registry are internal, with one implementation each.
 
 **The client's projection of conversation events is a pure reducer** — not a boundary, since it has one
-implementation, but named and tested at its own interface because several load-bearing rules live in it: an
+implementation, but named at its own interface because several load-bearing rules live in it: an
 entry appended twice appears once; a dispatch's activity holds only the participants the model layer has
 actually reported progress for, clearing one the moment its entry lands, never a place for one it has not; an
 action finishing late for an action no longer current is discarded; and reading the piece mid-dispatch and
 watching one open from the start project identically.
-
-## Verification
-
-**A fixture implementation of the model interface, for tests only.** A test that needs a model call declares
-what that call returns — a conforming value, or any of the failures the interface can state. Delays and a
-preparing state are declarable the same way, which is how a dispatch's progression through its calls is
-exercised, and how a composition gets judged against a state the interface can emit rather than only against
-the ones that are easy to produce. There is no shared library of default outputs: every fixture belongs to
-the test that needs it, and with no models assigned every surface's document opens and is writable while
-the room says it is unavailable.
-
-**The boundaries are the test surface**, and the rules stated in this document are the properties. What each
-boundary's assertions cover:
-
-| Boundary | Its assertion territory |
-|---|---|
-| **context** | independence, the history policies, and the Story Editor's asymmetric input |
-| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, the edit loop and the inapplicable failure exhausting it leaves, and that no operation writes any surface's document |
-| **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
-| **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, the turns a call site sends crossing intact and in order with their declared roles, no reasoning above the seam, and the adapter's serialization of independent submissions |
-| **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |
-| **projection** | idempotent append, activity only for a participant reported on, and stale events discarded |
-
-**A DOM without a browser where a hook or a surface is the boundary**, per-file rather than as the suite's
-environment: the server and the pure rules are the larger part of the suite and have no use for one. It is
-for what the component itself decides, and not for what only the running application settles.
-
-**A small number of browser tests over the fixture implementation**, and the smallness is deliberate. A
-browser earns a test only where the thing that can break is a browser: real layout, real keystrokes, and the
-surface reacting to a state a real stream delivered — typing while a dispatch lands, an application changing
-the visible manuscript and the editor's own undo restoring it, and the reading view restoring position
-against real layout. Where a hook or a component can state the property against a modelled DOM, it owns it
-and the browser does not repeat it. Beside them, one journey through the deployed arrangement, because
-nothing below the browser can say that the parts were assembled at all.
-
-Those need the studio answering from the fixture model implementation rather than from a runtime, which is
-its own way of standing the studio up: a configuration that substitutes the fixture at the model seam and
-nothing else, so the arrangement under test is the real one down to that boundary. It is a development entry
-point and not a mode of the application — nothing shipped reads it, nothing branches on it, and a test in the
-import graph holds it that way.
-
-**No screenshot regression farm and no browser test per response state.** How the interface composes under
-lopsided and late responses is design work, not a thing tests assert.
 
 ## Deliberately out
 

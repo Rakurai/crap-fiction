@@ -52,6 +52,7 @@ export function useApply(
   const applyController = useRef<AbortController | undefined>(undefined)
 
   useEffect(() => {
+    mounted.current = true
     return () => {
       mounted.current = false
       applyController.current?.abort()

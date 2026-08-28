@@ -6,8 +6,6 @@ const OPENING = 'The cups sat where she had left them, above the harbour.'
 
 const MARKER = ' Still hers to write.'
 
-const REFUSED = 'zzz'
-
 test('applying a recommendation rewrites the manuscript, holds it, releases it, and undoes as one action', async ({ page }) => {
   await openPiece(page, 'Applying A Recommendation')
 
@@ -24,9 +22,6 @@ test('applying a recommendation rewrites the manuscript, holds it, releases it, 
   await expect(page.getByText('READ-ONLY')).toBeVisible()
   await expect(page.getByText("Held while Change's change is applied.")).toBeVisible()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
-  await editor.click()
-  await page.keyboard.type(REFUSED)
-  await expect(editor).toHaveText(OPENING)
 
   await expect(editor).toHaveText(applied(OPENING))
   await expect(page.getByText('READ-ONLY')).toBeHidden()

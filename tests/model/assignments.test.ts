@@ -7,13 +7,13 @@ import { callSites, UnknownCallSiteError } from '../../src/server/model/callSite
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import { SettingsStore } from '../../src/server/store/index.js'
 
-const roles: readonly RoleDefinition[] = [
+const ROLES: readonly RoleDefinition[] = [
   { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', persona: 'reasons about x', eligibility: 'cast', function: undefined, availability: [] },
   { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', mark: 'SE', persona: 'reasons about y', eligibility: 'generalist', function: undefined, availability: [] },
 ]
-const sites = callSites(roles)
+const SITES = callSites(ROLES)
 
-describe('assignments', () => {
+describe('reading and writing the model a call site is assigned', () => {
   let dataRoot: string
   const settings = new SettingsStore()
 
@@ -29,9 +29,9 @@ describe('assignments', () => {
     expect(getAssignment(dataRoot, 'shape')).toBeUndefined()
     expect(listAssignments(dataRoot)).toEqual(new Map())
 
-    await setAssignment(settings, dataRoot, sites, 'shape', 'llama-3')
-    await setAssignment(settings, dataRoot, sites, 'story-editor', 'qwen-14b')
-    await setAssignment(settings, dataRoot, sites, 'shape', 'llama-3-70b')
+    await setAssignment(settings, dataRoot, SITES, 'shape', 'llama-3')
+    await setAssignment(settings, dataRoot, SITES, 'story-editor', 'qwen-14b')
+    await setAssignment(settings, dataRoot, SITES, 'shape', 'llama-3-70b')
 
     expect(getAssignment(dataRoot, 'shape')).toBe('llama-3-70b')
     expect(listAssignments(dataRoot)).toEqual(
@@ -43,7 +43,7 @@ describe('assignments', () => {
   })
 
   it('refuses to assign a model to a call site that does not exist', async () => {
-    await expect(setAssignment(settings, dataRoot, sites, 'no-such-site', 'llama-3')).rejects.toThrow(UnknownCallSiteError)
+    await expect(setAssignment(settings, dataRoot, SITES, 'no-such-site', 'llama-3')).rejects.toThrow(UnknownCallSiteError)
     expect(listAssignments(dataRoot)).toEqual(new Map())
   })
 })

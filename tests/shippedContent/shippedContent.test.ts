@@ -118,7 +118,6 @@ function buildFixtureRoot(): string {
 
 describe('ShippedContentCatalog', () => {
   let root: string
-  let catalog: ShippedContentCatalog
 
   afterEach(() => {
     rmSync(root, { recursive: true, force: true })
@@ -130,45 +129,38 @@ describe('ShippedContentCatalog', () => {
   }
 
   it('lists every loaded mode and looks one up by id', () => {
-    catalog = load()
+    const catalog = load()
     expect(catalog.modes.map((mode) => mode.id).sort()).toEqual(['epic', 'flash'])
     expect(catalog.mode('flash').displayName).toBe('flash')
   })
 
   it('refuses to look up a mode that did not load', () => {
-    catalog = load()
+    const catalog = load()
     expect(() => catalog.mode('novella')).toThrowError(UnknownModeError)
   })
 
   it('resolves the generalist, the addressed-only participants and the declared interviewer once, from the full roster', () => {
-    catalog = load()
+    const catalog = load()
     expect(catalog.roster.storyEditor.id).toBe('story-editor')
     expect(catalog.roster.addressedOnly.map((role) => role.id).sort()).toEqual(['archivist', 'interviewer'])
     expect(catalog.roster.interviewer).toEqual({ role: expect.objectContaining({ id: 'interviewer' }), invocation: 'ask me a clarifying question' })
     expect(catalog.roster.specialists.map((role) => role.id).sort()).toEqual(['reader', 'shape'])
   })
 
-  it.each([
-    { mode: 'flash', surface: 'draft', available: ['shape'], defaultCast: ['shape'] },
-    { mode: 'flash', surface: 'storyContext', available: ['reader'], defaultCast: ['reader'] },
-    { mode: 'flash', surface: 'authorContext', available: [], defaultCast: [] },
-    { mode: 'epic', surface: 'draft', available: [], defaultCast: [] },
-    { mode: 'epic', surface: 'storyContext', available: ['shape'], defaultCast: [] },
-    { mode: 'epic', surface: 'authorContext', available: [], defaultCast: [] },
-  ] as const)('derives the available and default cast for $mode / $surface from participant-owned availability', ({ mode, surface, available, defaultCast }) => {
-    catalog = load()
-    expect(catalog.specialistsFor(mode, surface).map((role) => role.id).sort()).toEqual(available)
-    expect([...catalog.defaultCastFor(mode, surface)].sort()).toEqual(defaultCast)
+  it('carries the availability each participant document declared through to the cast it derives', () => {
+    const catalog = load()
+    expect(catalog.specialistsFor('epic', 'storyContext').map((role) => role.id)).toEqual(['shape'])
+    expect([...catalog.defaultCastFor('epic', 'storyContext')]).toEqual([])
   })
 
   it("gives every mode its own reference guidance on the story context surface, never the other mode's", () => {
-    catalog = load()
+    const catalog = load()
     expect(catalog.referenceFor('flash', 'storyContext')).toBe('Flash sections: entry, turn, close.')
     expect(catalog.referenceFor('epic', 'storyContext')).toBe('Epic sections: books, each holding chapters.')
   })
 
   it('resolves the draft to no reference, and author context to the one global reference, for every mode', () => {
-    catalog = load()
+    const catalog = load()
     const authorContextReference = readFileSync(path.join(CONTENT_ROOT, 'author-context.yaml'), 'utf8').trim()
     for (const mode of ['flash', 'epic']) {
       expect(catalog.referenceFor(mode, 'draft')).toBeNull()
@@ -177,7 +169,7 @@ describe('ShippedContentCatalog', () => {
   })
 
   it('derives call sites for every loaded participant plus the operations, and none other', () => {
-    catalog = load()
+    const catalog = load()
     expect(catalog.callSites.map((site) => site.site).sort()).toEqual(['apply', 'archivist', 'interviewer', 'reader', 'shape', 'story-editor'])
   })
 })

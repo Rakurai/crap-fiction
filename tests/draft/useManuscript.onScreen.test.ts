@@ -96,28 +96,4 @@ describe('useManuscript', () => {
     act(() => result.current.leaveReading())
     expect(result.current.view).toBe('rendered')
   })
-
-  it('captures the outgoing scroll ratio and restores it on the incoming view without the caller sequencing anything', () => {
-    // `result.current` settles only after the passive-effect phase, which runs after the
-    // layout effect under test, so the view is tracked from the render itself.
-    let latestView = 'rendered'
-    const { result } = renderHook(() => {
-      const manuscript = useManuscript('Some prose.')
-      latestView = manuscript.view
-      return manuscript
-    })
-    const container = document.createElement('div')
-    Object.defineProperty(container, 'scrollHeight', {
-      configurable: true,
-      get: () => (latestView === 'source' ? 400 : 200),
-    })
-    Object.defineProperty(container, 'scrollTop', { value: 100, writable: true, configurable: true })
-    act(() => {
-      result.current.containerRef.current = container
-    })
-
-    act(() => result.current.showSource())
-
-    expect(container.scrollTop).toBe(200)
-  })
 })

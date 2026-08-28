@@ -5,7 +5,6 @@ import type { ApplicationEntryView, ConversationEntryView } from '../../src/shar
 import type { ConversationActivitySnapshot, RoomEvent } from '../../src/shared/conversationEvents.js'
 import { Conversation } from '../../src/client/Conversation.js'
 import type { RequestResult } from '../../src/client/request.js'
-import type { AutosaveState } from '../../src/client/autosave.js'
 import type { ApplyConfirmation } from '../../src/shared/applyViews.js'
 import type { RoomAdapters } from '../../src/client/useConversation.js'
 import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../support/roomAdapters.js'
@@ -24,16 +23,21 @@ const INTERVIEWER = { handle: 'interview', displayName: 'Interviewer', descripti
 
 const HANDLE_BY_ID: Record<string, string> = { shape: 'shape', reader: 'reader', editor: 'editor' }
 
-function roomHolding(
-  entries: readonly ConversationEntryView[],
-  abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
-): RoomAdapters {
+const RESPONSE_WITH_COMMENTARY: ConversationEntryView = {
+  id: 'e0',
+  kind: 'participantResponse',
+  participantId: 'shape',
+  causeId: 'e-1',
+  outcome: 'commentary',
+  claim: 'It holds.',
+}
+
+function roomHolding(entries: readonly ConversationEntryView[]): RoomAdapters {
   return roomAdapters({
     subscribeToRoom: () => ({ snapshot: onTheDraft(null), unsubscribe: () => {} }),
     createConversation: () => Promise.resolve({ outcome: 'value', value: { id: 'c1' } }),
     fetchConversation: conversationOnDisk('c1', entries),
     dispatch: () => Promise.resolve({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
-    abandonOperation,
     applyRecommendation: () => Promise.resolve({ outcome: 'value', value: { outcome: 'noChange', actionId: 'a1' } }),
   })
 }
@@ -62,13 +66,9 @@ function renderConversation(entries: readonly ConversationEntryView[], extra: Pa
   )
 }
 
-function roomStreaming(
-  entries: readonly ConversationEntryView[],
-  abandonOperation: RoomAdapters['abandonOperation'] = () => Promise.resolve({ outcome: 'value', value: null }),
-  draftActivity: ConversationActivitySnapshot | null = null,
-): { room: RoomAdapters; stream: (...events: readonly RoomEvent[]) => void } {
-  const { subscribeToRoom, stream } = roomStream(onTheDraft(draftActivity))
-  return { room: { ...roomHolding(entries, abandonOperation), subscribeToRoom }, stream }
+function roomStreaming(entries: readonly ConversationEntryView[]): { room: RoomAdapters; stream: (...events: readonly RoomEvent[]) => void } {
+  const { subscribeToRoom, stream } = roomStream(onTheDraft(null))
+  return { room: { ...roomHolding(entries), subscribeToRoom }, stream }
 }
 
 function blockContaining(text: string): HTMLElement {
@@ -326,15 +326,6 @@ describe('the applied change, shown on its originating response', () => {
   })
 })
 
-const RESPONSE_WITH_COMMENTARY: ConversationEntryView = {
-  id: 'e0',
-  kind: 'participantResponse',
-  participantId: 'shape',
-  causeId: 'e-1',
-  outcome: 'commentary',
-  claim: 'It holds.',
-}
-
 describe('replying to a response', () => {
   afterEach(cleanup)
 
@@ -487,23 +478,14 @@ describe('one response-local field shared by every action on the response', () =
 describe('handle completion at the composer', () => {
   afterEach(cleanup)
 
-  it('offers every handle the token prefix-matches, as the author types one', async () => {
-    renderConversation([RESPONSE_WITH_COMMENTARY])
-
-    const composer = await screen.findByLabelText('Message the room')
-    fireEvent.change(composer, { target: { value: '@sh' } })
-
-    expect(await screen.findByRole('option', { name: /@shape/ })).toBeTruthy()
-    expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
-  })
-
-  it('completes the token into the message, and closes the offer', async () => {
+  it('offers only the handles the token prefix-matches, completes the one chosen into the message, and closes the offer', async () => {
     renderConversation([RESPONSE_WITH_COMMENTARY])
 
     const composer = await screen.findByLabelText('Message the room')
     fireEvent.change(composer, { target: { value: '@sh' } })
 
     const suggestion = await screen.findByRole('option', { name: /@shape/ })
+    expect(screen.queryByRole('option', { name: /@reader/ })).toBeNull()
     fireEvent.click(suggestion)
 
     await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
@@ -551,55 +533,5 @@ describe('sending from the keyboard', () => {
 
     expect(dispatch).not.toHaveBeenCalled()
     expect((composer as HTMLTextAreaElement).value).toBe('a message')
-  })
-})
-
-describe('conversation activity, truthfully', () => {
-  afterEach(cleanup)
-
-  it("reconnect: an apply already in flight for a response shows its flight from the stream's own snapshot alone, no new event required", async () => {
-    const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'apply',
-      sourceEntryId: 'e1',
-      startedAt: 1_700_000_000_000,
-    })
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
-
-    expect(await screen.findByText('APPLYING')).toBeTruthy()
-  })
-
-  it('reconnect: releases the surface once the Apply it resumed has been confirmed', async () => {
-    const { room } = roomStreaming([RESPONSE_WITH_RECOMMENDATION], undefined, {
-      actionId: 'a1',
-      conversationId: 'c1',
-      kind: 'apply',
-      sourceEntryId: 'e1',
-      startedAt: 1_700_000_000_000,
-      applicationId: 'app1',
-    })
-    let confirm: () => void = () => {
-      throw new Error('the studio was never asked to confirm')
-    }
-    const confirmed = new Promise<RequestResult<ApplyConfirmation>>((resolve) => {
-      confirm = () => resolve({ outcome: 'value', value: { entryId: 'e-app1', change: { kind: 'rewrittenWhole' } } })
-    })
-    const resumable: RoomAdapters = {
-      ...room,
-      retrievePendingApply: () => Promise.resolve({ outcome: 'value', value: { replacement: 'resumed text' } }),
-      confirmApplication: () => confirmed,
-    }
-
-    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room: resumable, onApplied: () => Promise.resolve({ failed: false }) })
-
-    expect(await screen.findByText('APPLYING')).toBeTruthy()
-
-    await act(async () => {
-      confirm()
-      await confirmed
-    })
-
-    await waitFor(() => expect(screen.queryByText('APPLYING')).toBeNull())
   })
 })

@@ -2,45 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
-import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
-import { INTERVIEWER_FIXTURE } from '../support/roomFixtures.js'
+import { idleStudio } from '../support/harness.js'
+import { INTERVIEWER_FIXTURE, MODE_FIXTURE } from '../support/roomFixtures.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
-
-const MODE: ModeDescriptor = {
-  id: 'flash',
-  displayName: 'Flash',
-  description: 'A short piece read in one sitting.',
-  storyContextReference: 'Sections, each holding entries.',
-}
-
-const ROLES: readonly RoleDefinition[] = [
-  {
-    id: 'shape',
-    handle: 'shape',
-    displayName: 'Shape',
-    description: 'attends to the turn',
-    mark: 'SH',
-    persona: 'reasons about attends to the turn',
-    eligibility: 'cast',
-    function: undefined,
-    availability: [{ mode: 'flash', surface: 'draft', enabledByDefault: true }],
-  },
-  {
-    id: 'story-editor',
-    handle: 'editor',
-    displayName: 'Story Editor',
-    description: 'the generalist',
-    mark: 'SE',
-    persona: 'reasons about the generalist',
-    eligibility: 'generalist',
-    function: undefined,
-    availability: [],
-  },
-  INTERVIEWER_FIXTURE,
-]
 
 describe('the call-site and model routes', () => {
   let dataRoot: string
@@ -54,13 +20,7 @@ describe('the call-site and model routes', () => {
   })
 
   function studio(runtimeStatus?: RuntimeStatus) {
-    return buildTestApp(dataRoot, {
-      modes: [MODE],
-      roles: ROLES,
-      runtimeStatus,
-      room: idleRoom(dataRoot, [MODE], ROLES),
-      authorContextReference: UNREACHED_REFERENCE,
-    }).app
+    return idleStudio(dataRoot, [MODE_FIXTURE], runtimeStatus).app
   }
 
   it('carries every call site the roles compose to, in the order the studio names them', async () => {
