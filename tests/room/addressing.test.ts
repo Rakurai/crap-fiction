@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseAddressing } from '../../src/server/room/addressing.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 
-const shape: RoleDefinition = {
+const SHAPE: RoleDefinition = {
   id: 'shape',
   handle: 'shape',
   displayName: 'Shape',
@@ -13,7 +13,7 @@ const shape: RoleDefinition = {
   function: undefined,
   availability: [],
 }
-const compression: RoleDefinition = {
+const COMPRESSION: RoleDefinition = {
   id: 'compression',
   handle: 'compression',
   displayName: 'Compression',
@@ -24,7 +24,7 @@ const compression: RoleDefinition = {
   function: undefined,
   availability: [],
 }
-const editor: RoleDefinition = {
+const EDITOR: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
   displayName: 'Story Editor',
@@ -35,22 +35,22 @@ const editor: RoleDefinition = {
   function: undefined,
   availability: [],
 }
-const participants = [shape, compression, editor]
+const PARTICIPANTS = [SHAPE, COMPRESSION, EDITOR]
 
 describe('parseAddressing', () => {
   it('addresses every participant a message names, by full handle or by prefix, in the order named, whatever the case and only once each', () => {
-    expect(parseAddressing('@shape does the opening earn its length', participants)).toEqual([shape])
-    expect(parseAddressing('@comp the last line is doing too much', participants)).toEqual([compression])
-    expect(parseAddressing('a note for @SHAPE and @editor, both of you', participants)).toEqual([shape, editor])
-    expect(parseAddressing('@shape, really, @shape', participants)).toEqual([shape])
+    expect(parseAddressing('@shape does the opening earn its length', PARTICIPANTS)).toEqual([SHAPE])
+    expect(parseAddressing('@comp the last line is doing too much', PARTICIPANTS)).toEqual([COMPRESSION])
+    expect(parseAddressing('a note for @SHAPE and @editor, both of you', PARTICIPANTS)).toEqual([SHAPE, EDITOR])
+    expect(parseAddressing('@shape, really, @shape', PARTICIPANTS)).toEqual([SHAPE])
   })
 
   it('addresses nobody from a token matching no handle or more than one, from a sigil that opened nothing, or from a message with none', () => {
-    const ambiguous = [shape, { ...compression, id: 'shade', handle: 'shade' }]
+    const ambiguous = [SHAPE, { ...COMPRESSION, id: 'shade', handle: 'shade' }]
 
-    expect(parseAddressing('@nobody home', participants)).toEqual([])
+    expect(parseAddressing('@nobody home', PARTICIPANTS)).toEqual([])
     expect(parseAddressing('@sh pick one', ambiguous)).toEqual([])
-    expect(parseAddressing('mail@shape.com is not a mention', participants)).toEqual([])
-    expect(parseAddressing('just an ordinary note', participants)).toEqual([])
+    expect(parseAddressing('mail@shape.com is not a mention', PARTICIPANTS)).toEqual([])
+    expect(parseAddressing('just an ordinary note', PARTICIPANTS)).toEqual([])
   })
 })

@@ -59,16 +59,28 @@ const BASE_PROPS = {
 describe('a surface mounted on its own, with no other transport standing in for it', () => {
   afterEach(cleanup)
 
-  it('renders the prose body and dispatches through only the room it was given', async () => {
+  it('renders the prose body and dispatches the piece, the surface and the message through only the room it was given', async () => {
     const dispatch = vi.fn(() =>
       Promise.resolve<RequestResult<{ conversationId: string; actionId: string }>>({ outcome: 'value', value: { conversationId: 'c1', actionId: 'a1' } }),
     )
     render(<EditingSurface {...BASE_PROPS} room={{ ...roomHolding(), dispatch }} />)
 
     fireEvent.change(await screen.findByLabelText('Message the room'), { target: { value: 'what isn’t working' } })
+    fireEvent.click(screen.getByRole('button', { name: 'source' }))
+    expect((screen.getByLabelText('Manuscript source') as HTMLTextAreaElement).value).toBe('First light.')
+
     fireEvent.click(screen.getByRole('button', { name: 'send' }))
 
-    await waitFor(() => expect(dispatch).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith(
+        'the-lighthouse',
+        'draft',
+        'c1',
+        { message: 'what isn’t working' },
+        expect.objectContaining({ draft: 'First light.' }),
+        expect.any(AbortSignal),
+      ),
+    )
   })
 
   it('keeps the composer text through a trip into and back out of reading view', async () => {

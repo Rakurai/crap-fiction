@@ -1,6 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { facts, modeName, wordCount } from '../../src/client/facts.js'
 import { Manuscript } from '../../src/client/Manuscript.js'
 import type { RequestResult } from '../../src/client/request.js'
 import { useAutosave } from '../../src/client/useAutosave.js'
@@ -68,16 +67,16 @@ describe('the piece header', () => {
   afterEach(cleanup)
 
   it('states the mode and the length as one composed fact when more than one mode is loaded', () => {
-    renderManuscript({ draft: 'First light of the day.' })
+    renderManuscript()
 
-    expect(screen.getByText(facts(modeName('flash'), wordCount(5)))).toBeTruthy()
+    expect(screen.getByText('FLASH · 5 WORDS')).toBeTruthy()
   })
 
   it('names no mode when only one is loaded', () => {
-    renderManuscript({ draft: 'First light of the day.', namesMode: false })
+    renderManuscript({ namesMode: false })
 
-    expect(screen.queryByText(facts(modeName('flash'), wordCount(5)))).toBeNull()
-    expect(screen.getByText(wordCount(5))).toBeTruthy()
+    expect(screen.queryByText(/FLASH/)).toBeNull()
+    expect(screen.getByText('5 WORDS')).toBeTruthy()
   })
 })
 

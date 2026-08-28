@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RosterMemberView, StoryEditorView } from '../../src/shared/pieceViews.js'
 import { RoomEditor } from '../../src/client/RoomEditor.js'
@@ -35,12 +35,21 @@ describe('editing the room', () => {
     expect(screen.getByRole('button', { name: 'enable' }).hasAttribute('disabled')).toBe(false)
   })
 
-  it('holds the Story Editor as a member nothing can be done to', () => {
+  it('holds the Story Editor last, marked always present, as the one member nothing can be done to', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
-    expect(screen.getByText('@editor')).toBeTruthy()
+    const rows = screen.getAllByRole('listitem').map((row) => ({
+      handle: within(row).getByText(/^@/).textContent,
+      acts: within(row).queryAllByRole('button').map((act) => act.textContent),
+    }))
+
+    expect(rows).toEqual([
+      { handle: '@shape', acts: ['disable'] },
+      { handle: '@comp', acts: ['enable'] },
+      { handle: '@editor', acts: [] },
+    ])
+    expect(screen.getByText('ALWAYS PRESENT')).toBeTruthy()
     expect(screen.getByText('holds the whole of it')).toBeTruthy()
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['done', 'disable', 'enable'])
   })
 
   it('toggles one specialist and is left, one action apiece, generating no rationale and presenting no lifecycle', () => {

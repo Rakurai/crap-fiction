@@ -34,14 +34,14 @@ import { appliedChangeSchema, type AppliedChange } from '../../src/shared/applie
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, INTERVIEWER_ROSTER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
-const epic: ModeDescriptor = {
+const EPIC: ModeDescriptor = {
   id: 'epic',
   displayName: 'Epic',
   description: 'A piece read over several sittings.',
   storyContextReference: 'Sections, each holding entries.',
 }
 
-const specialists: readonly RoleDefinition[] = [
+const SPECIALISTS: readonly RoleDefinition[] = [
   {
     id: 'shape',
     handle: 'shape',
@@ -66,9 +66,9 @@ const specialists: readonly RoleDefinition[] = [
   },
 ]
 
-const interviewer = INTERVIEWER_ROSTER_FIXTURE
+const INTERVIEWER = INTERVIEWER_ROSTER_FIXTURE
 
-const storyEditor: RoleDefinition = {
+const STORY_EDITOR: RoleDefinition = {
   id: 'story-editor',
   handle: 'editor',
   eligibility: 'generalist',
@@ -80,10 +80,10 @@ const storyEditor: RoleDefinition = {
   availability: [],
 }
 
-function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[] = specialists): ShippedContentCatalog {
+function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefinition[] = SPECIALISTS): ShippedContentCatalog {
   return ShippedContentCatalog.assemble({
     modes,
-    roles: [...roles, storyEditor, interviewer.role],
+    roles: [...roles, STORY_EDITOR, INTERVIEWER.role],
     charter: 'unused in these tests',
     fragments: PROMPT_FRAGMENTS_FIXTURE,
     authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
@@ -92,7 +92,7 @@ function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefini
 
 const pieceMetadata = new PieceMetadataStore()
 
-describe('pieces', () => {
+describe('creating a piece, listing the workspace, and opening one again', () => {
   let dataRoot: string
   let workspaceDir: string
 
@@ -125,11 +125,11 @@ describe('pieces', () => {
   })
 
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
-    const piece = await createPiece(pieceMetadata, workspaceDir, 'A Long Way', epic.id, catalogFor([MODE_FIXTURE, epic]))
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'A Long Way', EPIC.id, catalogFor([MODE_FIXTURE, EPIC]))
     expect(piece.mode).toBe('epic')
-    expect(getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE, epic])).mode).toBe('epic')
+    expect(getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE, EPIC])).mode).toBe('epic')
 
-    await expect(createPiece(pieceMetadata, workspaceDir, 'Nope', 'novella', catalogFor([MODE_FIXTURE, epic]))).rejects.toThrowError(UnknownModeError)
+    await expect(createPiece(pieceMetadata, workspaceDir, 'Nope', 'novella', catalogFor([MODE_FIXTURE, EPIC]))).rejects.toThrowError(UnknownModeError)
   })
 
   it('disambiguates a colliding slug at creation', async () => {
@@ -200,10 +200,10 @@ describe('pieces', () => {
       },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
       interviewer: {
-        handle: interviewer.role.handle,
-        displayName: interviewer.role.displayName,
-        description: interviewer.role.description,
-        invocation: interviewer.invocation,
+        handle: INTERVIEWER.role.handle,
+        displayName: INTERVIEWER.role.displayName,
+        description: INTERVIEWER.role.description,
+        invocation: INTERVIEWER.invocation,
       },
     })
   })
@@ -244,7 +244,7 @@ describe('pieces', () => {
       function: undefined,
       availability: [{ mode: 'flash', surface: 'authorContext', enabledByDefault: false }],
     }
-    const withArchivist = [...specialists, archivist]
+    const withArchivist = [...SPECIALISTS, archivist]
 
     const otherWorkspaceDir = path.join(dataRoot, 'another-writing')
     mkdirSync(otherWorkspaceDir, { recursive: true })

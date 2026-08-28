@@ -7,7 +7,7 @@ import { deleteAppliedChange, PieceMetadataStore, readAppliedChanges, writeAppli
 import { TolerantReadError } from '../../src/server/store/yaml.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 
-const cutSentence: AppliedChange = {
+const CUT_SENTENCE: AppliedChange = {
   id: 'change1',
   content: { kind: 'passages', passages: [{ leading: '', before: 'Ruth stood looking at them.', after: '', trailing: '' }] },
 }
@@ -15,7 +15,7 @@ const cutSentence: AppliedChange = {
 const REWRITE: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
 const pieceMetadata = new PieceMetadataStore()
 
-describe('applied changes', () => {
+describe('the applied changes a piece carries', () => {
   let dataRoot: string
   let workspaceDir: string
   let scope: ConversationScope
@@ -39,16 +39,16 @@ describe('applied changes', () => {
   it('reports none before anything is applied, and afterwards every change the piece holds, whatever each of them changed', async () => {
     expect(readAppliedChanges(dataRoot, scope, appliedChangeSchema)).toEqual([])
 
-    await writeAppliedChange(dataRoot, scope, cutSentence)
+    await writeAppliedChange(dataRoot, scope, CUT_SENTENCE)
     await writeAppliedChange(dataRoot, scope, REWRITE)
 
     const changes = readAppliedChanges(dataRoot, scope, appliedChangeSchema)
     expect(changes).toHaveLength(2)
-    expect(changes).toEqual(expect.arrayContaining([cutSentence, REWRITE]))
+    expect(changes).toEqual(expect.arrayContaining([CUT_SENTENCE, REWRITE]))
   })
 
   it('deletes the one change its id names and no other, and reports nothing wrong for a change not there', async () => {
-    await writeAppliedChange(dataRoot, scope, cutSentence)
+    await writeAppliedChange(dataRoot, scope, CUT_SENTENCE)
     await writeAppliedChange(dataRoot, scope, REWRITE)
 
     await deleteAppliedChange(dataRoot, scope, 'change1')
@@ -58,7 +58,7 @@ describe('applied changes', () => {
   })
 
   it('throws on a passage record that predates leading and trailing context, rather than dropping it silently', async () => {
-    await writeAppliedChange(dataRoot, scope, cutSentence)
+    await writeAppliedChange(dataRoot, scope, CUT_SENTENCE)
     const changeFile = path.join(workspaceDir, 'cups', 'changes', 'draft', 'change1.json')
     writeFileSync(
       changeFile,
