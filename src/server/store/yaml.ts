@@ -28,7 +28,6 @@ export class ShippedDataError extends Error {
   }
 }
 
-// `ZodDefault` is deliberately not unwrapped here.
 function tolerate(schema: z.core.$ZodType, raw: unknown): unknown {
   let core: z.core.$ZodType = schema
   let optionalSection = false

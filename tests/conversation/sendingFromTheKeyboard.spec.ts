@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { composer, manuscript, openPiece, transcriptLine } from './studio.js'
+import { composer, manuscript, openPiece, transcriptLine } from '../support/studio.js'
 
 const OPENING = 'The cups sat where she had left them.'
 

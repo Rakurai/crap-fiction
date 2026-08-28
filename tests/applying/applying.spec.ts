@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { APPLIED_TEXT, SUGGESTION_CLAIM } from '../support/fixtureAnswers.js'
-import { answerControl, manuscript, openPiece, sendToRoom } from './studio.js'
+import { answerControl, manuscript, openPiece, sendToRoom } from '../support/studio.js'
 
 const OPENING = 'The cups sat where she had left them.'
 

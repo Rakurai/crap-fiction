@@ -224,18 +224,8 @@ export function useConversation(
       })
     }
 
-    function learnActivity(activityPromise: Promise<RoomActivitySnapshot>, cleanup?: () => void): void {
-      void activityPromise
-        .then((activity) => {
-          cleanup?.()
-          if (!active) return
-          update({ type: 'activityLearned', activity: activity[surface] })
-        })
-        .catch((err: unknown) => {
-          cleanup?.()
-          if (!active) return
-          update({ type: 'activityUnlearnable', message: `${err instanceof Error ? err.message : String(err)} — ${STAYS_LOCKED}` })
-        })
+    function unlearnable(message: string): void {
+      update({ type: 'activityUnlearnable', message: `${message} — ${STAYS_LOCKED}` })
     }
 
     const { snapshot, unsubscribe } = subscribeToRoom(
@@ -246,13 +236,19 @@ export function useConversation(
       },
       (message) => {
         if (!active) return
-        update({ type: 'reported', message })
-        const peek = subscribeToRoom(pieceId, () => {}, () => {})
-        learnActivity(peek.snapshot, peek.unsubscribe)
+        unlearnable(message)
       },
     )
 
-    learnActivity(snapshot)
+    void snapshot
+      .then((activity) => {
+        if (!active) return
+        update({ type: 'activityLearned', activity: activity[surface] })
+      })
+      .catch((err: unknown) => {
+        if (!active) return
+        unlearnable(err instanceof Error ? err.message : String(err))
+      })
 
     return () => {
       active = false

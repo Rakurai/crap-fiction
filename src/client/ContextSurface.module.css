@@ -9,12 +9,7 @@
 }
 
 .lifecycleError {
-  flex: none;
-  font: 400 11.5px/1.45 var(--font-ui);
-  color: var(--ink2);
-  margin: 0;
-  padding: 8px 22px;
-  border-top: 1px solid var(--rule2);
+  composes: lifecycleError from './chrome.module.css';
 }
 
 .scroll {

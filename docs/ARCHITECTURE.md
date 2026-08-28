@@ -480,9 +480,9 @@ values, maintainer-facing, in one place — never author configuration and never
 interface, which several callers could then disagree about.
 
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
-it can answer makes the author wait for a reason the interface can state. An implementation that
-cannot tell setup from work simply never reports preparing — the interface admits the richer state
-and a weaker implementation under-reports. Load progress as a fraction is deliberately not carried:
+it can answer makes the author wait for a reason the interface can state. The interface admits the
+richer state and lets a weaker implementation under-report, rather than levelling down to what every
+implementation can distinguish. Load progress as a fraction is deliberately not carried:
 the author's next move is the same at forty percent as at sixty, and a number on the interface is a
 progress bar the composition then owes.
 

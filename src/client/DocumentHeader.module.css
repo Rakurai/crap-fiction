@@ -1,12 +1,5 @@
 .bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 52px;
-  flex: none;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--rule);
-  overflow: hidden;
+  composes: bar from './chrome.module.css';
 }
 
 .doors {
@@ -17,17 +10,7 @@
 }
 
 .door {
-  font: 400 10px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: .07em;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.door:hover {
-  color: var(--ink2);
+  composes: door from './controls.module.css';
 }
 
 .rule {

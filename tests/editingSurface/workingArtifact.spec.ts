@@ -11,7 +11,7 @@ import {
   reopenPiece,
   sendToRoom,
   transcriptLine,
-} from './studio.js'
+} from '../support/studio.js'
 
 const FIRST = 'Working Artifact'
 

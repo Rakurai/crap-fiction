@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { manuscript, openPiece, paneControl, writeThroughSource } from './studio.js'
+import { manuscript, openPiece, paneControl, writeThroughSource } from '../support/studio.js'
 
 const LONG_MANUSCRIPT = Array.from(
   { length: 40 },

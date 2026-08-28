@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { INTERVIEWER_QUESTION } from '../support/fixtureAnswers.js'
-import { answerOf, composer, control, manuscript, openPiece, transcriptLine } from './studio.js'
+import { answerOf, composer, control, manuscript, openPiece, transcriptLine } from '../support/studio.js'
 
 const PIECE = 'Asking For A Question'
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import styles from './Manuscript.module.css'
+import styles from './EditableTitle.module.css'
 
 type EditableTitleProps = {
   readonly title: string

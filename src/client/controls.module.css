@@ -89,3 +89,17 @@
   border-color: var(--rule2);
   cursor: default;
 }
+
+.door {
+  font: 400 10px/1 var(--font-facts);
+  color: var(--ink4);
+  letter-spacing: .07em;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.door:hover {
+  color: var(--ink2);
+}
