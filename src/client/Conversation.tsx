@@ -694,18 +694,20 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
-        <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
-          ask me
-        </button>
-        {conversationActionInFlight ? (
-          <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
-            stop
+        <div className={styles.composerActions}>
+          <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
+            ask me
           </button>
-        ) : (
-          <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-            send
-          </button>
-        )}
+          {conversationActionInFlight ? (
+            <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
+              stop
+            </button>
+          ) : (
+            <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
+              send
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )
