@@ -12,6 +12,7 @@ import {
   type HistoryPolicy,
 } from '../../src/server/room/context.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
+import type { CallTurns, TurnRole } from '../../src/server/model/types.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
@@ -81,8 +82,14 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: Ap
   }
 }
 
-function wholeOf(rendered: { durable: string; perCall: string }): string {
-  return rendered.durable + rendered.perCall
+function wholeOf(rendered: CallTurns): string {
+  return rendered.map((turn) => turn.content).join('')
+}
+
+function contentOf(rendered: CallTurns, role: TurnRole): string {
+  const turn = rendered.find((candidate) => candidate.role === role)
+  if (turn === undefined) throw new Error(`the rendered call carries no ${role} turn`)
+  return turn.content
 }
 
 function markerIndices(text: string, markers: readonly string[]): readonly number[] {
@@ -394,17 +401,17 @@ describe('rendering a prompt', () => {
     expect(wholeOf(renderPrompt(withNothing, fragments, charter))).not.toContain('FIXTURE_READINGS_HEADING')
   })
 
-  it("states the mode's shared description of form and scale alongside the role's own persona in the durable half, and selects the generalist task for the generalist in the per-call half", () => {
+  it("states the mode's shared description of form and scale alongside the role's own persona in the standing turn, and selects the generalist task for the generalist in the request turn", () => {
     const compiled = compileSpecialistContext(contextInput({ role: shape }))
-    const { durable, perCall } = renderPrompt(compiled, fragments, charter)
-    expect(durable).toContain(MODE_DESCRIPTION)
-    expect(sectionOf(durable, 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
-    expect(perCall).toContain('FIXTURE_SPECIALIST_TASK')
+    const rendered = renderPrompt(compiled, fragments, charter)
+    expect(contentOf(rendered, 'system')).toContain(MODE_DESCRIPTION)
+    expect(sectionOf(contentOf(rendered, 'system'), 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
+    expect(contentOf(rendered, 'user')).toContain('FIXTURE_SPECIALIST_TASK')
 
     const generalistRole: RoleDefinition = { ...shape, eligibility: 'generalist' }
-    const generalistPrompt = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
-    expect(generalistPrompt.perCall).toContain('FIXTURE_GENERALIST_TASK')
-    expect(generalistPrompt.perCall).not.toContain('FIXTURE_SPECIALIST_TASK')
+    const generalist = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
+    expect(contentOf(generalist, 'user')).toContain('FIXTURE_GENERALIST_TASK')
+    expect(contentOf(generalist, 'user')).not.toContain('FIXTURE_SPECIALIST_TASK')
   })
 
   it('states that an answer is owed only when the call owes one', () => {
@@ -490,8 +497,18 @@ describe('the task instruction names the surface it was compiled for', () => {
   })
 })
 
-describe('the order the two halves compose in', () => {
-  it('orders a participant call widest-frame to narrowest-responsibility, and its per-call half task through the current material', () => {
+describe('the turns a call site sends', () => {
+  it('sends the standing material as a system turn and the request as a user turn, in that order, for a participant call and for an application alike', () => {
+    const participant = renderPrompt(compileSpecialistContext(contextInput({ role: shape })), fragments, charter)
+    const application = renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments)
+
+    expect(participant.map((turn) => turn.role)).toEqual(['system', 'user'])
+    expect(application.map((turn) => turn.role)).toEqual(['system', 'user'])
+  })
+})
+
+describe('the order the two turns compose in', () => {
+  it('orders a participant call widest-frame to narrowest-responsibility, and its request turn task through the current material', () => {
     const context = compileSpecialistContext(
       contextInput({
         role: shape,
@@ -501,12 +518,12 @@ describe('the order the two halves compose in', () => {
       }),
     )
 
-    const { durable, perCall } = renderPrompt(context, fragments, charter)
+    const rendered = renderPrompt(context, fragments, charter)
 
-    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
+    expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
     expect(
       isAscending(
-        markerIndices(perCall, [
+        markerIndices(contentOf(rendered, 'user'), [
           'FIXTURE_SPECIALIST_TASK',
           'FIXTURE_DRAFT_SURFACE',
           'FIXTURE_ADDRESSED_HEADING',
@@ -518,7 +535,7 @@ describe('the order the two halves compose in', () => {
     ).toBe(true)
   })
 
-  it('orders an operation call mode description then operation role, and its per-call half task through the current material', () => {
+  it('orders an operation call mode description then operation role, and its request turn task through the current material', () => {
     const context = compileApplyContext(
       applyContextInput({
         authorContext: 'prefers short sentences',
@@ -527,12 +544,12 @@ describe('the order the two halves compose in', () => {
       }),
     )
 
-    const { durable, perCall } = renderApplyPrompt(context, fragments)
+    const rendered = renderApplyPrompt(context, fragments)
 
-    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
+    expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
     expect(
       isAscending(
-        markerIndices(perCall, [
+        markerIndices(contentOf(rendered, 'user'), [
           'FIXTURE_APPLY_TASK',
           'FIXTURE_DRAFT_SURFACE',
           'FIXTURE_AUTHOR_CONTEXT_HEADING',

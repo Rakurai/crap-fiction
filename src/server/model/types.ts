@@ -14,12 +14,16 @@ export const callStateSchema = participantStageSchema.exclude(['called'])
 
 export type CallState = z.infer<typeof callStateSchema>
 
-export type CallPrompt = Readonly<{ durable: string; perCall: string }>
+export type TurnRole = 'system' | 'user' | 'assistant'
+
+export type Turn = Readonly<{ role: TurnRole; content: string }>
+
+export type CallTurns = readonly Turn[]
 
 export type ModelAccess = {
   call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,

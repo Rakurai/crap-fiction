@@ -5,25 +5,28 @@ import { FixtureModelAdapter } from '../support/modelAdapter.js'
 
 const schema = z.object({ claim: z.string() })
 const runtimeStatus = { reachable: true, models: [] } as const
-const prompt = { durable: 'durable', perCall: 'per-call' }
+const turns = [
+  { role: 'system', content: 'standing' },
+  { role: 'user', content: 'request' },
+] as const
 
 describe('the fixture model implementation, as a substitute for the seam', () => {
   it("relays every scripted outcome as the seam would — a value through the caller's own schema, one that does not conform as nonconforming carrying what it was, and a failure as its own reason", async () => {
     const conforming = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'the room agrees' } } }, runtimeStatus)
-    expect(await conforming.call('shape', prompt, schema, new AbortController().signal)).toEqual({
+    expect(await conforming.call('shape', turns, schema, new AbortController().signal)).toEqual({
       outcome: 'value',
       value: { claim: 'the room agrees' },
     })
 
     const muttering = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { outcome: 'muttered' } } }, runtimeStatus)
-    expect(await muttering.call('shape', prompt, eligibleResponseValueSchema, new AbortController().signal)).toEqual({
+    expect(await muttering.call('shape', turns, eligibleResponseValueSchema, new AbortController().signal)).toEqual({
       outcome: 'failed',
       reason: 'nonconforming',
       returned: '{"outcome":"muttered"}',
     })
 
     const failing = FixtureModelAdapter.uniform({ result: { outcome: 'failed', reason: 'timeout' } }, runtimeStatus)
-    expect(await failing.call('shape', prompt, schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
+    expect(await failing.call('shape', turns, schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
   })
 
   it('delivers scripted states in order ahead of the settled outcome, and resolves cancellation as abandoned rather than as a failure', async () => {
@@ -33,13 +36,13 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
     )
     const states: string[] = []
 
-    await adapter.call('shape', prompt, schema, new AbortController().signal, (state) => states.push(state))
+    await adapter.call('shape', turns, schema, new AbortController().signal, (state) => states.push(state))
 
     expect(states).toEqual(['preparing', 'working'])
 
     const slow = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'too slow' } }, delayMs: 50 }, runtimeStatus)
     const controller = new AbortController()
-    const pending = slow.call('shape', prompt, schema, controller.signal)
+    const pending = slow.call('shape', turns, schema, controller.signal)
     controller.abort()
 
     expect(await pending).toEqual({ outcome: 'abandoned' })
@@ -51,11 +54,43 @@ describe('the fixture model implementation, as a substitute for the seam', () =>
       runtimeStatus,
     )
 
-    expect(await adapter.call('shape', prompt, schema, new AbortController().signal)).toEqual({
+    expect(await adapter.call('shape', turns, schema, new AbortController().signal)).toEqual({
       outcome: 'value',
       value: { claim: 'from shape' },
     })
-    await expect(adapter.call('story-editor', prompt, schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
+    await expect(adapter.call('story-editor', turns, schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
+  })
+
+  it('records the turns of every call to a site, in the order they were made, and reports none for a site never called', async () => {
+    const adapter = FixtureModelAdapter.uniform({ result: { outcome: 'value', value: { claim: 'x' } } }, runtimeStatus)
+
+    await adapter.call('shape', turns, schema, new AbortController().signal)
+    await adapter.call('shape', [...turns, { role: 'assistant', content: 'what it answered' }], schema, new AbortController().signal)
+
+    expect(adapter.turnsFor('shape')).toEqual([
+      turns,
+      [...turns, { role: 'assistant', content: 'what it answered' }],
+    ])
+    expect(adapter.turnsFor('compression')).toEqual([])
+  })
+
+  it('spends a scripted sequence one behaviour per call to that site, and fails loudly once it is exhausted', async () => {
+    const adapter = FixtureModelAdapter.bySite(
+      {
+        shape: [
+          { result: { outcome: 'value', value: { claim: 'first round' } } },
+          { result: { outcome: 'failed', reason: 'timeout' } },
+        ],
+      },
+      runtimeStatus,
+    )
+
+    expect(await adapter.call('shape', turns, schema, new AbortController().signal)).toEqual({
+      outcome: 'value',
+      value: { claim: 'first round' },
+    })
+    expect(await adapter.call('shape', turns, schema, new AbortController().signal)).toEqual({ outcome: 'failed', reason: 'timeout' })
+    await expect(adapter.call('shape', turns, schema, new AbortController().signal)).rejects.toThrow(/no scripted result/)
   })
 
   it('reports the runtime status a test stated, and refuses to invent one no test stated', async () => {

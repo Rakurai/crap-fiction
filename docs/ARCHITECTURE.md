@@ -452,10 +452,18 @@ mean different things to the author and to the room, so none of them is the abse
 result modelling two of them as a missing value would leave every caller inferring the difference
 from state it happens to hold. A failure carries what came back verbatim where anything did.
 
-**Each half crosses as text rather than as messages.** A message array would import a chat topology
-from whichever runtime was consulted first, and this conversation has five speakers with no faithful
-mapping onto user-and-assistant alternation. Flattening is the correct representation here rather
-than a concession, and context compilation already produces it.
+**A call crosses as an ordered sequence of turns, each carrying a role**, and the roles are the three
+an instruction-tuned model was trained on. The room's speakers are not the call's speakers: a
+conversation of five participants is material a turn carries, while the turns themselves are the
+exchange between this application and one model, which has exactly two speakers. What that buys is
+attribution — anything a model itself said is marked as its own words rather than arriving as text the
+author appears to have written — and a standing turn that is byte-identical across the calls of one
+operation, which is what a cached prefix requires.
+
+**Which sequence a call site sends is declared rather than left to each implementation.** "Ordered
+turns" is a guarantee two implementations can both satisfy while attributing the same material to
+different speakers, and an implementation that attributed it differently from the fixture would make
+the fixture lie about what the runtime will see.
 
 **A successful result conformed.** Nothing above this interface parses, validates, repairs or
 inspects raw model text; a response that could not be made to conform is a stated failure. Where the
@@ -530,8 +538,8 @@ would call for one is wanting a model this runtime cannot reach, which is narrow
 because it is nearly free, not because it is expected to be exercised.
 
 A separate service behind a sidecar or proxy is not eligible: one process and one schema definition
-are what make the artifact shapes a single contract. Nor may the runtime's own agent loop, tool loop
-or chat abstraction be used, because the product's essential rule — that specialists form
+are what make the artifact shapes a single contract. Nor may the runtime's own session object, agent
+loop or tool loop be used, because the product's essential rule — that specialists form
 current-dispatch judgments independently and then the Story Editor may see them — has to remain
 visible and testable in this application's own code.
 
@@ -607,10 +615,10 @@ states nothing about any one participant's responsibility; each interprets what 
 through its own persona, so the Story Editor receives the same description as every specialist and
 applies it through a different persona rather than being exempted from it.
 
-**A call's prompt has a durable half and a per-call half, each composed from loaded fragments in a
-fixed order.** The durable half is what is true of the call site before a request — the mode
+**A call's input is a standing turn and a request turn, each composed from loaded fragments in a
+fixed order.** The standing turn is what is true of the call site before a request — the mode
 description, the charter, a participant's persona, or a non-participant call's operation role; the
-per-call half is the task and the material a particular request carries. No heading, task instruction
+request turn is the task and the material a particular request carries. No heading, task instruction
 or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
 prompt language of its own.
 
@@ -1178,7 +1186,7 @@ boundary's assertions cover:
 | **context** | independence, the history policies, and the Story Editor's asymmetric input |
 | **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, and that no operation writes any surface's document |
 | **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
-| **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, no reasoning above the seam, and the adapter's serialization of independent submissions |
+| **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, the turns a call site sends crossing intact and in order with their declared roles, no reasoning above the seam, and the adapter's serialization of independent submissions |
 | **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |
 | **projection** | idempotent append, activity only for a participant reported on, and stale events discarded |
 
@@ -1233,7 +1241,7 @@ Stated so they do not accrete.
   adapter's own fixed policy, never a scheduler, a limit, or a residency abstraction the room configures or
   depends on.
 - **No context-window awareness, no chunking, and no excerpting** of anything sent to a model.
-- **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its single-call
+- **No session object, agent loop or tool loop taken from the model library.** Only its single-call
   surface is used.
 - **No per-participant re-ask**, and no attempt history inside a settled response.
 - **No validation of a declared outcome against a response's content**, which would take a second model call

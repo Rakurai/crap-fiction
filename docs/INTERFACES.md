@@ -141,10 +141,10 @@ Connecting to a piece's stream is what opens it.
 ## The model seam
 
 ```ts
-call(site, prompt, schema, signal, onState?) → CallResult<T>
+call(site, turns, schema, signal, onState?) → CallResult<T>
 status()                                    → whether the runtime is reachable, and what it holds
 
-Prompt = { durable, perCall }               each half a string; see Context compilation
+Turn = { role, content }                    role is system, user or assistant; see Context compilation
 
 CallResult<T> =
   | { outcome: 'value';     value: T }
@@ -154,9 +154,11 @@ CallResult<T> =
 FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming' | 'internal'
 ```
 
-`prompt` carries the durable half and the per-call half apart; no caller composes them into one string
-before the seam, and only an implementation constrained to a single-string vendor call joins them, as
-that vendor's own accommodation.
+`turns` is an ordered sequence, and the sequence a call site sends is declared rather than an
+implementation's choice: every call site's first call is the standing material as a system turn
+followed by its request as a user turn. An implementation delivers them with their roles intact and in
+that order, and only one constrained to a single-string vendor call joins them, as that vendor's own
+accommodation.
 
 | Reason | Means |
 |---|---|

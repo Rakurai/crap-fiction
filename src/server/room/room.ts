@@ -525,7 +525,7 @@ export class Room {
       role,
       owesAnswer,
       contributesEvidence,
-      prompt: renderPrompt(context, this.#catalog.fragments, this.#catalog.charter),
+      turns: renderPrompt(context, this.#catalog.fragments, this.#catalog.charter),
     }))
 
     const evidence: ParticipantEvidence[] = []
@@ -544,7 +544,7 @@ export class Room {
 
     const settleSpecialist = async (call: (typeof calls)[number]): Promise<void> => {
       onState(call.role.id, 'called')
-      const outcome = await callParticipant(call.role, call.prompt, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
+      const outcome = await callParticipant(call.role, call.turns, causeEntry.id, call.owesAnswer, this.#modelAccess, signal, (state) =>
         onState(call.role.id, state),
       )
       operation.states.delete(call.role.id)
@@ -580,13 +580,13 @@ export class Room {
       } else {
         const storyEditor = this.#catalog.roster.storyEditor
         const owesAnswer = addressedIds.includes(storyEditor.id) || evidence.length === 0
-        const prompt = renderPrompt(
+        const turns = renderPrompt(
           compileStoryEditorContext(contextFor(storyEditor, owesAnswer), evidence),
           this.#catalog.fragments,
           this.#catalog.charter,
         )
         onState(storyEditor.id, 'called')
-        const outcome = await callParticipant(storyEditor, prompt, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
+        const outcome = await callParticipant(storyEditor, turns, causeEntry.id, owesAnswer, this.#modelAccess, signal, (state) =>
           onState(storyEditor.id, state),
         )
         operation.states.delete(storyEditor.id)
@@ -661,8 +661,8 @@ export class Room {
         entries,
         participants: this.#catalog.participantDisplayNames,
       })
-      const prompt = renderApplyPrompt(context, this.#catalog.fragments)
-      const result = await this.#modelAccess.call('apply', prompt, applyResultSchema, controller.signal)
+      const turns = renderApplyPrompt(context, this.#catalog.fragments)
+      const result = await this.#modelAccess.call('apply', turns, applyResultSchema, controller.signal)
       if (result.outcome !== 'value') {
         closeOut(result.outcome === 'abandoned' ? 'abandoned' : 'failed')
         return {

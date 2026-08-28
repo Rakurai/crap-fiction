@@ -5,7 +5,7 @@ import type { StudioConfig } from '../../shared/config.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
-import type { CallPrompt, CallResult, CallState, ModelAccess } from './types.js'
+import type { CallResult, CallState, CallTurns, ModelAccess } from './types.js'
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -101,19 +101,19 @@ export class LMStudioAdapter implements ModelAccess {
 
   call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
-    const run = this.#queue.then(() => this.#call(site, prompt, schema, signal, onState))
+    const run = this.#queue.then(() => this.#call(site, turns, schema, signal, onState))
     this.#queue = run.catch(() => undefined)
     return run
   }
 
   async #call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
@@ -138,7 +138,7 @@ export class LMStudioAdapter implements ModelAccess {
     }
 
     try {
-      const value = await pRetry(() => this.#attempt(assignment, prompt, schema, jsonSchema, maxTokens, combined, announce), {
+      const value = await pRetry(() => this.#attempt(assignment, turns, schema, jsonSchema, maxTokens, combined, announce), {
         retries: this.#config.retries,
         signal: combined,
       })
@@ -163,7 +163,7 @@ export class LMStudioAdapter implements ModelAccess {
 
   async #attempt<T>(
     assignment: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     jsonSchema: object,
     maxTokens: number,
@@ -173,9 +173,8 @@ export class LMStudioAdapter implements ModelAccess {
     announce('preparing')
     const model = await throughRuntime(() => this.#client.llm.model(assignment, { signal }))
     announce('working')
-    const result = await throughRuntime(() =>
-      model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal }),
-    )
+    const chat = turns.map(({ role, content }) => ({ role, content }))
+    const result = await throughRuntime(() => model.respond(chat, { structured: { type: 'json', jsonSchema }, maxTokens, signal }))
 
     const returned = result.nonReasoningContent
 

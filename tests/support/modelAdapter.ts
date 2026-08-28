@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
-import type { CallPrompt, CallResult, CallState, ModelAccess } from '../../src/server/model/types.js'
+import type { CallResult, CallState, CallTurns, ModelAccess } from '../../src/server/model/types.js'
 
 export type FixtureBehavior = Readonly<{
   result: CallResult<unknown>
@@ -9,20 +9,22 @@ export type FixtureBehavior = Readonly<{
   held?: boolean
 }>
 
+export type FixtureScript = FixtureBehavior | readonly FixtureBehavior[]
+
 export class FixtureModelAdapter implements ModelAccess {
-  readonly #behaviorFor: (site: string) => FixtureBehavior
+  readonly #scriptFor: (site: string) => FixtureScript
   readonly #runtimeStatus: RuntimeStatus | undefined
   readonly #onCall: ((site: string) => void) | undefined
-  readonly #prompts = new Map<string, CallPrompt>()
+  readonly #calls: Array<{ site: string; turns: CallTurns }> = []
   readonly #released = new Set<string>()
   readonly #gates = new Map<string, () => void>()
 
   private constructor(
-    behaviorFor: (site: string) => FixtureBehavior,
+    scriptFor: (site: string) => FixtureScript,
     runtimeStatus: RuntimeStatus | undefined,
     onCall: ((site: string) => void) | undefined,
   ) {
-    this.#behaviorFor = behaviorFor
+    this.#scriptFor = scriptFor
     this.#runtimeStatus = runtimeStatus
     this.#onCall = onCall
   }
@@ -32,15 +34,15 @@ export class FixtureModelAdapter implements ModelAccess {
   }
 
   static bySite(
-    behaviors: Readonly<Record<string, FixtureBehavior>>,
+    scripts: Readonly<Record<string, FixtureScript>>,
     runtimeStatus: RuntimeStatus | undefined,
     onCall?: (site: string) => void,
   ): FixtureModelAdapter {
     return new FixtureModelAdapter(
       (site) => {
-        const behavior = behaviors[site]
-        if (behavior === undefined) throw new Error(`no scripted result for "${site}"`)
-        return behavior
+        const script = scripts[site]
+        if (script === undefined) throw new Error(`no scripted result for "${site}"`)
+        return script
       },
       runtimeStatus,
       onCall,
@@ -49,16 +51,17 @@ export class FixtureModelAdapter implements ModelAccess {
 
   async call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
-    this.#prompts.set(site, prompt)
+    const round = this.turnsFor(site).length
+    this.#calls.push({ site, turns })
     this.#onCall?.(site)
     if (signal.aborted) return { outcome: 'abandoned' }
 
-    const behavior = this.#behaviorFor(site)
+    const behavior = this.#behaviorFor(site, round)
     for (const state of behavior.states ?? []) onState?.(state)
 
     if (behavior.held) {
@@ -84,9 +87,22 @@ export class FixtureModelAdapter implements ModelAccess {
     this.#gates.get(site)?.()
   }
 
+  turnsFor(site: string): readonly CallTurns[] {
+    return this.#calls.filter((call) => call.site === site).map((call) => call.turns)
+  }
+
   promptFor(site: string): string | undefined {
-    const prompt = this.#prompts.get(site)
-    return prompt === undefined ? undefined : prompt.durable + prompt.perCall
+    const rounds = this.turnsFor(site)
+    const last = rounds[rounds.length - 1]
+    return last === undefined ? undefined : last.map((turn) => turn.content).join('')
+  }
+
+  #behaviorFor(site: string, round: number): FixtureBehavior {
+    const script = this.#scriptFor(site)
+    if ('result' in script) return script
+    const behavior = script[round]
+    if (behavior === undefined) throw new Error(`no scripted result for "${site}" beyond ${script.length} call(s)`)
+    return behavior
   }
 
   async status(): Promise<RuntimeStatus> {
