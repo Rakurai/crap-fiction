@@ -1,5 +1,5 @@
 import * as Ariakit from '@ariakit/react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AppliedChangeContent, ChangedPassage } from '../shared/appliedChange.js'
 import { conversationName } from './conversationNaming.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../shared/conversationEntryViews.js'
@@ -14,7 +14,7 @@ import { isChangeDisclosed, setChangeDisclosed } from './appliedChangeDisclosure
 import { config } from './config.js'
 import { elapsed, facts, machineWords, messageWhen, passageCount, wordCount } from './facts.js'
 import styles from './Conversation.module.css'
-import { Mark } from './Mark.js'
+import { Identity } from './Identity.js'
 import { isParticipantOutcome } from './entryProjection.js'
 import { completeMention, mentionQuery, type MentionQuery } from './mentionTrigger.js'
 import { useApply, type ApplySettlement, type ApplyingResponse } from './useApply.js'
@@ -242,22 +242,6 @@ type EntryActions = Readonly<{
   onAsk: (responseId: string, clarification: string | undefined) => void
 }>
 
-function IdentityLine({ identity, status }: { readonly identity: ParticipantIdentity; readonly status?: string | undefined }) {
-  return (
-    <div className={styles.identity}>
-      <Mark mark={identity.mark} ordinal={identity.ordinal} />
-      {identity.handle !== undefined && <span className={styles.handle}>@{identity.handle}</span>}
-      <span className={styles.name}>{identity.displayName}</span>
-      {status !== undefined && (
-        <>
-          <span className={styles.identitySpacer} />
-          <span className={styles.identityStatus}>{status}</span>
-        </>
-      )}
-    </div>
-  )
-}
-
 function Disclosable({ text, tone }: { readonly text: string; readonly tone: 'claim' | 'note' }) {
   const [open, setOpen] = useState(false)
   const [beyondTheCeiling, setBeyondTheCeiling] = useState(false)
@@ -330,13 +314,13 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'participantNoComment':
       return (
         <div className={styles.participant}>
-          <IdentityLine identity={identify(entry.participantId)} status={machineWords('nothing to add')} />
+          <Identity {...identify(entry.participantId)} status={machineWords('nothing to add')} />
         </div>
       )
     case 'participantFailure':
       return (
         <div className={styles.participant}>
-          <IdentityLine identity={identify(entry.participantId)} />
+          <Identity {...identify(entry.participantId)} />
           <p className={styles.failed}>did not answer — {machineWords(entry.reason)}</p>
           {entry.returned !== undefined && <p className={styles.returned}>{entry.returned}</p>}
           <ResponseActions
@@ -359,8 +343,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
       const responseSettlement = applied ? undefined : settlement?.responseId === entry.id ? settlement : undefined
       return (
         <div className={styles.participant}>
-          <IdentityLine
-            identity={identify(entry.participantId)}
+          <Identity
+            {...identify(entry.participantId)}
             status={
               responseSettlement === undefined
                 ? undefined
@@ -430,7 +414,7 @@ function ParticipantFlightLine({
 }) {
   return (
     <div className={`${styles.participant} ${styles.pending}`}>
-      <IdentityLine identity={identify(participantId)} status={participantStatus(state, nowMs)} />
+      <Identity {...identify(participantId)} status={participantStatus(state, nowMs)} />
     </div>
   )
 }

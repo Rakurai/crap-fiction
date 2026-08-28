@@ -18,7 +18,7 @@ const STORY_EDITOR: StoryEditorView = {
 describe('editing the room', () => {
   afterEach(cleanup)
 
-  it('lists every specialist by handle with its role description and the act available on it, disabling only the row a toggle is in flight for', () => {
+  it('lists every specialist by name and handle with its role description and the act available on it, disabling only the row a toggle is in flight for', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('@shape')).toBeTruthy()

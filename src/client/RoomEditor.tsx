@@ -1,6 +1,6 @@
 import type { RosterMemberView, StoryEditorView } from '../shared/pieceViews.js'
 import { machineWords } from './facts.js'
-import { Mark } from './Mark.js'
+import { Identity } from './Identity.js'
 import { PanelHeader } from './PanelHeader.js'
 import styles from './RoomEditor.module.css'
 import { Scrim } from './Scrim.js'
@@ -14,7 +14,6 @@ type RoomEditorProps = {
 }
 
 const ALWAYS_PRESENT = machineWords('always present')
-const ABSENT = machineWords('absent')
 
 export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }: RoomEditorProps) {
   return (
@@ -25,15 +24,10 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
         <ul className={styles.list}>
           {members.map((member) => (
             <li key={member.id} className={styles.item}>
-              <div className={styles.identity}>
-                <Mark mark={member.mark} ordinal={member.ordinal} />
-                <span className={styles.handle}>@{member.handle}</span>
-                <span className={styles.name}>{member.displayName}</span>
-                {!member.enabled && <span className={styles.absent}>{ABSENT}</span>}
-              </div>
+              <Identity mark={member.mark} ordinal={member.ordinal} displayName={member.displayName} handle={member.handle} />
               <button
                 type="button"
-                className={styles.toggle}
+                className={member.enabled ? `${styles.toggle} ${styles.present}` : styles.toggle}
                 disabled={toggling === member.id}
                 onClick={() => onToggle(member.id)}
               >
@@ -43,11 +37,7 @@ export function RoomEditor({ members, storyEditor, toggling, onToggle, onClose }
             </li>
           ))}
           <li className={styles.item}>
-            <div className={styles.identity}>
-              <Mark mark={storyEditor.mark} ordinal={null} />
-              <span className={styles.handle}>@{storyEditor.handle}</span>
-              <span className={styles.name}>{storyEditor.displayName}</span>
-            </div>
+            <Identity mark={storyEditor.mark} ordinal={null} displayName={storyEditor.displayName} handle={storyEditor.handle} />
             <span className={styles.always}>{ALWAYS_PRESENT}</span>
             <p className={styles.role}>{storyEditor.description}</p>
           </li>
