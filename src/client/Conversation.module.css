@@ -225,6 +225,12 @@
   padding: 6px 8px;
 }
 
+.actionField:disabled {
+  color: var(--ink4);
+  background: none;
+  border-color: var(--rule);
+}
+
 .actionButton {
   composes: action from './controls.module.css';
   flex: none;
@@ -383,6 +389,12 @@
   border: 1px solid var(--rule2);
   border-radius: 4px;
   padding: 8px 10px;
+}
+
+.input:disabled {
+  color: var(--ink4);
+  background: none;
+  border-color: var(--rule);
 }
 
 .mentions {

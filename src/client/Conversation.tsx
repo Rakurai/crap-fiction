@@ -120,6 +120,7 @@ function ResponseActions({
         aria-label={fieldLabel}
         className={styles.actionField}
         value={text}
+        disabled={disabled}
         onChange={(event) => setText(event.target.value)}
       />
     </div>
@@ -454,6 +455,7 @@ export function Conversation({
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
   const [caretOffset, setCaretOffset] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const wasBusy = useRef(false)
   const combobox = Ariakit.useComboboxStore()
   const token = Ariakit.useStoreState(combobox, 'inputValue')
 
@@ -535,6 +537,16 @@ export function Conversation({
   const roomBusy = conversation.busy || apply.applying !== undefined
   const conversationActionInFlight = activity !== undefined
   const opening = conversationName(conversation.projection.entries)
+
+  useEffect(() => {
+    if (roomBusy) {
+      wasBusy.current = true
+      return
+    }
+    if (!wasBusy.current) return
+    wasBusy.current = false
+    textareaRef.current?.focus()
+  }, [roomBusy])
 
   function askAboutChange(): void {
     if (roomBusy) return
@@ -661,6 +673,7 @@ export function Conversation({
               <textarea
                 ref={textareaRef}
                 rows={2}
+                disabled={roomBusy}
                 onPointerDown={combobox.hide}
                 onChange={(event) => {
                   const textarea = event.target
