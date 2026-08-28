@@ -73,7 +73,7 @@ export class WorkspaceRegistry {
   async set(candidate: string): Promise<string> {
     const resolved = containedWorkspace(this.#dataRoot, candidate)
 
-    await this.#settings.writeSection(this.#dataRoot, 'workspace', resolved)
+    await this.#settings.writeSection(this.#dataRoot, 'workspace', resolved, workspacePathSchema)
     this.#workspace = resolved
     return resolved
   }

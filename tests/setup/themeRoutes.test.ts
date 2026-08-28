@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
 import { MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 describe('the theme routes', () => {
   let dataRoot: string
@@ -49,6 +50,6 @@ describe('the theme routes', () => {
     })
 
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'INVALID_REQUEST' } })
+    expect(await res.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.INVALID_REQUEST } })
   })
 })

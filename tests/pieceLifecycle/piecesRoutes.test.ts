@@ -8,6 +8,7 @@ import type { ConversationScope } from '../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../src/server/store/index.js'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../support/roomFixtures.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const MODE: ModeDescriptor = {
   id: 'flash',
@@ -172,41 +173,41 @@ describe('the piece routes', () => {
   it('translates every refusal the studio states into a named code at its own status', async () => {
     const unconfigured = await studio().app.request('/pieces')
     expect(unconfigured.status).toBe(400)
-    expect(await unconfigured.json()).toMatchObject({ success: false, error: { code: 'WORKSPACE_NOT_SET' } })
+    expect(await unconfigured.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.WORKSPACE_NOT_SET } })
 
     const { app, dir } = await withPiece()
 
     const ungrammatical = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({}) })
     expect(ungrammatical.status).toBe(400)
-    expect(await ungrammatical.json()).toMatchObject({ success: false, error: { code: 'INVALID_REQUEST' } })
+    expect(await ungrammatical.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.INVALID_REQUEST } })
 
     const absentPiece = await app.request('/pieces/nothing-here')
     expect(absentPiece.status).toBe(404)
-    expect(await absentPiece.json()).toMatchObject({ success: false, error: { code: 'PIECE_NOT_FOUND' } })
+    expect(await absentPiece.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.PIECE_NOT_FOUND } })
 
     const absentConversation = await app.request('/pieces/cups/surfaces/draft/conversations/never-written', { method: 'DELETE' })
     expect(absentConversation.status).toBe(404)
-    expect(await absentConversation.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
+    expect(await absentConversation.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.CONVERSATION_NOT_FOUND } })
 
     const outsideCast = await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: { surface: 'draft', ids: ['story-editor'] } }) })
     expect(outsideCast.status).toBe(400)
-    expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: 'CAST_MEMBER_UNKNOWN' } })
+    expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.CAST_MEMBER_UNKNOWN } })
 
     mkdirSync(path.join(dir, 'broken'), { recursive: true })
     writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\nstatus: not-a-status\n', 'utf8')
     const corrupted = await app.request('/pieces/broken')
     expect(corrupted.status).toBe(500)
-    expect(await corrupted.json()).toMatchObject({ success: false, error: { code: 'ARTIFACT_INVALID' } })
+    expect(await corrupted.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ARTIFACT_INVALID } })
 
     const unknownMode = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Nope', mode: 'novella' }) })
     expect(unknownMode.status).toBe(400)
-    expect(await unknownMode.json()).toMatchObject({ success: false, error: { code: 'MODE_UNKNOWN' } })
+    expect(await unknownMode.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.MODE_UNKNOWN } })
 
     const outside = mkdtempSync(path.join(tmpdir(), 'studio-outside-root-'))
     symlinkSync(outside, path.join(dir, 'escaped'))
     const escaped = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'escaped', mode: 'flash' }) })
     expect(escaped.status).toBe(400)
-    expect(await escaped.json()).toMatchObject({ success: false, error: { code: 'PATH_ESCAPES_ROOT' } })
+    expect(await escaped.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.PATH_ESCAPES_ROOT } })
     rmSync(outside, { recursive: true, force: true })
   })
 

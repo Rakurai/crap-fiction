@@ -39,23 +39,10 @@ export function responseEnvelopeSchema<T extends z.ZodType>(data: T) {
 
 export type ResponseEnvelope<T> = z.infer<ReturnType<typeof responseEnvelopeSchema<z.ZodType<T>>>>
 
-export type ApiError = { readonly code: string; readonly message: string }
-
-export type ApiResponse<T> =
-  | { readonly success: true; readonly data: T }
-  | { readonly success: false; readonly error: ApiError }
-
-export function ok<T>(data: T): ApiResponse<T> {
+export function ok<T>(data: T): ResponseEnvelope<T> {
   return { success: true, data }
 }
 
-export function fail(code: string, message: string): ApiResponse<never> {
+export function fail(code: FailureCode, message: string): ResponseFailure {
   return { success: false, error: { code, message } }
-}
-
-export function apiResponseSchema<T extends z.ZodType>(data: T) {
-  return z.discriminatedUnion('success', [
-    z.object({ success: z.literal(true), data }),
-    z.object({ success: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
-  ])
 }

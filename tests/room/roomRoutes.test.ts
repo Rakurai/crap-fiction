@@ -12,6 +12,7 @@ import { FixtureModelAdapter, type FixtureBehavior } from '../support/modelAdapt
 import { buildTestApp } from '../support/harness.js'
 import { buildTestRoom } from '../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const MODE: ModeDescriptor = {
   id: 'flash',
@@ -134,7 +135,7 @@ describe('the room over HTTP', () => {
     expect(res.status).toBe(200)
     const unopened = await app.request(`/pieces/cups/surfaces/draft/conversations/${id}`)
     expect(unopened.status).toBe(404)
-    expect(await unopened.json()).toMatchObject({ success: false, error: { code: 'CONVERSATION_NOT_FOUND' } })
+    expect(await unopened.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.CONVERSATION_NOT_FOUND } })
   })
 
   it('opens the act each request body names — a message to the room, a reply to one participant, or a concrete change asked of a response — reporting the one in flight with the audience it resolved', async () => {
@@ -231,7 +232,7 @@ describe('the room over HTTP', () => {
 
     const unsaved = await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}/apply/${applied.applicationId}/confirm`, { method: 'POST' })
     expect(unsaved.status).toBe(409)
-    expect(await unsaved.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_DOCUMENT_NOT_SAVED' } })
+    expect(await unsaved.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.APPLICATION_DOCUMENT_NOT_SAVED } })
   })
 
   it('accepts abandoning an action nothing is running without complaint', async () => {
@@ -249,22 +250,22 @@ describe('the room over HTTP', () => {
 
     const busy = await dispatch(app, conversationId, { message: 'another message' })
     expect(busy.status).toBe(409)
-    expect(await busy.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
+    expect(await busy.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ROOM_BUSY } })
 
     const deletingBusy = await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}`, { method: 'DELETE' })
     expect(deletingBusy.status).toBe(409)
-    expect(await deletingBusy.json()).toMatchObject({ success: false, error: { code: 'ROOM_BUSY' } })
+    expect(await deletingBusy.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ROOM_BUSY } })
 
     modelAccess.release('shape')
     await untilIdle(room)
 
     const unknownParticipant = await dispatch(app, conversationId, { target: 'no-such-participant', message: 'a reply' })
     expect(unknownParticipant.status).toBe(404)
-    expect(await unknownParticipant.json()).toMatchObject({ success: false, error: { code: 'PARTICIPANT_NOT_FOUND' } })
+    expect(await unknownParticipant.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.PARTICIPANT_NOT_FOUND } })
 
     const unknownCommentary = await dispatch(app, conversationId, { respondingTo: 'no-such-response' })
     expect(unknownCommentary.status).toBe(404)
-    expect(await unknownCommentary.json()).toMatchObject({ success: false, error: { code: 'COMMENTARY_NOT_FOUND' } })
+    expect(await unknownCommentary.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.COMMENTARY_NOT_FOUND } })
 
     const unknownRecommendation = await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}/apply`, {
       method: 'POST',
@@ -272,10 +273,10 @@ describe('the room over HTTP', () => {
       body: JSON.stringify({ responseId: 'no-such-response', documents: { draft: 'text', storyContext: '', authorContext: '' } }),
     })
     expect(unknownRecommendation.status).toBe(404)
-    expect(await unknownRecommendation.json()).toMatchObject({ success: false, error: { code: 'RECOMMENDATION_NOT_FOUND' } })
+    expect(await unknownRecommendation.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.RECOMMENDATION_NOT_FOUND } })
 
     const unknownApplication = await app.request(`/pieces/cups/surfaces/draft/conversations/${conversationId}/apply/no-such-application/confirm`, { method: 'POST' })
     expect(unknownApplication.status).toBe(404)
-    expect(await unknownApplication.json()).toMatchObject({ success: false, error: { code: 'APPLICATION_NOT_PENDING' } })
+    expect(await unknownApplication.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.APPLICATION_NOT_PENDING } })
   })
 })

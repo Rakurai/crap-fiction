@@ -1,10 +1,12 @@
+import type { FailureCode } from '../shared/envelope.js'
+
 export type RefusalKind = 'invalid' | 'not_found' | 'conflict' | 'internal'
 
 export class RouteFailure extends Error {
-  readonly code: string
+  readonly code: FailureCode
   readonly kind: RefusalKind
 
-  constructor(code: string, kind: RefusalKind, message: string) {
+  constructor(code: FailureCode, kind: RefusalKind, message: string) {
     super(message)
     this.code = code
     this.kind = kind

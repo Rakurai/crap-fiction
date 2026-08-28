@@ -1,6 +1,6 @@
 import { act } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { RoomEvent } from '../../src/client/entryProjection.js'
+import type { RoomEvent } from '../../src/shared/conversationEvents.js'
 import { EMPTY_ROOM_ACTIVITY } from '../../src/client/roomClient.js'
 import type { RoomAdapters } from '../../src/client/useConversation.js'
 import type { ConversationEntryView } from '../../src/shared/conversationEntryViews.js'

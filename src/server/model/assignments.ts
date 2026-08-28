@@ -22,7 +22,7 @@ export async function setAssignment(
   model: string,
 ): Promise<void> {
   requireCallSite(sites, site)
-  await settings.writeSection(dataRoot, 'modelAssignments', { [site]: model })
+  await settings.writeSection(dataRoot, 'modelAssignments', { [site]: model }, assignmentsSchema)
 }
 
 export class CallSiteAssignments {

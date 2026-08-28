@@ -5,7 +5,7 @@ import type {
   ParticipantResponseEntry,
 } from '../../shared/conversationEntries.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { CallPrompt, ModelAccess } from '../model/types.js'
+import type { CallPrompt, CallState, ModelAccess } from '../model/types.js'
 import { normalizeResponse, responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
@@ -26,7 +26,7 @@ export async function callParticipant(
   owesAnswer: boolean,
   modelAccess: ModelAccess,
   signal: AbortSignal,
-  onState: (state: 'preparing' | 'working') => void,
+  onState: (state: CallState) => void,
 ): Promise<ParticipantOutcome> {
   const schema = responseValueSchema(owesAnswer)
   const result = await modelAccess.call(role.id, prompt, schema, signal, onState)

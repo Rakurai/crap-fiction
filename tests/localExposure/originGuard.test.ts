@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
 import { createLogger } from '../../src/server/logger.js'
 import { originGuard } from '../../src/server/originGuard.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 function buildApp() {
   const app = new Hono()
@@ -28,6 +29,6 @@ describe('originGuard', () => {
     const res = await buildApp().request('/thing', { headers: { origin: 'http://evil.example' } })
     expect(res.status).toBe(403)
     const body = await res.json()
-    expect(body).toMatchObject({ success: false, error: { code: 'ORIGIN_REFUSED' } })
+    expect(body).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ORIGIN_REFUSED } })
   })
 })

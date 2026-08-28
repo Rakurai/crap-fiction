@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Replacement } from '../shared/applyResult.js'
 import type { AutosaveState } from './autosave.js'
 import type { FailureReason } from '../shared/modelResult.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
@@ -70,7 +71,7 @@ export function useApply(
     stop(message)
   }
 
-  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: string, signal: AbortSignal): Promise<void> {
+  async function installAndConfirm(cid: string, actionId: string, applicationId: string, replacement: Replacement, signal: AbortSignal): Promise<void> {
     const saved = await install(replacement)
     if (saved.failed) {
       await stopAndAbandon(cid, actionId, saved.message)

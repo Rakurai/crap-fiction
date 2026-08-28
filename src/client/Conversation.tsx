@@ -6,6 +6,7 @@ import type { ApplicationEntryView, ConversationEntryView } from '../shared/conv
 import type { Clock } from '../shared/clock.js'
 import type { DispatchActivitySnapshot } from '../shared/conversationEvents.js'
 import type { InterviewerView } from '../shared/pieceViews.js'
+import type { SubstantiveOutcome } from '../shared/participantResponse.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import { countWords } from '../shared/storyLength.js'
 import type { AutosaveState } from './autosave.js'
@@ -61,7 +62,7 @@ function ResponseActions({
   readonly responseId: string
   readonly participantId: string
   readonly participantName: string
-  readonly outcome: 'commentary' | 'applicableSuggestion' | 'failed' | 'applied'
+  readonly outcome: SubstantiveOutcome | 'failed' | 'applied'
   readonly disabled: boolean
   readonly onApply: (responseId: string, constraint: string | undefined) => void
   readonly onAsk: (responseId: string, clarification: string | undefined) => void

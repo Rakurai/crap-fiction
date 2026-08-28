@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ConversationScope } from '../../src/server/scope.js'
 import {
+  ArtifactWriteRefusedError,
   ConversationEntryStore,
   conversationActivity,
   DraftStore,
@@ -29,6 +30,9 @@ import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 const CUPS = { title: 'Cups', mode: 'flash', cast: { draft: ['shape'], storyContext: [], authorContext: [] } }
 const pieceMetadata = new PieceMetadataStore()
 const settings = new SettingsStore()
+const workspaceSchema = z.string().min(1)
+const assignmentsSchema = z.record(z.string(), z.string().min(1))
+const preferencesSchema = z.object({ theme: z.enum(['light', 'dark']) })
 
 describe('the settings file', () => {
   let dataRoot: string
@@ -49,7 +53,7 @@ describe('the settings file', () => {
     mkdirSync(path.dirname(settingsPath()), { recursive: true })
     writeFileSync(settingsPath(), '# author notes\nworkspace: old-path\nunknown-to-schema: kept\n', 'utf8')
 
-    await settings.writeSection(dataRoot, 'workspace', 'new-path')
+    await settings.writeSection(dataRoot, 'workspace', 'new-path', workspaceSchema)
 
     const text = readFileSync(settingsPath(), 'utf8')
     expect(text).toContain('# author notes')
@@ -59,16 +63,16 @@ describe('the settings file', () => {
   })
 
   it('reads an absent optional section as empty rather than as absent', async () => {
-    await settings.writeSection(dataRoot, 'workspace', 'my-writing')
+    await settings.writeSection(dataRoot, 'workspace', 'my-writing', workspaceSchema)
 
     const schema = z.object({ theme: z.enum(['light', 'dark']).optional() })
     expect(readSettingsSection(dataRoot, 'interfacePreferences', schema)).toEqual({})
   })
 
   it('sets one section and leaves the others as they stood', async () => {
-    await settings.writeSection(dataRoot, 'workspace', 'my-writing')
-    await settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' })
-    await settings.writeSection(dataRoot, 'interfacePreferences', { theme: 'dark' })
+    await settings.writeSection(dataRoot, 'workspace', 'my-writing', workspaceSchema)
+    await settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' }, assignmentsSchema)
+    await settings.writeSection(dataRoot, 'interfacePreferences', { theme: 'dark' }, preferencesSchema)
 
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
     expect(readSettingsSection(dataRoot, 'modelAssignments', z.record(z.string(), z.string()))).toEqual({ shape: 'a-model' })
@@ -76,8 +80,8 @@ describe('the settings file', () => {
 
   it('serializes two concurrent writers of the same file, so neither discards the other', async () => {
     await Promise.all([
-      settings.writeSection(dataRoot, 'workspace', 'my-writing'),
-      settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' }),
+      settings.writeSection(dataRoot, 'workspace', 'my-writing', workspaceSchema),
+      settings.writeSection(dataRoot, 'modelAssignments', { shape: 'a-model' }, assignmentsSchema),
     ])
 
     expect(readSettingsSection(dataRoot, 'workspace', z.string())).toBe('my-writing')
@@ -144,6 +148,40 @@ describe('the tolerant reader', () => {
     })
     handWrite(path.join(workspaceDir, 'cups', 'conversations', 'draft', 'c1.json'), '{ not valid json')
     expect(() => readConversationEntries(dataRoot, scope, 'c1')).toThrowError(TolerantReadError)
+  })
+})
+
+describe('the artifact writer', () => {
+  let dataRoot: string
+  let workspaceDir: string
+
+  beforeEach(async () => {
+    dataRoot = mkdtempSync(path.join(tmpdir(), 'studio-data-root-'))
+    workspaceDir = path.join(dataRoot, 'my-writing')
+    mkdirSync(workspaceDir, { recursive: true })
+    await pieceMetadata.write(workspaceDir, 'cups', CUPS)
+  })
+
+  afterEach(() => {
+    rmSync(dataRoot, { recursive: true, force: true })
+  })
+
+  it('refuses a write its reader would reject, leaving the file as it stood', async () => {
+    await expect(pieceMetadata.writeDetails(workspaceDir, 'cups', { title: '' })).rejects.toThrowError(ArtifactWriteRefusedError)
+
+    expect(readPiece(workspaceDir, 'cups')?.metadata.title).toBe('Cups')
+  })
+
+  it('refuses a conversation entry the schema does not admit, leaving the conversation as it stood', async () => {
+    const scope: ConversationScope = { kind: 'piece', workspaceDir, pieceId: 'cups', surface: 'draft' }
+    const entries = new ConversationEntryStore()
+    const kept: ConversationEntry = { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] }
+    await entries.append(dataRoot, scope, 'c1', kept)
+
+    const unwritable = { ...kept, id: '' }
+    await expect(entries.append(dataRoot, scope, 'c1', unwritable)).rejects.toThrowError(ArtifactWriteRefusedError)
+
+    expect(readConversationEntries(dataRoot, scope, 'c1')?.entries).toEqual([kept])
   })
 })
 

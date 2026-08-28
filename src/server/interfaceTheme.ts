@@ -18,6 +18,6 @@ export class InterfaceTheme {
   }
 
   async set(theme: Theme): Promise<void> {
-    await this.#settings.writeSection(this.#dataRoot, 'interfacePreferences', { theme })
+    await this.#settings.writeSection(this.#dataRoot, 'interfacePreferences', { theme }, preferencesSchema)
   }
 }

@@ -2,7 +2,8 @@ import { render } from '@testing-library/react'
 import { createElement, StrictMode, useEffect } from 'react'
 import { describe, expect, it } from 'vitest'
 import { applyRoomEvent, createPieceStream, usePieceStream } from '../../src/client/pieceStream.js'
-import { applyDispatchEvent, type RoomEvent } from '../../src/client/entryProjection.js'
+import { applyDispatchEvent } from '../../src/client/entryProjection.js'
+import type { RoomEvent } from '../../src/shared/conversationEvents.js'
 import { EMPTY_ROOM_ACTIVITY as EMPTY, type subscribeToRoom as subscribeToRoomFn } from '../../src/client/roomClient.js'
 
 const STARTED: RoomEvent = {

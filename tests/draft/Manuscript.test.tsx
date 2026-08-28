@@ -5,6 +5,7 @@ import { Manuscript } from '../../src/client/Manuscript.js'
 import type { RequestResult } from '../../src/client/request.js'
 import { useAutosave } from '../../src/client/useAutosave.js'
 import { useManuscript } from '../../src/client/useManuscript.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const saveDraft = vi.fn<(id: string, text: string) => Promise<RequestResult<null>>>()
 
@@ -154,7 +155,7 @@ describe('the manuscript while a save is failing', () => {
   })
 
   it('says what the machine said, as a statement asking nothing, and takes it back once a write succeeds', async () => {
-    saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
+    saveDraft.mockResolvedValueOnce({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message: 'EACCES: permission denied' })
     renderManuscript({ draft: 'First light.' })
 
     type('First light. Then none.')

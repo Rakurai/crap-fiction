@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { participantStageSchema } from '../../shared/conversationEvents.js'
 import type { FailureReason } from '../../shared/modelResult.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 
@@ -9,7 +10,9 @@ export type CallResult<T> =
   | { readonly outcome: 'abandoned' }
   | { readonly outcome: 'failed'; readonly reason: FailureReason; readonly returned?: string }
 
-export type CallState = 'preparing' | 'working'
+export const callStateSchema = participantStageSchema.exclude(['called'])
+
+export type CallState = z.infer<typeof callStateSchema>
 
 export type CallPrompt = Readonly<{ durable: string; perCall: string }>
 

@@ -1,21 +1,5 @@
 import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
-import type {
-  ActionFinishedEvent,
-  ActionStartedEvent,
-  ApplyPendingEvent,
-  ConversationErrorEvent,
-  DispatchActivitySnapshot,
-  EntryAppendedEvent,
-  ParticipantActivityEvent,
-} from '../shared/conversationEvents.js'
-
-export type RoomEvent =
-  | Readonly<{ type: 'action.started'; data: ActionStartedEvent }>
-  | Readonly<{ type: 'apply.pending'; data: ApplyPendingEvent }>
-  | Readonly<{ type: 'participant.activity'; data: ParticipantActivityEvent }>
-  | Readonly<{ type: 'entry.appended'; data: EntryAppendedEvent }>
-  | Readonly<{ type: 'action.finished'; data: ActionFinishedEvent }>
-  | Readonly<{ type: 'error'; data: ConversationErrorEvent }>
+import type { DispatchActivitySnapshot, RoomEvent } from '../shared/conversationEvents.js'
 
 export type ConversationProjection = Readonly<{
   entries: readonly ConversationEntryView[]

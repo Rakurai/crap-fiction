@@ -6,7 +6,7 @@ import type { ApplyOutcome } from '../../shared/applyViews.js'
 import type { Clock } from '../../shared/clock.js'
 import type { Logger } from '../logger.js'
 import type { ModelAccess } from '../model/types.js'
-import { applyResultSchema } from '../../shared/applyResult.js'
+import { applyResultSchema, type Replacement } from '../../shared/applyResult.js'
 import type {
   ApplicationEntry,
   AuthorMessageEntry,
@@ -14,16 +14,11 @@ import type {
   ConversationEntry,
 } from '../../shared/conversationEntries.js'
 import {
-  type ActionFinishedEvent,
-  type ActionStartedEvent,
-  type ApplyPendingEvent,
   type ConversationActivitySnapshot,
-  type ConversationErrorEvent,
   type ConversationFailureCode,
-  type EntryAppendedEvent,
-  type ParticipantActivityEvent,
   type ParticipantState,
   type RoomActivitySnapshot,
+  type RoomEvent,
 } from '../../shared/conversationEvents.js'
 import { SURFACE_IDS, type DocumentSnapshot, type SurfaceId } from '../../shared/surfaces.js'
 import { ConversationNotFoundError, deleteConversation, PieceNotFoundError, startConversation } from '../pieces.js'
@@ -55,14 +50,6 @@ import {
 } from './context.js'
 import { callParticipant, evidenceFrom } from './dispatch.js'
 import type { ShippedContentCatalog } from '../shippedContent.js'
-
-export type RoomEvent =
-  | { readonly type: 'action.started'; readonly data: ActionStartedEvent }
-  | { readonly type: 'apply.pending'; readonly data: ApplyPendingEvent }
-  | { readonly type: 'participant.activity'; readonly data: ParticipantActivityEvent }
-  | { readonly type: 'entry.appended'; readonly data: EntryAppendedEvent }
-  | { readonly type: 'action.finished'; readonly data: ActionFinishedEvent }
-  | { readonly type: 'error'; readonly data: ConversationErrorEvent }
 
 export class RoomBusyError extends RouteFailure {
   constructor(pieceId: string, surface: string) {
@@ -137,7 +124,7 @@ type PendingReplacement = Readonly<{
   applicationId: string
   responseId: string
   constraint: string | undefined
-  replacement: string
+  replacement: Replacement
   change: AppliedChange
 }>
 

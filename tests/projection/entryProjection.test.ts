@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_PROJECTION, projectEvent, type RoomEvent } from '../../src/client/entryProjection.js'
+import { EMPTY_PROJECTION, projectEvent } from '../../src/client/entryProjection.js'
+import type { RoomEvent } from '../../src/shared/conversationEvents.js'
 import type { ConversationEntryView } from '../../src/shared/conversationEntryViews.js'
 
 const STARTED_AT = 1_700_000_000_000

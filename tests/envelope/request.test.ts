@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { failureMessage, requestJson } from '../../src/client/request.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const payload = z.object({ title: z.string() })
 
@@ -25,8 +26,9 @@ describe('requestJson', () => {
     stubFetchOnce({ success: true, data: { title: 'ok' } })
     expect(await requestJson('/x', payload)).toEqual({ outcome: 'value', value: { title: 'ok' } })
 
-    stubFetchOnce({ success: false, error: { code: 'NOPE', message: 'no can do' } })
-    expect(await requestJson('/x', payload)).toEqual({ outcome: 'refused', code: 'NOPE', message: 'no can do' })
+    const refusal = failureCodeSchema.enum.INVALID_REQUEST
+    stubFetchOnce({ success: false, error: { code: refusal, message: 'no can do' } })
+    expect(await requestJson('/x', payload)).toEqual({ outcome: 'refused', code: refusal, message: 'no can do' })
   })
 
   it('does not call an answer it cannot read a refusal, whether the payload, the envelope or the body itself is the part it cannot read', async () => {

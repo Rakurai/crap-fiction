@@ -2,8 +2,9 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { RequestResult } from '../../src/client/request.js'
 import { usePlainTextSession, useProseSession } from '../../src/client/useDocumentSession.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
-const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: 'ARTIFACT_INVALID', message })
+const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message })
 const succeeds = (): Promise<RequestResult<null>> => Promise.resolve({ outcome: 'value', value: null })
 
 describe('useProseSession', () => {

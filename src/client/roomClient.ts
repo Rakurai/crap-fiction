@@ -9,18 +9,13 @@ import {
 } from '../shared/applyViews.js'
 import { entryConversationViewSchema, type EntryConversationView } from '../shared/conversationEntryViews.js'
 import {
-  actionFinishedEventSchema,
-  actionStartedEventSchema,
-  applyPendingEventSchema,
-  conversationErrorEventSchema,
-  entryAppendedEventSchema,
-  participantActivityEventSchema,
   roomActivitySnapshotSchema,
-  type ConversationErrorEvent,
+  roomEventSchema,
   type RoomActivitySnapshot,
+  type RoomEvent,
+  type RoomEventName,
 } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
-import type { RoomEvent } from './entryProjection.js'
 import { requestJson, type RequestResult } from './request.js'
 
 function readJson(text: string): unknown {
@@ -147,6 +142,8 @@ export function abandonOperation(
   )
 }
 
+const ACTIVITY_SNAPSHOT: RoomEventName = 'activity.snapshot'
+
 export const EMPTY_ROOM_ACTIVITY: RoomActivitySnapshot = { draft: null, storyContext: null, authorContext: null }
 
 export function subscribeToRoom(
@@ -156,22 +153,22 @@ export function subscribeToRoom(
 ): Readonly<{ snapshot: Promise<RoomActivitySnapshot>; unsubscribe: () => void }> {
   const source = new EventSource(`/pieces/${encodeURIComponent(pieceId)}/events`)
 
-  function listen<T>(name: string, schema: z.ZodType<T>, wrap: (data: T) => RoomEvent): void {
+  function listen(name: RoomEventName): void {
     source.addEventListener(name, (event) => {
       if (!(event instanceof MessageEvent)) return
       const frame: unknown = event.data
-      const parsed = typeof frame === 'string' ? schema.safeParse(readJson(frame)) : { success: false as const }
+      const parsed = typeof frame === 'string' ? roomEventSchema.safeParse({ type: name, data: readJson(frame) }) : { success: false as const }
       if (!parsed.success) {
         onMalformedFrame(`malformed "${name}" event from the studio`)
         return
       }
-      onEvent(wrap(parsed.data))
+      onEvent(parsed.data)
     })
   }
 
   const snapshot = new Promise<RoomActivitySnapshot>((resolve, reject) => {
     source.addEventListener(
-      'activity.snapshot',
+      ACTIVITY_SNAPSHOT,
       (event) => {
         if (!(event instanceof MessageEvent)) {
           reject(new Error('the room’s activity arrived as something this client cannot read'))
@@ -180,7 +177,7 @@ export function subscribeToRoom(
         const frame: unknown = event.data
         const parsed = typeof frame === 'string' ? roomActivitySnapshotSchema.safeParse(readJson(frame)) : { success: false as const }
         if (!parsed.success) {
-          const message = 'malformed "activity.snapshot" event from the studio'
+          const message = `malformed "${ACTIVITY_SNAPSHOT}" event from the studio`
           onMalformedFrame(message)
           reject(new Error(message))
           return
@@ -199,12 +196,9 @@ export function subscribeToRoom(
     })
   })
 
-  listen('action.started', actionStartedEventSchema, (data) => ({ type: 'action.started', data }))
-  listen('apply.pending', applyPendingEventSchema, (data) => ({ type: 'apply.pending', data }))
-  listen('participant.activity', participantActivityEventSchema, (data) => ({ type: 'participant.activity', data }))
-  listen('entry.appended', entryAppendedEventSchema, (data) => ({ type: 'entry.appended', data }))
-  listen('action.finished', actionFinishedEventSchema, (data) => ({ type: 'action.finished', data }))
-  listen('error', conversationErrorEventSchema, (data: ConversationErrorEvent) => ({ type: 'error', data }))
+  for (const frame of roomEventSchema.options) {
+    for (const name of frame.shape.type.options) listen(name)
+  }
 
   return { snapshot, unsubscribe: () => source.close() }
 }

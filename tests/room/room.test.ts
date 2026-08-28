@@ -21,7 +21,7 @@ import {
 } from '../../src/server/store/index.js'
 import { appliedChangeSchema } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
-import type { ParticipantActivityEvent } from '../../src/shared/conversationEvents.js'
+import type { ParticipantActivityEvent, RoomEvent } from '../../src/shared/conversationEvents.js'
 import type { DocumentSnapshot } from '../../src/shared/surfaces.js'
 import {
   ApplicationDocumentNotSavedError,
@@ -32,13 +32,13 @@ import {
   RecommendationNotFoundError,
   Room,
   RoomBusyError,
-  type RoomEvent,
 } from '../../src/server/room/room.js'
 import { SHIPPED_HISTORY_POLICY } from '../../src/server/room/context.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { FixtureModelAdapter, type FixtureBehavior } from '../support/modelAdapter.js'
 import { buildTestRoom } from '../support/room.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, CHARTER_FIXTURE, INTERVIEWER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const pieceMetadata = new PieceMetadataStore()
 
@@ -293,7 +293,7 @@ describe('Room.dispatch', () => {
       'action.finished',
     ])
     expect(events.find((event) => event.type === 'error')?.data).toMatchObject({
-      code: 'UNEXPECTED_FAILURE',
+      code: failureCodeSchema.enum.UNEXPECTED_FAILURE,
       message: 'the seam broke in a way nothing named',
     })
     expect(events.find((event) => event.type === 'action.finished')?.data).toMatchObject({ outcome: 'failed' })
@@ -844,7 +844,7 @@ describe('Room.dispatch', () => {
     await settlementOf(room, piece.id)
 
     expect(events.find((event) => event.type === 'error')?.data).toMatchObject({
-      code: 'CONVERSATION_NOT_WRITTEN',
+      code: failureCodeSchema.enum.CONVERSATION_NOT_WRITTEN,
       message: "Shape's response was not written to the conversation: the conversation file refused the write",
     })
     expect(events.find((event) => event.type === 'action.finished')?.data).toMatchObject({ outcome: 'settled' })

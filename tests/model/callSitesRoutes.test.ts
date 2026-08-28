@@ -7,6 +7,7 @@ import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RuntimeStatus } from '../../src/shared/runtimeStatus.js'
 import { buildTestApp, idleRoom, UNREACHED_REFERENCE } from '../support/harness.js'
 import { INTERVIEWER_FIXTURE } from '../support/roomFixtures.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const MODE: ModeDescriptor = {
   id: 'flash',
@@ -92,7 +93,7 @@ describe('the call-site and model routes', () => {
     })
 
     expect(res.status).toBe(404)
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'CALL_SITE_NOT_FOUND' } })
+    expect(await res.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.CALL_SITE_NOT_FOUND } })
   })
 
   it('reports an unreachable runtime on the success channel rather than as a refusal', async () => {

@@ -225,8 +225,8 @@ those as absent would invite something to read them.
 The author hand-edits everything under `config/` and every YAML file in a piece. A conversation and a
 change file are machinery, and nothing invites an edit to them. The draft and the story context each
 keep their own conversations and changes, nested under the piece by surface; the author context's live
-once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is
-validated on read; `author-context.yaml` and `story-context.yaml` keep the name by convention.
+once, outside every piece, under the data root's own `author-context/` directory. `piece.yaml` is a
+structured file; `author-context.yaml` and `story-context.yaml` keep the name by convention.
 
 Shipped data — the charter, every participant, the mode descriptors, every prompt fragment, and every
 reference schema — travels with the application and not under the data root, under a content root

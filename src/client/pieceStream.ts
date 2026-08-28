@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { RoomActivitySnapshot } from '../shared/conversationEvents.js'
-import { applyDispatchEvent, type RoomEvent } from './entryProjection.js'
+import { applyDispatchEvent } from './entryProjection.js'
+import type { RoomEvent } from '../shared/conversationEvents.js'
 import { type subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
 
 export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent): RoomActivitySnapshot {

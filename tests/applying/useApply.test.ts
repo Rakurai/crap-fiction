@@ -7,6 +7,7 @@ import type { ApplyAdapters } from '../../src/client/useApply.js'
 import { useApply } from '../../src/client/useApply.js'
 import type { ApplyConfirmation, ApplyOutcome, PendingApply } from '../../src/shared/applyViews.js'
 import type { DocumentSnapshot } from '../../src/shared/surfaces.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const DOCUMENTS: DocumentSnapshot = { draft: 'the draft', storyContext: '', authorContext: '' }
 const SAVED: AutosaveState = { failed: false }
@@ -69,7 +70,7 @@ describe('installing a pending Apply result', () => {
   it('a failed confirmation likewise terminates the Apply, unlocks the surface and abandons the pending server state', async () => {
     const install = vi.fn(() => Promise.resolve(SAVED))
     const room = adapters({
-      confirmApplication: vi.fn(() => Promise.resolve<RequestResult<ApplyConfirmation>>({ outcome: 'refused', code: 'APPLICATION_DOCUMENT_NOT_SAVED', message: 'the target moved' })),
+      confirmApplication: vi.fn(() => Promise.resolve<RequestResult<ApplyConfirmation>>({ outcome: 'refused', code: failureCodeSchema.enum.APPLICATION_DOCUMENT_NOT_SAVED, message: 'the target moved' })),
     })
     const abandonAction = owner()
 

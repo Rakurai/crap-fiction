@@ -6,6 +6,7 @@ import type { PieceDetail } from '../../src/shared/pieceViews.js'
 import { OpenedPiece, type CallSiteAdapters, type PieceSwitchRequest } from '../../src/client/OpenedPiece.js'
 import type { PieceAdapters } from '../../src/client/usePiece.js'
 import { onTheDraft, roomAdapters, roomStream } from '../support/roomAdapters.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const PIECE: PieceDetail = {
   id: 'cups',
@@ -178,7 +179,7 @@ describe('a failed save on one document', () => {
   it('leaves the other document’s state untouched, and reports the piece as blocking a switch to another', async () => {
     const failingDraft = vi.fn((_id: string, surface: string, _text: string) =>
       surface === 'draft'
-        ? Promise.resolve<RequestResult<null>>({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
+        ? Promise.resolve<RequestResult<null>>({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message: 'EACCES: permission denied' })
         : Promise.resolve(SAVED),
     )
     const onLeaveBlockedChange = vi.fn()
@@ -232,7 +233,7 @@ describe('switching to another piece', () => {
     expect(onSettled).not.toHaveBeenCalled()
 
     await act(async () => {
-      resolveSave?.({ outcome: 'refused', code: 'ARTIFACT_INVALID', message: 'EACCES: permission denied' })
+      resolveSave?.({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message: 'EACCES: permission denied' })
     })
 
     expect(onSettled).toHaveBeenCalledWith(true)

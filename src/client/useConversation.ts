@@ -3,7 +3,8 @@ import type { ConversationEntryView } from '../shared/conversationEntryViews.js'
 import type { ActionKind, ConversationActivitySnapshot, RoomActivitySnapshot } from '../shared/conversationEvents.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type { AutosaveState } from './autosave.js'
-import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection, type RoomEvent } from './entryProjection.js'
+import { appendEntry, EMPTY_PROJECTION, projectEvent, type ConversationProjection } from './entryProjection.js'
+import type { RoomEvent } from '../shared/conversationEvents.js'
 import type {
   abandonOperation as abandonOperationFn,
   applyRecommendation as applyRecommendationFn,

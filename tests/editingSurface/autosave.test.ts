@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAutosaveController, type SaveDocument } from '../../src/client/autosave.js'
 import type { RequestResult } from '../../src/client/request.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const FAILED_AT_MS = new Date(2026, 7, 23, 14, 32).getTime()
 
 const clock = () => FAILED_AT_MS
 
 const WROTE: RequestResult<null> = { outcome: 'value', value: null }
-const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: 'ARTIFACT_INVALID', message })
+const refused = (message: string): RequestResult<null> => ({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message })
 
 function saver() {
   return vi.fn<SaveDocument>()

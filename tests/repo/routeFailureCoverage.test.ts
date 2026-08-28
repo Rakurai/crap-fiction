@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 import { REPO_ROOT, sourcesUnder } from '../support/sourceTree.js'
 
 const CLASS_EXTENDS_PATTERN = /class\s+(\w+)\s+extends\s+(\w+)/g
@@ -44,5 +45,22 @@ describe('every class under src/server or src/shared declared as extending Error
     const declared = new Set(declaredErrorClasses([...sourcesUnder('src', 'server'), ...sourcesUnder('src', 'shared')]).map((entry) => entry.name))
     const stale = [...THROWN_ONLY_OUTSIDE_REQUEST_HANDLING].filter((name) => !declared.has(name))
     expect(stale).toEqual([])
+  })
+})
+
+const RAISED_CODE_PATTERN = /super\(\s*'([A-Z][A-Z_]*)'/g
+
+describe('the failure codes a route can answer with', () => {
+  it('holds every code the server raises inside the declared taxonomy', () => {
+    const raised = [...sourcesUnder('src', 'server'), ...sourcesUnder('src', 'shared')].flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(RAISED_CODE_PATTERN)].map(([, code]) => ({
+        file: path.relative(REPO_ROOT, file),
+        code: code as string,
+      })),
+    )
+    const undeclared = raised.filter((entry) => !failureCodeSchema.safeParse(entry.code).success)
+
+    expect(raised.length).toBeGreaterThan(0)
+    expect(undeclared).toEqual([])
   })
 })

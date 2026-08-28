@@ -344,9 +344,10 @@ is never an error, because nothing may be derived from it in order to be true. D
 deletes the change files its applications name.
 
 **There is one representation for a structured file, so it carries no version and no compatibility
-layer.** Piece metadata and settings are validated on read, and nothing the author wrote is silently
-discarded. Both rules of representation reach structured files alone, and neither context document is
-one.
+layer.** A structured file is validated whenever it is read and whenever it is written, against the
+same declaration and with the same tolerance, so the studio never writes a file it would refuse to
+read back, and nothing the author wrote is silently discarded. Both rules of representation reach
+structured files alone, and neither context document is one.
 
 **What a tolerant read of a hand-edited structured file tolerates is a closed list**: a key the
 current schema does not know is kept and survives a write; a scalar where a list is expected reads as

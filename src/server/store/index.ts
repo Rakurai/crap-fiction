@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { Mutex } from 'async-mutex'
 import { z } from 'zod'
-import type { AppliedChange } from '../../shared/appliedChange.js'
+import { appliedChangeSchema, type AppliedChange } from '../../shared/appliedChange.js'
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
@@ -28,7 +28,7 @@ import {
 } from './yaml.js'
 
 export { PathEscapesRootError } from './containment.js'
-export { ShippedDataError, TolerantReadError } from './yaml.js'
+export { ArtifactWriteRefusedError, ShippedDataError, TolerantReadError } from './yaml.js'
 
 export function isAbsoluteLocation(value: string): boolean {
   return path.isAbsolute(value)
@@ -52,8 +52,10 @@ export function readSettingsSection<T>(dataRoot: string, section: SettingsSectio
 export class SettingsStore {
   readonly #lock = new Mutex()
 
-  async writeSection(dataRoot: string, section: SettingsSection, value: unknown): Promise<void> {
-    await this.#lock.runExclusive(() => writeYamlArtifact(settingsFile(dataRoot), { [section]: value }))
+  async writeSection<T>(dataRoot: string, section: SettingsSection, value: T, schema: z.ZodType<T>): Promise<void> {
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(settingsFile(dataRoot), { [section]: value }, z.object({ [section]: schema })),
+    )
   }
 }
 
@@ -167,19 +169,27 @@ export class PieceMetadataStore {
   readonly #lock = new Mutex()
 
   async write(workspaceDir: string, id: string, metadata: PieceMetadata): Promise<void> {
-    await this.#lock.runExclusive(() => writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata }))
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { ...metadata }, pieceMetadataSchema),
+    )
   }
 
   async writeCast(workspaceDir: string, id: string, surface: SurfaceId, cast: readonly string[]): Promise<void> {
     await this.#lock.runExclusive(() =>
-      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), { cast: { [surface]: [...cast] } }),
+      writeYamlArtifact(
+        pieceMetadataFile(resolveWithinRoot(workspaceDir, id)),
+        { cast: { [surface]: [...cast] } },
+        pieceMetadataSchema,
+      ),
     )
   }
 
   async writeDetails(workspaceDir: string, id: string, patch: Readonly<Partial<Pick<PieceMetadata, 'title'>>>): Promise<void> {
     const values: Record<string, unknown> = {}
     if (patch.title !== undefined) values.title = patch.title
-    await this.#lock.runExclusive(() => writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values))
+    await this.#lock.runExclusive(() =>
+      writeYamlArtifact(pieceMetadataFile(resolveWithinRoot(workspaceDir, id)), values, pieceMetadataSchema),
+    )
   }
 }
 
@@ -264,7 +274,7 @@ export class ConversationEntryStore {
       const existing = readJsonArtifact(file, entryConversationSchema)
       if (existing?.entries.some((candidate) => candidate.id === entry.id) === true) return
       const next: EntryConversation = { id: conversationId, entries: [...(existing?.entries ?? []), entry] }
-      await writeJsonArtifact(file, next)
+      await writeJsonArtifact(file, next, entryConversationSchema)
     })
   }
 }
@@ -308,7 +318,7 @@ function changeFile(dir: string, changeId: string): string {
 
 export async function writeAppliedChange(dataRoot: string, scope: ConversationScope, change: AppliedChange): Promise<void> {
   const dir = namespaceDirectoryForWrite(dataRoot, scope, 'changes')
-  await writeJsonArtifact(changeFile(dir, change.id), change)
+  await writeJsonArtifact(changeFile(dir, change.id), change, appliedChangeSchema)
 }
 
 export function readAppliedChanges<T>(dataRoot: string, scope: ConversationScope, schema: z.ZodType<T>): readonly T[] {
