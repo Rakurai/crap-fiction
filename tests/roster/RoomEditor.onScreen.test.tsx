@@ -18,11 +18,12 @@ const STORY_EDITOR: StoryEditorView = {
 describe('editing the room', () => {
   afterEach(cleanup)
 
-  it('lists every specialist by handle with its role description and the act available on it, disabling only the row a toggle is in flight for', () => {
+  it('lists every specialist by name and handle with its role description and the act available on it, disabling only the row a toggle is in flight for', () => {
     render(<RoomEditor members={MEMBERS} storyEditor={STORY_EDITOR} toggling={undefined} onToggle={vi.fn()} onClose={vi.fn()} />)
 
     expect(screen.getByText('@shape')).toBeTruthy()
     expect(screen.getByText('Shape')).toBeTruthy()
+    expect(screen.getByText('Shape').compareDocumentPosition(screen.getByText('@shape'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(screen.getByText('the shape of it')).toBeTruthy()
     expect(screen.getByText('@comp')).toBeTruthy()
     expect(screen.getByText('what earns its space')).toBeTruthy()

@@ -188,9 +188,10 @@ that offers no action looks diminished for it; frequently it is the most useful 
 conversation.
 
 Every visible response carries the participant's identity, what it said, and its actions.
-Identity is identity only: it never encodes agreement, severity or confidence. It is carried on the
-handle the participant is addressed by, so every response teaches the addressing in the ordinary
-course of being read.
+Identity is identity only: it never encodes agreement, severity or confidence. **Wherever a
+participant is identified, it is drawn the same way: its mark, then the display name, then the handle
+it is addressed by**, the handle subordinate to the name — so the name is what the eye lands on and
+every response still teaches the addressing in the ordinary course of being read.
 
 **What a response says arrives in two parts.** Its **claim** is one sentence and is always visible.
 Its **note** elaborates and is optional. The two are typographically distinct, so the author can read
@@ -310,9 +311,10 @@ them by name alongside the title, and the choice is fixed for that piece from th
 **Enabling and disabling specialists is a short list of the piece's available roster, each member
 carrying its own description** — every specialist its mode makes available, and the Story Editor, which
 is always present and is not something the author can turn off — reached in one action and left in one
-action. Members are named by the handle they are addressed by. No rationale is generated, no
-lifecycle is presented, and disabling explains nothing to the author beyond what the description
-already says.
+action. **A member in the room draws its own control in the accent colour and one out of it stays
+quiet**, so presence — the single fact the window exists to convey — is legible at a glance without
+being restated in words beside the name. No rationale is generated, no lifecycle is presented, and
+disabling explains nothing to the author beyond what the description already says.
 
 Nothing in the conversation is altered by a change to the cast, and a specialist re-enabled after
 several messages simply appears again.

@@ -37,6 +37,7 @@ describe('choosing a model for a call site', () => {
     expect(screen.getByText('@editor')).toBeTruthy()
     expect(screen.getByText('Story Editor')).toBeTruthy()
     expect(screen.getByText('holds the whole of it')).toBeTruthy()
+    expect(screen.getByText('Story Editor').compareDocumentPosition(screen.getByText('@editor'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('offers every model the runtime reports, showing the standing assignment as chosen even where the runtime no longer reports it', () => {

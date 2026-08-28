@@ -18,22 +18,6 @@
   column-gap: 16px;
 }
 
-.identity {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.handle {
-  font: 600 12.5px/1 var(--font-ui);
-  color: var(--ink3);
-}
-
-.name {
-  font: 400 11.5px/1.3 var(--font-ui);
-  color: var(--ink);
-}
-
 .role {
   grid-column: 1 / -1;
   font: 400 11.5px/1.5 var(--font-ui);
@@ -47,7 +31,17 @@
   white-space: nowrap;
 }
 
-.absent,
+.toggle.present {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle.present:hover:enabled {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--tint);
+}
+
 .always {
   font: 400 9.5px/1 var(--font-facts);
   color: var(--ink4);

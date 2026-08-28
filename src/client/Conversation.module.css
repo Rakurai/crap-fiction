@@ -109,33 +109,6 @@
   opacity: 0.5;
 }
 
-.identity {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.identitySpacer {
-  flex: 1;
-}
-
-.identityStatus {
-  flex: none;
-  font: 400 9.5px/1 var(--font-facts);
-  color: var(--ink4);
-  letter-spacing: 0.06em;
-}
-
-.handle {
-  font: 600 12.5px/1 var(--font-ui);
-  color: var(--ink3);
-}
-
-.name {
-  font: 400 11px/1 var(--font-ui);
-  color: var(--ink2);
-}
-
 .claim {
   --clamp-line: 23.25px;
   font: 400 15px/var(--clamp-line) var(--font-prose);
