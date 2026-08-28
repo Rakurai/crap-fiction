@@ -112,13 +112,7 @@ Scan for code that claims to do something but doesn't:
 
 #### C. Coding Standards Violations
 
-For each rule in STANDARDS, scan the files in scope for violations:
-- Defensive programming patterns (`catch` without re-throw, fallback values, `??` against validated inputs)
-- Type safety erosion (`any`, non-null assertions, `as` used to escape a shape, `T | undefined` where absence is not part of the contract)
-- Dead code, compatibility shims, legacy accommodation
-- Defaults, placeholders, seeded content, demo modes, anything fake outside a test
-- Toolchain violations (e.g., a module-level mutable singleton, or a dynamic `import()` used to swap an implementation)
-- Any other rule-specific checks
+Scan the files in scope against every rule in STANDARDS, its prose sections and its Prohibited list alike. STANDARDS is the sole authority on what each rule is and what it admits; this command restates none of them and adds none of its own.
 
 #### D. Silent Failure Patterns
 
@@ -169,61 +163,24 @@ Propose a new test only when you can name the distinct plausible failure it prot
 
 This section checks the code against the project's architectural rules and the engineering discipline the repository binds itself to. These are the most important checks for preventing regression of structural problems.
 
-**H1. Seam Violations** (ARCHITECTURE.md; STANDARDS -- HTTP layer, client, third-party machinery):
-- A domain module knowing anything about HTTP: status codes, framework error types, request objects
-- A route -- the outermost adapter -- carrying a decision, assembling a response by hand, or holding logic of its own
-- A vendor shape crossing a seam -- an editor node, a schema library's error, a framework context, a model runtime type, a stored file shape -- reaching a module that does not own the vendor
-- A presentational module that fetches, subscribes, knows a URL, or holds product logic
-- Client state standing in for something the server is the authority on
+Each area below names the authority that states its rules. Read the rules there; this list restates none of them.
 
-**H2. Depth** (STANDARDS -- core philosophy, depth in practice):
-- A module that fails the deletion test: delete it and the complexity vanishes rather than reappearing across its callers
-- A premature seam: one adapter and no concrete variation
-- A module that exists only to be testable, separate from the interface that exercises the real behaviour
-- An interface too granular: callers combining several calls, or calling in a particular order, to reach the common outcome
+- **H1. Seams** -- ARCHITECTURE.md; STANDARDS: HTTP layer, client, third-party machinery
+- **H2. Depth** -- STANDARDS: core philosophy, depth in practice
+- **H3. Schemas and validation** -- STANDARDS: schemas and validation
+- **H4. Fail-fast** -- STANDARDS: core philosophy, errors and failures
+- **H5. Persistence and paths** -- STANDARDS: persistence
+- **H6. Async work and cancellation** -- STANDARDS: async work and cancellation
+- **H7. Logging and configuration** -- STANDARDS: logging, configuration
 
-**H3. Schemas & Validation** (STANDARDS -- schemas and validation):
-- A hand-written type beside a schema rather than derived from it
-- Validation repeated behind a seam that already validated
-- A schema nearly as complex as the module behind it, or machinery repairing what a schema returned
-- A tolerance decided case by case rather than as an enumerated closed list at the seam
-- Business rules inside a schema refinement
-
-**H4. Fail-Fast Violations** (STANDARDS -- core philosophy, errors and failures):
-- Silent fallback defaults: a default parameter, a constant, or a `??` supplying an operational value
-- `try`/`catch` blocks that substitute default values
-- Optional chaining or a guard against `undefined` masking missing data rather than enforcing a contract
-- Defensive `?.` or a fallback on a value the interface guarantees is present
-- Startup that does not validate its configuration and shipped data, or that degrades quietly
-- Retry and timeout passed in by callers rather than owned by the module that calls the unreliable thing
-
-**H5. Persistence & Paths** (STANDARDS -- persistence):
-- A file read or written outside the module that owns disk access
-- A path, file handle, parsed document or serializer detail crossing that seam
-- A path built by concatenating author input, or not resolved and contained to the workspace
-- A failed write not reported as failed; an empty object standing in for a missing artifact
-
-**H6. Async Work & Cancellation** (STANDARDS -- async work and cancellation):
-- An `AbortSignal` accepted and not honoured at the point that waits, or cancellation resolving as an error
-- A floating promise
-- Cleanup missing on any of success, failure and cancellation
-- A polling loop or a timer waiting for state
-- Overlap guarded at every caller rather than serialized at the single writer that owns it
-
-**H7. Logging & Configuration** (STANDARDS -- logging, configuration):
-- A log line carrying the content the work consists of: manuscript text, a prompt, a model result
-- Logging inside an implementation rather than at the seam that owns the operation, or one event logged twice
-- Process configuration and user-editable data treated as the same thing; a hand-editable value cached from startup
-
-**H8. Wiring & Dead Code** (STANDARDS -- core philosophy, depth in practice):
+**H8. Wiring** (no STANDARDS rule states these):
 - Functions, modules, hooks or routes not reachable from any entry point
 - Renamed or moved functions with stale call sites
-- Commented-out code, and code that exists to accommodate a shape this repository never had
 
-**H9. Codebase Alignment** (cross-cutting):
+**H9. Codebase Alignment** (cross-cutting; no STANDARDS rule states these):
 - Code that contradicts patterns established elsewhere in `src/` (inconsistent module structure, different naming conventions)
 - Code that reintroduces patterns the project has moved away from
-- Code that reimplements what an assigned package already provides, or reaches for a package nothing assigns a capability to
+- Code that reimplements what an assigned package already provides
 - A second access path to state a module already owns
 
 ### 5. Cross-Reference Gate
@@ -333,7 +290,7 @@ Use CRITICAL, HIGH, MEDIUM and LOW, and rank consistently within the report so t
 
 - **Do not soften findings.** If the code is wrong, say it is wrong. Do not hedge with "might want to consider" or "could potentially."
 - **Do not invent findings.** Every finding must have quoted evidence. Where the evidence is incomplete, label the claim Uncertainty rather than dropping it or asserting it.
-- **Do not report what tooling catches.** `make test` runs `npm run typecheck` then `npm test`, and is the project's own gate; do not hand-audit for what the compiler rejects, and do not run it here.
+- **Do not report what tooling catches.** CLAUDE.md names the commands that answer for the code; do not hand-audit for what they reject, and do not run them here.
 - **Do not re-run if nothing changed.** If the report exists and no new commits since its timestamp, inform the user and ask whether to re-audit.
 - **Respect the standards as-is.** Do not suggest changes to STANDARDS. If a rule seems wrong for this project, that's outside audit scope.
 - **Design documents are authoritative.** When checking compliance, use the rules in DOCS as written. There is no register of tolerated divergences; a divergence is a finding.

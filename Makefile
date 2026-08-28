@@ -16,6 +16,7 @@ run:
 
 test:
 	npm run typecheck
+	npm run lint
 	npm test
 
 test-browser:

@@ -88,12 +88,10 @@ prose the author typed is the one thing a piece switch may never discard.
 
 ## Dependency roster
 
-**This is the closed roster of what the application depends on, and a capability named here is not
-implemented in this repository.** A dependency earns its place by one test: it removes machinery this
-project would otherwise own and maintain. The roster is explicit because the alternative is not a
-smaller dependency list — it is the same capability written badly here, arrived at one plausible
-decision at a time, which is how a studio for writing fiction acquires its own Markdown parser and
-its own diff.
+**A capability named here is not implemented in this repository.** A dependency earns its place by one
+test: it removes machinery this project would otherwise own and maintain. The roster is explicit
+because the alternative is not a smaller dependency list — it is the same capability written badly
+here, arrived at one plausible decision at a time.
 
 | Capability | Package |
 |---|---|
@@ -125,9 +123,7 @@ its own diff.
 | Running a maintainer script written in the project's own language | `tsx` |
 
 **The roster names capabilities, not every line of `package.json`.** A package named here brings with
-it the type declarations it does not ship and the piece it is unusable without, and nothing further.
-Anything installed that is neither an entry above nor one of those is a document change argued here
-first.
+it the type declarations it does not ship and the piece it is unusable without.
 
 Several entries carry a constraint on how they are used.
 
@@ -1245,8 +1241,8 @@ Stated so they do not accrete.
 
 - **No implementation of this repository's own for anything the roster owns.** No Markdown parser or
   serializer, no diff, no atomic-write routine, no retry loop, no mutex, no slug function, no identifier
-  generator and no schema validator written here. A capability arrived at by writing it is a change to the
-  roster, argued as one.
+  generator and no schema validator written here. Where a capability is missing, add a dependency rather
+  than write one.
 - **No second container, service or process.** One service, no reverse proxy, no TLS, no orchestration, and
   no model served from inside the container.
 - **No configuration baked into the image**, and no environment variable with a value the author did not
