@@ -2,9 +2,11 @@ import type { Charter } from '../model/charter.js'
 import type { Fragment, PromptFragments, SectionName } from '../model/prompts.js'
 import { renderFragment } from '../model/prompts.js'
 import type { RoleDefinition } from '../model/roles.js'
-import type { CallPrompt } from '../model/types.js'
+import type { CallTurns } from '../model/types.js'
 import type { ConversationEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
+import { applyResultSchema, type ApplyResult } from '../../shared/applyResult.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import type { EditVerdict } from './edits.js'
 import { RouteFailure } from '../routeFailure.js'
 
 export type HistoryPolicy = 'shared' | 'stricter'
@@ -186,6 +188,8 @@ export type ApplyContext = Readonly<{
   history: readonly HistoryEntry[]
 }>
 
+export type RejectedAttempt = Readonly<{ returned: ApplyResult; verdicts: readonly EditVerdict[] }>
+
 export function compileApplyContext(input: ApplyContextInput): ApplyContext {
   return {
     modeDescription: input.modeDescription,
@@ -214,6 +218,13 @@ function compose(parts: readonly string[]): string {
 
 function fixedSection(fragment: Fragment): string {
   return renderFragment(fragment, {})
+}
+
+function turns(standing: string, request: string): CallTurns {
+  return [
+    { role: 'system', content: standing },
+    { role: 'user', content: request },
+  ]
 }
 
 const TARGET_DOCUMENT: Readonly<Record<SurfaceId, string>> = {
@@ -265,9 +276,37 @@ function readingsLines(fragments: PromptFragments, evidence: readonly Participan
     .join('\n')
 }
 
-export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments): CallPrompt {
-  const durable = compose([context.modeDescription, fixedSection(fragments.roles.apply)])
-  const perCall = compose([
+function diagnosisLine(fragments: PromptFragments, verdict: EditVerdict): string {
+  if (verdict.outcome === 'resolved') return renderFragment(fragments.lines.editResolved, { anchor: verdict.find })
+  switch (verdict.diagnosis) {
+    case 'unmatched':
+      return renderFragment(fragments.lines.editUnmatched, { anchor: verdict.find })
+    case 'ambiguous':
+      return renderFragment(fragments.lines.editAmbiguous, { anchor: verdict.find })
+    case 'occurrenceOutOfRange':
+      return renderFragment(fragments.lines.editOccurrenceOutOfRange, { anchor: verdict.find })
+    case 'overlapping':
+      return renderFragment(fragments.lines.editOverlapping, { anchor: verdict.find })
+    case 'emptyAnchor':
+      return fixedSection(fragments.lines.editEmptyAnchor)
+    default: {
+      const exhaustive: never = verdict.diagnosis
+      return exhaustive
+    }
+  }
+}
+
+function attemptTurns(fragments: PromptFragments, attempt: RejectedAttempt): CallTurns {
+  const diagnoses = attempt.verdicts.map((verdict) => diagnosisLine(fragments, verdict)).join('\n')
+  return [
+    { role: 'assistant', content: JSON.stringify(applyResultSchema.parse(attempt.returned)) },
+    { role: 'user', content: renderFragment(fragments.sections.rejectedAttempt, { diagnoses }) },
+  ]
+}
+
+export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragments, rejected: readonly RejectedAttempt[]): CallTurns {
+  const standing = compose([context.modeDescription, fixedSection(fragments.roles.apply)])
+  const request = compose([
     taskSection(fragments.tasks.apply, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
     section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
@@ -278,20 +317,20 @@ export function renderApplyPrompt(context: ApplyContext, fragments: PromptFragme
     section(fragments, 'recommendation', 'recommendation', readingValue(context.recommendationClaim, context.recommendationNote)),
     section(fragments, 'constraint', 'constraint', context.constraint),
   ])
-  return { durable, perCall }
+  return [...turns(standing, request), ...rejected.flatMap((attempt) => attemptTurns(fragments, attempt))]
 }
 
-export function renderPrompt(context: Context, fragments: PromptFragments, charter: Charter): CallPrompt {
+export function renderPrompt(context: Context, fragments: PromptFragments, charter: Charter): CallTurns {
   const task =
     context.ask !== undefined ? fragments.tasks.concreteChange : context.role.eligibility === 'generalist' ? fragments.tasks.generalist : fragments.tasks.specialist
 
-  const durable = compose([
+  const standing = compose([
     context.modeDescription,
     renderFragment(fragments.sections.charter, { charter }),
     renderFragment(fragments.sections.role, { persona: context.role.persona }),
   ])
 
-  const perCall = compose([
+  const request = compose([
     taskSection(task, context.surface),
     fixedSection(fragments.surfaces[context.surface]),
     section(fragments, 'referenceSchema', 'referenceSchema', context.referenceSchema),
@@ -306,6 +345,6 @@ export function renderPrompt(context: Context, fragments: PromptFragments, chart
     context.ask?.clarification === undefined ? '' : section(fragments, 'clarification', 'clarification', context.ask.clarification),
   ])
 
-  return { durable, perCall }
+  return turns(standing, request)
 }
 

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createLogger } from '../../src/server/logger.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { RoomScope } from '../../src/server/scope.js'
@@ -77,7 +78,9 @@ describe('the room over HTTP', () => {
       charter: CHARTER_FIXTURE,
       fragments: PROMPT_FRAGMENTS_FIXTURE,
       policy: SHIPPED_HISTORY_POLICY,
+      applying: { rounds: 3 },
       modelAccess,
+      logger: createLogger('silent'),
       now: () => 1_700_000_000_000,
       authorContextReference: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
     })
@@ -174,7 +177,7 @@ describe('the room over HTTP', () => {
   it('reports an application in flight naming the response it came from, then answers with a pending replacement that becomes the change on that response once confirmed', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'them.', replace: 'them, revised.' }] } }, held: true },
     })
     const responseId = await respondedTo(app, room, conversationId, { target: 'shape', message: 'a direct question' })
 
@@ -214,7 +217,7 @@ describe('the room over HTTP', () => {
   it('answers the pending replacement to a client asking for it by its provisional identity, and states the room\'s refusal of a confirmation the save has not caught up with', async () => {
     const { app, modelAccess, room, conversationId } = await withPiece({
       shape: RECOMMENDATION,
-      apply: { result: { outcome: 'value', value: { replacement: 'The cups sat where she left them, revised.' } }, held: true },
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'them.', replace: 'them, revised.' }] } }, held: true },
     })
     const responseId = await respondedTo(app, room, conversationId, { target: 'shape', message: 'a direct question' })
 

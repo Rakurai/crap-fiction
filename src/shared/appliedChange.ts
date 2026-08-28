@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 const changedPassageSchema = z
-  .object({ before: z.string(), after: z.string() })
+  .object({ leading: z.string(), before: z.string(), after: z.string(), trailing: z.string() })
   .refine((value) => value.before.length > 0 || value.after.length > 0, {
     message: 'a changed passage says something on at least one side',
   })

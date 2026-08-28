@@ -444,7 +444,10 @@ describe('getConversation', () => {
     const scope = scopeFor(piece.id)
     for (const entry of [authorMessage, response, otherResponse, application]) await store.append(dataRoot, scope, 'c1', entry)
 
-    const change: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'the second paragraph', after: '' }] } }
+    const change: AppliedChange = {
+      id: 'change1',
+      content: { kind: 'passages', passages: [{ leading: '', before: 'the second paragraph', after: '', trailing: '' }] },
+    }
     await writeAppliedChange(dataRoot, scope, change)
 
     const conversation = getConversation(dataRoot, workspaceDir, piece.id, 'draft', 'c1')
@@ -538,7 +541,10 @@ describe('deleteConversation', () => {
     await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
     await store.append(dataRoot, scope, 'c2', { id: 'e1', kind: 'authorMessage', text: 'y', audience: [], brought: [] })
 
-    const ownChange: AppliedChange = { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } }
+    const ownChange: AppliedChange = {
+      id: 'change1',
+      content: { kind: 'passages', passages: [{ leading: '', before: 'it', after: '', trailing: '' }] },
+    }
     const unrelatedChange: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
     await writeAppliedChange(dataRoot, scope, ownChange)
     await writeAppliedChange(dataRoot, scope, unrelatedChange)

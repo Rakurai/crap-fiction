@@ -81,6 +81,7 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
     recommendation: variableFragment('sections/recommendation', ['recommendation'], 'FIXTURE_RECOMMENDATION_HEADING\n\n{{recommendation}}'),
     constraint: variableFragment('sections/constraint', ['constraint'], 'FIXTURE_CONSTRAINT_HEADING\n\n{{constraint}}'),
     referenceSchema: variableFragment('sections/referenceSchema', ['referenceSchema'], 'FIXTURE_REFERENCE_SCHEMA_HEADING\n\n{{referenceSchema}}'),
+    rejectedAttempt: variableFragment('sections/rejectedAttempt', ['diagnoses'], 'FIXTURE_REJECTED_ATTEMPT_HEADING\n\n{{diagnoses}}'),
   },
   lines: {
     historyMessage: variableFragment('lines/historyMessage', ['text'], 'Author: {{text}}'),
@@ -97,6 +98,12 @@ export const PROMPT_FRAGMENTS_FIXTURE: PromptFragments = {
       "{{participant}}'s recommendation was applied: {{reading}}",
     ),
     readingSubstantive: variableFragment('lines/readingSubstantive', ['participant', 'reading'], '{{participant}}: {{reading}}'),
+    editResolved: variableFragment('lines/editResolved', ['anchor'], 'FIXTURE_EDIT_RESOLVED {{anchor}}'),
+    editUnmatched: variableFragment('lines/editUnmatched', ['anchor'], 'FIXTURE_EDIT_UNMATCHED {{anchor}}'),
+    editAmbiguous: variableFragment('lines/editAmbiguous', ['anchor'], 'FIXTURE_EDIT_AMBIGUOUS {{anchor}}'),
+    editOccurrenceOutOfRange: variableFragment('lines/editOccurrenceOutOfRange', ['anchor'], 'FIXTURE_EDIT_OCCURRENCE_OUT_OF_RANGE {{anchor}}'),
+    editOverlapping: variableFragment('lines/editOverlapping', ['anchor'], 'FIXTURE_EDIT_OVERLAPPING {{anchor}}'),
+    editEmptyAnchor: fixedFragment('lines/editEmptyAnchor', 'FIXTURE_EDIT_EMPTY_ANCHOR'),
   },
   tasks: {
     specialist: variableFragment('tasks/specialist', ['targetDocument'], 'FIXTURE_SPECIALIST_TASK {{targetDocument}}'),

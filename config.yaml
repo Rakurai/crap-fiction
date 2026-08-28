@@ -6,7 +6,10 @@ model:
   retries: 2                 # additional attempts after a malformed or nonconforming response, before failing
   timeoutMs: 120000           # a call is abandoned as a timeout after this many milliseconds
   responseMaxTokens: 2000     # generation bound for an ordinary specialist or Story Editor reply
-  manuscriptMaxTokens: 32000  # generation bound for an Apply call, which returns a whole manuscript
+  editSetMaxTokens: 32000     # generation bound for an Apply call, whose edits may quote and replace the whole document
+
+applying:
+  rounds: 3                  # attempts at an edit set that resolves — one and its corrections; each is a further model call
 
 appliedChange:
   contextWords: 8            # words of unchanged prose kept before and after a change, for context

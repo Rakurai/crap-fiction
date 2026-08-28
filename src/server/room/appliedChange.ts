@@ -89,8 +89,10 @@ export function createComputeAppliedChangeContent(config: StudioConfig['appliedC
     if (unbounded) return { kind: 'rewrittenWhole' }
 
     const passages = hunksFrom(parts, contextWords).map((hunk) => ({
-      before: hunk.leading + hunk.removed + hunk.trailing,
-      after: hunk.leading + hunk.added + hunk.trailing,
+      leading: hunk.leading,
+      before: hunk.removed,
+      after: hunk.added,
+      trailing: hunk.trailing,
     }))
 
     return { kind: 'passages', passages }

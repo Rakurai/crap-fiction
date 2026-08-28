@@ -141,10 +141,10 @@ Connecting to a piece's stream is what opens it.
 ## The model seam
 
 ```ts
-call(site, prompt, schema, signal, onState?) → CallResult<T>
+call(site, turns, schema, signal, onState?) → CallResult<T>
 status()                                    → whether the runtime is reachable, and what it holds
 
-Prompt = { durable, perCall }               each half a string; see Context compilation
+Turn = { role, content }                    role is system, user or assistant; see Context compilation
 
 CallResult<T> =
   | { outcome: 'value';     value: T }
@@ -154,9 +154,11 @@ CallResult<T> =
 FailureReason = 'unconfigured' | 'unreachable' | 'timeout' | 'malformed' | 'nonconforming' | 'internal'
 ```
 
-`prompt` carries the durable half and the per-call half apart; no caller composes them into one string
-before the seam, and only an implementation constrained to a single-string vendor call joins them, as
-that vendor's own accommodation.
+`turns` is an ordered sequence, and the sequence a call site sends is declared rather than an
+implementation's choice: every call site's first call is the standing material as a system turn
+followed by its request as a user turn. An implementation delivers them with their roles intact and in
+that order, and only one constrained to a single-string vendor call joins them, as that vendor's own
+accommodation.
 
 | Reason | Means |
 |---|---|
@@ -172,6 +174,20 @@ is preparing before it is working; an implementation that cannot tell setup from
 preparing. A caller may submit a further call without awaiting the one before it, and the seam
 guarantees nothing about their relative start order, completion order, latency, progress or
 cancellation.
+
+An application can fail for a reason no call can report about itself, so applying answers from a wider
+set of its own:
+
+```ts
+ApplyFailureReason = FailureReason | 'inapplicable'
+```
+
+| Reason | Means |
+|---|---|
+| `inapplicable` | the answer conformed and could not be applied to the document as it arrived |
+
+A call result and a durable participant failure carry `FailureReason`. The reply to an Apply and the
+settlement a surface reports carry `ApplyFailureReason`, and `inapplicable` carries no `returned`.
 
 ## The context seam
 
@@ -227,8 +243,9 @@ those as absent would invite something to read them.
 A **trace** is one Markdown document per attempt at one model call, named by the instant the attempt
 settled and the call site it was made for, so the directory reads in the order the calls happened. It
 carries the attempt's ordinal, the model the site was assigned, whether the studio could read what came
-back, what the runtime said about stopping and how many tokens it counted, and then the two halves of
-the compiled prompt and the returned text, each verbatim and unabridged. It names no piece and no
+back, what the runtime said about stopping and how many tokens it counted, and then every turn the call
+carried under the name of its role, in the order they crossed, and the returned text, each verbatim and
+unabridged. It names no piece and no
 conversation, because the model seam knows neither. It is written and never read: nothing in the studio
 parses a trace, lists one, or behaves differently for one existing, and deleting the whole directory
 mid-run costs nothing.

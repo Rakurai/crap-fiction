@@ -221,7 +221,7 @@ describe('the applied change, shown on its originating response', () => {
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
-    stream(application({ kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] }))
+    stream(application({ kind: 'passages', passages: [{ leading: '', before: 'the old line', after: 'the new line', trailing: '' }] }))
 
     const toggle = await screen.findByRole('button', { name: 'APPLIED · 3 WORDS' })
     expect(screen.getByText('the old line')).toBeTruthy()
@@ -230,6 +230,31 @@ describe('the applied change, shown on its originating response', () => {
     fireEvent.click(toggle)
 
     expect(screen.queryByText('the old line')).toBeNull()
+  })
+
+  it('counts a passage by the greater of its removed and added words, never the context around it', async () => {
+    const { room, stream } = roomStreaming([RESPONSE_WITH_RECOMMENDATION])
+
+    renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
+    stream(
+      application({
+        kind: 'passages',
+        passages: [
+          {
+            leading: 'Plenty of unchanged prose sits before this. ',
+            before: 'one two three four five six seven eight nine ten',
+            after: '',
+            trailing: ' And plenty more sits after it.',
+          },
+          { leading: '', before: '', after: 'brand new sentence arrived', trailing: '' },
+          { leading: '', before: 'short', after: 'a longer replacement text here', trailing: '' },
+        ],
+      }),
+    )
+
+    await screen.findByRole('button', { name: 'APPLIED · 19 WORDS · 3 PASSAGES' })
   })
 
   it('states a change with nothing to disclose, offering no toggle, and still shows the application when the change file is gone', async () => {
@@ -263,7 +288,7 @@ describe('the applied change, shown on its originating response', () => {
     renderConversation([RESPONSE_WITH_RECOMMENDATION], { room })
 
     fireEvent.click(await screen.findByRole('button', { name: 'apply' }))
-    streaming.stream(application({ kind: 'passages', passages: [{ before: 'the old line', after: 'the new line' }] }))
+    streaming.stream(application({ kind: 'passages', passages: [{ leading: '', before: 'the old line', after: 'the new line', trailing: '' }] }))
     fireEvent.click(await screen.findByRole('button', { name: 'ask the room about this' }))
 
     await waitFor(() =>

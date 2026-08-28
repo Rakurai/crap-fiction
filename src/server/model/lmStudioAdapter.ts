@@ -4,9 +4,8 @@ import { z } from 'zod'
 import type { StudioConfig } from '../../shared/config.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Logger } from '../logger.js'
-import type { ModelTraceRecord } from '../store/index.js'
 import { APPLY_CALL_SITE } from './callSites.js'
-import type { CallPrompt, CallResult, CallState, ModelAccess, ModelTrace } from './types.js'
+import type { CallResult, CallState, CallTurns, ModelAccess, ModelTrace, ModelTraceRecord } from './types.js'
 
 export type GetAssignment = (site: string) => string | undefined
 
@@ -110,19 +109,19 @@ export class LMStudioAdapter implements ModelAccess {
 
   call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
   ): Promise<CallResult<T>> {
-    const run = this.#queue.then(() => this.#call(site, prompt, schema, signal, onState))
+    const run = this.#queue.then(() => this.#call(site, turns, schema, signal, onState))
     this.#queue = run.catch(() => undefined)
     return run
   }
 
   async #call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,
@@ -135,7 +134,7 @@ export class LMStudioAdapter implements ModelAccess {
     const timeoutSignal = AbortSignal.timeout(this.#config.timeoutMs)
     const combined = AbortSignal.any([signal, timeoutSignal])
     const jsonSchema = z.toJSONSchema(schema)
-    const maxTokens = site === APPLY_CALL_SITE ? this.#config.manuscriptMaxTokens : this.#config.responseMaxTokens
+    const maxTokens = site === APPLY_CALL_SITE ? this.#config.editSetMaxTokens : this.#config.responseMaxTokens
 
     let preparing = false
     const announce = (state: CallState): void => {
@@ -147,7 +146,7 @@ export class LMStudioAdapter implements ModelAccess {
     }
 
     try {
-      const value = await pRetry((attempt) => this.#attempt(site, attempt, assignment, prompt, schema, jsonSchema, maxTokens, combined, announce), {
+      const value = await pRetry((attempt) => this.#attempt(site, attempt, assignment, turns, schema, jsonSchema, maxTokens, combined, announce), {
         retries: this.#config.retries,
         signal: combined,
       })
@@ -174,7 +173,7 @@ export class LMStudioAdapter implements ModelAccess {
     site: string,
     attempt: number,
     assignment: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     jsonSchema: object,
     maxTokens: number,
@@ -184,9 +183,8 @@ export class LMStudioAdapter implements ModelAccess {
     announce('preparing')
     const model = await throughRuntime(() => this.#client.llm.model(assignment, { signal }))
     announce('working')
-    const result = await throughRuntime(() =>
-      model.respond(`${prompt.durable}${prompt.perCall}`, { structured: { type: 'json', jsonSchema }, maxTokens, signal }),
-    )
+    const chat = turns.map(({ role, content }) => ({ role, content }))
+    const result = await throughRuntime(() => model.respond(chat, { structured: { type: 'json', jsonSchema }, maxTokens, signal }))
 
     const returned = result.nonReasoningContent
 
@@ -196,8 +194,7 @@ export class LMStudioAdapter implements ModelAccess {
         site,
         assignment,
         attempt,
-        durablePrompt: prompt.durable,
-        perCallPrompt: prompt.perCall,
+        turns,
         returned,
         reading,
         runtimeStopReason: result.stats.stopReason,

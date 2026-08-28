@@ -40,3 +40,38 @@ describe('application code names no shipped identity', () => {
     expect(filesNamingAny(sourcesUnder('src'), identities)).toEqual([])
   })
 })
+
+const PHRASE_WORDS = 5
+
+function phrasesOf(template: string): readonly string[] {
+  const words = template
+    .replace(/\{\{[a-zA-Z]+\}\}/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word !== '')
+  return words.flatMap((_, index) => (index + PHRASE_WORDS <= words.length ? [words.slice(index, index + PHRASE_WORDS).join(' ')] : []))
+}
+
+describe('application code holds no prompt language for an unresolved edit', () => {
+  it('names no phrase from the fragments that frame and diagnose a rejected attempt', () => {
+    const { fragments } = ShippedContentCatalog.load(CONTENT_ROOT)
+    const diagnostic = [
+      fragments.sections.rejectedAttempt,
+      fragments.lines.editResolved,
+      fragments.lines.editUnmatched,
+      fragments.lines.editAmbiguous,
+      fragments.lines.editOccurrenceOutOfRange,
+      fragments.lines.editOverlapping,
+      fragments.lines.editEmptyAnchor,
+    ]
+    const phrases = diagnostic.flatMap((fragment) => phrasesOf(fragment.template))
+
+    const offenders = sourcesUnder('src').flatMap((file) => {
+      const source = readFileSync(file, 'utf8')
+      const named = phrases.find((phrase) => source.includes(phrase))
+      return named === undefined ? [] : [{ file: path.relative(REPO_ROOT, file), phrase: named }]
+    })
+
+    expect(phrases.length).toBeGreaterThan(0)
+    expect(offenders).toEqual([])
+  })
+})

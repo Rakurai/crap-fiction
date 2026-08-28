@@ -5,7 +5,7 @@ import { loadEnv, type StudioEnv } from './env.js'
 import { InterfaceTheme } from './interfaceTheme.js'
 import { createLogger, type Logger } from './logger.js'
 import { CallSiteAssignments } from './model/assignments.js'
-import type { ModelAccess, ModelTrace } from './model/types.js'
+import type { ModelAccess, ModelTrace, ModelTraceRecord } from './model/types.js'
 import { PieceDocumentWriter, PieceStore } from './pieces.js'
 import { createComputeAppliedChangeContent } from './room/appliedChange.js'
 import { SHIPPED_HISTORY_POLICY } from './room/context.js'
@@ -16,7 +16,6 @@ import {
   AuthorContextStore,
   ConversationEntryStore,
   DraftStore,
-  type ModelTraceRecord,
   PieceMetadataStore,
   SettingsStore,
   StoryContextStore,
@@ -54,6 +53,7 @@ export function bootstrap(
     env.dataRoot,
     catalog,
     SHIPPED_HISTORY_POLICY,
+    config.applying,
     logger,
     Date.now,
     createComputeAppliedChangeContent(config.appliedChange),

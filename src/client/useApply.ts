@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Replacement } from '../shared/applyResult.js'
 import type { AutosaveState } from './autosave.js'
-import type { FailureReason } from '../shared/modelResult.js'
+import type { ApplyFailureReason } from '../shared/applyViews.js'
 import type { DocumentSnapshot, SurfaceId } from '../shared/surfaces.js'
 import type {
   applyRecommendation as applyRecommendationFn,
@@ -20,7 +20,7 @@ export type ApplyAdapters = Readonly<{
 export type ApplyingResponse = Readonly<{ responseId: string }>
 
 export type ApplySettlement = Readonly<
-  | { readonly kind: 'failed'; readonly responseId: string; readonly reason: FailureReason; readonly returned: string | undefined }
+  | { readonly kind: 'failed'; readonly responseId: string; readonly reason: ApplyFailureReason; readonly returned: string | undefined }
   | { readonly kind: 'abandoned'; readonly responseId: string }
 >
 
@@ -150,7 +150,8 @@ export function useApply(
         return
       }
       if (outcome.outcome === 'failed') {
-        if (mounted.current) setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned: outcome.returned })
+        const returned = 'returned' in outcome ? outcome.returned : undefined
+        if (mounted.current) setSettlement({ kind: 'failed', responseId, reason: outcome.reason, returned })
         stop(undefined)
         return
       }

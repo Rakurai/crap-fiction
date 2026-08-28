@@ -10,8 +10,11 @@ import {
   type ApplyContextInput,
   type ContextInput,
   type HistoryPolicy,
+  type RejectedAttempt,
 } from '../../src/server/room/context.js'
 import type { RoleDefinition } from '../../src/server/model/roles.js'
+import type { CallTurns, TurnRole } from '../../src/server/model/types.js'
+import { applyResultSchema } from '../../src/shared/applyResult.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
 import { CHARTER_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
@@ -81,8 +84,14 @@ function applyContextInput(overrides: Partial<ApplyContextInput> & { entries: Ap
   }
 }
 
-function wholeOf(rendered: { durable: string; perCall: string }): string {
-  return rendered.durable + rendered.perCall
+function wholeOf(rendered: CallTurns): string {
+  return rendered.map((turn) => turn.content).join('')
+}
+
+function contentOf(rendered: CallTurns, role: TurnRole): string {
+  const turn = rendered.find((candidate) => candidate.role === role)
+  if (turn === undefined) throw new Error(`the rendered call carries no ${role} turn`)
+  return turn.content
 }
 
 function markerIndices(text: string, markers: readonly string[]): readonly number[] {
@@ -227,7 +236,7 @@ describe('compiling a context', () => {
     expect(compileApplyContext(applyContextInput({ entries: entriesWithApplication })).history).toEqual(WHOLE_CONVERSATION_WITH_APPLICATION)
 
     const rendered = wholeOf(
-      renderApplyPrompt(compileApplyContext(applyContextInput({ entries: entriesWithApplication })), fragments),
+      renderApplyPrompt(compileApplyContext(applyContextInput({ entries: entriesWithApplication })), fragments, []),
     )
     expect(rendered).not.toContain('a-change-file-with-no-file-on-disk')
   })
@@ -306,13 +315,13 @@ describe('rendering a prompt', () => {
   it('always carries the manuscript, unexcerpted, whichever call it is', () => {
     expect(wholeOf(renderPrompt(bareSpecialist, fragments, charter))).toContain(MANUSCRIPT)
     expect(
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: entriesWithTwoMessages })), fragments, [])),
     ).toContain(MANUSCRIPT)
   })
 
   it('renders a line fragment once per supplied history entry, never collapsing or duplicating them', () => {
     const applyContext = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    const prompt = wholeOf(renderApplyPrompt(applyContext, fragments))
+    const prompt = wholeOf(renderApplyPrompt(applyContext, fragments, []))
     const lines = sectionOf(prompt, 'FIXTURE_HISTORY_HEADING')
       .split('\n')
       .filter((line) => line.length > 0)
@@ -324,7 +333,7 @@ describe('rendering a prompt', () => {
 
     for (const prompt of [
       wholeOf(renderPrompt(compileSpecialistContext(contextInput({ role: shape, ...written })), fragments, charter)),
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ ...written, entries: [] })), fragments)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ ...written, entries: [] })), fragments, [])),
     ]) {
       expect(prompt).toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).toContain('prefers short sentences')
@@ -334,7 +343,7 @@ describe('rendering a prompt', () => {
 
     for (const prompt of [
       wholeOf(renderPrompt(bareSpecialist, fragments, charter)),
-      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments)),
+      wholeOf(renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments, [])),
     ]) {
       expect(prompt).not.toContain('FIXTURE_AUTHOR_CONTEXT_HEADING')
       expect(prompt).not.toContain('FIXTURE_STORY_CONTEXT_HEADING')
@@ -345,31 +354,31 @@ describe('rendering a prompt', () => {
     const constrained = compileApplyContext(
       applyContextInput({ recommendationClaim: 'cut the second paragraph', constraint: 'keep the last line', entries: entriesWithTwoMessages }),
     )
-    const prompt = wholeOf(renderApplyPrompt(constrained, fragments))
+    const prompt = wholeOf(renderApplyPrompt(constrained, fragments, []))
     expect(prompt).toContain('cut the second paragraph')
     expect(prompt).toContain('FIXTURE_CONSTRAINT_HEADING')
     expect(prompt).toContain('keep the last line')
 
     const unconstrained = compileApplyContext(applyContextInput({ entries: entriesWithTwoMessages }))
-    expect(wholeOf(renderApplyPrompt(unconstrained, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+    expect(wholeOf(renderApplyPrompt(unconstrained, fragments, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
   it('substitutes text the author supplied exactly as it was typed, and renders no section at all for one holding only whitespace', () => {
     const typed = '  keep the last line\n\tand the title'
     const withWhitespace = compileApplyContext(applyContextInput({ constraint: typed, entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withWhitespace, fragments))).toContain(`FIXTURE_CONSTRAINT_HEADING\n\n${typed}`)
+    expect(wholeOf(renderApplyPrompt(withWhitespace, fragments, []))).toContain(`FIXTURE_CONSTRAINT_HEADING\n\n${typed}`)
 
     const blank = compileApplyContext(applyContextInput({ constraint: '   \n ', entries: [] }))
-    expect(wholeOf(renderApplyPrompt(blank, fragments))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
+    expect(wholeOf(renderApplyPrompt(blank, fragments, []))).not.toContain('FIXTURE_CONSTRAINT_HEADING')
   })
 
   it('carries the reference schema for the document a context Apply targets, only where the surface has one', () => {
     const withReference = compileApplyContext(applyContextInput({ referenceSchema: 'Sections, each holding entries.', entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withReference, fragments))).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
-    expect(wholeOf(renderApplyPrompt(withReference, fragments))).toContain('Sections, each holding entries.')
+    expect(wholeOf(renderApplyPrompt(withReference, fragments, []))).toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(wholeOf(renderApplyPrompt(withReference, fragments, []))).toContain('Sections, each holding entries.')
 
     const withoutReference = compileApplyContext(applyContextInput({ entries: [] }))
-    expect(wholeOf(renderApplyPrompt(withoutReference, fragments))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
+    expect(wholeOf(renderApplyPrompt(withoutReference, fragments, []))).not.toContain('FIXTURE_REFERENCE_SCHEMA_HEADING')
   })
 
   it('carries a reference schema to a participant under its own section, only where the compiled context was given one', () => {
@@ -394,17 +403,17 @@ describe('rendering a prompt', () => {
     expect(wholeOf(renderPrompt(withNothing, fragments, charter))).not.toContain('FIXTURE_READINGS_HEADING')
   })
 
-  it("states the mode's shared description of form and scale alongside the role's own persona in the durable half, and selects the generalist task for the generalist in the per-call half", () => {
+  it("states the mode's shared description of form and scale alongside the role's own persona in the standing turn, and selects the generalist task for the generalist in the request turn", () => {
     const compiled = compileSpecialistContext(contextInput({ role: shape }))
-    const { durable, perCall } = renderPrompt(compiled, fragments, charter)
-    expect(durable).toContain(MODE_DESCRIPTION)
-    expect(sectionOf(durable, 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
-    expect(perCall).toContain('FIXTURE_SPECIALIST_TASK')
+    const rendered = renderPrompt(compiled, fragments, charter)
+    expect(contentOf(rendered, 'system')).toContain(MODE_DESCRIPTION)
+    expect(sectionOf(contentOf(rendered, 'system'), 'FIXTURE_ROLE_HEADING')).toContain(shape.persona)
+    expect(contentOf(rendered, 'user')).toContain('FIXTURE_SPECIALIST_TASK')
 
     const generalistRole: RoleDefinition = { ...shape, eligibility: 'generalist' }
-    const generalistPrompt = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
-    expect(generalistPrompt.perCall).toContain('FIXTURE_GENERALIST_TASK')
-    expect(generalistPrompt.perCall).not.toContain('FIXTURE_SPECIALIST_TASK')
+    const generalist = renderPrompt(compileSpecialistContext(contextInput({ role: generalistRole })), fragments, charter)
+    expect(contentOf(generalist, 'user')).toContain('FIXTURE_GENERALIST_TASK')
+    expect(contentOf(generalist, 'user')).not.toContain('FIXTURE_SPECIALIST_TASK')
   })
 
   it('states that an answer is owed only when the call owes one', () => {
@@ -474,7 +483,7 @@ describe('the task instruction names the surface it was compiled for', () => {
       kind: 'apply',
       marker: 'FIXTURE_APPLY_TASK',
       render: (surface: (typeof SURFACES)[number]) =>
-        renderApplyPrompt(compileApplyContext(applyContextInput({ surface, draft: MANUSCRIPT, entries: [] })), fragments),
+        renderApplyPrompt(compileApplyContext(applyContextInput({ surface, draft: MANUSCRIPT, entries: [] })), fragments, []),
     },
   ]
 
@@ -490,8 +499,18 @@ describe('the task instruction names the surface it was compiled for', () => {
   })
 })
 
-describe('the order the two halves compose in', () => {
-  it('orders a participant call widest-frame to narrowest-responsibility, and its per-call half task through the current material', () => {
+describe('the turns a call site sends', () => {
+  it('sends the standing material as a system turn and the request as a user turn, in that order, for a participant call and for an application alike', () => {
+    const participant = renderPrompt(compileSpecialistContext(contextInput({ role: shape })), fragments, charter)
+    const application = renderApplyPrompt(compileApplyContext(applyContextInput({ entries: [] })), fragments, [])
+
+    expect(participant.map((turn) => turn.role)).toEqual(['system', 'user'])
+    expect(application.map((turn) => turn.role)).toEqual(['system', 'user'])
+  })
+})
+
+describe('the order the two turns compose in', () => {
+  it('orders a participant call widest-frame to narrowest-responsibility, and its request turn task through the current material', () => {
     const context = compileSpecialistContext(
       contextInput({
         role: shape,
@@ -501,12 +520,12 @@ describe('the order the two halves compose in', () => {
       }),
     )
 
-    const { durable, perCall } = renderPrompt(context, fragments, charter)
+    const rendered = renderPrompt(context, fragments, charter)
 
-    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
+    expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_CHARTER_HEADING', 'FIXTURE_ROLE_HEADING']))).toBe(true)
     expect(
       isAscending(
-        markerIndices(perCall, [
+        markerIndices(contentOf(rendered, 'user'), [
           'FIXTURE_SPECIALIST_TASK',
           'FIXTURE_DRAFT_SURFACE',
           'FIXTURE_ADDRESSED_HEADING',
@@ -518,7 +537,7 @@ describe('the order the two halves compose in', () => {
     ).toBe(true)
   })
 
-  it('orders an operation call mode description then operation role, and its per-call half task through the current material', () => {
+  it('orders an operation call mode description then operation role, and its request turn task through the current material', () => {
     const context = compileApplyContext(
       applyContextInput({
         authorContext: 'prefers short sentences',
@@ -527,12 +546,12 @@ describe('the order the two halves compose in', () => {
       }),
     )
 
-    const { durable, perCall } = renderApplyPrompt(context, fragments)
+    const rendered = renderApplyPrompt(context, fragments, [])
 
-    expect(isAscending(markerIndices(durable, [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
+    expect(isAscending(markerIndices(contentOf(rendered, 'system'), [MODE_DESCRIPTION, 'FIXTURE_APPLY_ROLE']))).toBe(true)
     expect(
       isAscending(
-        markerIndices(perCall, [
+        markerIndices(contentOf(rendered, 'user'), [
           'FIXTURE_APPLY_TASK',
           'FIXTURE_DRAFT_SURFACE',
           'FIXTURE_AUTHOR_CONTEXT_HEADING',
@@ -542,5 +561,78 @@ describe('the order the two halves compose in', () => {
         ]),
       ),
     ).toBe(true)
+  })
+})
+
+describe('the rejected attempts a correction round carries', () => {
+  const applyContext = compileApplyContext(applyContextInput({ draft: MANUSCRIPT, entries: [] }))
+
+  const firstAttempt: RejectedAttempt = {
+    returned: { edits: [{ find: 'the cups', replace: 'the mugs' }] },
+    verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis: 'unmatched' }],
+  }
+  const secondAttempt: RejectedAttempt = {
+    returned: { edits: [{ find: 'sat', replace: 'stood' }] },
+    verdicts: [{ outcome: 'defective', find: 'sat', diagnosis: 'ambiguous' }],
+  }
+
+  it('gives each attempt as the answer the model returned in an assistant turn, in the shape it was asked to answer in, and the room\'s diagnosis in a user turn that follows it', () => {
+    const rendered = renderApplyPrompt(applyContext, fragments, [firstAttempt])
+
+    expect(rendered.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user'])
+    const answer = rendered[2]
+    if (answer === undefined) throw new Error('the correction carries no assistant turn')
+    expect(applyResultSchema.parse(JSON.parse(answer.content))).toEqual(firstAttempt.returned)
+    expect(rendered[3]?.content).toContain('FIXTURE_REJECTED_ATTEMPT_HEADING')
+    expect(rendered[3]?.content).toContain('FIXTURE_EDIT_UNMATCHED the cups')
+  })
+
+  it('accumulates the pairs in the order they were rejected, and leaves the standing turn byte-identical in every round', () => {
+    const first = renderApplyPrompt(applyContext, fragments, [])
+    const second = renderApplyPrompt(applyContext, fragments, [firstAttempt])
+    const third = renderApplyPrompt(applyContext, fragments, [firstAttempt, secondAttempt])
+
+    expect(third.map((turn) => turn.role)).toEqual(['system', 'user', 'assistant', 'user', 'assistant', 'user'])
+    expect(third.slice(0, 4)).toEqual(second)
+    expect(second.slice(0, 2)).toEqual(first)
+    expect(contentOf(second, 'system')).toBe(contentOf(first, 'system'))
+    expect(contentOf(third, 'system')).toBe(contentOf(first, 'system'))
+  })
+
+  const DIAGNOSIS_CASES = [
+    { diagnosis: 'unmatched', marker: 'FIXTURE_EDIT_UNMATCHED the cups' },
+    { diagnosis: 'ambiguous', marker: 'FIXTURE_EDIT_AMBIGUOUS the cups' },
+    { diagnosis: 'occurrenceOutOfRange', marker: 'FIXTURE_EDIT_OCCURRENCE_OUT_OF_RANGE the cups' },
+    { diagnosis: 'overlapping', marker: 'FIXTURE_EDIT_OVERLAPPING the cups' },
+    { diagnosis: 'emptyAnchor', marker: 'FIXTURE_EDIT_EMPTY_ANCHOR' },
+  ] as const
+
+  it.each(DIAGNOSIS_CASES)('carries the $diagnosis diagnosis as its own fragment', ({ diagnosis, marker }) => {
+    const rendered = renderApplyPrompt(applyContext, fragments, [
+      { returned: { edits: [{ find: 'the cups', replace: 'the mugs' }] }, verdicts: [{ outcome: 'defective', find: 'the cups', diagnosis }] },
+    ])
+
+    expect(contentOf(rendered.slice(2), 'user')).toContain(marker)
+  })
+
+  it('says of an edit that resolved that it resolved, beside the sibling that did not', () => {
+    const rendered = renderApplyPrompt(applyContext, fragments, [
+      {
+        returned: {
+          edits: [
+            { find: 'she left', replace: 'she had left' },
+            { find: 'the saucers', replace: 'the plates' },
+          ],
+        },
+        verdicts: [
+          { outcome: 'resolved', find: 'she left' },
+          { outcome: 'defective', find: 'the saucers', diagnosis: 'unmatched' },
+        ],
+      },
+    ])
+
+    const diagnosis = contentOf(rendered.slice(2), 'user')
+    expect(diagnosis).toContain('FIXTURE_EDIT_RESOLVED she left')
+    expect(diagnosis).toContain('FIXTURE_EDIT_UNMATCHED the saucers')
   })
 })

@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { participantStageSchema } from '../../shared/conversationEvents.js'
 import type { FailureReason } from '../../shared/modelResult.js'
 import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
-import type { ModelTraceRecord } from '../store/index.js'
 
 export type { FailureReason } from '../../shared/modelResult.js'
 
@@ -15,14 +14,30 @@ export const callStateSchema = participantStageSchema.exclude(['called'])
 
 export type CallState = z.infer<typeof callStateSchema>
 
-export type CallPrompt = Readonly<{ durable: string; perCall: string }>
+export type TurnRole = 'system' | 'user' | 'assistant'
+
+export type Turn = Readonly<{ role: TurnRole; content: string }>
+
+export type CallTurns = readonly Turn[]
+
+export type ModelTraceRecord = Readonly<{
+  site: string
+  assignment: string
+  attempt: number
+  turns: CallTurns
+  returned: string
+  reading: 'value' | 'malformed' | 'nonconforming'
+  runtimeStopReason: string
+  promptTokens: number | undefined
+  predictedTokens: number | undefined
+}>
 
 export type ModelTrace = (record: ModelTraceRecord) => Promise<void>
 
 export type ModelAccess = {
   call<T>(
     site: string,
-    prompt: CallPrompt,
+    turns: CallTurns,
     schema: z.ZodType<T>,
     signal: AbortSignal,
     onState?: (state: CallState) => void,

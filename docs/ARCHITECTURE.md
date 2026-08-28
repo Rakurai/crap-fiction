@@ -68,7 +68,7 @@ it.
 **Model traffic is kept verbatim only for a run the maintainer asked to trace.** Telling a weakly
 written role apart from a weak model, and either apart from a participant whose replies never parse,
 needs the request and the reply as they actually crossed the seam — which no log line may carry and no
-settled response keeps. So a traced run writes one file per attempt, holding the compiled prompt, the
+settled response keeps. So a traced run writes one file per attempt, holding the turns it carried, the
 text that came back unread, and what the runtime said about stopping; every attempt of a retried call
 gets its own, because the interesting one is usually not the last. The environment decides whether a
 run traces, and a run nobody is diagnosing does not. The refusal being suspended is the author's
@@ -464,10 +464,18 @@ mean different things to the author and to the room, so none of them is the abse
 result modelling two of them as a missing value would leave every caller inferring the difference
 from state it happens to hold. A failure carries what came back verbatim where anything did.
 
-**Each half crosses as text rather than as messages.** A message array would import a chat topology
-from whichever runtime was consulted first, and this conversation has five speakers with no faithful
-mapping onto user-and-assistant alternation. Flattening is the correct representation here rather
-than a concession, and context compilation already produces it.
+**A call crosses as an ordered sequence of turns, each carrying a role**, and the roles are the three
+an instruction-tuned model was trained on. The room's speakers are not the call's speakers: a
+conversation of five participants is material a turn carries, while the turns themselves are the
+exchange between this application and one model, which has exactly two speakers. What that buys is
+attribution — anything a model itself said is marked as its own words rather than arriving as text the
+author appears to have written — and a standing turn that is byte-identical across the calls of one
+operation, which is what a cached prefix requires.
+
+**Which sequence a call site sends is declared rather than left to each implementation.** "Ordered
+turns" is a guarantee two implementations can both satisfy while attributing the same material to
+different speakers, and an implementation that attributed it differently from the fixture would make
+the fixture lie about what the runtime will see.
 
 **A successful result conformed.** Nothing above this interface parses, validates, repairs or
 inspects raw model text; a response that could not be made to conform is a stated failure. Where the
@@ -491,6 +499,13 @@ answering. How many times a failed call is retried and how long a call may wait 
 values, maintainer-facing, in one place — never author configuration and never a knob on the
 interface, which several callers could then disagree about.
 
+**The module retries what the model got wrong about answering; a caller re-asks what the model got
+wrong about the material.** A call that never came back as the structure it was asked for is the
+module's own failure to absorb, and it retries. An answer that conforms and is still wrong against
+something the module never learns exists — a document, an anchor into one — is a failure only the
+caller can see, so correcting it is the caller's loop and costs further calls rather than further
+attempts inside one.
+
 **A call may report that it is preparing before it is working.** A model that has to be loaded before
 it can answer makes the author wait for a reason the interface can state. The interface admits the
 richer state and lets a weaker implementation under-report, rather than levelling down to what every
@@ -504,6 +519,12 @@ runtime could not be reached or the model could not be served, because the confi
 because what came back was not the structure it was asked for at all, or because it was that
 structure and still did not conform — and each of those means something different to the author or to
 the room.
+
+**A caller that can fail for a reason of its own carries its own wider set rather than widening this
+one.** The model's set is closed to the ways a call can fail, and it is what a call result and a
+durable participant failure carry. Admitting into it a reason no call could produce would make a
+nonsense state legal and persistable — a specialist's answer recorded as having failed for something
+that was never in reach of that call.
 
 **A malformed answer and a nonconforming one are two reasons, not one.** Text that is not the
 requested structure says the runtime is not honouring the constraint it was given — the wrong model,
@@ -542,8 +563,8 @@ would call for one is wanting a model this runtime cannot reach, which is narrow
 because it is nearly free, not because it is expected to be exercised.
 
 A separate service behind a sidecar or proxy is not eligible: one process and one schema definition
-are what make the artifact shapes a single contract. Nor may the runtime's own agent loop, tool loop
-or chat abstraction be used, because the product's essential rule — that specialists form
+are what make the artifact shapes a single contract. Nor may the runtime's own session object, agent
+loop or tool loop be used, because the product's essential rule — that specialists form
 current-dispatch judgments independently and then the Story Editor may see them — has to remain
 visible and testable in this application's own code.
 
@@ -619,10 +640,11 @@ states nothing about any one participant's responsibility; each interprets what 
 through its own persona, so the Story Editor receives the same description as every specialist and
 applies it through a different persona rather than being exempted from it.
 
-**A call's prompt has a durable half and a per-call half, each composed from loaded fragments in a
-fixed order.** The durable half is what is true of the call site before a request — the mode
+**A call's input opens with a standing turn and a request turn, each composed from loaded fragments in
+a fixed order**, and where a caller re-asks, what it re-asks with follows that pair rather than
+displacing it. The standing turn is what is true of the call site before a request — the mode
 description, the charter, a participant's persona, or a non-participant call's operation role; the
-per-call half is the task and the material a particular request carries. No heading, task instruction
+request turn is the task and the material a particular request carries. No heading, task instruction
 or repeated line is source: compilation selects, orders and repeats loaded fragments, and holds no
 prompt language of its own.
 
@@ -825,7 +847,7 @@ locking a document for a dispatch would break the premise that the author writes
 
 ## Applying a recommendation
 
-**One call.** Its input is the current draft, the full current conversation, the recommendation itself,
+**One compiled request.** Its input is the current draft, the full current conversation, the recommendation itself,
 both durable contexts, the reference schema where the target surface has one, the author's constraint
 where they supplied one, and the surface the recommendation names. Its output is that surface's document
 embodying it.
@@ -850,7 +872,9 @@ author's own surface holds it.
 the document its own editor writes, so a replacement in some other equivalent spelling of the same prose
 is text that surface can never save and a confirmation that can never match. Reading it in once, where the
 replacement is formed, is also what makes the before-and-after and the answer that nothing changed describe
-the text that will land rather than the text the model happened to type.
+the text that will land rather than the text the model happened to type. What is read in is the assembled
+document and never a piece of one: a fragment is not a document, and reading half a paragraph in on its own
+gets it back as a block.
 
 **A replacement is provisional until the client confirms it was saved.** The room retains it — the
 document, the change computed from it, and a provisional identity — as the one pending application its
@@ -876,12 +900,50 @@ surface stays held and states why.
 input does not imply restrained output: a model asked to cut one sentence will otherwise renormalize
 punctuation, reflow paragraphs and revise text nobody asked about.
 
-**The representation the model returns is an implementation choice** — revised Markdown, replacement
-ranges, or structured operations — and the author experience does not depend on it. What bounds it: the
-result reaches its target surface as one atomic replacement — a single transaction where that surface is
-the document's editor, so it participates in the editor's own undo as one action — and the application
-computes the before-and-after presented to the author from the two states of that document rather than
-trusting the model to describe its own edit. That before-and-after is the changed passages with a little
+**What the model returns is a set of bounded edits against verbatim anchors.** Each edit quotes text as
+it stands in the target document and supplies what stands in its place. Every anchor resolves against the
+document as it arrived, each edit resolves to exactly one span or is a defect, and the whole set resolves
+before any of it is applied. Two edits resolving to spans that overlap is a defect on both edges of the
+intersection, because the correction the model needs is that the pair conflicts, not that one of them is
+fine. Since every span resolves against the document as it arrived, the order of the edits carries no
+meaning, and an edit quoting what another edit would produce quotes text that does not exist. An anchor
+quoting the whole document conforms and is deliberately not refused: an author may ask for a broad
+change, and a model that obeyed would otherwise be told its answer was inapplicable. What makes an
+element this small viable is that the runtime enforces the structure strictly — a hand-parsed patch
+format would have to tolerate a weak model's spelling of it, and every tolerance is a way for an edit to
+mean something other than what it said.
+
+**This inverts the economics of unrequested change rather than adding a rule against it.** Breadth stops
+being free: a model that wants to reflow a paragraph nobody mentioned has to quote that paragraph, in
+full and exactly.
+
+**A set that does not resolve is corrected rather than failed on the first attempt.** The room owns a
+bounded loop: it calls the seam, resolves what came back, and where any edit is defective composes
+further turns and calls again. One defective edit invalidates the whole returned set, so the next
+round re-asks against the document unchanged rather than against a partly edited one. A correction
+carries everything the first call carried and the attempts already rejected — the edit set as the
+model returned it, and the room's diagnosis of it, naming each failed edit by the anchor it quoted
+and saying of an edit that resolved that it resolved. Attempts accumulate rather than replace, and
+the standing material is byte-identical in every round. The loop is one operation throughout: one
+started action, one busy window, one pending replacement at the end, and one abandonment path
+cancelling whichever round is in flight. How many rounds there are is the room's own
+maintainer-facing value, never crossing the model seam and never reaching the author as an attempt
+count. A failed call in any round, a call that timed out included, ends the application rather than
+spending the rounds that remain.
+
+**A set still unresolvable when the rounds are exhausted fails as inapplicable, and that reason
+belongs to applying's set rather than to the model's.** The answer conformed and could not be applied to the document, which is a thing no call
+can report about itself. It carries nothing back — what a failure carries verbatim exists for what a
+runtime returned when it was not the structure asked for, and here the answer was well formed and its
+content is the author's prose. The reason reaches the author as machine words, so it is named for what
+happened to the document rather than for which representation the model returns.
+
+**The result reaches its target surface as one atomic replacement** — a single transaction where that
+surface is the document's editor, so it participates in the editor's own undo as one action — and the
+application computes the before-and-after presented to the author from the two states of that document
+rather than trusting the model to describe its own edit. Building it from the edits instead would hide a
+respelling or a stripped construct from the review the author trusts: the edits describe intent, and the
+two states describe what landed. That before-and-after is the changed passages with a little
 text around them and no positions of any kind — enough to show what happened, not enough to reapply it anywhere — and where
 the change is unbounded it is the statement that the piece was rewritten whole. That last case is a rule
 about what the file may hold, not about how much the surface may show: what it prevents is storing the
@@ -904,7 +966,10 @@ from an entry is that a recommendation was applied, and nothing was.
 
 **Nothing is stored that would let an application be replayed.** A recommendation is interpreted afresh
 against whatever that document is at the moment it is applied, which is what makes an old
-recommendation applicable at all. **A failed application changes nothing** — no partial write, no
+recommendation applicable at all. The edit set is the case this most obviously names: a quotation paired
+with its replacement is precisely a positionless replayable edit, so it lives in what was sent and nowhere
+else — not in the pending replacement, not in the change record, not in the entry, and not in a log line,
+where an anchor or a replacement would be manuscript text. **A failed application changes nothing** — no partial write, no
 half-applied document, and the recommendation stays applicable. A replacement whose confirmation is
 refused changes nothing by the same rule: the change record and the entry naming it are written together
 or not at all.
@@ -1188,9 +1253,9 @@ boundary's assertions cover:
 | Boundary | Its assertion territory |
 |---|---|
 | **context** | independence, the history policies, and the Story Editor's asymmetric input |
-| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, and that no operation writes any surface's document |
+| **room** | audience resolution and addressing, entry durability and ordering, the Story Editor's gate, refusal and abandonment scoped to one room scope at a time, the edit loop and the inapplicable failure exhausting it leaves, and that no operation writes any surface's document |
 | **store** | write atomicity and ordering, failure reporting, the tolerances and what falls off them, hand-edited files surviving a round trip, and re-reading at compilation |
-| **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, no reasoning above the seam, and the adapter's serialization of independent submissions |
+| **model** | the failure taxonomy, retry and timeout, cancellation as abandonment, the turns a call site sends crossing intact and in order with their declared roles, no reasoning above the seam, and the adapter's serialization of independent submissions |
 | **draft** | semantic Markdown round-tripping, an application as one history action, and what survives a view switch |
 | **projection** | idempotent append, activity only for a participant reported on, and stale events discarded |
 
@@ -1245,7 +1310,7 @@ Stated so they do not accrete.
   adapter's own fixed policy, never a scheduler, a limit, or a residency abstraction the room configures or
   depends on.
 - **No context-window awareness, no chunking, and no excerpting** of anything sent to a model.
-- **No agent loop, tool loop or conversation abstraction taken from the model library.** Only its single-call
+- **No session object, agent loop or tool loop taken from the model library.** Only its single-call
   surface is used.
 - **No per-participant re-ask**, and no attempt history inside a settled response.
 - **No validation of a declared outcome against a response's content**, which would take a second model call

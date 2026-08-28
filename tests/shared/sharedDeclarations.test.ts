@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { applyResultSchema, replacementSchema } from '../../src/shared/applyResult.js'
-import { applyOutcomeSchema, pendingApplySchema } from '../../src/shared/applyViews.js'
-import { participantResponseEntrySchema } from '../../src/shared/conversationEntries.js'
+import { applyFailureReasonSchema, applyOutcomeSchema, INAPPLICABLE, pendingApplySchema } from '../../src/shared/applyViews.js'
+import { participantFailureEntrySchema, participantResponseEntrySchema } from '../../src/shared/conversationEntries.js'
+import { failureReasonSchema } from '../../src/shared/modelResult.js'
 import {
   conversationFailureCodeSchema,
   participantActivityEventSchema,
@@ -66,12 +67,44 @@ describe('the event names', () => {
   })
 })
 
+describe('what applying asks the model for', () => {
+  it('is a list of edits, one required, each quoting text and supplying its replacement, with the occurrence index a whole count from zero', () => {
+    expect(applyResultSchema.safeParse({ edits: [{ find: 'the second cup', replace: 'the chipped cup' }] }).success).toBe(true)
+    expect(applyResultSchema.safeParse({ edits: [{ find: 'the second cup', replace: 'the chipped cup', occurrence: 0 }] }).success).toBe(true)
+    expect(applyResultSchema.safeParse({ edits: [] }).success).toBe(false)
+    expect(applyResultSchema.safeParse({ replacement: 'the whole document' }).success).toBe(false)
+
+    expect(applyResultSchema.safeParse({ edits: [{ find: 'a', replace: 'b', occurrence: -1 }] }).success).toBe(false)
+    expect(applyResultSchema.safeParse({ edits: [{ find: 'a', replace: 'b', occurrence: 1.5 }] }).success).toBe(false)
+  })
+})
+
 describe('the apply replacement', () => {
-  it('is one rule the model result, the pending payload and the apply outcome all hold to', () => {
-    expect(replacementSchema.safeParse('').success).toBe(false)
-    expect(applyResultSchema.safeParse({ replacement: '' }).success).toBe(false)
-    expect(pendingApplySchema.safeParse({ replacement: '' }).success).toBe(false)
-    expect(applyOutcomeSchema.safeParse({ outcome: 'pending', actionId: 'a1', applicationId: 'ap1', replacement: '' }).success).toBe(false)
+  it('is one rule the edit, the pending payload and the apply outcome all hold to, and the empty document a deletion leaves is legal', () => {
+    expect(replacementSchema.safeParse('').success).toBe(true)
+    expect(applyResultSchema.safeParse({ edits: [{ find: 'a', replace: '' }] }).success).toBe(true)
+    expect(pendingApplySchema.safeParse({ replacement: '' }).success).toBe(true)
+    expect(applyOutcomeSchema.safeParse({ outcome: 'pending', actionId: 'a1', applicationId: 'ap1', replacement: '' }).success).toBe(true)
     expect(applyOutcomeSchema.safeParse({ outcome: 'pending', actionId: 'a1', applicationId: 'ap1', replacement: 'text' }).success).toBe(true)
+  })
+})
+
+describe('the two failure sets', () => {
+  it('holds the reason only a document can cause outside the model\'s own set, so no participant failure can carry it', () => {
+    for (const reason of failureReasonSchema.options) {
+      expect(applyFailureReasonSchema.safeParse(reason).success).toBe(true)
+    }
+    expect(applyFailureReasonSchema.safeParse(INAPPLICABLE).success).toBe(true)
+    expect(failureReasonSchema.safeParse(INAPPLICABLE).success).toBe(false)
+
+    const failure = { id: 'e1', kind: 'participantFailure', participantId: 'shape', causeId: 'c1' }
+    expect(participantFailureEntrySchema.safeParse({ ...failure, reason: 'timeout' }).success).toBe(true)
+    expect(participantFailureEntrySchema.safeParse({ ...failure, reason: INAPPLICABLE }).success).toBe(false)
+  })
+
+  it('carries no returned value with the reason a document caused, where the answer was well-formed and its content is the author\'s prose', () => {
+    const failed = { outcome: 'failed', actionId: 'a1' }
+    expect(applyOutcomeSchema.parse({ ...failed, reason: INAPPLICABLE, returned: 'the prose it wrote' })).toEqual({ ...failed, reason: INAPPLICABLE })
+    expect(applyOutcomeSchema.parse({ ...failed, reason: 'malformed', returned: 'not json' })).toEqual({ ...failed, reason: 'malformed', returned: 'not json' })
   })
 })

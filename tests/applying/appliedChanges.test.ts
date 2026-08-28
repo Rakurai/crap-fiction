@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { deleteAppliedChange, PieceMetadataStore, readAppliedChanges, writeAppliedChange } from '../../src/server/store/index.js'
+import { TolerantReadError } from '../../src/server/store/yaml.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 
 const cutSentence: AppliedChange = {
   id: 'change1',
-  content: { kind: 'passages', passages: [{ before: 'Ruth stood looking at them.', after: '' }] },
+  content: { kind: 'passages', passages: [{ leading: '', before: 'Ruth stood looking at them.', after: '', trailing: '' }] },
 }
 
 const REWRITE: AppliedChange = { id: 'change2', content: { kind: 'rewrittenWhole' } }
@@ -54,5 +55,17 @@ describe('applied changes', () => {
 
     expect(readAppliedChanges(dataRoot, scope, appliedChangeSchema)).toEqual([REWRITE])
     await expect(deleteAppliedChange(dataRoot, scope, 'never-written')).resolves.toBeUndefined()
+  })
+
+  it('throws on a passage record that predates leading and trailing context, rather than dropping it silently', async () => {
+    await writeAppliedChange(dataRoot, scope, cutSentence)
+    const changeFile = path.join(workspaceDir, 'cups', 'changes', 'draft', 'change1.json')
+    writeFileSync(
+      changeFile,
+      JSON.stringify({ id: 'change1', content: { kind: 'passages', passages: [{ before: 'Ruth stood looking at them.', after: '' }] } }),
+      'utf8',
+    )
+
+    expect(() => readAppliedChanges(dataRoot, scope, appliedChangeSchema)).toThrowError(TolerantReadError)
   })
 })

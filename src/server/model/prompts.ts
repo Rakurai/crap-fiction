@@ -54,6 +54,7 @@ export type SectionName =
   | 'recommendation'
   | 'constraint'
   | 'referenceSchema'
+  | 'rejectedAttempt'
 
 export type LineName =
   | 'historyMessage'
@@ -62,6 +63,12 @@ export type LineName =
   | 'historyResponse'
   | 'historyApplication'
   | 'readingSubstantive'
+  | 'editResolved'
+  | 'editUnmatched'
+  | 'editAmbiguous'
+  | 'editOccurrenceOutOfRange'
+  | 'editOverlapping'
+  | 'editEmptyAnchor'
 
 export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
 export type OperationRoleName = 'apply'
@@ -81,6 +88,7 @@ const SECTION_NAMES: readonly SectionName[] = [
   'recommendation',
   'constraint',
   'referenceSchema',
+  'rejectedAttempt',
 ]
 const LINE_NAMES: readonly LineName[] = [
   'historyMessage',
@@ -89,6 +97,12 @@ const LINE_NAMES: readonly LineName[] = [
   'historyResponse',
   'historyApplication',
   'readingSubstantive',
+  'editResolved',
+  'editUnmatched',
+  'editAmbiguous',
+  'editOccurrenceOutOfRange',
+  'editOverlapping',
+  'editEmptyAnchor',
 ]
 const TASK_NAMES: readonly TaskName[] = ['specialist', 'generalist', 'concreteChange', 'apply']
 const OPERATION_ROLE_NAMES: readonly OperationRoleName[] = ['apply']

@@ -5,6 +5,7 @@ import { appliedChangeSchema, type AppliedChange } from '../../shared/appliedCha
 import type { ConversationEntry, EntryConversation } from '../../shared/conversationEntries.js'
 import { entryConversationSchema } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import type { ModelTraceRecord } from '../model/types.js'
 import type { ConversationScope } from '../scope.js'
 import { PathEscapesRootError, resolveWithinRoot } from './containment.js'
 import {
@@ -338,19 +339,6 @@ export async function deleteAppliedChange(dataRoot: string, scope: ConversationS
 
 const TRACES_DIR = 'traces'
 
-export type ModelTraceRecord = Readonly<{
-  site: string
-  assignment: string
-  attempt: number
-  durablePrompt: string
-  perCallPrompt: string
-  returned: string
-  reading: 'value' | 'malformed' | 'nonconforming'
-  runtimeStopReason: string
-  promptTokens: number | undefined
-  predictedTokens: number | undefined
-}>
-
 function traceFile(dataRoot: string, at: number, site: string): string {
   const instant = new Date(at).toISOString().replaceAll(':', '-')
   return path.join(dataRoot, TRACES_DIR, `${instant}-${site}.md`)
@@ -370,14 +358,7 @@ function traceText(record: ModelTraceRecord): string {
     `prompt tokens: ${reportedCount(record.promptTokens)}`,
     `predicted tokens: ${reportedCount(record.predictedTokens)}`,
     '',
-    '## Durable prompt',
-    '',
-    record.durablePrompt,
-    '',
-    '## Per-call prompt',
-    '',
-    record.perCallPrompt,
-    '',
+    ...record.turns.flatMap((turn) => [`## ${turn.role}`, '', turn.content, '']),
     '## Returned',
     '',
     record.returned,

@@ -161,7 +161,10 @@ describe('the piece routes', () => {
     const store = new ConversationEntryStore()
     await store.append(dataRoot, scope, 'c1', { id: 'e1', kind: 'authorMessage', text: 'x', audience: [], brought: [] })
     await store.append(dataRoot, scope, 'c1', { id: 'e2', kind: 'application', responseId: 'e1', changeId: 'change1' })
-    await writeAppliedChange(dataRoot, scope, { id: 'change1', content: { kind: 'passages', passages: [{ before: 'it', after: '' }] } })
+    await writeAppliedChange(dataRoot, scope, {
+      id: 'change1',
+      content: { kind: 'passages', passages: [{ leading: '', before: 'it', after: '', trailing: '' }] },
+    })
 
     const res = await app.request('/pieces/cups/surfaces/draft/conversations/c1', { method: 'DELETE' })
 
