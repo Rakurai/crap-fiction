@@ -25,6 +25,8 @@ There is no `docs/adr/` and none is wanted. A settled technical decision lives i
 
 - **`docs/CODING_STANDARDS.md`**, whenever the work touches code. Engineering discipline only — depth, typing, schemas, seams, failures, cancellation, persistence, the HTTP layer, configuration, client shape, logging, testing. It is subordinate to the design doc set and decides no product behaviour.
 
+- **`docs/DOC_STANDARDS.md`**, whenever the work would edit committed prose — a design document, a nested README, a docstring, a comment, a test description. It decides whether the edit belongs at all and how it is written; it assigns no ownership, so the roles above are what locate the owning document.
+
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
 ## File structure

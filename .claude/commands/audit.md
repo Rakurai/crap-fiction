@@ -22,7 +22,7 @@ Audit the current implementation (the whole codebase) against the specification,
 
 ## Operating Constraints
 
-**Standards Authority**: The coding standards (`docs/CODING_STANDARDS.md`) are the sole authority for coding standards and best practices within this audit. The design document set is the structural authority. If the user provides additional best-practice references in their input, incorporate those as supplementary criteria.
+**Standards Authority**: The coding standards (`docs/CODING_STANDARDS.md`) are the sole authority for coding standards and best practices within this audit. The design document set is the structural authority. The documentation standards (`docs/DOC_STANDARDS.md`) govern any document edit this audit leads to, and nothing else here. If the user provides additional best-practice references in their input, incorporate those as supplementary criteria.
 
 **Read-Only**: The audit is static analysis. Read the source, the tests and git history (`git log`/`blame`). Do not run the test suite, start services, invoke package managers, or modify source, tests, dependencies or runtime state. This audit evaluates design, not the behavior of the code under test. Cross those boundaries only if the user explicitly asks.
 
@@ -38,6 +38,7 @@ Derive the paths of the authorities, relative to the repo root:
 
 - DOCS = docs/VISION.md, CONTEXT.md, docs/PRD.md, docs/UX_DESIGN.md, docs/ARCHITECTURE.md, docs/INTERFACES.md
 - STANDARDS = docs/CODING_STANDARDS.md
+- DOC_STANDARDS = docs/DOC_STANDARDS.md, needed only if the user approves a **document** decision
 
 Abort with an error if any required file is missing.
 
@@ -308,7 +309,7 @@ Present MEDIUM and LOW findings as a summary list. Ask if the user wants to prom
 After the user responds with their decisions:
 
 1. For each **fix** decision: Record a remediation task naming the specific change required. Make no code change -- fixes are left for a later session.
-2. For each **document** decision: Update the relevant section of the owning document to match the implementation reality, obeying the editing rules in CLAUDE.md -- one home per fact, current state only, no cross-references, no history. Note the change in the audit report.
+2. For each **document** decision: Update the relevant section of the owning document to match the implementation reality, obeying DOC_STANDARDS. Note the change in the audit report.
 3. **skip** decisions: No action.
 
 Each remediation task must reference the finding ID and include the specific file:line to modify.
