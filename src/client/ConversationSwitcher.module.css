@@ -10,7 +10,7 @@
 }
 
 .start {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
 }
 
 .empty {
@@ -67,7 +67,7 @@
 }
 
 .arm {
-  composes: view from './controls.module.css';
+  composes: quiet from './controls.module.css';
   flex: none;
   opacity: 0;
 }
@@ -84,13 +84,13 @@
 }
 
 .confirmDelete {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }
 
 .keep {
-  composes: view from './controls.module.css';
+  composes: quiet from './controls.module.css';
   flex: none;
   white-space: nowrap;
 }

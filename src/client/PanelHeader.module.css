@@ -20,6 +20,6 @@
 }
 
 .dismiss {
-  composes: surface from './controls.module.css';
+  composes: action from './controls.module.css';
   flex: none;
 }
