@@ -7,6 +7,7 @@ import { Conversation } from '../../src/client/Conversation.js'
 import type { RequestResult } from '../../src/client/request.js'
 import type { ApplyConfirmation } from '../../src/shared/applyViews.js'
 import type { RoomAdapters } from '../../src/client/useConversation.js'
+import { failureCodeSchema } from '../../src/shared/envelope.js'
 import { conversationOnDisk, onTheDraft, roomAdapters, roomStream } from '../support/roomAdapters.js'
 
 const DOCUMENTS = { draft: 'First light.', storyContext: '', authorContext: '' }
@@ -131,6 +132,60 @@ describe('a landed response in the conversation', () => {
     await waitFor(() => expect(screen.getByText('did not answer — TIMEOUT')).toBeTruthy())
     expect(blockContaining('did not answer — TIMEOUT').textContent).toContain('Shape')
     expect(screen.getByText('{"claim": "the ending')).toBeTruthy()
+  })
+})
+
+const LONG_CLAIM = 'The ending arrives before the fear does, and the fear is the only thing the scene was ever about.'
+
+const LONG_NOTE = 'Three paragraphs earlier the light is already gone, which is where the dread should have started to gather.'
+
+function everythingOverflows(): () => void {
+  const was = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 200 })
+  return () => {
+    if (was === undefined) {
+      Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+      return
+    }
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', was)
+  }
+}
+
+describe('a response too long to show whole', () => {
+  afterEach(cleanup)
+
+  it('truncates the claim and the note alike, each behind a toggle inside the text it cuts, and offers no toggle where nothing is cut', async () => {
+    const restore = everythingOverflows()
+    try {
+      renderConversation([
+        { id: 'e1', kind: 'participantResponse', participantId: 'reader', causeId: 'e0', outcome: 'commentary', claim: LONG_CLAIM, note: LONG_NOTE },
+      ])
+
+      const [claimToggle, noteToggle] = await screen.findAllByRole('button', { name: '… MORE' })
+      expect(claimToggle?.parentElement?.textContent).toContain(LONG_CLAIM)
+      expect(noteToggle?.parentElement?.textContent).toContain(LONG_NOTE)
+      expect(screen.getAllByRole('button', { name: '… MORE' })).toHaveLength(2)
+
+      if (claimToggle === undefined) throw new Error('the claim was drawn with nothing to disclose it')
+      fireEvent.click(claimToggle)
+
+      const opened = screen.getByRole('button', { name: 'LESS' })
+      expect(opened.getAttribute('aria-expanded')).toBe('true')
+      expect(opened.parentElement?.textContent).toContain(LONG_CLAIM)
+
+      fireEvent.click(opened)
+
+      expect(screen.getAllByRole('button', { name: '… MORE' })).toHaveLength(2)
+    } finally {
+      restore()
+    }
+  })
+
+  it('leaves a claim that fits with no toggle at all', async () => {
+    renderConversation([RESPONSE_WITH_COMMENTARY])
+
+    await screen.findByText('It holds.')
+    expect(screen.queryByRole('button', { name: /MORE/ })).toBeNull()
   })
 })
 
@@ -490,6 +545,42 @@ describe('handle completion at the composer', () => {
 
     await waitFor(() => expect((composer as HTMLTextAreaElement).value).toBe('@shape '))
     expect(screen.queryByRole('option')).toBeNull()
+  })
+})
+
+describe('the composer while the room is working', () => {
+  afterEach(cleanup)
+
+  it('takes no typing at the composer or at a response field, and comes back live and focused the moment the room settles', async () => {
+    let settle: ((result: RequestResult<{ conversationId: string; actionId: string }>) => void) | undefined
+    const dispatch = vi.fn(
+      () =>
+        new Promise<RequestResult<{ conversationId: string; actionId: string }>>((resolve) => {
+          settle = resolve
+        }),
+    )
+    const room: RoomAdapters = { ...roomHolding([RESPONSE_WITH_COMMENTARY]), dispatch }
+
+    renderConversation([RESPONSE_WITH_COMMENTARY], { room })
+
+    const composer = (await screen.findByLabelText('Message the room')) as HTMLTextAreaElement
+    const replyField = (await screen.findByLabelText('Reply or ask for a concrete change, in your own words')) as HTMLInputElement
+    fireEvent.change(composer, { target: { value: 'a message' } })
+    fireEvent.click(screen.getByRole('button', { name: 'send' }))
+
+    await waitFor(() => expect(composer.disabled).toBe(true))
+    expect(replyField.disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'ask me' }).hasAttribute('disabled')).toBe(true)
+
+    const reached = settle
+    if (reached === undefined) throw new Error('the message never reached the room')
+    await act(async () => {
+      reached({ outcome: 'refused', code: failureCodeSchema.enum.ARTIFACT_INVALID, message: 'the room did not take it' })
+    })
+
+    await waitFor(() => expect(composer.disabled).toBe(false))
+    expect(replyField.disabled).toBe(false)
+    expect(document.activeElement).toBe(composer)
   })
 })
 

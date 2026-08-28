@@ -48,6 +48,8 @@ type ConversationProps = {
 
 const ROOM_UNAVAILABLE = 'No model is reachable. The manuscript is yours to write.'
 
+const STILL_AT_THE_NEWEST = 24
+
 function ResponseActions({
   responseId,
   participantId,
@@ -120,7 +122,7 @@ function ResponseActions({
         aria-label={fieldLabel}
         className={styles.actionField}
         value={text}
-        placeholder="in your words — optional"
+        disabled={disabled}
         onChange={(event) => setText(event.target.value)}
       />
     </div>
@@ -256,7 +258,7 @@ function IdentityLine({ identity, status }: { readonly identity: ParticipantIden
   )
 }
 
-function Claim({ text }: { readonly text: string }) {
+function Disclosable({ text, tone }: { readonly text: string; readonly tone: 'claim' | 'note' }) {
   const [open, setOpen] = useState(false)
   const [beyondTheCeiling, setBeyondTheCeiling] = useState(false)
   const ref = useRef<HTMLParagraphElement>(null)
@@ -267,17 +269,17 @@ function Claim({ text }: { readonly text: string }) {
     setBeyondTheCeiling(element.scrollHeight > element.clientHeight + 1)
   }, [text, open])
 
+  const written = tone === 'claim' ? styles.claim : styles.note
+
   return (
-    <>
-      <p ref={ref} className={open ? styles.claim : `${styles.claim} ${styles.claimClamped}`}>
-        {text}
-      </p>
+    <p ref={ref} className={open ? written : `${written} ${styles.clamped}`}>
       {beyondTheCeiling && (
-        <button type="button" className={styles.claimMore} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
-          {machineWords(open ? 'less' : 'more')}
+        <button type="button" className={styles.disclosure} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+          {open ? machineWords('less') : `… ${machineWords('more')}`}
         </button>
       )}
-    </>
+      {text}
+    </p>
   )
 }
 
@@ -301,8 +303,10 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
     case 'authorMessage':
       return (
         <>
-          <p className={styles.message}>{entry.text}</p>
-          {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
+          <div className={styles.messageLine}>
+            <p className={styles.message}>{entry.text}</p>
+            {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
+          </div>
           {entry.brought.length > 0 && (
             <RoomChanged names={entry.brought.map((participantId) => identify(participantId).displayName)} castSize={entry.castSize} />
           )}
@@ -315,9 +319,11 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
             <span className={styles.askedFacts}>{machineWords('asked')}</span>
             <span className={styles.askedWords}>{askedText(identify(entry.target).displayName)}</span>
           </div>
-          {entry.clarification !== undefined && <p className={styles.message}>{entry.clarification}</p>}
-          {entry.clarification !== undefined && entry.atMs !== undefined && (
-            <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>
+          {entry.clarification !== undefined && (
+            <div className={styles.messageLine}>
+              <p className={styles.message}>{entry.clarification}</p>
+              {entry.atMs !== undefined && <span className={styles.messageWhen}>{messageWhen(entry.atMs, clock)}</span>}
+            </div>
           )}
         </>
       )
@@ -361,8 +367,8 @@ function EntryView({ entry, actions }: { readonly entry: ConversationEntryView; 
                 : machineWords(responseSettlement.kind === 'failed' ? 'application failed' : 'application abandoned')
             }
           />
-          <Claim text={entry.claim} />
-          {entry.note !== undefined && <p className={styles.note}>{entry.note}</p>}
+          <Disclosable text={entry.claim} tone="claim" />
+          {entry.note !== undefined && <Disclosable text={entry.note} tone="note" />}
           {responseSettlement?.kind === 'failed' && (
             <>
               <p className={styles.failed}>the application did not settle — {machineWords(responseSettlement.reason)}</p>
@@ -451,6 +457,9 @@ export function Conversation({
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
   const [caretOffset, setCaretOffset] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
+  const pinnedToNewest = useRef(true)
+  const wasBusy = useRef(false)
   const combobox = Ariakit.useComboboxStore()
   const token = Ariakit.useStoreState(combobox, 'inputValue')
 
@@ -533,6 +542,42 @@ export function Conversation({
   const conversationActionInFlight = activity !== undefined
   const opening = conversationName(conversation.projection.entries)
 
+  function scrollToNewest(): void {
+    const transcript = transcriptRef.current
+    if (transcript === null) return
+    transcript.scrollTop = transcript.scrollHeight
+  }
+
+  function followTheNewestFromHere(): void {
+    pinnedToNewest.current = true
+    scrollToNewest()
+  }
+
+  function holdWhereTheAuthorLeftIt(): void {
+    const transcript = transcriptRef.current
+    if (transcript === null) return
+    pinnedToNewest.current = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight <= STILL_AT_THE_NEWEST
+  }
+
+  useLayoutEffect(() => {
+    if (pinnedToNewest.current) scrollToNewest()
+  }, [conversation.projection.entries, pendingParticipants])
+
+  useLayoutEffect(() => {
+    pinnedToNewest.current = true
+    scrollToNewest()
+  }, [conversation.conversationId])
+
+  useEffect(() => {
+    if (roomBusy) {
+      wasBusy.current = true
+      return
+    }
+    if (!wasBusy.current) return
+    wasBusy.current = false
+    textareaRef.current?.focus()
+  }, [roomBusy])
+
   function askAboutChange(): void {
     if (roomBusy) return
     conversation.sendMessage(REVIEW_CHANGE_MESSAGE)
@@ -541,6 +586,7 @@ export function Conversation({
   function askTheInterviewer(): void {
     if (roomBusy) return
     conversation.sendMessage(`@${interviewer.handle} ${interviewer.invocation}`)
+    followTheNewestFromHere()
   }
 
   function replyEmpty(participantId: string): void {
@@ -567,6 +613,7 @@ export function Conversation({
     if (message.trim().length === 0 || roomBusy) return
     conversation.sendMessage(message)
     setMessage('')
+    followTheNewestFromHere()
   }
 
   function selectHandle(handle: string) {
@@ -609,7 +656,7 @@ export function Conversation({
           </button>
         </div>
       </div>
-      <div className={styles.transcript}>
+      <div ref={transcriptRef} className={styles.transcript} onScroll={holdWhereTheAuthorLeftIt}>
         {conversation.projection.entries.map((entry) => (
           <EntryView key={entry.id} entry={entry} actions={actions} />
         ))}
@@ -658,6 +705,7 @@ export function Conversation({
               <textarea
                 ref={textareaRef}
                 rows={2}
+                disabled={roomBusy}
                 onPointerDown={combobox.hide}
                 onChange={(event) => {
                   const textarea = event.target
@@ -691,18 +739,20 @@ export function Conversation({
             ))}
           </Ariakit.ComboboxPopover>
         </div>
-        <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
-          ask me
-        </button>
-        {conversationActionInFlight ? (
-          <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
-            stop
+        <div className={styles.composerActions}>
+          <button type="button" className={styles.interview} disabled={roomBusy} onClick={askTheInterviewer}>
+            ask me
           </button>
-        ) : (
-          <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
-            send
-          </button>
-        )}
+          {conversationActionInFlight ? (
+            <button type="button" className={styles.send} onClick={() => void abandonCurrentAction()}>
+              stop
+            </button>
+          ) : (
+            <button type="submit" className={styles.send} disabled={roomBusy || message.trim().length === 0}>
+              send
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )
