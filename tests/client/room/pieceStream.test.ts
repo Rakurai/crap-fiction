@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { createElement, StrictMode, useEffect } from 'react'
 import { describe, expect, it } from 'vitest'
 import { applyRoomEvent, createPieceStream, usePieceStream } from '../../../src/client/pieceStream.js'
-import type { RoomEvent } from '../../../src/client/entryProjection.js'
+import { applyDispatchEvent, type RoomEvent } from '../../../src/client/entryProjection.js'
 import { EMPTY_ROOM_ACTIVITY as EMPTY, type subscribeToRoom as subscribeToRoomFn } from '../../../src/client/roomClient.js'
 
 const STARTED: RoomEvent = {
@@ -35,6 +35,22 @@ describe('applyRoomEvent', () => {
   it('ignores progress and completion naming an action no longer current for that surface', () => {
     const snapshot = applyRoomEvent(EMPTY, { type: 'action.finished', data: { actionId: 'a-stale', outcome: 'abandoned', surface: 'draft' } })
     expect(snapshot).toEqual(EMPTY)
+  })
+
+  it('folds a dispatch onto a surface the same way a resubscribed room snapshot and a live conversation projection each fold it', () => {
+    const events: RoomEvent[] = [
+      STARTED,
+      { type: 'participant.activity', data: { actionId: 'a1', participantId: 'shape', state: 'working', startedAt: 1, surface: 'draft' } },
+      {
+        type: 'entry.appended',
+        data: { actionId: 'a1', entry: { id: 'e1', kind: 'participantResponse', participantId: 'shape', causeId: 'e0', outcome: 'commentary', claim: 'It holds.' }, surface: 'draft' },
+      },
+    ]
+
+    const snapshot = events.reduce(applyRoomEvent, EMPTY)
+    const directly = events.reduce<ReturnType<typeof applyDispatchEvent>>((activity, event) => applyDispatchEvent(activity, event), undefined)
+
+    expect(snapshot.draft).toEqual(directly)
   })
 })
 

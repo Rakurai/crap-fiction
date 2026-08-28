@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { RoomActivitySnapshot } from '../shared/conversationEvents.js'
-import { isParticipantOutcome, type RoomEvent } from './entryProjection.js'
+import { applyDispatchEvent, type RoomEvent } from './entryProjection.js'
 import { type subscribeToRoom as subscribeToRoomFn } from './roomClient.js'
 
 export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent): RoomActivitySnapshot {
@@ -13,15 +13,7 @@ export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent)
         ...snapshot,
         [surface]:
           event.data.kind === 'dispatch'
-            ? {
-                actionId: event.data.actionId,
-                conversationId: event.data.conversationId,
-                kind: 'dispatch',
-                sourceEntryId: event.data.sourceEntryId,
-                audience: event.data.audience,
-                states: {},
-                startedAt: event.data.startedAt,
-              }
+            ? applyDispatchEvent(undefined, event) ?? null
             : {
                 actionId: event.data.actionId,
                 conversationId: event.data.conversationId,
@@ -30,22 +22,15 @@ export function applyRoomEvent(snapshot: RoomActivitySnapshot, event: RoomEvent)
                 startedAt: event.data.startedAt,
               },
       }
-    case 'participant.activity': {
-      if (current === null || current.kind !== 'dispatch' || current.actionId !== event.data.actionId) return snapshot
-      const { participantId, state, startedAt } = event.data
-      return { ...snapshot, [surface]: { ...current, states: { ...current.states, [participantId]: { state, startedAt } } } }
+    case 'participant.activity':
+    case 'entry.appended': {
+      if (current === null || current.kind !== 'dispatch') return snapshot
+      const next = applyDispatchEvent(current, event)
+      return next === current ? snapshot : { ...snapshot, [surface]: next ?? null }
     }
     case 'apply.pending': {
       if (current === null || current.kind !== 'apply' || current.actionId !== event.data.actionId) return snapshot
       return { ...snapshot, [surface]: { ...current, applicationId: event.data.applicationId } }
-    }
-    case 'entry.appended': {
-      if (current === null || current.kind !== 'dispatch' || current.actionId !== event.data.actionId) return snapshot
-      const { entry } = event.data
-      if (!isParticipantOutcome(entry)) return snapshot
-      const states = { ...current.states }
-      delete states[entry.participantId]
-      return { ...snapshot, [surface]: { ...current, states } }
     }
     case 'action.finished':
       if (current === null || current.actionId !== event.data.actionId) return snapshot
