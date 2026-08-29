@@ -13,7 +13,7 @@ to hold in mind:
 
 - No `theme.ts`. It runs on stock MUI defaults with `colorSchemes: {light, dark}` and CSS variables,
   so the light/dark control exercises the real mechanism the plan specifies. Spacing, radius, and
-  palette are therefore **not proposals** — they are MUI's defaults, and step 2 overrides them.
+  palette are therefore **not proposals** — they are MUI's defaults, and the foundation work overrides them.
   Spectral is applied by hand in the register places; Public Sans is not wired.
 - No TipTap. The rendered manuscript is static prose in the product register; `source` shows the
   Markdown as text.
@@ -50,7 +50,7 @@ loses to the anchoring rule because the rule is legible without being explained.
 | Identity | mark (`Avatar variant="rounded"`) → display name (`subtitle2`, `text.primary`) → handle (`caption`, `text.secondary`) | Order and prominence are fixed by canon: the name is what the eye lands on, and the handle rides along so every response teaches the addressing. My first pass had the handle first and louder — wrong on both counts |
 | Claim vs note | Two `Typography` blocks, both Spectral, differing in size, leading, and `color`; the note clamps to three lines with a `Link component="button"` disclosure | Not `Accordion`: its header is a control, and the claim is prose the author reads. Not `Tooltip`: the note is often the longer half and must stay in the column |
 | No-comment result | A dimmed identity line reading `NOTHING TO ADD`, always shown | The hide-all-non-answers toggle I proposed is deleted. The space is spent deliberately, so the author can see who was in the room and who spoke without inferring either from an absence; and filtering by entry kind would have hidden a directly addressed participant's answer, which is the case canon protects most explicitly |
-| Failure | `Alert severity="warning" variant="outlined" icon={false}` + the returned text in monospace, **and no actions** | A failure is not a response: there is nothing said to reply to, and the author's next move is an ordinary message. Severity hue is neutralized in `theme.ts` per the no-alarm-hue rule — here it still shows MUI's stock amber, which is exactly what step 2 must override |
+| Failure | `Alert severity="warning" variant="outlined" icon={false}` + the returned text in monospace, **and no actions** | A failure is not a response: there is nothing said to reply to, and the author's next move is an ordinary message. Severity hue is neutralized in `theme.ts` per the no-alarm-hue rule — here it still shows MUI's stock amber, which is exactly what the foundation theme must override |
 | Participant in flight | Identity + status `overline`, four stages: `WAITING` → `CALLED` → `PREPARING` → `WORKING · m:ss`. A spinner and an **indeterminate** `LinearProgress` appear only from `PREPARING` on | Not `Skeleton`: a skeleton promises a shape, and a participant may end in *nothing to add*. No determinate progress anywhere — a fraction or a position would assert a schedule the studio does not control |
 | Applied change | `Accordion`; closed state reads `APPLIED`, or `REWRITTEN WHOLE` where the change was unbounded. No counts | The word count is gone by author decision; the room keeps its own before/after counts for classification and serves them to nobody |
 | Actions on a response | `Button size="small"` row + inline `TextField`. `apply` / `ask for a concrete change` before, `ask the room about this` after the change lands, `reply` always | `ask the room about this` moved out of the disclosure: inside the accordion it disappeared when the disclosure closed, and it is the one route across that silence. Not a `Menu` behind an overflow icon — `apply` is the only act that touches the prose and should be visible and boring |
@@ -148,9 +148,10 @@ bar asserting a schedule, actions on a failure, `ask the room about this` vanish
 disclosure) only became visible because something was on screen to be wrong.
 
 **Not useful:** anything below the composition level. This mockup cannot tell you a spacing, a
-radius, or a type scale, and if it tried you would have to unlearn it at step 2. It is left on stock
+radius, or a type scale, and if it tried you would have to unlearn it during the foundation work. It is left on stock
 defaults so there is nothing to re-interpret.
 
 **The honest risk:** this document is specification-shaped, and the plan's per-surface review format
 already asks for the same thing. My recommendation stands — keep the mockup for the transcript and
-the arrival question, and let steps 6–8 use the review format directly against real components.
+the arrival question, and let the remaining surface and retirement work use the review format directly
+against real components.

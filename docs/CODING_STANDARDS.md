@@ -260,7 +260,7 @@ operation's progress, whether an operation may start, what a call returned. Proj
 events into a view model is not inventing state; inferring a state the server never reported is. Where
 a projection and the server disagree, the server is right, and the fix is in the projection.
 
-No hidden retries and no silent recovery in the client.
+Do not let recovery misrepresent failure or replace server authority. Retry and revalidation policy belongs to the module that understands the operation and requires an explicit reliability or product rationale; do not inherit it accidentally from a dependency default.
 
 Use semantic HTML, labelled controls and keyboard operability. Style through the project's token and
 component layer rather than hardcoding values a token exists for; custom styles express layout and

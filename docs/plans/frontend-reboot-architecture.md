@@ -68,9 +68,11 @@ write result / event stream
 
 Resource definitions provide one place for identity and validation without hiding TanStack Query's useful lifecycle or reproducing its reducer. Query keys carry the piece or conversation identity needed for targeted invalidation.
 
-The application may configure Query defaults at the composition root where product behavior requires it. Feature hooks may override a default when the resource has a different requirement. Query results supply the request lifecycle without a second client-owned state machine.
+The Query client disables automatic read retries at the composition root with `retry: false`. This application has no defined read-recovery strategy that benefits from repeating a failed request before exposing the failure, so it does not inherit TanStack Query's retry default. A resource that later needs retries requires an explicit reliability decision at the resource's owning module. Other refresh and revalidation settings follow the freshness needs of the resource rather than a blanket application policy. Query results supply the request lifecycle without a second client-owned state machine.
 
-Writes cross the transport through the feature or session module that owns the intent. The returned authoritative value is installed or the affected resource is invalidated using TanStack Query's standard APIs. A feature may use `useMutation` when its lifecycle is useful; write ordering that affects correctness remains with the writer rather than being inferred from mutation state.
+Feature hooks project the Query result into the product-shaped union `Fact<T>`: not arrived from `isPending`, failed first read from `isLoadingError`, present value, or present value with a failed refresh from `isRefetchError`. `isFetching` is not part of this shared projection because no current product presentation distinguishes a background fetch; it can gain product meaning where a later design requires it.
+
+Writes cross the transport through the feature or session module that owns the intent. The returned authoritative value is installed or the affected resource is invalidated using TanStack Query's standard APIs. Features may use TanStack Query's mutation lifecycle, but the choice of hook does not authorize installing an unconfirmed value as a served fact. Write ordering that affects correctness remains with the writer rather than being inferred from mutation state.
 
 ## Event stream
 
@@ -86,9 +88,7 @@ piece EventSource
       └── resource changed ───▶ Query invalidation by piece/resource key
 ```
 
-Frames received before the activity snapshot are buffered until the snapshot gives them context. A disconnect changes visible connection state. Reconnection establishes a trustworthy baseline before the disconnected statement clears.
-
-The current protocol can resynchronize by treating the fresh activity snapshot sent on connection as a signal to invalidate the served facts fed by the stream for that piece. Event replay would be an alternative protocol design; the root-plan review should confirm which mechanism the server will support.
+Frames received before the activity snapshot are buffered until the snapshot gives them context. A disconnect changes visible connection state. The server sends a fresh activity snapshot before other frames on every connection. Each snapshot establishes the stream baseline and invalidates the stream-fed Query keys beneath the open piece's key prefix; after reconnection, the disconnected statement clears only once that baseline is trustworthy. The current protocol therefore resynchronizes without event replay or a server change.
 
 An optimistic author-message echo remains an open protocol and state-ownership choice rather than an assumption of the new transcript.
 
