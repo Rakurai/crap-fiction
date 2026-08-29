@@ -1,56 +1,56 @@
-# Frontend Reboot — Roadmap
+# Frontend Reboot — Candidate Roadmap
 
-**Noncanonical.** A sequencing companion to `frontend-reboot.md`, carrying no decision of its own: where the two disagree, the plan governs, and where the plan and a canonical document disagree on anything the plan does not explicitly reverse, the canonical document governs. Both are transitional and die once step 2 lands.
+**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This roadmap arranges the work described by the working specification and proposed architecture; the root-plan review may reorder its slices.
 
-Step numbers are the plan's own and are referenced across it.
+## Dependency shape
 
----
+```text
+approve specification and architecture
+                │
+                ▼
+foundation and safety net
+                │
+                ▼
+representative vertical slice
+                │
+                ├──▶ protocol and server-boundary corrections
+                │
+                └──▶ manuscript and workspace composition
+                              │
+                              ▼
+                    remaining surfaces and retirement
+```
 
-## Now, in parallel
+The vertical slice should be chosen for the uncertainty it resolves. The transcript is behaviorally dense and may reveal protocol needs, while a workspace skeleton may reveal composition and state-lifetime needs earlier. The root-plan review should select the slice deliberately.
 
-Neither blocks the other.
+## Proposed sequence
 
-- **Step 1 — boundary audit.** Reading only, no code. For each row of the plan's *Domain boundary* table, determine where the decision is made today: server, client, shared, split, or duplicated. **Deliverable:** the filled table, plus the explicit list of decisions that must move server-side. Frozen at the end of the step; representation stays open. This is the baseline step 4's guardrail checks against — without it nothing detects a classification drifting client-side.
-- **Author task.** Write the reference conversation through the current application and leave it in the workspace, carrying all eight shapes from the plan's step-3 preparation list. Step 3 cannot start without it, and it has to be authored on the current frontend, which stays runnable through step 7.
+1. **Approve the working specification and architecture.** Resolve the remaining architecture decisions, then update each canonical document only with the truth it owns. The proposal and working specification remain planning inputs rather than parallel authorities.
+2. **Establish the foundation.** Add the approved dependencies, create the MUI theme and provider composition, establish TanStack Query resource definitions, preserve the focused test seams, and add the lightweight assembled-client check.
+3. **Build a representative vertical slice against real data.** Exercise the selected slice through the real transport and server-owned resources rather than fixtures that reproduce the old component model. Use the existing hard-shape conversation and mockup as evidence where the transcript participates.
+4. **Stabilize representation.** Correct event and resource shapes revealed by the slice, move the addressable set, opening words, and note-absence decision behind the server seam, and establish stream resynchronization.
+5. **Build the primary product modules.** Complete transcript behavior, integrate TipTap and the piece session, and compose manuscript and conversation within the shell. The order within this slice should follow dependencies discovered by the representative slice.
+6. **Build secondary surfaces.** Complete pieces, conversations, room, and settings through the approved shell and served-fact architecture.
+7. **Retire replaced code and disposable scaffolding.** Remove superseded client modules, styling infrastructure, dependencies, tests that encode the retired implementation, and any scaffold used only to assemble early slices. Run the final architecture and product review against the updated canonical documents.
+8. **Promote durable truth and remove spent plans.** Ensure accepted product, architecture, interface, and engineering decisions live in their canonical owners, then delete planning artifacts whose work is complete.
 
-## Step 2 — foundation
+## Evidence to prepare
 
-The gate for everything after it. Rules exist before substantial UI is written, or a second design system grows inside MUI.
+- A real conversation containing an unaddressed author action, out-of-order participant settlement, a no-comment result, a claim without a note, an applicable suggestion, an applied constraint and disclosure, a reply, and a switch during settlement.
+- The existing MUI mockup and its awkward-state coverage.
+- Current behavior for save failure, leave blocking, reading position, autosave, and application resumption.
+- A list of backend representation changes required by the selected vertical slice.
 
-`theme.ts` — palette with no alarm hue, `colorSchemes` driven from the persisted author value with MUI's own storage disabled, self-hosted fonts rewired, density, component defaults. Disposable shell scaffold. `CLAUDE.md` rules. ESLint bans. Delete the `onScreen` project. Delete Playwright, the `test:e2e` script and the `test-browser` target. Rebuild the image, since the roster changed. **The canonical edit.**
+## Review at slice boundaries
 
-## Step 3 — the transcript
+Review each completed slice for product fidelity, one representation per concept, responsibility placed with the module that understands it, use of adopted dependencies instead of parallel machinery, and accidental constraints on later slices.
 
-Highest-risk surface first, read-only, against the real backend. Mention composer stubbed. Validates the transcript's information architecture, MUI composition, partial settlement behavior, interaction patterns, and what domain information the frontend actually needs. Ends with a divergence list and `/audit`.
+Surface-local MUI composition does not require a formal accept/reject ceremony. Escalate a change when it would alter canonical product behavior, depart from a proposed canonical change without resolving it, or change an architectural relationship shared by later work.
 
-## Step 4 — stabilize the protocol
+## Questions for the root-plan review
 
-Reshape events using what step 3 revealed. Check against step 1: representation is open, ownership is not.
-
-## Step 5 — correct the backend, wire the transcript
-
-Move misplaced domain logic server-side. Connect the transcript to the real protocol. Build the real mention composer.
-
-## Step 6 — manuscript surface
-
-Keep TipTap, the constrained schema and the Markdown round trip. Rebuild the surrounding UI only. The document model is not a frontend-reboot concern.
-
-## Step 7 — compose the workspace
-
-The two halves designed together as one application. The step-2 scaffold dies here, and the current frontend can be retired after it.
-
-## Step 8 — secondary surfaces
-
-Pieces, conversations, room configuration, models, settings. The current four-window organization is not assumed to survive.
-
-Then the plan's one countable check.
-
----
-
-## Notes on the path
-
-**The critical path is 2 → 3 → 4 → 5.** Steps 6, 7 and 8 are lower-risk work carried out against a protocol already settled.
-
-**Mockups are an input to step 2, not a reconciliation after it.** A rendered appearance reference bears on `theme.ts` for the values it implies and on step 3 for the transcript's information architecture. Settling the palette and type scale before one arrives means reconciling twice.
-
-**`/audit` runs at the end of each surface step** — 3, 5, 6, 7, 8. It performs the cross-file analysis the plan's coherence principle depends on, and it is that principle's enforcement mechanism rather than a review courtesy.
+- Which representative slice provides the most useful evidence first?
+- Does protocol stabilization precede manuscript integration, or can those paths proceed independently?
+- Which unresolved architecture decisions block foundation work?
+- What is the removal point for the old client and its styling and test infrastructure?
+- Which checks define completion for each slice without rebuilding the existing test burden?
