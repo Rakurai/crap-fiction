@@ -5,13 +5,7 @@ import LibraryBooksIcon from '@mui/icons-material/LibraryBooks'
 import SettingsIcon from '@mui/icons-material/Settings'
 import { AppBar, Box, IconButton, Tab, Tabs, Toolbar, Tooltip, Typography } from '@mui/material'
 import { SURFACE_IDS, type SurfaceId } from '../../shared/surfaces.js'
-import type { OverlayId } from './state.js'
-
-const SURFACE_LABEL: Readonly<Record<SurfaceId, string>> = {
-  draft: 'Draft',
-  storyContext: 'Story context',
-  authorContext: 'Author context',
-}
+import { SURFACE_LABEL, type OverlayId } from './state.js'
 
 export type WorkspaceBarProps = Readonly<{
   pieceOpen: boolean

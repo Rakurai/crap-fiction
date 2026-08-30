@@ -4,6 +4,12 @@ import type { SurfaceId } from '../../shared/surfaces.js'
 export type OverlayId = 'pieces' | 'conversations' | 'room' | 'settings'
 export type DocumentPresentation = 'rendered' | 'source'
 
+export const SURFACE_LABEL: Readonly<Record<SurfaceId, string>> = {
+  draft: 'Draft',
+  storyContext: 'Story context',
+  authorContext: 'Author context',
+}
+
 export type ShellState = Readonly<{
   openPieceId: string | null
   activeSurface: SurfaceId

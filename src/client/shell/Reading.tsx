@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Box, Typography } from '@mui/material'
+import { FailingDocuments } from './FailingDocuments.js'
 
 export function useReadingEscape(active: boolean, onExit: () => void): void {
   useEffect(() => {
@@ -13,19 +14,11 @@ export function useReadingEscape(active: boolean, onExit: () => void): void {
   }, [active, onExit])
 }
 
-export type ReadingExitProps = Readonly<{
-  failingDocuments: readonly string[]
-}>
-
-export function ReadingExit({ failingDocuments }: ReadingExitProps) {
+export function ReadingExit() {
   return (
     <Box sx={{ position: 'fixed', insetInlineStart: (theme) => theme.spacing(2), insetBlockEnd: (theme) => theme.spacing(2) }}>
       <Typography variant="machine">Esc to leave reading</Typography>
-      {failingDocuments.map((label) => (
-        <Typography key={label} variant="machine" color="error" component="div">
-          {label} is not saving
-        </Typography>
-      ))}
+      <FailingDocuments />
     </Box>
   )
 }

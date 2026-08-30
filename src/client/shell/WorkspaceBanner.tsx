@@ -1,23 +1,16 @@
 import { Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
+import { FailingDocuments } from './FailingDocuments.js'
 import type { DocumentPresentation } from './state.js'
+import { WordCount } from './WordCount.js'
 
 export type WorkspaceBannerProps = Readonly<{
   title: string | null
-  wordCount: number
   presentation: DocumentPresentation
   onPresentationChange: (presentation: DocumentPresentation) => void
   showPresentationToggle: boolean
-  failingDocuments: readonly string[]
 }>
 
-export function WorkspaceBanner({
-  title,
-  wordCount,
-  presentation,
-  onPresentationChange,
-  showPresentationToggle,
-  failingDocuments,
-}: WorkspaceBannerProps) {
+export function WorkspaceBanner({ title, presentation, onPresentationChange, showPresentationToggle }: WorkspaceBannerProps) {
   return (
     <Stack
       direction="row"
@@ -26,12 +19,8 @@ export function WorkspaceBanner({
     >
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
         {title !== null && <Typography variant="machine">{title}</Typography>}
-        <Typography variant="machine">{wordCount} words</Typography>
-        {failingDocuments.map((label) => (
-          <Typography key={label} variant="machine" color="error">
-            {label} is not saving
-          </Typography>
-        ))}
+        <WordCount surface="draft" />
+        <FailingDocuments />
       </Stack>
 
       {showPresentationToggle && (
