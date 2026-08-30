@@ -1,76 +1,70 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useColorScheme } from '@mui/material/styles'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
-import { responseEnvelopeSchema } from '../../shared/envelope.js'
 import { themeSchema, type Theme } from '../../shared/theme.js'
+import { readState, type ReadState } from '../servedFacts/readState.js'
+import { get, put, type RequestFailure } from '../servedFacts/transport.js'
 
-const themeResultSchema = z.object({ theme: themeSchema.nullable() })
-const themeEnvelopeSchema = responseEnvelopeSchema(themeResultSchema)
+const themeReadSchema = z.object({ theme: themeSchema.nullable() })
+const themeWriteSchema = z.object({ theme: themeSchema })
 
-async function readEnvelope(response: Response): Promise<Theme | null> {
-  if (!response.ok) throw new Error(`the theme route answered with status ${response.status}`)
-  const envelope = themeEnvelopeSchema.parse(await response.json())
-  if (!envelope.success) throw new Error(envelope.error.message)
-  return envelope.data.theme
-}
-
-async function fetchServerTheme(): Promise<Theme | null> {
-  return readEnvelope(await fetch('/theme'))
-}
-
-async function putServerTheme(theme: Theme): Promise<void> {
-  await readEnvelope(
-    await fetch('/theme', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ theme }),
-    }),
-  )
-}
+const THEME_KEY = ['theme'] as const
 
 export type SchemeState =
-  | { readonly status: 'loading' }
-  | { readonly status: 'unset' }
-  | { readonly status: 'confirmed'; readonly theme: Theme }
-  | { readonly status: 'unavailable' }
+  | Readonly<{ status: 'loading' }>
+  | Readonly<{ status: 'unset' }>
+  | Readonly<{ status: 'confirmed'; theme: Theme }>
+  | Readonly<{ status: 'unavailable' }>
 
 export type ServerColorScheme = Readonly<{
   state: SchemeState
   choose: (theme: Theme) => void
 }>
 
+function toSchemeState(read: ReadState<Theme | null>): SchemeState {
+  switch (read.status) {
+    case 'notArrived':
+      return { status: 'loading' }
+    case 'failed':
+      return { status: 'unavailable' }
+    case 'present':
+    case 'refreshFailed':
+      return read.value === null ? { status: 'unset' } : { status: 'confirmed', theme: read.value }
+    default: {
+      const exhaustive: never = read
+      return exhaustive
+    }
+  }
+}
+
 export function useServerColorScheme(): ServerColorScheme {
   const { setMode } = useColorScheme()
-  const [state, setState] = useState<SchemeState>({ status: 'loading' })
+  const queryClient = useQueryClient()
+
+  const query = useQuery<Theme | null, RequestFailure>({
+    queryKey: THEME_KEY,
+    queryFn: async ({ signal }) => (await get('/theme', themeReadSchema, signal)).theme,
+  })
 
   useEffect(() => {
-    let cancelled = false
-    fetchServerTheme()
-      .then((theme) => {
-        if (cancelled) return
-        setMode(theme ?? 'dark')
-        setState(theme === null ? { status: 'unset' } : { status: 'confirmed', theme })
-      })
-      .catch(() => {
-        if (cancelled) return
-        setMode('dark')
-        setState({ status: 'unavailable' })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [setMode])
+    if (query.status !== 'pending') setMode(query.data ?? 'dark')
+  }, [query.status, query.data, setMode])
+
+  const mutation = useMutation<Theme, RequestFailure, Theme>({
+    mutationFn: async (theme) => (await put('/theme', themeWriteSchema, { theme })).theme,
+    onSuccess: (theme) => queryClient.setQueryData(THEME_KEY, theme),
+  })
 
   const choose = useCallback(
     (theme: Theme) => {
       setMode(theme)
-      setState({ status: 'confirmed', theme })
-      void putServerTheme(theme).catch(() => {
-        setState({ status: 'unavailable' })
-      })
+      mutation.mutate(theme)
     },
-    [setMode],
+    [setMode, mutation.mutate],
   )
+
+  const state: SchemeState = mutation.isError ? { status: 'unavailable' } : toSchemeState(readState(query))
 
   return { state, choose }
 }
