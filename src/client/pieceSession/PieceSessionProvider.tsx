@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
 import { countWords } from '../../shared/storyLength.js'
-import { SURFACE_IDS, type SurfaceId } from '../../shared/surfaces.js'
+import { SURFACE_IDS, type DocumentSnapshot, type SurfaceId } from '../../shared/surfaces.js'
 import { config } from '../config.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { usePieceDetail } from '../servedFacts/resources.js'
 import { put } from '../servedFacts/transport.js'
+import type { ConversationPane, ConversationPaneState } from './conversationPane.js'
 import { createPieceSession, type PieceSession } from './pieceSession.js'
 
 const PieceSessionContext = createContext<PieceSession | null>(null)
@@ -63,6 +64,25 @@ export function useDocumentFailing(surface: SurfaceId): boolean {
 export function useWordCount(surface: SurfaceId): number {
   const text = useDocumentText(surface)
   return useMemo(() => countWords(text), [text])
+}
+
+export function useDocumentSnapshot(): DocumentSnapshot {
+  const draft = useDocumentText('draft')
+  const storyContext = useDocumentText('storyContext')
+  const authorContext = useDocumentText('authorContext')
+  return { draft, storyContext, authorContext }
+}
+
+export function useConversationPane(surface: SurfaceId): ConversationPane | null {
+  const session = usePieceSession()
+  return session?.surfaces[surface].conversationPane ?? null
+}
+
+const EMPTY_PANE_STATE: ConversationPaneState = { conversationId: null, composerText: '', transcriptPosition: 0, disclosures: new Set() }
+
+export function useConversationPaneState(surface: SurfaceId): ConversationPaneState {
+  const pane = useConversationPane(surface)
+  return useSyncExternalStore(pane?.subscribe ?? neverSubscribe, () => pane?.getState() ?? EMPTY_PANE_STATE)
 }
 
 export function useFailingSurfaceIds(): readonly SurfaceId[] {

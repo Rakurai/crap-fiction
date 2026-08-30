@@ -1,10 +1,13 @@
 import { skipToken, useMutation, useQuery, useQueryClient, type UseMutationResult, type UseQueryResult } from '@tanstack/react-query'
 import { z } from 'zod'
+import { applyOutcomeSchema, type ApplyOutcome } from '../../shared/applyViews.js'
 import { callSiteAssignmentViewSchema, type CallSiteAssignmentView } from '../../shared/callSiteViews.js'
+import { entryConversationViewSchema, type EntryConversationView } from '../../shared/conversationEntryViews.js'
 import { modeSummarySchema, type ModeSummary } from '../../shared/modeViews.js'
 import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../../shared/pieceViews.js'
 import { runtimeStatusSchema, type RuntimeStatus } from '../../shared/runtimeStatus.js'
-import { get, put, type RequestFailure } from './transport.js'
+import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
+import { get, post, put, type RequestFailure } from './transport.js'
 
 const workspaceReadSchema = z.object({ workspace: z.string().nullable() })
 const workspaceWriteSchema = z.object({ workspace: z.string() })
@@ -70,5 +73,64 @@ export function useModels(): UseQueryResult<RuntimeStatus, RequestFailure> {
   return useQuery({
     queryKey: MODELS_KEY,
     queryFn: ({ signal }) => get('/models', runtimeStatusSchema, signal),
+  })
+}
+
+export const conversationKey = (pieceId: string, surface: SurfaceId, conversationId: string | null) =>
+  ['conversation', pieceId, surface, conversationId] as const
+
+export function useConversation(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string | null,
+): UseQueryResult<EntryConversationView, RequestFailure> {
+  return useQuery({
+    queryKey: conversationKey(pieceId, surface, conversationId),
+    queryFn:
+      conversationId === null
+        ? skipToken
+        : ({ signal }) => get(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}`, entryConversationViewSchema, signal),
+  })
+}
+
+export type DispatchRequestBody =
+  | Readonly<{ message: string; documents: DocumentSnapshot }>
+  | Readonly<{ target: string; message: string; documents: DocumentSnapshot }>
+  | Readonly<{ respondingTo: string; clarification?: string; documents: DocumentSnapshot }>
+
+const dispatchResultSchema = z.object({ conversationId: z.string(), actionId: z.string() }).readonly()
+
+export function useDispatch(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+): UseMutationResult<{ conversationId: string; actionId: string }, RequestFailure, DispatchRequestBody> {
+  return useMutation({
+    mutationFn: (request) =>
+      post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/dispatch`, dispatchResultSchema, request),
+  })
+}
+
+export type ApplyRequestBody = Readonly<{ responseId: string; constraint?: string; documents: DocumentSnapshot }>
+
+export function useApplyRecommendation(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+): UseMutationResult<ApplyOutcome, RequestFailure, ApplyRequestBody> {
+  return useMutation({
+    mutationFn: (request) =>
+      post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply`, applyOutcomeSchema, request),
+  })
+}
+
+export function useAbandonAction(
+  pieceId: string,
+  surface: SurfaceId,
+  conversationId: string,
+): UseMutationResult<null, RequestFailure, string> {
+  return useMutation({
+    mutationFn: (actionId) =>
+      post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/actions/${actionId}/abandon`, z.null(), null),
   })
 }

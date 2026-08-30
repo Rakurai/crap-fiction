@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { roomActivitySnapshotSchema, roomEventSchema } from '../../shared/conversationEvents.js'
-import { pieceDetailKey } from '../servedFacts/resources.js'
+import type { EntryConversationView } from '../../shared/conversationEntryViews.js'
+import { conversationKey, pieceDetailKey } from '../servedFacts/resources.js'
 import { createSubscribableValue } from '../pieceSession/subscribableValue.js'
 import { initialRoomProjection, transitionRoomProjection, type Frame, type RoomProjectionState, type StreamEvent } from './roomProjection.js'
 
@@ -36,7 +37,15 @@ export function connectToRoom(pieceId: string, queryClient: QueryClient): RoomCo
     value.set(state)
     for (const effect of effects) {
       if (effect.type === 'closeConnection') source.close()
-      else void queryClient.invalidateQueries({ queryKey: pieceDetailKey(pieceId) })
+      else if (effect.type === 'invalidatePieceDetail') void queryClient.invalidateQueries({ queryKey: pieceDetailKey(pieceId) })
+      else {
+        const key = conversationKey(pieceId, effect.surface, effect.conversationId)
+        queryClient.setQueryData(key, (current: EntryConversationView | undefined) =>
+          current === undefined || current.entries.some((entry) => entry.id === effect.entry.id)
+            ? current
+            : { ...current, entries: [...current.entries, effect.entry] },
+        )
+      }
     }
   }
 

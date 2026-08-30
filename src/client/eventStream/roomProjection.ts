@@ -1,4 +1,5 @@
 import type { ActionKind, ConversationActivitySnapshot, ParticipantState, RoomActivitySnapshot, RoomEvent } from '../../shared/conversationEvents.js'
+import type { ConversationEntryView } from '../../shared/conversationEntryViews.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 
 export type BusyAction = Readonly<{
@@ -39,7 +40,10 @@ export type StreamEvent =
   | Readonly<{ type: 'unreadable' }>
   | Readonly<{ type: 'frame'; frame: Frame }>
 
-export type RoomProjectionEffect = Readonly<{ type: 'closeConnection' }> | Readonly<{ type: 'invalidatePieceDetail' }>
+export type RoomProjectionEffect =
+  | Readonly<{ type: 'closeConnection' }>
+  | Readonly<{ type: 'invalidatePieceDetail' }>
+  | Readonly<{ type: 'appendEntry'; surface: SurfaceId; conversationId: string; entry: ConversationEntryView }>
 
 export type RoomProjectionTransition = Readonly<{ state: RoomProjectionState; effects: readonly RoomProjectionEffect[] }>
 
@@ -133,9 +137,10 @@ function applyRoomEvent(state: RoomProjectionState, event: RoomEvent): RoomProje
     }
     case 'entry.appended': {
       const d = event.data
-      const effects = d.entry.kind === 'authorMessage' ? [INVALIDATE_PIECE_DETAIL] : []
+      const effects: RoomProjectionEffect[] = d.entry.kind === 'authorMessage' ? [INVALIDATE_PIECE_DETAIL] : []
       const current = busyActionFor(state, d.surface, d.actionId)
       if (current === undefined) return { state, effects }
+      effects.push({ type: 'appendEntry', surface: d.surface, conversationId: current.conversationId, entry: d.entry })
       if (d.entry.kind !== 'participantResponse' && d.entry.kind !== 'participantNoComment' && d.entry.kind !== 'participantFailure') {
         return { state, effects }
       }
