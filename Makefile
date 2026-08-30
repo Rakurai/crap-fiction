@@ -2,7 +2,7 @@ TSX := ./.sandcastle/node_modules/.bin/tsx
 
 STUDIO_ENV := .env
 
-.PHONY: sandcastle run test test-browser
+.PHONY: sandcastle run test
 
 sandcastle:
 	$(TSX) .sandcastle/main.mts
@@ -18,6 +18,3 @@ test:
 	npm run typecheck
 	npm run lint
 	npm test
-
-test-browser:
-	npm run test:e2e

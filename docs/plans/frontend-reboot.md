@@ -24,7 +24,7 @@ Product concepts are stable; their presentation is open. Existing interactions s
 
 The reboot should prefer established library behavior over locally owned machinery, cohesive modules over generic collections, and one representation of a concept over parallel feature-local models. These are design aims rather than a catalogue of prohibited syntax, directory names, or library options.
 
-The proposed canonical changes are collected in `frontend-reboot-spec.md`. The proposed system structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. The candidate implementation order remains isolated in `frontend-reboot-roadmap.md` so sequencing can change without rewriting product or architecture intent.
+The proposed canonical changes are collected in `frontend-reboot-spec.md`. The proposed system structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. There is no separate implementation order: the client is removed and rebuilt in the dependency order the architecture describes, so sequencing is a consequence of that structure rather than a document with decisions of its own.
 
 ## Scope
 

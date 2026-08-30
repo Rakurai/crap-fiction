@@ -18,7 +18,9 @@ Those six and the two standards below are the canon. Every other path under `doc
 
 `docs/CODING_STANDARDS.md` is binding on all code. Read it before writing code, not after review.
 
-Three commands answer for the code and none of them substitutes for another: `npm run typecheck`, `npm run lint` for the rules that hold over the repository rather than over the product, and `npm test` with `npm run test:e2e` for the product's own behaviour. A change is finished when all of them pass.
+Three commands answer for the code and none of them substitutes for another: `npm run typecheck`, `npm run lint` for the rules that hold over the repository rather than over the product, and `npm test` for the product's own behaviour. A change is finished when all of them pass.
+
+The frontend reboot removed the browser-level suite along with the client tests, so no command currently answers for behaviour in a browser. The rebuilt client restores that check; until it does, `npm test` covers the server, the domain and the document round trip and nothing above them.
 
 ## Agent skills
 
