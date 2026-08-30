@@ -113,10 +113,12 @@ await run({
 
   logging: { type: "file", path: ".sandcastle/logs/worker.log", verbose: true },
 
-  // No copyToWorktree and no install hook: this repository has no package.json
-  // yet, and both would fail before the agent started. Once the ticket that
-  // establishes the substrate has landed, add
-  //   copyToWorktree: ["node_modules"],
-  //   hooks: { sandbox: { onSandboxReady: [{ command: "npm ci" }] } },
-  // so an iteration does not reinstall from scratch.
+  hooks: {
+    host: {
+      onWorktreeReady: [{ command: "git merge-base --is-ancestor main HEAD" }],
+    },
+    sandbox: {
+      onSandboxReady: [{ command: "npm ci", timeoutMs: 900_000 }],
+    },
+  },
 });

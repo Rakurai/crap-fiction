@@ -10,6 +10,8 @@ Read in this order, each more specific than the last: `docs/VISION.md` → `CONT
 
 Those six and the two standards below are the canon. Every other path under `docs/` governs nothing: `docs/audits/` holds audit reports, `docs/plans/` holds working planning documents that are deleted once their work is done, and `docs/agents/` is configuration external skills read — leave it untouched, and take nothing in it as authoritative here. `mockup/` at the repository root is a rendered composition reference carrying no engineering claim and, by its own notes, no appearance claim either: it runs on stock Material UI defaults, so nothing about its spacing, radii, palette or type is a proposal. Read it for arrangement, never for a value. Noncanonical material says so in its own opening lines.
 
+The client the reboot replaced is not a reference for anything. It lives on another branch, behaviour is described in the documents above rather than read off it, and comparing the finished studio against it is the author's own acceptance check rather than an input to the work.
+
 ## Documentation discipline
 
 `docs/DOC_STANDARDS.md` is binding on every documentation edit. Read it before editing prose, not after review.
