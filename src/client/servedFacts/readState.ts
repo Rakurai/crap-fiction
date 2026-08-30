@@ -13,3 +13,7 @@ export function readState<T>(result: UseQueryResult<T, RequestFailure>): ReadSta
   if (result.isPending) return { status: 'notArrived' }
   return { status: 'present', value: result.data }
 }
+
+export function presentValue<T>(state: ReadState<T>): T | null {
+  return state.status === 'present' || state.status === 'refreshFailed' ? state.value : null
+}
