@@ -1,5 +1,6 @@
 import { Alert, Box } from '@mui/material'
 import { ErrorBoundary } from 'react-error-boundary'
+import { Document } from '../document/Document.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { usePieceDetail } from '../servedFacts/resources.js'
 import { OverlayHost } from './OverlayHost.js'
@@ -41,7 +42,7 @@ export function Shell({ shell }: ShellProps) {
         )}
 
         <Box sx={{ display: 'flex', flexGrow: 1, minHeight: 0 }}>
-          <Box sx={{ flexGrow: 1, minWidth: 0 }} />
+          <Document activeSurface={shell.activeSurface} presentation={isReading ? 'rendered' : shell.presentation} />
           {!isReading && pieceOpen && <Box sx={{ width: (theme) => theme.spacing(45), flexShrink: 0 }} />}
         </Box>
 
