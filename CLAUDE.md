@@ -20,6 +20,8 @@ Those six and the two standards below are the canon. Every other path under `doc
 
 Three commands answer for the code and none of them substitutes for another: `npm run typecheck`, `npm run lint` for the rules that hold over the repository rather than over the product, and `npm test` for the product's own behaviour. A change is finished when all of them pass.
 
+Material UI's API is read rather than recalled. The `mui-mcp` server is configured in `.mcp.json` and is what answers a question about a component, a prop, a theme key or the shape of a provider — consult it before writing Material UI code, because the version this repository targets is newer than what recall reliably reaches.
+
 The frontend reboot removed the browser-level suite along with the client tests, and the rebuilt client does not restore it: no command answers for behaviour in a browser, and none is meant to. `npm test` covers the server, the domain and the document round trip and nothing above them. What answers for client behaviour is the author looking at it.
 
 ## Agent skills
