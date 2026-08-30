@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import { appliedChangeSchema, type AppliedChange } from '../shared/appliedChange.js'
 import { openingWords, type ConversationSummary } from '../shared/conversationEntries.js'
 import type { ConversationEntryView, EntryConversationView } from '../shared/conversationEntryViews.js'
-import type { PieceDetail, PieceSummary, RosterMemberView, SurfaceDetail } from '../shared/pieceViews.js'
+import type { AddressableParticipantView, PieceDetail, PieceSummary, SurfaceDetail } from '../shared/pieceViews.js'
 import { countWords } from '../shared/storyLength.js'
 import type { SurfaceId } from '../shared/surfaces.js'
 import type { RoleDefinition } from './model/roles.js'
@@ -72,23 +72,27 @@ function requirePiece(workspaceDir: string, id: string): StoredPiece {
   return piece
 }
 
-function rosterView(
-  specialists: readonly RoleDefinition[],
+function addressableView(
+  addressable: readonly RoleDefinition[],
   enabled: readonly string[],
   ordinals: ReadonlyMap<string, number>,
-): readonly RosterMemberView[] {
-  return specialists.map((role) => {
-    const ordinal = ordinals.get(role.id)
-    if (ordinal === undefined) throw new Error(`no ordinal recorded for cast participant "${role.id}"`)
-    return {
+): readonly AddressableParticipantView[] {
+  return addressable.map((role): AddressableParticipantView => {
+    const identity = {
       id: role.id,
       handle: role.handle,
       displayName: role.displayName,
       description: role.description,
       mark: role.mark,
-      ordinal,
-      enabled: enabled.includes(role.id),
     }
+    if (role.eligibility === 'generalist') return { ...identity, eligibility: 'generalist' }
+
+    const ordinal = ordinals.get(role.id)
+    if (ordinal === undefined) throw new Error(`no ordinal recorded for addressable participant "${role.id}"`)
+    if (role.eligibility === 'cast') {
+      return { ...identity, eligibility: 'cast', ordinal, enabled: enabled.includes(role.id) }
+    }
+    return { ...identity, eligibility: 'addressed-only', ordinal }
   })
 }
 
@@ -159,14 +163,13 @@ function surfaceDetail(
   catalog: ShippedContentCatalog,
   surface: SurfaceId,
 ): SurfaceDetail {
-  const available = catalog.specialistsFor(piece.metadata.mode, surface)
   return {
     text: surfaceText(workspaceDir, dataRoot, id, piece, surface),
     location: SURFACE_LOCATIONS[surface],
     referenceSchema: catalog.referenceFor(piece.metadata.mode, surface),
     currentConversationId: mostRecentConversationId(dataRoot, surfaceScope(workspaceDir, id, surface)) ?? null,
     conversations: listConversations(dataRoot, workspaceDir, id, surface),
-    roster: rosterView(available, piece.metadata.cast[surface], catalog.markOrdinals),
+    addressable: addressableView(catalog.addressableFor(piece.metadata.mode, surface), piece.metadata.cast[surface], catalog.markOrdinals),
   }
 }
 
@@ -199,15 +202,14 @@ export async function setPieceCast(
   catalog: ShippedContentCatalog,
   surface: SurfaceId,
   cast: readonly string[],
-): Promise<readonly RosterMemberView[]> {
+): Promise<readonly AddressableParticipantView[]> {
   const piece = requirePiece(workspaceDir, id)
-  const available = catalog.specialistsFor(piece.metadata.mode, surface)
-  const ceiling = new Set(available.map((role) => role.id))
+  const ceiling = new Set(catalog.specialistsFor(piece.metadata.mode, surface).map((role) => role.id))
   const outside = cast.find((memberId) => !ceiling.has(memberId))
   if (outside !== undefined) throw new UnknownCastMemberError(id, outside)
 
   await pieceMetadata.writeCast(workspaceDir, id, surface, cast)
-  return rosterView(available, cast, catalog.markOrdinals)
+  return addressableView(catalog.addressableFor(piece.metadata.mode, surface), cast, catalog.markOrdinals)
 }
 
 export async function updatePieceDetails(

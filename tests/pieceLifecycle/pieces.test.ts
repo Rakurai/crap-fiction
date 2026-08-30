@@ -32,6 +32,7 @@ import {
 import type { ConversationScope } from '../../src/server/scope.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 import type { ConversationEntry } from '../../src/shared/conversationEntries.js'
+import type { AddressableParticipantView } from '../../src/shared/pieceViews.js'
 import { AUTHOR_CONTEXT_REFERENCE_FIXTURE, INTERVIEWER_ROSTER_FIXTURE, MODE_FIXTURE, PROMPT_FRAGMENTS_FIXTURE } from '../support/roomFixtures.js'
 
 const EPIC: ModeDescriptor = {
@@ -92,6 +93,12 @@ function catalogFor(modes: readonly ModeDescriptor[], roles: readonly RoleDefini
 
 const pieceMetadata = new PieceMetadataStore()
 
+type CastParticipantView = Extract<AddressableParticipantView, { eligibility: 'cast' }>
+
+function specialistsIn(addressable: readonly AddressableParticipantView[]): readonly CastParticipantView[] {
+  return addressable.filter((participant): participant is CastParticipantView => participant.eligibility === 'cast')
+}
+
 describe('creating a piece, listing the workspace, and opening one again', () => {
   let dataRoot: string
   let workspaceDir: string
@@ -119,9 +126,9 @@ describe('creating a piece, listing the workspace, and opening one again', () =>
     const piece = await createPiece(pieceMetadata, workspaceDir, 'The Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const opened = getPiece(dataRoot, workspaceDir, piece.id, catalogFor([MODE_FIXTURE]))
 
-    expect(opened.surfaces.draft.roster.map((member) => member.id).sort()).toEqual(['compression', 'shape'])
-    expect(opened.surfaces.storyContext.roster.map((member) => member.id)).toEqual([])
-    expect(opened.surfaces.authorContext.roster.map((member) => member.id)).toEqual([])
+    expect(specialistsIn(opened.surfaces.draft.addressable).map((member) => member.id).sort()).toEqual(['compression', 'shape'])
+    expect(specialistsIn(opened.surfaces.storyContext.addressable)).toEqual([])
+    expect(specialistsIn(opened.surfaces.authorContext.addressable)).toEqual([])
   })
 
   it('persists whichever loaded mode the author chose, and refuses one that did not load', async () => {
@@ -173,21 +180,55 @@ describe('creating a piece, listing the workspace, and opening one again', () =>
   it('opens a piece by its directory id, with an empty draft, no story context and no conversation yet', async () => {
     const created = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, catalogFor([MODE_FIXTURE]))
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
-    const roster = [
-      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: true },
-    ]
+    const storyEditorAddressable = {
+      id: 'story-editor',
+      handle: 'editor',
+      displayName: 'Story Editor',
+      description: 'holds the whole of it',
+      mark: 'SE',
+      eligibility: 'generalist',
+    }
+    const interviewerAddressable = {
+      id: INTERVIEWER.role.id,
+      handle: INTERVIEWER.role.handle,
+      displayName: INTERVIEWER.role.displayName,
+      description: INTERVIEWER.role.description,
+      mark: INTERVIEWER.role.mark,
+      ordinal: 2,
+      eligibility: 'addressed-only',
+    }
+    const contextAddressable = [storyEditorAddressable, interviewerAddressable]
     expect(opened).toEqual({
       ...created,
       surfaces: {
-        draft: { text: '', location: 'draft.md', referenceSchema: null, currentConversationId: null, conversations: [], roster },
+        draft: {
+          text: '',
+          location: 'draft.md',
+          referenceSchema: null,
+          currentConversationId: null,
+          conversations: [],
+          addressable: [
+            { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, eligibility: 'cast', enabled: true },
+            {
+              id: 'compression',
+              handle: 'comp',
+              displayName: 'Compression',
+              description: 'what earns its space',
+              mark: 'CO',
+              ordinal: 1,
+              eligibility: 'cast',
+              enabled: true,
+            },
+            ...contextAddressable,
+          ],
+        },
         storyContext: {
           text: '',
           location: 'story-context.yaml',
           referenceSchema: MODE_FIXTURE.storyContextReference,
           currentConversationId: null,
           conversations: [],
-          roster: [],
+          addressable: contextAddressable,
         },
         authorContext: {
           text: '',
@@ -195,7 +236,7 @@ describe('creating a piece, listing the workspace, and opening one again', () =>
           referenceSchema: AUTHOR_CONTEXT_REFERENCE_FIXTURE,
           currentConversationId: null,
           conversations: [],
-          roster: [],
+          addressable: contextAddressable,
         },
       },
       storyEditor: { handle: 'editor', displayName: 'Story Editor', description: 'holds the whole of it', mark: 'SE' },
@@ -270,8 +311,8 @@ describe('creating a piece, listing the workspace, and opening one again', () =>
     expect(openedFromFirst.surfaces.authorContext.conversations.map((c) => c.id)).toEqual(['shared-conversation'])
     expect(openedFromSecond.surfaces.authorContext.conversations).toEqual(openedFromFirst.surfaces.authorContext.conversations)
 
-    expect(openedFromFirst.surfaces.authorContext.roster.find((member) => member.id === 'archivist')?.enabled).toBe(true)
-    expect(openedFromSecond.surfaces.authorContext.roster.find((member) => member.id === 'archivist')?.enabled).toBe(false)
+    expect(specialistsIn(openedFromFirst.surfaces.authorContext.addressable).find((member) => member.id === 'archivist')?.enabled).toBe(true)
+    expect(specialistsIn(openedFromSecond.surfaces.authorContext.addressable).find((member) => member.id === 'archivist')?.enabled).toBe(false)
   })
 
   it('refuses every way in to a piece that is not there, or whose id would escape the workspace', async () => {
@@ -305,14 +346,14 @@ describe('setPieceCast', () => {
 
     const disabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape'])
 
-    expect(disabled).toEqual([
-      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'the shape of it', mark: 'SH', ordinal: 0, enabled: true },
-      { id: 'compression', handle: 'comp', displayName: 'Compression', description: 'what earns its space', mark: 'CO', ordinal: 1, enabled: false },
+    expect(specialistsIn(disabled).map((member) => ({ id: member.id, enabled: member.enabled }))).toEqual([
+      { id: 'shape', enabled: true },
+      { id: 'compression', enabled: false },
     ])
-    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE])).surfaces.draft.roster).toEqual(disabled)
+    expect(getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE])).surfaces.draft.addressable).toEqual(disabled)
 
     const reEnabled = await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'draft', ['shape', 'compression'])
-    expect(reEnabled.find((member) => member.id === 'compression')?.enabled).toBe(true)
+    expect(specialistsIn(reEnabled).find((member) => member.id === 'compression')?.enabled).toBe(true)
   })
 
   it("never widens the room past the mode's cast: an id outside it is a stated UnknownCastMemberError", async () => {
@@ -330,11 +371,11 @@ describe('setPieceCast', () => {
     await setPieceCast(pieceMetadata, workspaceDir, created.id, catalogFor([MODE_FIXTURE]), 'storyContext', [])
 
     const opened = getPiece(dataRoot, workspaceDir, created.id, catalogFor([MODE_FIXTURE]))
-    expect(opened.surfaces.draft.roster.map((member) => ({ id: member.id, enabled: member.enabled }))).toEqual([
+    expect(specialistsIn(opened.surfaces.draft.addressable).map((member) => ({ id: member.id, enabled: member.enabled }))).toEqual([
       { id: 'shape', enabled: true },
       { id: 'compression', enabled: false },
     ])
-    expect(opened.surfaces.storyContext.roster).toEqual([])
+    expect(specialistsIn(opened.surfaces.storyContext.addressable)).toEqual([])
   })
 })
 

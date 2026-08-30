@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ModeDescriptor } from '../../src/server/modes.js'
 import type { ConversationScope } from '../../src/server/scope.js'
 import { ConversationEntryStore, writeAppliedChange } from '../../src/server/store/index.js'
-import { idleStudio } from '../support/harness.js'
+import { buildTestApp, idleRoom, idleStudio, UNREACHED_REFERENCE } from '../support/harness.js'
 import { MODE_FIXTURE, ROLES_FIXTURE } from '../support/roomFixtures.js'
+import type { RoleDefinition } from '../../src/server/model/roles.js'
 import { failureCodeSchema } from '../../src/shared/envelope.js'
 
 const EPIC: ModeDescriptor = {
@@ -14,6 +15,18 @@ const EPIC: ModeDescriptor = {
   displayName: 'Epic',
   description: 'A piece read over several sittings.',
   storyContextReference: 'Sections, each holding entries.',
+}
+
+const ONLY_IN_EPIC: RoleDefinition = {
+  id: 'sprawl',
+  handle: 'sprawl',
+  displayName: 'Sprawl',
+  description: 'how a long piece holds together',
+  mark: 'SP',
+  persona: 'reasons about how a long piece holds together',
+  eligibility: 'cast',
+  function: undefined,
+  availability: [{ mode: EPIC.id, surface: 'draft', enabledByDefault: true }],
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json' }
@@ -49,7 +62,7 @@ describe('the piece routes', () => {
     return { app, dir }
   }
 
-  it('carries an opened piece whole, keyed by all three surfaces: its details, each surface\'s text, cast and conversations', async () => {
+  it("carries an opened piece whole, keyed by all three surfaces: its details, each surface's text and conversations", async () => {
     const { app, dir } = await withPiece()
     await app.request('/pieces/cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'Two small words.' }) })
     await new ConversationEntryStore().append(dataRoot, draftScope(dir, 'cups'), 'c1', {
@@ -73,14 +86,36 @@ describe('the piece routes', () => {
           draft: {
             text: 'Two small words.',
             referenceSchema: null,
-            roster: [{ id: 'shape', displayName: 'Shape', description: ROLES_FIXTURE[0]?.description, enabled: true }],
             conversations: [{ id: 'c1', opening: 'does the opening earn its length', lastActivity: expect.any(Number) }],
           },
-          storyContext: { text: '', referenceSchema: MODE_FIXTURE.storyContextReference, roster: [], conversations: [] },
-          authorContext: { text: '', roster: [], conversations: [] },
+          storyContext: { text: '', referenceSchema: MODE_FIXTURE.storyContextReference, conversations: [] },
+          authorContext: { text: '', conversations: [] },
         },
       },
     })
+  })
+
+  it("serves each surface's whole addressable set, every entry saying what it is to the room: the mode's specialists with their membership, the Story Editor, and the addressed-only participants", async () => {
+    const roles = [...ROLES_FIXTURE, ONLY_IN_EPIC]
+    const { app, workspace } = buildTestApp(dataRoot, {
+      modes: [MODE_FIXTURE, EPIC],
+      roles,
+      runtimeStatus: undefined,
+      room: idleRoom(dataRoot, [MODE_FIXTURE, EPIC], roles),
+      authorContextReference: UNREACHED_REFERENCE,
+    })
+    await workspace.set('my-writing')
+    await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', mode: 'flash' }) })
+    await app.request('/pieces/cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ cast: { surface: 'draft', ids: [] } }) })
+
+    const { data } = await (await app.request('/pieces/cups')).json()
+
+    expect(data.surfaces.draft.addressable).toEqual([
+      { id: 'shape', handle: 'shape', displayName: 'Shape', description: 'x', mark: 'SH', ordinal: 0, eligibility: 'cast', enabled: false },
+      { id: 'story-editor', handle: 'editor', displayName: 'Story Editor', description: 'y', mark: 'SE', eligibility: 'generalist' },
+      { id: 'interview', handle: 'interview', displayName: 'Interviewer', description: 'q', mark: 'IV', ordinal: 1, eligibility: 'addressed-only' },
+    ])
+    expect(data.surfaces.storyContext.addressable.map((participant: { id: string }) => participant.id)).toEqual(['story-editor', 'interview'])
   })
 
   it('carries a conversation the author asks for by id, with the entries it holds', async () => {
@@ -103,10 +138,9 @@ describe('the piece routes', () => {
     expect(await listed.json()).toMatchObject({ success: true, data: [{ id: 'the-cups' }] })
 
     const patched = await app.request('/pieces/the-cups', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Cups', cast: { surface: 'draft', ids: [] } }) })
-    expect(await patched.json()).toMatchObject({
-      success: true,
-      data: { title: 'Cups', surfaces: { draft: { roster: [{ id: 'shape', enabled: false }] } } },
-    })
+    const patchedBody = await patched.json()
+    expect(patchedBody).toMatchObject({ success: true, data: { title: 'Cups' } })
+    expect(patchedBody.data.surfaces.draft.addressable).toContainEqual(expect.objectContaining({ id: 'shape', eligibility: 'cast', enabled: false }))
 
     const saved = await app.request('/pieces/the-cups/surfaces/draft/document', { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ text: 'text' }) })
     expect(await saved.json()).toEqual({ success: true, data: null })

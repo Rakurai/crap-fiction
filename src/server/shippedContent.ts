@@ -6,7 +6,7 @@ import { loadPromptFragments, type PromptFragments } from './model/prompts.js'
 import { loadRoles, type RoleDefinition } from './model/roles.js'
 import { loadModes, type ModeDescriptor } from './modes.js'
 import { RouteFailure } from './routeFailure.js'
-import { defaultCastFor, resolveRoster, specialistsFor, type RoomRoster } from './room/roster.js'
+import { addressableFor, defaultCastFor, resolveRoster, specialistsFor, type RoomRoster } from './room/roster.js'
 import { readShippedAuthorContextReference } from './store/index.js'
 
 export const CONTENT_ROOT = path.join(import.meta.dirname, '..', '..', 'content')
@@ -96,6 +96,10 @@ export class ShippedContentCatalog {
 
   specialistsFor(modeId: string, surface: SurfaceId): readonly RoleDefinition[] {
     return specialistsFor(this.#roster.specialists, modeId, surface)
+  }
+
+  addressableFor(modeId: string, surface: SurfaceId): readonly RoleDefinition[] {
+    return addressableFor(this.#roster, modeId, surface)
   }
 
   defaultCastFor(modeId: string, surface: SurfaceId): readonly string[] {

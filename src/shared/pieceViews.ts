@@ -12,18 +12,20 @@ const pieceSummaryShape = z.object({
 export const pieceSummarySchema = pieceSummaryShape.readonly()
 export type PieceSummary = z.infer<typeof pieceSummarySchema>
 
-export const rosterMemberViewSchema = z
-  .object({
-    id: z.string(),
-    handle: z.string(),
-    displayName: z.string(),
-    description: z.string(),
-    mark: z.string(),
-    ordinal: z.number(),
-    enabled: z.boolean(),
-  })
-  .readonly()
-export type RosterMemberView = z.infer<typeof rosterMemberViewSchema>
+const addressableIdentity = z.object({
+  id: z.string(),
+  handle: z.string(),
+  displayName: z.string(),
+  description: z.string(),
+  mark: z.string(),
+})
+
+export const addressableParticipantViewSchema = z.discriminatedUnion('eligibility', [
+  addressableIdentity.extend({ eligibility: z.literal('cast'), ordinal: z.number(), enabled: z.boolean() }).readonly(),
+  addressableIdentity.extend({ eligibility: z.literal('generalist') }).readonly(),
+  addressableIdentity.extend({ eligibility: z.literal('addressed-only'), ordinal: z.number() }).readonly(),
+])
+export type AddressableParticipantView = z.infer<typeof addressableParticipantViewSchema>
 
 export const storyEditorViewSchema = z
   .object({
@@ -52,7 +54,7 @@ export const surfaceDetailSchema = z
     referenceSchema: z.string().nullable(),
     currentConversationId: z.string().nullable(),
     conversations: z.array(conversationSummarySchema).readonly(),
-    roster: z.array(rosterMemberViewSchema).readonly(),
+    addressable: z.array(addressableParticipantViewSchema).readonly(),
   })
   .readonly()
 export type SurfaceDetail = z.infer<typeof surfaceDetailSchema>

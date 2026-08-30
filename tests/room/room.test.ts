@@ -350,6 +350,44 @@ describe('Room.dispatch', () => {
     expect(landed.filter((entry) => entry.kind === 'participantResponse')).toHaveLength(2)
   })
 
+  it('records a response as the room reads it: the claim and the note as said, and a note of nothing but space as no note at all', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: '  the entry is late  ', note: ' \n  ' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'it holds', note: '  by a paragraph  ' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+    })
+
+    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, 'c1').filter((entry) => entry.kind === 'participantResponse')
+    const withoutNote = landed.find((entry) => entry.participantId === 'shape')
+    expect(withoutNote).toMatchObject({ claim: 'the entry is late' })
+    expect(withoutNote !== undefined && 'note' in withoutNote).toBe(false)
+    expect(landed.find((entry) => entry.participantId === 'compression')).toMatchObject({ claim: 'it holds', note: 'by a paragraph' })
+  })
+
+  it('records a claim of nothing but space as a nonconforming answer carrying what came back, never as a response with nothing in it', async () => {
+    const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
+    const { room } = buildRoom(dataRoot, {
+      shape: { result: { outcome: 'value', value: { outcome: 'commentary', claim: '   ' } } },
+      compression: { result: { outcome: 'value', value: { outcome: 'noComment' } } },
+      'story-editor': { result: { outcome: 'value', value: { outcome: 'commentary', claim: 'agreed' } } },
+    })
+
+    await dispatch(room, workspaceDir, scope(piece.id), 'c1', { kind: 'message', text: 'a message' }, documents('draft text'))
+    await settlementOf(room, piece.id)
+
+    const landed = entries(dataRoot, workspaceDir, piece.id, 'c1')
+    expect(landed.filter((entry) => entry.kind === 'participantResponse').map((entry) => entry.participantId)).toEqual(['story-editor'])
+    expect(landed.find((entry) => entry.kind === 'participantFailure')).toMatchObject({
+      participantId: 'shape',
+      reason: 'nonconforming',
+      returned: '{"outcome":"commentary","claim":"   "}',
+    })
+  })
+
   it('stamps every participant it calls with a start moment from its own clock, carried unchanged from called through preparing into working', async () => {
     const piece = await createPiece(pieceMetadata, workspaceDir, 'Cups', MODE_FIXTURE.id, FIXTURE_CATALOG)
     const { room } = buildRoom(dataRoot, {

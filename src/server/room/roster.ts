@@ -50,6 +50,10 @@ export function specialistsFor(specialists: readonly RoleDefinition[], modeId: s
   return specialists.filter((role) => role.availability.some((entry) => entry.mode === modeId && entry.surface === surface))
 }
 
+export function addressableFor(roster: RoomRoster, modeId: string, surface: SurfaceId): readonly RoleDefinition[] {
+  return [...specialistsFor(roster.specialists, modeId, surface), roster.storyEditor, ...roster.addressedOnly]
+}
+
 export function defaultCastFor(specialists: readonly RoleDefinition[], modeId: string, surface: SurfaceId): readonly string[] {
   return specialistsFor(specialists, modeId, surface)
     .filter((role) => role.availability.some((entry) => entry.mode === modeId && entry.surface === surface && entry.enabledByDefault))

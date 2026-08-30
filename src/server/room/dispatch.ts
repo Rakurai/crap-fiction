@@ -6,7 +6,7 @@ import type {
 } from '../../shared/conversationEntries.js'
 import type { RoleDefinition } from '../model/roles.js'
 import type { CallState, CallTurns, ModelAccess } from '../model/types.js'
-import { normalizeResponse, responseValueSchema } from '../../shared/participantResponse.js'
+import { responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
 export type ParticipantOutcome =
@@ -45,9 +45,22 @@ export async function callParticipant(
     return { kind: 'entry', entry }
   }
 
-  const response = normalizeResponse(result.value)
+  const response = result.value
   if (response.outcome === 'noComment') {
     const entry: ParticipantNoCommentEntry = { id: nanoid(), kind: 'participantNoComment', participantId: role.id, causeId }
+    return { kind: 'entry', entry }
+  }
+
+  const claim = said(response.claim)
+  if (claim === undefined) {
+    const entry: ParticipantFailureEntry = {
+      id: nanoid(),
+      kind: 'participantFailure',
+      participantId: role.id,
+      causeId,
+      reason: 'nonconforming',
+      returned: JSON.stringify(response),
+    }
     return { kind: 'entry', entry }
   }
 
@@ -57,8 +70,14 @@ export async function callParticipant(
     participantId: role.id,
     causeId,
     outcome: response.outcome,
-    claim: response.claim,
-    note: response.note,
+    claim,
+    note: said(response.note),
   }
   return { kind: 'entry', entry }
+}
+
+function said(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined
+  const trimmed = text.trim()
+  return trimmed.length === 0 ? undefined : trimmed
 }

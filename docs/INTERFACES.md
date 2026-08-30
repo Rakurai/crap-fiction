@@ -46,9 +46,10 @@ POST   /pieces                                     title and the chosen mode; en
 GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
                                                    its invocation; for each editing surface, its text,
                                                    file, conversation index with server-derived opening
-                                                   words, current conversation, roster with enabled
-                                                   state, and complete addressable participant set; the
-                                                   two context surfaces also carry a reference schema
+                                                   words, current conversation, and the complete
+                                                   addressable participant set, each entry with its
+                                                   description and its membership; the two context
+                                                   surfaces also carry a reference schema
 PATCH  /pieces/:id                                 title, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text
@@ -92,8 +93,11 @@ GET    /models                                     what the runtime holds, and w
 reports whether the runtime can be reached at all, which is the state where every surface still opens
 and only the room is unavailable.
 
-The addressable participant set is complete for its editing surface: roster membership, enabled state,
-the Story Editor and addressed-only participants require no further client interpretation. A response
+The addressable participant set is complete for its editing surface, and it is the only participant set
+a surface carries: every entry says what it is to the room — a specialist with its enabled state, the
+Story Editor, or an addressed-only participant — so membership requires no client interpretation. A specialist
+or addressed-only entry carries the ordinal its mark's colours derive from; the Story Editor carries none,
+and the treatment that absence selects is the client's to author. A response
 whose note is absent has already had absence decided by the room; a client does not trim or reinterpret
 response text to reach that result.
 

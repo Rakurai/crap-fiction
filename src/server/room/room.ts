@@ -339,7 +339,7 @@ export class Room {
     const existingEntries = onDisk?.entries ?? []
     const modeDescription = this.#catalog.mode(piece.metadata.mode).description
     const modeSpecialists = this.#catalog.specialistsFor(piece.metadata.mode, roomScope.surface)
-    const roster = [...modeSpecialists, this.#catalog.roster.storyEditor, ...this.#catalog.roster.addressedOnly]
+    const roster = this.#catalog.addressableFor(piece.metadata.mode, roomScope.surface)
 
     const startedAt = this.#now()
 
