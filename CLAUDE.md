@@ -8,7 +8,7 @@ Read in this order, each more specific than the last: `docs/VISION.md` → `CONT
 
 `CONTEXT.md` is at the repository root and is the only one: one domain model, one glossary. There is no `docs/adr/` and none is wanted — a settled technical decision goes in `ARCHITECTURE.md`, which is an ADR set in all but filename.
 
-Those six and the two standards below are the canon. Every other path under `docs/` governs nothing: `docs/audits/` holds audit reports, `docs/plans/` holds working planning documents that are deleted once their work is done, and `docs/agents/` is configuration external skills read — leave it untouched, and take nothing in it as authoritative here. `mockup/` at the repository root is a rendered appearance reference carrying no engineering claim. Noncanonical material says so in its own opening lines.
+Those six and the two standards below are the canon. Every other path under `docs/` governs nothing: `docs/audits/` holds audit reports, `docs/plans/` holds working planning documents that are deleted once their work is done, and `docs/agents/` is configuration external skills read — leave it untouched, and take nothing in it as authoritative here. `mockup/` at the repository root is a rendered composition reference carrying no engineering claim and, by its own notes, no appearance claim either: it runs on stock Material UI defaults, so nothing about its spacing, radii, palette or type is a proposal. Read it for arrangement, never for a value. Noncanonical material says so in its own opening lines.
 
 ## Documentation discipline
 
@@ -20,7 +20,7 @@ Those six and the two standards below are the canon. Every other path under `doc
 
 Three commands answer for the code and none of them substitutes for another: `npm run typecheck`, `npm run lint` for the rules that hold over the repository rather than over the product, and `npm test` for the product's own behaviour. A change is finished when all of them pass.
 
-The frontend reboot removed the browser-level suite along with the client tests, so no command currently answers for behaviour in a browser. The rebuilt client restores that check; until it does, `npm test` covers the server, the domain and the document round trip and nothing above them.
+The frontend reboot removed the browser-level suite along with the client tests, and the rebuilt client does not restore it: no command answers for behaviour in a browser, and none is meant to. `npm test` covers the server, the domain and the document round trip and nothing above them. What answers for client behaviour is the author looking at it.
 
 ## Agent skills
 

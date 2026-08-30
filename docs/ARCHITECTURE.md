@@ -246,7 +246,8 @@ those three states; selecting another conversation replaces only that view's con
 There is no presentation-state registry for conversations that are not selected. Opening another piece
 recreates the entire piece session. Document text is not a rendered context value: the session exposes
 it through a subscription, so typing re-renders neither the bar, the banner, nor the transcript beside
-it.
+it. What tracks the text is whatever subscribes to a value derived from it — the word count is drawn by
+one such element, which is how it stays live without the banner around it re-rendering.
 
 **Feature modules own cohesive product responsibilities.** Document owns the workspace's editing half.
 Its manuscript implementation owns TipTap, Markdown conversion, rendered and source presentation,
@@ -261,7 +262,10 @@ required file shape.
 as container queries rather than viewport breakpoints. The measure is then correct under any
 arrangement of the workspace, and a later arrangement is a change to composition alone.
 
-**Each server-owned resource has a stable Query key, transport operation and runtime schema.** Feature
+**Each server-owned resource has a stable Query key, transport operation and runtime schema.** The key
+and the operation stay paired at every observation, invalidation and write-back site, and a resource
+whose identity the client does not yet hold withholds the operation rather than calling one with a
+placeholder identity, so no read asserts an identity it was not given. Feature
 modules use Query results directly and project a smaller product result only where their presentation
 benefits. Presentation can distinguish a value that has not arrived, a failed first read, a present
 value, and a failed refresh that leaves the prior value available; background fetching is not projected
@@ -279,7 +283,15 @@ cannot discover external changes to them. A refreshed piece detail never replace
 
 **The server stores the author's theme choice and the client does not create another persisted
 preference.** The served resource distinguishes no saved choice from an explicit choice, and confirmed
-writes update that resource.
+writes update that resource. **Changing the colour scheme does not re-render the editor**: the editor's
+own styling resolves against the theme rather than against a value the tree passes down, so a scheme
+the author switches mid-sentence cannot cost them their cursor.
+
+**An expected failure belongs to the feature that asked for the thing that failed.** A read does not
+throw its error past the module that made it, and the shell holds one boundary, for a render or
+programming failure nothing anticipated. Save failure is the exception that is shared rather than
+thrown: the piece session makes it available to the document, the shell and pieces at once, because a
+document whose write is failing is not necessarily the one the author is looking at.
 
 ## Persistence
 
@@ -1040,7 +1052,8 @@ reports both a retrying interruption and a closed connection through its error e
 `readyState` is `CONNECTING`, the surface stays held without reporting a failure, while an unexpected
 `CLOSED` is a visible disconnection. The server sends a fresh activity snapshot before other frames on
 every connection; that snapshot establishes the new baseline, invalidates the open piece's stream-fed
-facts and clears the disconnected state. Activity that cannot be interpreted is terminal and the surface
+facts and clears the disconnected state. A frame arriving before it is buffered until it has that
+context rather than interpreted against a baseline the client does not hold yet. Activity that cannot be interpreted is terminal and the surface
 stays held until the piece is reopened.
 
 **Only one piece is open at a time, and opening one is server-authoritative.** A different piece that was

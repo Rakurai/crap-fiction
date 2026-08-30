@@ -24,7 +24,7 @@ Product concepts are stable; their presentation is open. Existing interactions s
 
 The reboot should prefer established library behavior over locally owned machinery, cohesive modules over generic collections, and one representation of a concept over parallel feature-local models. These are design aims rather than a catalogue of prohibited syntax, directory names, or library options.
 
-The implementation outcomes are collected in `frontend-reboot-spec.md`. The client structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. This proposal does not prescribe implementation order; work can follow discovered dependencies without making a schedule another source of design truth.
+The implementation outcomes are collected in `frontend-reboot-spec.md`, and the client's shape is `docs/ARCHITECTURE.md`'s own. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. This proposal does not prescribe implementation order; work can follow discovered dependencies without making a schedule another source of design truth.
 
 ## Scope
 

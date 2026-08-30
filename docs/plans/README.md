@@ -7,17 +7,18 @@ Planning documents separate intent, decisions, design, and evidence because mixi
 The frontend reboot documents use this model:
 
 ```text
-proposal → specification → architecture
+proposal → specification
                  ↑
           supporting evidence
 ```
 
 - **Proposal — why.** States the problem, desired outcome, scope, and design posture. It does not prescribe implementation details.
 - **Specification — what.** Collects the accepted outcomes and points to their canonical owners. It is precise without enumerating every disallowed implementation.
-- **Architecture — how the system fits together.** Describes modules, interfaces, state ownership, lifetimes, data flow, and component relationships. It distinguishes selected design from choices still requiring review.
 - **Supporting evidence — why a decision is credible.** Records audits, prototypes, and code observations. Evidence supports a decision without becoming a second specification or prescribing the solution.
 
-Specificity belongs in the document that owns the question. The specification can be firm about a decision already made, and the architecture can be detailed about an approved relationship; neither needs defensive bans against every alternative. Preferences remain guidance, unresolved choices remain visible, and enforcement is added only when a real invariant requires it.
+There is no planning architecture document. How the system fits together — modules, seams, state lifetimes, invariants — is `docs/ARCHITECTURE.md`'s, and a planning document holding a second version of it is the parallel authority this model exists to prevent. A settled shape goes there; what is left is either a requirement the specification states or a choice the implementation makes.
+
+Specificity belongs in the document that owns the question. The specification can be firm about a decision already made; it needs no defensive bans against every alternative. Preferences remain guidance, unresolved choices remain visible, and enforcement is added only when a real invariant requires it.
 
 Planning documents govern no durable product or engineering truth. Accepted decisions are reflected in the canonical document that owns them before code relies on them. Once their work is complete, spent planning documents are deleted rather than retained as parallel authority.
 
@@ -62,7 +63,7 @@ architecture deliberately leaves open.
 ### 3. Derive the implementation plan
 
 Only after the specification is approved does sequencing become useful. The implementation plan derives
-steps and dependency edges from the specification and architecture, including coherent transitional
+steps and dependency edges from the specification and canon, including coherent transitional
 states, verification, and deletion of replaced machinery. It orders settled work rather than deciding
 the design a second time.
 
