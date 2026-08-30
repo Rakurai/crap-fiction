@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { responseEnvelopeSchema, type FailureCode } from '../../shared/envelope.js'
 
-export type RequestFailureReason = Readonly<{ kind: 'refused'; code: FailureCode }> | Readonly<{ kind: 'unreachable' }>
+export type RequestFailureReason =
+  | Readonly<{ kind: 'refused'; code: FailureCode }>
+  | Readonly<{ kind: 'unreachable' }>
+  | Readonly<{ kind: 'unreadable' }>
 
 export class RequestFailure extends Error {
   readonly reason: RequestFailureReason
@@ -14,14 +17,19 @@ export class RequestFailure extends Error {
 }
 
 const UNREACHABLE_MESSAGE = 'the studio could not be reached'
+const UNREADABLE_MESSAGE = "the studio's answer could not be read"
 
 function unreachable(): never {
   throw new RequestFailure(UNREACHABLE_MESSAGE, { kind: 'unreachable' })
 }
 
+function unreadable(): never {
+  throw new RequestFailure(UNREADABLE_MESSAGE, { kind: 'unreadable' })
+}
+
 export function unwrapEnvelope<T>(body: unknown, schema: z.ZodType<T>): T {
   const parsed = responseEnvelopeSchema(schema).safeParse(body)
-  if (!parsed.success) return unreachable()
+  if (!parsed.success) return unreadable()
   const envelope = parsed.data
   if (!envelope.success) throw new RequestFailure(envelope.error.message, { kind: 'refused', code: envelope.error.code })
   return envelope.data
@@ -31,7 +39,7 @@ async function readBody(response: Response): Promise<unknown> {
   try {
     return await response.json()
   } catch {
-    return unreachable()
+    return unreadable()
   }
 }
 

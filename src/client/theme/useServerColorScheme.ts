@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { useColorScheme } from '@mui/material/styles'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query'
 import { z } from 'zod'
 import { themeSchema, type Theme } from '../../shared/theme.js'
 import { readState, type ReadState } from '../servedFacts/readState.js'
@@ -17,8 +17,14 @@ export type SchemeState =
   | Readonly<{ status: 'confirmed'; theme: Theme }>
   | Readonly<{ status: 'unavailable' }>
 
+export type SchemeSave =
+  | Readonly<{ status: 'settled' }>
+  | Readonly<{ status: 'saving'; theme: Theme }>
+  | Readonly<{ status: 'unsaved'; theme: Theme; message: string }>
+
 export type ServerColorScheme = Readonly<{
   state: SchemeState
+  save: SchemeSave
   choose: (theme: Theme) => void
 }>
 
@@ -36,6 +42,12 @@ function toSchemeState(read: ReadState<Theme | null>): SchemeState {
       return exhaustive
     }
   }
+}
+
+function saveState(mutation: UseMutationResult<Theme, RequestFailure, Theme>): SchemeSave {
+  if (mutation.isPending) return { status: 'saving', theme: mutation.variables }
+  if (mutation.isError) return { status: 'unsaved', theme: mutation.variables, message: mutation.error.message }
+  return { status: 'settled' }
 }
 
 export function useServerColorScheme(): ServerColorScheme {
@@ -64,7 +76,5 @@ export function useServerColorScheme(): ServerColorScheme {
     [setMode, mutation.mutate],
   )
 
-  const state: SchemeState = mutation.isError ? { status: 'unavailable' } : toSchemeState(readState(query))
-
-  return { state, choose }
+  return { state: toSchemeState(readState(query)), save: saveState(mutation), choose }
 }

@@ -11,13 +11,40 @@ export function WorkspaceGate({ children }: WorkspaceGateProps) {
 
   if (read.status === 'notArrived') return null
 
+  if (read.status === 'failed') {
+    return <WorkspaceUnknown message={read.failure.message} rereading={query.isFetching} onReread={() => void query.refetch()} />
+  }
+
   const configured = presentValue(read) !== null
   if (configured) return <>{children}</>
 
-  return <DirectoryAsk unavailable={read.status === 'failed'} />
+  return <DirectoryAsk />
 }
 
-function DirectoryAsk({ unavailable }: Readonly<{ unavailable: boolean }>) {
+type WorkspaceUnknownProps = Readonly<{
+  message: string
+  rereading: boolean
+  onReread: () => void
+}>
+
+function WorkspaceUnknown({ message, rereading, onReread }: WorkspaceUnknownProps) {
+  return (
+    <GateSurface>
+      <Stack spacing={3}>
+        <Typography variant="h5">crap-fiction</Typography>
+        <Alert severity="error">{message}</Alert>
+        <Typography variant="body1">
+          The studio cannot tell whether a workspace is already set, so it is not asking for one.
+        </Typography>
+        <Button variant="affirm" onClick={onReread} disabled={rereading}>
+          Try again
+        </Button>
+      </Stack>
+    </GateSurface>
+  )
+}
+
+function DirectoryAsk() {
   const [candidate, setCandidate] = useState('')
   const mutation = useSetWorkspace()
   const trimmed = candidate.trim()
@@ -29,15 +56,11 @@ function DirectoryAsk({ unavailable }: Readonly<{ unavailable: boolean }>) {
   }
 
   return (
-    <Box
-      component="main"
-      sx={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', p: 4 }}
-    >
-      <Stack component="form" onSubmit={handleSubmit} spacing={3} sx={{ width: '100%', maxWidth: (theme) => theme.spacing(60) }}>
+    <GateSurface>
+      <Stack component="form" onSubmit={handleSubmit} spacing={3}>
         <Typography variant="h5">crap-fiction</Typography>
         <Typography variant="body1">Where does this studio keep its pieces?</Typography>
 
-        {unavailable && <Alert severity="error">the workspace could not be read</Alert>}
         {mutation.isError && <Alert severity="error">{mutation.error.message}</Alert>}
 
         <TextField
@@ -53,6 +76,14 @@ function DirectoryAsk({ unavailable }: Readonly<{ unavailable: boolean }>) {
           Use this workspace
         </Button>
       </Stack>
+    </GateSurface>
+  )
+}
+
+function GateSurface({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <Box component="main" sx={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+      <Box sx={{ width: '100%', maxWidth: (theme) => theme.spacing(60) }}>{children}</Box>
     </Box>
   )
 }

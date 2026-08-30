@@ -23,23 +23,23 @@ describe('unwrapping the response envelope a route answers with', () => {
     }
   })
 
-  it('raises an unreachable failure when the body is not envelope-shaped at all', () => {
+  it('raises an unreadable failure when the body is not envelope-shaped at all', () => {
     try {
       unwrapEnvelope({ nonsense: true }, workspaceSchema)
       expect.unreachable()
     } catch (failure) {
       expect(failure).toBeInstanceOf(RequestFailure)
-      expect((failure as RequestFailure).reason).toEqual({ kind: 'unreachable' })
+      expect((failure as RequestFailure).reason).toEqual({ kind: 'unreadable' })
     }
   })
 
-  it('raises an unreachable failure when the payload does not satisfy the caller-declared schema', () => {
+  it('raises an unreadable failure when the payload does not satisfy the caller-declared schema', () => {
     try {
       unwrapEnvelope({ success: true, data: { workspace: 42 } }, workspaceSchema)
       expect.unreachable()
     } catch (failure) {
       expect(failure).toBeInstanceOf(RequestFailure)
-      expect((failure as RequestFailure).reason).toEqual({ kind: 'unreachable' })
+      expect((failure as RequestFailure).reason).toEqual({ kind: 'unreadable' })
     }
   })
 })
