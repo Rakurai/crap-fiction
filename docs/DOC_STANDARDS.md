@@ -112,7 +112,7 @@ Good: Requests are rate limited to 10/s until config `provider_burst_v2`
 
 Working material that governs nothing declares that in its own opening lines, never only in a header a retrieval may arrive without. Name what it is, and what governs instead.
 
-Spent working material is deleted, not marked. An implementation plan whose decisions have landed, and any record of how a decision was reached, is history and belongs to version control alone.
+Spent working material is deleted, not marked. Once the work it coordinates is complete, an implementation plan and any record of how its decisions were reached are history and belong to version control alone.
 
 ---
 

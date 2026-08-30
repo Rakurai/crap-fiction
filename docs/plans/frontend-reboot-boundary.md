@@ -1,10 +1,10 @@
 # Frontend Reboot — Boundary Audit
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This audit records code evidence behind proposed ownership corrections; it does not prescribe wire representation or client structure.
+**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This audit records code evidence behind ownership corrections; it does not prescribe wire representation or client structure.
 
 ## Audit result
 
-The audit found three domain decisions currently outside their proposed owner. The working specification states the proposed corrections; this report retains the evidence used to reach them.
+The audit found three domain decisions in the retired client that belonged on the server. The canonical architecture and interfaces own the corrections; this report retains the evidence used to reach them.
 
 | Concern | Placement in the retired client | Evidence | Consequence |
 |---|---|---|---|

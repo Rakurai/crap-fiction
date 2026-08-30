@@ -107,12 +107,13 @@ the content's meaning, and the file on disk is Markdown either way.
 
 **Read the piece as a reader would** — *per session, but must be instant*
 No chrome, no conversation, just the story set as prose.
-*Done when:* entering and leaving costs one action each way and preserves reading position.
+*Done when:* entering and leaving costs one action each way and preserves reading position, while an
+unresolved save failure remains quietly visible and names its document.
 
 **See how long the piece is** — *constant*
-Flash is a length-constrained form, so approximate length is part of judging the draft.
-*Done when:* the story's current length is visible while writing, as a fact about the machine
-rather than a measure of the work, with no target enforced and no progress implied.
+Flash is a word-constrained form, so its current word count is part of judging the draft.
+*Done when:* the story's exact, unrounded word count is visible while writing, as a fact about the
+machine rather than a measure of the work, with no target enforced and no progress implied.
 
 **Keep the work when a write fails** — *constant*
 *Done when:* the author keeps writing and keeps their prose, nothing is discarded or rolled
@@ -257,15 +258,15 @@ changes only where the author went to that context's own surface and changed it 
 applying a recommendation made there.
 
 **Edit context directly** — *rare*
-*Done when:* both contexts are human-readable and hand-editable on disk, and edits made
-outside the application are simply what the application reads next.
+*Done when:* both contexts are human-readable and hand-editable on disk, and an external edit is read
+the next time that document is loaded without replacing unsaved text already held by the studio.
 
 **Work on the story context the way they work on the draft** — *per session*
 The author revises premise, intent, voice and established facts in a surface of its own, with
 the room's help, rather than only by hand-editing the file.
 *Done when:* story context has its own editing surface, conversations, cast and activity;
 switching between it and the draft changes nothing about either surface's own text, editor
-history, conversation, composer state or in-flight work; and a failed save on one surface's
+history, selected conversation, composer state or in-flight work; and a failed save on one surface's
 document is stated there and blocks leaving the piece without hiding or overriding whatever the
 other surface's own save state is.
 
@@ -274,10 +275,10 @@ Preferences that generalize across every story belong to the author, not to whic
 happens to be open, so revising them reaches the same place and the same standing conversation
 no matter which piece the author started from.
 *Done when:* author context has its own editing surface, conversations, cast and activity, reached
-identically from every piece; its active conversation stays selected across a piece switch and
-after a reload; and a call made there reads the currently open piece's draft, story context and
-mode, so leaving that piece is what ends work in progress there, the same as it ends work on the
-draft or the story context.
+identically from every piece; its durable document and conversations remain global without requiring
+client presentation state to survive a piece switch or reload; and a call made there reads the currently
+open piece's draft, story context and mode, so leaving that piece is what ends work in progress there,
+the same as it ends work on the draft or the story context.
 
 ### Conversations
 

@@ -10,14 +10,10 @@ Where this document describes a required interaction, it is settling its present
 
 > **Two halves are always present: the document being worked on, and the conversation about it.**
 
-Whichever surface the author is on, its document is where the work is and the conversation is
-where the work gets decided, so both halves are permanent and adjacent. The pair occupies the
-window. The conversation stays wide enough to read the room's sentences in and is capped there,
-because a conversation is a column of short messages and a wider one only travels the eye further
-for the same words; the surplus goes to the document, whose prose measure is centred in the space
-it has rather than dragged to an edge by it. Everything else — choosing a conversation, editing the room, configuration — arrives when
-the author reaches for it, over the window and on a ground of its own that accounts for what it
-covers, and leaves without disturbing either.
+Whichever editing surface the author is on, its document is where the work is and its transcript is where the work gets decided, so both halves are permanent and adjacent. The pair occupies the window. The transcript stays wide enough to read the room's sentences in and is capped there; the surplus goes to the document, whose prose measure is centred in the space it has. Everything else arrives as an overlay when the author reaches for it and leaves without disturbing the workspace.
+
+A quiet banner along the bottom of the workspace carries the story's length and names any document
+whose save is failing. It remains the same across all three editing surfaces.
 
 **One piece is open at a time.** Opening another replaces both halves with nothing to save
 and nothing to confirm, because everything the author has written is already on disk. The
@@ -60,16 +56,16 @@ type size are the editing surface's own, so entering and leaving re-wraps no lin
 eye lands on the sentence it left. The piece's title stands at its head and is not editable there,
 because reading is for reading. The way out is stated as a fact about the machine that stays put
 while the prose scrolls, and it names the keystroke that already does it rather than adding a
-second way.
+second way. An unresolved save failure remains stated quietly beside that exit, naming its document,
+because reading must not turn a persistent failure into silence.
 
 ## The story context surface
 
 **A short switcher, beside the manuscript's other one-action controls, moves between the draft,
-story context and author context.** Switching changes the document on screen, its conversations,
-its cast and its activity together, and nothing else: the surface left behind keeps its text,
-its editor history, its conversation and composer state, its scroll position, and whatever save
-or room activity it was already holding, exactly as it was left. Activity on one is never a
-reason the other cannot start its own.
+story context and author context.** One active editing surface selects both workspace halves.
+Switching preserves each surface's text, editor history, selected conversation, composer, transcript
+position, disclosures and ongoing work. It does not preserve separate presentation state for every
+conversation in a listing. Activity on one surface is never a reason another cannot start its own.
 
 **Story context is set as plain text, not as prose.** It carries no rendered view, no Markdown
 source toggle and no reading view — one surface, one way of seeing it, because it is notes
@@ -82,11 +78,10 @@ which file it is holding makes that a guess.
 
 ## The author context surface
 
-**The same surface, reached identically from every piece.** Unlike the draft and story context,
-switching pieces does not replace what is on screen here: the document, its conversations and
-the conversation currently selected are the same ones a moment ago in a different piece, and stay
-selected the next time the author reaches this surface, including after a reload. It is set as
-plain text with its own reference schema, exactly as story context is.
+**The same durable material, reached identically from every piece.** The author-context document and
+conversations are global rather than belonging to the open piece. No presentation continuity is
+required across a piece switch or reload; the view may be recreated like the other editing surfaces.
+It is set as plain text with its own reference schema, exactly as story context is.
 
 **Only its cast and its evidence are the open piece's own.** Which specialists are enabled here is
 stored per piece, and a call made here reads the currently open piece's draft, story context and
@@ -160,6 +155,9 @@ complete.
 **Nothing in the composition suggests one participant answered another.** Responses land in
 completion order rather than a fixed one, which makes this guardrail load-bearing: no connective
 framing, visual thread, or arrangement may imply that one reading answered another.
+
+**Participant identity occupies a fixed gutter beside the transcript.** The repeated marks form a
+scannable edge, and responses align as independent readings rather than as branches of a thread.
 
 ### Once responses land
 
@@ -243,16 +241,10 @@ the passage as it now stands reads as current, in the register the room's words 
 code diff, because the author is reading sentences and judging whether they are better.
 
 **The before-and-after is disclosed on the author's action.** Applying opens it; the claim and the
-note stay visible as on any other response, and the change itself opens and closes. Closed it is a
-count of what was altered, in the register facts about the machine are in, so length does not
-constrain it. Neither a reload nor navigating away and back auto-collapses it on the author's behalf.
-The disclosure is load-bearing over a conversation's life rather than in any one moment: applications
-accumulate, and a transcript where every past one permanently displays a withdrawn passage and its
-replacement stops being readable after three.
-
-**The count is of words, and exact.** Nothing counts sentences, because a sentence count needs a
-heuristic, the heuristic is wrong on dialogue and abbreviation, and a number in the register that
-states machine truth cannot be sometimes wrong and keep the register's meaning.
+note stay visible as on any other response, and the change itself opens and closes. Closed it is
+labelled **applied**, or **rewritten whole** where the change was unbounded. No count is shown. The
+disclosure keeps accumulated applications readable without requiring its open state to persist after
+the conversation is no longer selected.
 
 **It says what changed and never where.** No paragraph number, no position, and nothing that jumps
 to the passage in the document. The author reads the change on the response and finds the passage by
@@ -383,8 +375,8 @@ participant's words.** A specialist did not say that its application returned no
 have. One concatenation puts the studio's sentence inside the room's register and the author has no
 way left to tell whose sentence they are reading, which is the whole of what these distinctions buy.
 
-The visual language carrying these distinctions is typography and colour rather than
-composition, and its values are the token layer's.
+The visual language carrying these distinctions is typography and colour rather than composition,
+and its primitive values come from the Material UI theme.
 
 ## Prominence
 
@@ -398,15 +390,17 @@ conversation; editing the room; opening another piece; which model serves which 
 
 **Nearly invisible** — model status, saving, the mode once it is set.
 
-**Everything one action away arrives over the studio and leaves without disturbing it.** None of it
-is a screen the pair is replaced by, because the author reaches for all of it while working — for
-model assignment most of all, since the moment they want it is the moment a participant is answering
-badly.
+**Everything one action away arrives over the studio and leaves without disturbing it.** Pieces arrive
+from the left as a list/detail overlay; conversations arrive from the right over the transcript they
+select. Room configuration and settings are centred because they configure the studio rather than
+selecting workspace content. Settings opens on general configuration and keeps model assignment in a
+second section of the same overlay. Each overlay has a surface distinct from the workspace it covers.
+Pieces and centred configuration set that workspace back; conversations leave the backdrop visually
+clear so the transcript remains legible behind its selector.
 
-**Configuration of the author's machine is one place, and it is the one where models are assigned:**
-which model serves which participant, and which theme the interface is in. Both belong to the machine
-rather than to any story and both are decided rarely, and putting them together is what lets the
-studio answer *where are the settings* without ever growing a surface by that name.
+**Configuration of the author's machine is one settings overlay, and it is where models are assigned:**
+which model serves which participant, and which theme the interface is in. The studio starts dark
+until the author chooses light; it never delegates that choice to the operating system.
 
 **The listing of pieces states where the pieces are kept**, as a fact about the machine rather than as
 the most prominent thing in it. It is also where launching the studio lands with no piece open, which
@@ -433,11 +427,10 @@ wearing it is one the author is choosing to do, so a screen where the author has
 affirm shows two and a screen where they have none shows none, and the accent stays a statement
 about the act rather than a rationing of attention.
 
-**Destroying something never announces itself in a colour.** No alarm hue exists, because the
-interface has one act that discards the author's words and asking before doing it is what makes that
-safe; a red control makes the surface anxious in a place the author is only choosing a conversation
-to read. The destructive control is the deliberate one of the pair and never the louder one: it is
-bordered where the one that dismisses it is plain, so the author's eye finds the way out first.
+**Destroying something does not announce itself in the error colour.** Confirmation is what makes the
+one destructive act safe, so its control is deliberate without being the loudest thing in the listing.
+Failures use the studio's ordinary authored error treatment and remain distinguishable from selection,
+affirmation and destruction.
 
 What follows from prominence: nothing needs two paths to it, unless one of them is the author's own
 sentence — addressing an absent specialist enables it, because typing to a collaborator is a worse
@@ -493,7 +486,8 @@ saved, or it means nothing. Not a modal, because interrupting the author to say 
 unhappy costs them more than the failure does. Leaving for another piece is the one thing
 unavailable while any of the piece's documents is in this state, and it is unavailable rather
 than confirmed: an author asked whether to discard their own prose has been asked the wrong
-question.
+question. The workspace states every failing document in its bottom banner; reading states the same
+failures beside its fixed exit.
 
 **Leaving while a write is settling.** The control that leaves the piece disables the instant it
 is asked for and stays disabled until every document has durably saved. A write that fails during
@@ -508,11 +502,11 @@ so nothing about this state may compose as one.
 **One participant unavailable and the rest of the room fine.** Its failure is stated as its own and
 the conversation settles around it; nothing presents the room as down, because it isn't.
 
-**Could not learn what this surface is doing.** A malformed or unreachable stream never reads as an
-idle room: the composer and every response action stay disabled, and the failure is stated in words
-distinct from an ordinary busy state or from the room being unreachable — the author knows the
-studio could not tell them, not that it told them nothing was happening. Reopening the piece is the
-recovery; nothing here retries or polls on the author's behalf.
+**Could not learn what this surface is doing.** A retrying stream interruption holds the composer and
+response actions without presenting a failure. A malformed stream or a connection that has stopped
+retrying never reads as an idle room: those controls stay disabled and the failure is stated in words
+distinct from an ordinary busy state or from the room being unreachable. Reconnection clears it only
+after a fresh activity snapshot has established a trustworthy baseline.
 
 ## Guardrails
 

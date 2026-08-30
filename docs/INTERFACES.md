@@ -46,8 +46,9 @@ POST   /pieces                                     title and the chosen mode; en
 GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
                                                    its invocation, plus each of the three surfaces'
                                                    text, the file that text lives in, its reference
-                                                   schema where it has one, conversation index,
-                                                   current conversation, and roster with enabled state
+                                                   schema where it has one, conversation index with
+                                                   server-derived opening words, current conversation,
+                                                   roster with enabled state, and addressable participants
 PATCH  /pieces/:id                                 title, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text
@@ -79,8 +80,7 @@ POST   /pieces/:id/surfaces/:surface/conversations/:cid/actions/:actionId/abando
 GET    /pieces/:id/events                          the event stream
 GET    /workspace                                  the configured directory, or that there is none
 PUT    /workspace                                  the directory the author chose
-GET    /theme                                      the author's chosen appearance, or that they have
-                                                   not chosen
+GET    /theme                                      the author's chosen appearance, or no saved choice
 PUT    /theme                                      the appearance the author chose
 GET    /call-sites                                 every site, what the model there is for, the handle
                                                    where it has one, and its current assignment
@@ -91,6 +91,11 @@ GET    /models                                     what the runtime holds, and w
 `GET /call-sites` is what the room-editing surface and the assignment surface both read. `GET /models`
 reports whether the runtime can be reached at all, which is the state where every surface still opens
 and only the room is unavailable.
+
+The addressable participant set is complete for its editing surface: roster membership, enabled state,
+the Story Editor and addressed-only participants require no further client interpretation. A response
+whose note is absent has already had absence decided by the room; a client does not trim or reinterpret
+response text to reach that result.
 
 Every `:surface` above names `draft`, `storyContext` or `authorContext`. The piece id in the path
 always selects the room the request gates — its cast, its activity, the evidence a call reads —
@@ -118,6 +123,9 @@ on every later frame about that call and on the snapshot. It does not advance as
 one stage to the next, because those are stages of one wait. A client that stamped its own
 arrival time instead would restart the number on every reload and disagree with a second client on the
 same piece.
+
+An appended author entry can establish or change the opening words in its editing surface's conversation
+index. A client observing that index treats the frame as notice that the served index has changed.
 
 A pending replacement's provisional identity reaches a client two ways: live on `apply.pending` the
 moment the model answers, and on the snapshot where the action a room scope reports in flight is an

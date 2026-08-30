@@ -1,17 +1,17 @@
 # Frontend Reboot — Working Specification
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This working specification consolidates proposed canonical changes already chosen in planning conversation so they can be reviewed once and transferred to their owners before implementation.
+**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This working specification collects the accepted frontend-reboot outcomes in one implementation-facing view.
 
 ## Interpretation
 
-This specification states proposed outcomes and composition decisions. A proposed requirement does not imply that every rejected implementation needs a repository ban, lint rule, or permanent explanation. Details absent from this specification remain implementation choices unless a canonical document owns them.
+This specification states implementation outcomes and composition decisions. A requirement does not imply that every rejected implementation needs a repository ban, lint rule, or permanent explanation. Details absent from this specification remain implementation choices unless a canonical document owns them.
 
 ## Continuity map
 
 - `docs/VISION.md`, `CONTEXT.md`, and `docs/PRD.md` continue to own product purpose, concepts, and required behavior; the reboot proposes no replacement definitions.
-- `docs/UX_DESIGN.md` continues to own established interaction semantics; this specification records proposed changes to composition, theme defaults, presentation-state continuity, transcript presentation, and failure placement. It gains the presentation vocabulary the reboot introduces: overlay, transcript, and reading as a state of the application.
-- `docs/ARCHITECTURE.md` and `docs/INTERFACES.md` continue to own established domain allocation and contracts; this specification records proposed changes to client state ownership, resource representation, stream resynchronization, and the three domain decisions in the boundary section below.
-- `frontend-reboot-architecture.md` maps established behavior and the proposed changes onto the new client structure without becoming a second product specification.
+- `docs/UX_DESIGN.md` owns interaction semantics, including the reboot's composition, theme defaults, presentation-state continuity, transcript presentation, failure placement and colour treatment.
+- `docs/ARCHITECTURE.md` and `docs/INTERFACES.md` own client state, resource representation, stream resynchronization and the three domain allocations in the boundary audit.
+- `frontend-reboot-architecture.md` maps the accepted behavior onto the new client structure without becoming a second product specification.
 
 ## Scope and continuity
 
@@ -50,11 +50,17 @@ An overlay arrives over the workspace, dismisses without leaving it, and edits n
 - Settings is a centered modal with general and model-assignment sections, opening on general.
 - Model assignment is part of settings rather than a separate top-level overlay.
 
+Each overlay has a surface distinct from the workspace it covers. Pieces and centered configuration set
+the covered workspace back; conversations keep their backdrop visually clear so the transcript remains
+legible behind the selector.
+
 The primary workspace places the manuscript in the flexible left region and the conversation in a persistent right region, over a banner along the bottom carrying the story's length and, to its right, any document whose save is failing.
+
+Reading removes the workspace chrome but not an unresolved save failure. A quiet fixed statement beside the reading exit names each document whose save is failing.
 
 One active editing surface selects both halves of the workspace together: draft, story context, or author context. Switching among them preserves each surface's editor state and its conversation pane, including the selected conversation, composer text, transcript position, and local disclosures for that selected conversation. It does not preserve separate presentation state for every conversation in the listing.
 
-## Proposed transcript changes
+## Transcript composition
 
 - Compose the conversation record from entries of deliberately unequal visual weight rather than equal cards or generic chat turns.
 - Anchor each entry against a fixed left gutter carrying the participant's mark, so identity is scannable down the column and independent readings read as parallel rather than as a thread.
@@ -62,7 +68,7 @@ One active editing surface selects both halves of the workspace together: draft,
 - Disable response-triggering controls consistently while a dispatch is active; the composer send action becomes stop during that dispatch.
 - Do not add a separate notification for switching away from a conversation during settlement; participant activity remains in the durable record.
 
-## Proposed overlay changes
+## Overlay detail
 
 - The pieces overlay becomes a left-side list/detail composition containing piece selection, pre-open detail, creation, and workspace context.
 

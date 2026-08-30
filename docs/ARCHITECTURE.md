@@ -9,8 +9,8 @@ A statement belongs here only if it would still be true after the code implement
 rewritten. A fact whose accuracy can only be established by reading the source is the source's,
 not this document's. Values that are tuning rather than decision — a retry count, a timeout, a
 debounce interval — live in one maintainer-facing application configuration, validated at
-startup, and are absent here. An appearance value, such as a colour, lives in the token layer
-instead.
+startup, and are absent here. Primitive appearance belongs to the Material UI theme rather than this
+document.
 
 Where this document appears to decide product behaviour, it is recording what the behaviour above
 it forces.
@@ -46,17 +46,17 @@ advance.
 contract between orchestration and interface, and one language means one definition rather than two
 that drift.
 
-The server serves the client, exposes a local HTTP API, owns the filesystem, and owns model access
-and scheduling. The client owns the editor, the conversation surface, and its own projection of
-conversation entries and activity.
+The server serves the client, exposes a local HTTP interface, owns the filesystem, and owns model
+access and scheduling. The client owns the editor, workspace composition, transient editing state,
+and presentation of server-owned facts.
 
 **Not Electron** — a localhost URL is sufficient, and packaging is a cost with no return here.
 **No database** — everything a piece needs is in the piece's directory.
 
-**Client state is fed by the event stream rather than fetched.** This is a local event-stream
-application; modelling it as remote data fetching would be a category error. Entries and activity
-accumulate in a pure reducer the client feeds events to, over the framework's own state — a store
-library would be a second state authority above the one the framework already supplies.
+**TanStack Query owns the client representation of server-owned facts.** Request reads, confirmed
+writes, and event delivery update or invalidate the same keyed entries. The application adds no second
+cache or generic request-state machine around it. Conversation and activity projection remains pure
+product logic where event ordering and deduplication require it.
 
 **The logger writes to stderr and nowhere else.** No file transport, no log directory and no second
 destination, so nothing the logger emits outlives the process. A line may carry the call site, the
@@ -77,14 +77,13 @@ rest of their work already lives, and it is theirs to read and theirs to delete.
 where the model seam is crossed, by the module that owns the disk, and it is the only place the studio
 keeps a prompt or an unread reply.
 
-**One piece is open at a time, and the application state is singular** — each editing surface's own
-document, conversation and operation. Switching pieces replaces that state rather than accumulating
-alongside it, and abandons whatever operation is in flight on every surface, keeping whatever landed.
-Author context is the one exception to "replaces": its document and conversation are not the old
-piece's to begin with, so a switch changes only the transient evidence and cast a call there reads,
-never the document or which conversation is selected. Nothing is ordinarily held unsaved. A switch
-is refused only while a document's write remains unwritten after a failure, having first retried it:
-prose the author typed is the one thing a piece switch may never discard.
+**One piece is open at a time, and the client session is singular.** It holds one state object for each
+of the draft, story-context and author-context views so switching the active surface preserves both
+workspace halves. Opening another piece recreates all three view states; the author-context
+document and conversations remain global server facts even when their client presentation resets.
+Opening a different piece abandons operations in flight while keeping whatever landed. A switch is
+refused only while a document's write remains unwritten after a failure: prose the author typed is the
+one thing a piece switch may never discard.
 
 ## Dependency roster
 
@@ -96,6 +95,8 @@ here, arrived at one plausible decision at a time.
 | Capability | Package |
 |---|---|
 | Language, client framework, client build | `typescript`, `react`, `vite` |
+| Interface components and theme | `@mui/material` |
+| Client server-state lifecycle | `@tanstack/react-query` |
 | HTTP server and routing | `hono`, served by `@hono/vite-dev-server` |
 | Request body validation at a route | `@hono/zod-validator` |
 | Server-sent event framing | `hono`'s `streamSSE`, and the platform's `EventSource` on the client |
@@ -108,18 +109,13 @@ here, arrived at one plausible decision at a time.
 | Prose editor | `@tiptap/*` over `prosemirror-*` |
 | Markdown parsing and serialization | `prosemirror-markdown`, over `prosemirror-model`, tokenizing with `markdown-it` |
 | Before-and-after comparison of two document states | `diff` |
-| Design tokens and component styling | the repository's own token layer, through Vite's CSS Modules |
 | The prose and interface typefaces | latin-subset `woff2` files in this repository |
-| The combobox behind inline handle completion | `@ariakit/react` |
-| Relative time | `date-fns` |
 | Conversation and change identifiers | `nanoid` |
 | Piece directory slugs | `@sindresorhus/slugify` |
-| Story length | the platform's `Intl.Segmenter` |
+| Story word count | the platform's `Intl.Segmenter` |
 | Logging | `pino` |
 | Model runtime | `@lmstudio/sdk` |
 | Test runner | `vitest` |
-| A DOM for tests that need one, without a browser | `jsdom`, with `@testing-library/react` |
-| Browser tests | `@playwright/test` |
 | Running a maintainer script written in the project's own language | `tsx` |
 
 **The roster names capabilities, not every line of `package.json`.** A package named here brings with
@@ -142,19 +138,15 @@ library's output rather than a reason to compute the comparison here.
 repository's own.** They are a few lines each against rules stated in this document, and a package
 general enough to cover them would arrive with a policy the product has not chosen.
 
-**Appearance comes from the repository's own token layer and from no package.** What a register or a
-control weight resolves to is declared once as a token or a class other modules compose from, so a
-module states which register or weight a thing is in rather than restating what that looks like.
+**Material UI supplies ordinary interface vocabulary and primitive appearance.** Its theme owns
+palette, color schemes, typography, density, spacing, radii and component defaults. Product styling
+remains for the editor content, workspace composition and the prose, author, participant and machine
+registers. The client does not build a parallel general-purpose design system over it.
 
 **The typefaces are files in this repository**, subset and served by the app: a runtime network fetch
 is ruled out, and a font that fails to arrive leaves the author on a face nobody chose. Only the
 weights the interface's geometry was settled against are carried, and the licences sit beside them. A
 further typeface is a change to this roster.
-
-**`@ariakit/react` supplies behaviour and never appearance.** Its components arrive unstyled, which
-is the condition of adopting it: a library carrying its own look would compete with the registers the
-interface is composed in. It is taken for the combobox that offers handles as the author types one,
-and for nothing else — the interface has no dialog.
 
 **Where a model must be named, it is chosen from the runtime's reported models rather than typed.**
 An author typing an identifier by hand is being asked for something the application knows, and one
@@ -193,10 +185,9 @@ How representation switching is implemented is left to the editor integration; w
 the manuscript's meaning survives a switch in either direction and that Markdown is what reaches
 disk.
 
-**The reading view suppresses application chrome and disables editing**, and must be entered and left
-in one action each way with the author's reading position intact. Holding one editor instance is the
-cheapest way to get that and is the expected implementation; any integration that delivers it as
-cheaply is equally acceptable.
+**The reading view suppresses ordinary application chrome and disables editing.** It is entered and
+left in one action each way with reading position intact. An unresolved save failure remains visible
+beside the fixed exit; editor mounting and reuse are implementation choices.
 
 **History belongs to the editor.** The application installs no history of its own and keeps no undo
 stack. Applying a recommendation is performed through the editor's ordinary mutation mechanism as a
@@ -208,26 +199,51 @@ typing never reaches back into the room's change.
 **Nothing application-specific enters the document.** No node attributes carrying application state,
 no marks for recommendations, no decorations tracking responses.
 
-## The editing surface
+## Client composition
 
-**One client module is mounted once per surface.** It owns that surface's document session and
-persistence, its cast and the controls that change it, its conversations and which one it shows, its
-Apply and abandonment, and the body that composes its document with its conversation panel. What
-differs between draft, story context and author context — the prose body against the plain-text body
-and its reference schema, a piece-scoped conversation selection against author context's global one,
-the label a control carries — is supplied to that one module as configuration. It is never a branch
-inside the piece that opens onto it, and it is never a second copy of the module for a second surface.
+**The composition root creates the Material UI theme, transport, TanStack Query client and piece
+session before mounting the shell.** It selects concrete dependencies and defines no product resource
+or feature behavior.
 
-Which body draws the document decides which document session the surface has, so the two are chosen
-together at the mount, and a mount never switches from one to the other. That is what keeps the choice
-out of the mounted surface's own body, where it would be a condition every hook below it had to hold.
+**The shell owns arrangement and a small state model:** the open piece, one active editing surface,
+one open overlay and whether the application is writing or reading. The active editing surface selects
+both the document and transcript halves together. Pieces, conversations, room and settings are one
+mutually exclusive overlay value. Nothing in this local application is addressed by URL, so navigation
+needs no router.
 
-**The piece a surface opens onto holds none of that surface's own state.** What it holds is piece-wide
-chrome and close, and a registry of every surface's current client text compiled for whatever needs a
-snapshot of all three. A surface reports upward only its own text, whether its own write is failing,
-and the writer to flush when the piece closes — enough to compile the snapshot and to decide leaving
-once, from every surface's report. Nothing reads a sibling surface's state back out of it, and a
-surface's own read-only state is derived from nothing but its own.
+**The piece session holds three editing-view states**, one each for draft, story context and author
+context. Each holds current document text and save coordination together with the selected conversation
+and that conversation's composer, transcript position and local disclosures. Switching surfaces keeps
+those three states; selecting another conversation replaces only that view's conversation-pane state.
+There is no presentation-state registry for conversations that are not selected. Opening another piece
+recreates the entire piece session.
+
+**Feature modules own cohesive product responsibilities.** Document owns the workspace's editing half.
+Its manuscript implementation owns TipTap, Markdown conversion, rendered and source presentation,
+measure and typography; its context implementation owns plain-text editing and reference-schema
+disclosure for both context surfaces. Transcript owns conversation composition, response actions,
+activity, composer behavior, handle completion and Apply orchestration. Pieces, conversations, room and
+settings each own the corresponding overlay behavior. The shell owns chrome that selects a surface or
+opens an overlay. Internal module decomposition follows behavior rather than entry variants or a
+required file shape.
+
+**Resource definitions are ordinary TanStack Query options factories** pairing a stable key with a
+transport operation and runtime schema. Feature modules use Query results directly and project a
+smaller product result only where presentation benefits. Automatic read retry is disabled globally so
+a first failure is exposed immediately; a resource gains retry only through an explicit reliability
+decision. Confirmed writes install their authoritative result or invalidate the affected keys.
+
+**Resource freshness follows the channel that changes the fact.** Conversation entries, activity,
+cast and other values changed through the running application refresh through confirmed writes, events
+and reconnect snapshots rather than focus or mount revalidation. Piece listings, clean piece detail,
+theme and model assignments may revalidate when observed because their routes reread author-editable
+files. Runtime model status revalidates when settings observes it. Workspace selection, modes,
+participant definitions and call-site descriptions are server-startup state, so browser revalidation
+cannot discover external changes to them. A refreshed piece detail never replaces unsaved client text.
+
+**The server stores the author's theme choice and the client does not create another persisted
+preference.** Dark is the boot presentation and the meaning of no saved choice; a served light choice
+replaces it. A failed theme read remains visible but does not prevent the shell from painting.
 
 ## Persistence
 
@@ -254,8 +270,8 @@ every piece is addressed against; the boundary is what resolves it and what refu
 **Author configuration is a property of the author's machine rather than of any story**: author
 context, which generalizes across pieces; model assignment, so a participant pointed at a different
 model once is on that model for every piece; and the interface theme. With no theme written the
-interface follows the operating system — an absent key means the author has not chosen, which is a
-different thing from a value the application supplied on their behalf.
+interface is dark; light is the other explicit choice, and operating-system preference is not part of
+the stored model.
 
 **Shipped data travels with the application**, not under the data root: the charter, every participant,
 every mode descriptor, every prompt fragment and every reference schema are documents under a content
@@ -595,9 +611,10 @@ failure.
 
 **Schemas are as small as the call allows, because that is what makes constrained decoding hold.** A
 specialist's response is flat — its declared outcome, its claim, and its note — and a local model
-holds that reliably where it falls apart on a nested structure. The note is optional, so a claim
-standing alone conforms and nothing has to be invented to fill a field. Shrinking the schema is
-always preferred to adding machinery that repairs what a larger one returned.
+holds that reliably where it falls apart on a nested structure. The room decides whether the returned
+note is absent before the response crosses the server interface, so the client receives absence rather
+than repeating that domain interpretation. Shrinking the schema is always preferred to adding
+machinery that repairs what a larger one returned.
 
 **A call that owes an answer has no no-comment outcome in its schema.** An addressed participant owes
 one, and so does the Story Editor on a dispatch where no specialist reading landed for it to work
@@ -777,11 +794,11 @@ of the addressing. A client that parsed and posted its own participant list coul
 addressing contradicted the words about to reach the model; synthesizing a sigil into the author's text
 would put words in the conversation they never wrote.
 
-**The available roster is the ceiling on who can be addressed.** A specialist the piece's mode makes
-available is addressable whether or not it is enabled; one the mode does not make available is not
-addressable at all, and its handle resolves to nothing. Both the surface that suggests a handle as the
-author types and the resolver that reads the finished message derive that set the same way, so the author
-is never offered a handle the dispatch would then ignore.
+**The server resolves the complete addressable set for each surface.** It includes specialists the
+piece's mode makes available, whether enabled or not, together with the Story Editor and addressed-only
+participants. A specialist unavailable in that mode is not addressable. The client offers this served
+set while the room uses the same domain decision to resolve the finished message, so a suggested handle
+cannot be one the dispatch would ignore.
 
 **Addressing a specialist that is not enabled enables it** before the dispatch's entry is written — the
 same durable write as enabling it directly, and the same author-message entry that carries the resolved
@@ -977,19 +994,18 @@ or not at all.
 the open piece, outliving any single dispatch or Apply. Every event corresponds to an entry landing or to
 a frame around one.
 
-**The client opens that one connection per open piece and every surface observes it**, rather than a
-surface or a conversation opening a connection of its own. Switching which conversation a surface shows
-never reconnects the stream; a surface that starts observing after the piece connected is caught up to
-the activity the events already delivered rather than by a second, race-prone read from the server.
+**The client opens one connection per open piece.** Switching surfaces or conversations never
+reconnects it. The stream interprets each frame once, updates conversation and activity projection,
+and updates or invalidates TanStack Query entries by resource identity.
 
 **A surface whose activity is not yet known is held, not treated as idle.** Until the stream has
-delivered the snapshot the surface subscribed for, it starts nothing: an unknown room could already be
-working, and a client that guessed idle would offer the author an action the room is about to refuse.
-The platform reports a drop it will retry and an abandoned connection through the same event, so only
-the abandoned one is a failure the surface reports — a retryable drop leaves the surface held and still
-waiting, and the snapshot that arrives on reconnection releases it. Activity that arrives and cannot be
-read is terminal and the surface stays held until the piece is reopened, because nothing further from
-that stream can be trusted to describe what the room is doing.
+delivered its snapshot, it starts nothing: an unknown room could already be working. `EventSource`
+reports both a retrying interruption and a closed connection through its error event; while its
+`readyState` is `CONNECTING`, the surface stays held without reporting a failure, while an unexpected
+`CLOSED` is a visible disconnection. The server sends a fresh activity snapshot before other frames on
+every connection; that snapshot establishes the new baseline, invalidates the open piece's stream-fed
+facts and clears the disconnected state. Activity that cannot be interpreted is terminal and the surface
+stays held until the piece is reopened.
 
 **Only one piece is open at a time, and opening one is server-authoritative.** A different piece that was
 open has its unfinished work abandoned, across all three of its room scopes, including author-context
@@ -1027,6 +1043,11 @@ the simplest sufficient mechanism is the right one — reloading the conversatio
 action is in flight is enough. Sequence numbers, watermark replay and a re-emission protocol are not
 required, and are worth adding only if a simpler approach demonstrably fails.
 
+**An appended author entry updates the open conversation and, where it can establish or change the
+conversation's opening words, invalidates that editing surface's conversation index.** The client does
+not create an optimistic author entry; it presents the durable entry delivered after the server accepts
+it.
+
 **What the piece reports about an action in flight is what the surface needs in order to draw it**: which
 conversation action it is, its identifier, the entry that caused it, and for a dispatch the audience it
 resolved to and each participant's activity so far. Landed entries are not part of this report: they are
@@ -1060,9 +1081,10 @@ operation carries none, which is what tells the two kinds apart and what the ass
 Both carry a display name and a description, so the surface decides nothing about what either kind is.
 
 **Reading the piece reports the whole room, cast and Story Editor alike.** The Story Editor is not in the
-cast and is not togglable, so it is reported as its own thing rather than as a cast member with a flag —
-and it is reported rather than left to the client to infer as *the participant that is not in the cast*,
-which is a rule about the room's composition and belongs to the server that resolves the roster.
+cast and is not togglable, so it is reported as its own thing rather than as a cast member with a flag.
+For each editing surface the same read serves the complete addressable participant set; the client does
+not reconstruct it from roster, cast and special participants. Each conversation summary likewise
+serves its opening words once for every client consumer.
 
 **Creating a piece makes no model call.** It writes the piece directory and enables the roster
 specialists that declare themselves on by default for the chosen mode, so a piece is creatable and

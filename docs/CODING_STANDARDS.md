@@ -55,10 +55,10 @@ shallow and local to one file.
 alternate path is an explicit product decision, never silent recovery code. The word *fallback* is not
 a design.
 
-**No defaults and no placeholders.** No operational value hides in a parameter default, a constant, or
-a `??` at a call site. No seeded content, no demo mode, no example output, nothing fake outside a test.
-A default gets accepted as evidence that something belongs there, and then satisfies the check that was
-meant to catch its absence.
+**No hidden operational defaults and no placeholders.** Required configuration does not hide in a
+parameter default, a constant, or a `??` at a call site. A product default stated by the product or
+design is ordinary behaviour. No seeded content, demo mode, example output, or fake data appears outside
+a test.
 
 **One adapter is a hypothetical seam; two are a real one.** Do not introduce a seam unless something
 varies across it — a second runtime, a test substitute, a policy the product requires switching. A
@@ -233,24 +233,19 @@ than route by route.
 
 ## Configuration
 
-**Process configuration and user-editable data are not the same thing.** Process configuration is one
-validated object read once at startup, failing with a useful message when a required value is absent or
-malformed. Data the user may edit by hand while the application is running is re-read at the moment it
-is used, and is never cached from startup: a value held in memory is a hand-edit silently ignored for a
-whole session.
+**Give configuration an explicit lifetime.** Process configuration is one validated object read once
+at startup, failing with a useful message when a required value is absent or malformed. Each
+author-editable value is read at its architecturally assigned lifecycle; a value intended to be live is
+not retained past that boundary.
 
 ---
 
 ## Client
 
-Feature modules expose a small public interface — an entry component and typed hooks or facades — and
-keep their internals private.
-
-Presentational components are deliberately shallow: typed props in, callbacks out, no product logic.
-They do not fetch, do not open streams, do not know a URL, and do not reach global state.
-
-Depth lives in hooks, facades and state modules. A hook owns orchestration: load, act, subscribe,
-expose a view model.
+Feature modules expose a small public interface and keep their product behavior local. They may use
+framework and library facilities directly inside the module; do not build a facade that merely renames
+an established dependency. Leaf presentation components receive values and callbacks where that keeps
+them legible, without making prop-only presentation a rule for every component.
 
 Reducers over event streams are pure functions, named and tested at their own interface. State the
 rules they carry, and assert them there rather than through the interface that renders them.
@@ -262,9 +257,9 @@ a projection and the server disagree, the server is right, and the fix is in the
 
 Do not let recovery misrepresent failure or replace server authority. Retry and revalidation policy belongs to the module that understands the operation and requires an explicit reliability or product rationale; do not inherit it accidentally from a dependency default.
 
-Use semantic HTML, labelled controls and keyboard operability. Style through the project's token and
-component layer rather than hardcoding values a token exists for; custom styles express layout and
-composition, not reimplemented component internals.
+Use semantic HTML, labelled controls and keyboard operability. Prefer the adopted UI system for ordinary
+controls and primitive appearance; use custom styles where product composition, prose or semantic
+registers require them.
 
 `PascalCase` for components, `camelCase` for functions and hooks. One cohesive module per file.
 
@@ -281,13 +276,11 @@ package rather than write the capability.
 Application state does not enter another library's data model — no document attributes, marks or
 decorations carrying product concepts.
 
-Use a library's narrow surface where its wide one would import its topology into the product. Where a
-runtime offers an agent loop, chat abstraction or orchestration layer, the product's own rules stay in
-the product's own code where they remain visible and testable.
-
-Contain vendor concepts in the module that owns the vendor. Nothing outside it may name, receive or
-depend on them. Containment rather than abstinence: inside the module, use everything the vendor
-offers.
+Use a library idiomatically inside the modules that depend on it. Contain vendor concepts when leaking
+them would make a product interface depend on vendor topology; do not add containment layers that only
+mirror the library. Specialist machinery such as the editor and model runtime remains behind its owning
+module, while platform libraries such as the UI framework and server-state store may be used directly
+throughout the client.
 
 Where a library's own types are too loose to narrow honestly — a document model reached through a
 generic node type is the case to expect — the assertion that recovers the shape stays inside that
@@ -452,7 +445,7 @@ Prohibited, each reached by an argument that resembles the test above:
 ## Prohibited
 
 - Fallback behaviour, or the word *fallback* used as a design.
-- Defaults, placeholders, seeded content, demo modes and anything fake outside a test.
+- Undeclared operational defaults, placeholders, seeded content, demo modes and anything fake outside a test.
 - Defensive re-checks behind a seam that already validated.
 - Silent failure, log-and-continue, and catching without re-throwing or returning a declared failure.
 - Legacy, migration, compatibility or temporary bridging code.

@@ -1,6 +1,6 @@
 # Frontend Reboot — Proposal
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative for the kinds of truth they own. This proposal explains the intent of a change that will require corresponding canonical edits before implementation.
+**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative for the kinds of truth they own. This proposal explains the intent of the frontend rebuild; its accepted decisions are reflected in those canonical owners.
 
 ## Proposal
 
@@ -24,7 +24,7 @@ Product concepts are stable; their presentation is open. Existing interactions s
 
 The reboot should prefer established library behavior over locally owned machinery, cohesive modules over generic collections, and one representation of a concept over parallel feature-local models. These are design aims rather than a catalogue of prohibited syntax, directory names, or library options.
 
-The proposed canonical changes are collected in `frontend-reboot-spec.md`. The proposed system structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. This proposal does not prescribe implementation order; work can follow discovered dependencies without making a schedule another source of design truth.
+The implementation outcomes are collected in `frontend-reboot-spec.md`. The client structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. This proposal does not prescribe implementation order; work can follow discovered dependencies without making a schedule another source of design truth.
 
 ## Scope
 
@@ -38,4 +38,4 @@ The new frontend should be smaller in the places where the old one implemented g
 
 ## Next step
 
-The design review is complete when the working specification and architecture agree on the client state model and every accepted change has a canonical owner. The accepted product, interaction, interface, and architecture decisions can then move to those owners before implementation begins.
+The product, interaction, interface and architecture decisions have canonical owners. Implementation can proceed from those owners and use these planning documents as a compact map of the reboot until the work is complete.
