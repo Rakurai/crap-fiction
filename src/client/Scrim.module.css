@@ -1,6 +1,0 @@
-.scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(12, 10, 8, .34);
-  animation: global(dr-in) .12s ease-out;
-}

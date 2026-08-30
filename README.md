@@ -4,7 +4,9 @@ A local, single-user studio for writing fiction in conversation with a room of s
 collaborators. You write the prose; the room reads it and tells you what it sees, in the language
 of craft. Nothing changes the manuscript unless you edit it yourself or accept a recommendation.
 
-![The studio: manuscript on the left, the room on the right](docs/screenshots/main-view.png)
+**The browser client is being rebuilt and is not present.** The server, the room, the document
+model and the data on disk are unaffected; `make run` serves the API and nothing renders. The
+description below is the studio the rebuilt client restores.
 
 ## What it does
 
@@ -41,6 +43,5 @@ the same `.env` and reaching the host's model runtime through `STUDIO_CONTAINER_
 ## Checks
 
 ```sh
-make test           # typecheck, repository rules, unit tests
-make test-browser   # end-to-end tests
+make test   # typecheck, repository rules, unit tests
 ```

@@ -18,9 +18,7 @@ function sourceFiles(dir: string): string[] {
 
 function sourcesUnder(...segments: readonly string[]): string[] {
   const area = segments.join('/')
-  const files = sourceFiles(path.join(REPO_ROOT, area))
-  if (files.length === 0) throw new Error(`no source under ${area}`)
-  return files
+  return sourceFiles(path.join(REPO_ROOT, area))
 }
 
 function named(file: string): string {

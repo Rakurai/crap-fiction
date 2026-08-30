@@ -20,7 +20,7 @@ export function studioConfig(entry: string): UserConfig {
       devServer({
         entry,
         // The client's own HTML shell is Vite's to serve, as are the typeface
-        // files the token layer names — the default excludes cover source and
+        // files the theme names — the default excludes cover source and
         // stylesheets but no binary asset, so a font request would otherwise
         // reach the Hono application and come back a 404. Everything else not
         // excluded is a candidate for a Hono route.
