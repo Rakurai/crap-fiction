@@ -6,7 +6,7 @@
 
 The client should be a composition of deep product modules over Material UI, TipTap, and TanStack Query. Commodity dependencies should remain visible enough to use idiomatically while product-specific behavior is concentrated behind interfaces named in the language of the studio.
 
-The architecture addresses five structural pressures in the current client: server state forked into local models, presentation state with the wrong lifetime, feature coordination implemented through prop callbacks, generic UI infrastructure duplicating library behavior, and product modules combining several independent responsibilities.
+The architecture addresses five structural pressures found in the retired client: server state forked into local models, presentation state with the wrong lifetime, feature coordination implemented through prop callbacks, generic UI infrastructure duplicating library behavior, and product modules combining several independent responsibilities.
 
 ## System shape
 
@@ -17,13 +17,14 @@ Composition root
 ├── TanStack Query client
 └── application shell
     ├── piece session
-    │   ├── document sessions and autosave
-    │   └── manuscript editor lifetime
+    │   ├── draft view state
+    │   ├── story-context view state
+    │   └── author-context view state
     ├── primary workspace
-    │   ├── manuscript surface
-    │   └── transcript surface
-    ├── reading surface
-    └── arriving surface
+    │   ├── manuscript
+    │   └── transcript
+    ├── reading
+    └── open overlay
         ├── pieces
         ├── conversations
         ├── room
@@ -33,30 +34,40 @@ Cross-cutting product presentation
 └── semantic registers and participant identity
 ```
 
-The composition root creates dependencies and providers. The shell owns arrangement. Product modules own behavior for a cohesive surface. TanStack Query owns served-fact lifecycle. The piece session owns client state whose lifetime exceeds an individual mounted surface. The transport owns HTTP and event-stream mechanics.
+The composition root creates dependencies and providers. The shell owns arrangement. Product modules own behavior for one cohesive product responsibility. TanStack Query owns served-fact lifecycle. The piece session owns client state whose lifetime exceeds an individual mounted component. The transport owns HTTP and event-stream mechanics.
 
 ## Composition root
 
 The composition root creates the MUI theme, transport, TanStack Query client, and piece-session provider before mounting the shell. It is the only place where concrete application dependencies are selected.
 
-The composition root does not define product resources or surface behavior. Providers make the chosen dependencies available without threading adapter bundles through the component tree.
+The composition root does not define product resources or feature behavior. Providers make the chosen dependencies available without threading adapter bundles through the component tree.
+
+The server stores the author's interface-theme choice. MUI's browser persistence and system-derived choice are disabled so they do not create a second preference; the settings control writes the new value and installs the confirmed result. The theme starts dark, which is the specified meaning of an absent served choice, and applies a served light choice when it arrives.
+
+A failed theme read does not prevent the shell from painting. Dark remains the explicitly provisional boot presentation, and the read failure remains visible through the ordinary served-fact lifecycle rather than being presented as a confirmed preference.
 
 ## Shell
 
-The shell owns which piece is open, which manuscript-side and conversation-side surfaces are visible, which secondary surface is arriving, and whether the application is writing or reading. It does not copy piece, conversation, roster, or settings data into shell state.
+The shell owns which piece is open, one active editing surface that selects both halves of the workspace, which overlay is open, and whether the application is writing or reading. It does not copy piece, conversation, roster, or settings data into shell state.
 
-One arrival value represents the mutually exclusive pieces, conversations, room, and settings surfaces. The selected arrival determines its anchor and composition: left selection, right selection, or centered configuration.
+There is no router: nothing here is addressed, linked to, or shared.
 
-The shell owns reading mode, and the manuscript module supplies the rendered draft used by the reading surface.
+The application starts with no piece open and the pieces overlay showing, and nothing restores the last open piece.
+
+One value represents the mutually exclusive pieces, conversations, room, and settings overlays. Which overlay is open determines its anchor and composition: left selection, right selection, or centered configuration.
+
+The shell owns whether the application is reading, and the manuscript module supplies the rendered draft that reading presents.
+
+The desktop workspace keeps the conversation at a readable column width and gives the manuscript the remainder. No alternate small-screen product composition is specified. The implementation may use ordinary MUI layout behavior to preserve the two-pane composition, and the conversation width and prose measure remain theme values that can be calibrated against real responses.
 
 ## Served-fact architecture
 
 TanStack Query is the served-fact store; the application does not place a second owned cache or state machine around it.
 
-A resource definition pairs a stable query key with the transport operation and runtime schema for one server-owned value. Feature hooks compose those definitions through TanStack Query and present product-shaped results to feature modules. Presentational components receive typed values and callbacks rather than opening requests or streams.
+A resource definition is an ordinary TanStack Query options factory pairing a stable query key with the transport operation and runtime schema for one server-owned value. Feature modules use those definitions directly and project a smaller product-shaped result only where their presentation benefits from one. Leaf presentation components may receive typed values and callbacks without turning that separation into an application-wide wrapper layer.
 
 ```text
-feature hook
+feature module / query hook
     │ observes
     ▼
 TanStack Query entry ◀──── resource definition ────▶ transport + schema
@@ -70,7 +81,9 @@ Resource definitions provide one place for identity and validation without hidin
 
 The Query client disables automatic read retries at the composition root with `retry: false`. This application has no defined read-recovery strategy that benefits from repeating a failed request before exposing the failure, so it does not inherit TanStack Query's retry default. A resource that later needs retries requires an explicit reliability decision at the resource's owning module. Other refresh and revalidation settings follow the freshness needs of the resource rather than a blanket application policy. Query results supply the request lifecycle without a second client-owned state machine.
 
-Feature hooks project the Query result into the product-shaped union `Fact<T>`: not arrived from `isPending`, failed first read from `isLoadingError`, present value, or present value with a failed refresh from `isRefetchError`. `isFetching` is not part of this shared projection because no current product presentation distinguishes a background fetch; it can gain product meaning where a later design requires it.
+Features use TanStack Query's result directly to distinguish not arrived, failed first read, present value, and a failed refresh that leaves a value available wherever those states affect presentation. There is no universal `Fact<T>` wrapper. Background fetching is presented only where it gains product meaning.
+
+Stream-covered facts become stale through event or snapshot invalidation. Resource definitions for facts that can change outside the running client may use observation-time revalidation when it is safe for that resource. A refreshed served fact never silently replaces client-owned unsaved document text.
 
 Writes cross the transport through the feature or session module that owns the intent. The returned authoritative value is installed or the affected resource is invalidated using TanStack Query's standard APIs. Features may use TanStack Query's mutation lifecycle, but the choice of hook does not authorize installing an unconfirmed value as a served fact. Write ordering that affects correctness remains with the writer rather than being inferred from mutation state.
 
@@ -84,28 +97,29 @@ Conversation-entry projection remains a pure reducer because arrival-order dedup
 piece EventSource
       │
       ├── activity snapshot ──▶ conversation activity projection
-      ├── entry appended ─────▶ conversation projection
+      ├── entry appended ─────▶ conversation projection + index invalidation
       └── resource changed ───▶ Query invalidation by piece/resource key
 ```
 
 Frames received before the activity snapshot are buffered until the snapshot gives them context. A disconnect changes visible connection state. The server sends a fresh activity snapshot before other frames on every connection. Each snapshot establishes the stream baseline and invalidates the stream-fed Query keys beneath the open piece's key prefix; after reconnection, the disconnected statement clears only once that baseline is trustworthy. The current protocol therefore resynchronizes without event replay or a server change.
 
-An optimistic author-message echo remains an open protocol and state-ownership choice rather than an assumption of the new transcript.
+The transcript does not create an optimistic author-message entry. It presents the authoritative entry delivered after the server accepts it; observed latency can justify revisiting that choice later without changing server-state ownership.
 
 ## Piece session
 
-The piece session owns client state whose lifetime is the open piece rather than one mounted feature:
+The piece session holds three editing-view state objects, one each for draft, story context, and author context. The active-surface value selects which object is presented in both workspace halves. Each object contains only the state needed to leave that view and return to it unchanged:
 
-- current text for the draft, story context, and author context;
-- one autosave controller per editable document;
-- persistent save failure and the derived leave-blocked state;
-- document snapshots used when dispatching or applying changes.
+- current document text, autosave controller, save failure, and dispatch snapshots;
+- the selected conversation;
+- composer text, transcript scroll position, and local disclosures for that selected conversation.
 
-Piece-session state is not a served-fact cache because it represents work the server has not yet accepted. The piece session exposes document-oriented reads and intents rather than its internal controller or registry.
+Selecting another conversation replaces the conversation-pane portion of that view state; the piece session does not retain a presentation-state registry for unloaded conversations. Opening another piece may recreate all three view-state objects. This keeps their lifetime uniform even though the author-context document and conversations themselves are global served facts.
 
-The manuscript module owns the TipTap editor instance and its open-piece lifetime because it owns the vendor and the constrained document seam.
+Piece-session document state is not a served-fact cache because it represents work the server has not yet accepted. Manuscript and transcript behavior remains in those feature modules; the session supplies the shared lifetime needed to switch views without losing their state.
 
-The piece-session design makes state survival independent of whether inactive writing surfaces remain mounted.
+The manuscript module owns TipTap and any editor state needed to preserve history across editing-surface switches. Those vendor values remain behind the manuscript interface rather than becoming fields of the piece-session state object.
+
+Whether inactive editing surfaces remain mounted or the manuscript module detaches and later reattaches an editor is an implementation choice. The architecture requires only that switching the active surface preserves the three views' state.
 
 ## Feature modules
 
@@ -117,9 +131,9 @@ The manuscript module owns TipTap, constrained-schema conversion at the editor s
 
 ### Transcript
 
-The transcript module owns conversation-column composition, entry presentation, response actions, participant activity, composer behavior, handle completion, scroll position, focus return, and apply orchestration.
+The transcript module owns conversation-column composition, entry presentation, response actions, participant activity, composer behavior, handle completion, scroll and focus-return behavior, and apply orchestration. It reads and writes the active editing view's conversation-pane state from the piece session.
 
-The transcript implementation separates responsibilities with independent behavior rather than creating one component for every entry kind. Response actions, applied-change disclosure, participant flight, composer, and handle picker are likely internal modules because each carries meaningful interaction behavior.
+The transcript may separate response actions, applied-change disclosure, participant flight, composer, and handle completion internally where doing so gives the transcript a clearer implementation. The architecture does not require one module per visual fragment or entry kind.
 
 Apply orchestration remains at the transcript seam because applying, installing the result, saving, confirming, and resuming a pending application form a client workflow broader than one button or entry.
 
@@ -129,15 +143,15 @@ The pieces module owns listing, pre-open detail, creation, and piece selection. 
 
 ### Conversations
 
-The conversations module owns listing for the active writing surface, creation, switching, and armed deletion. Conversation identity selects the served conversation resource; presentation reset behavior should be explicit rather than an accidental effect of a React key.
+The conversations module owns listing for the active editing surface, creation, switching, and armed deletion. Conversation identity selects the served conversation resource and becomes the selected conversation in that editing view. Switching conversations may create fresh composer, scroll, and disclosure state; switching editing surfaces preserves the conversation pane each surface left behind.
 
 ### Room
 
-The room module owns cast presentation and cast-change intents for the active writing surface. It consumes the roster and cast as served facts and does not maintain desired and confirmed copies of the same server value.
+The room module owns cast presentation and cast-change intents for the active editing surface. It consumes the roster and cast as served facts and does not maintain desired and confirmed copies of the same server value.
 
 ### Settings
 
-The settings module owns general configuration and model assignment within one tabbed surface. It consumes theme, call-site, and runtime information through their resource definitions.
+The settings module owns general configuration and model assignment within one tabbed overlay. It consumes theme, call-site, and runtime information through their resource definitions.
 
 ### Semantic registers
 
@@ -151,43 +165,45 @@ Other cross-feature code should form a module when it has a similarly cohesive r
 application shell
 ├── primary workspace
 │   ├── manuscript chrome
-│   │   └── manuscript surface
-│   └── conversation chrome
-│       └── transcript
-│           ├── entry presentation
-│           ├── response actions
-│           ├── applied-change disclosure
-│           ├── participant activity
-│           └── composer
-│               └── handle picker
-├── reading surface
-└── arriving surface
+│   │   └── manuscript
+│   ├── conversation chrome
+│   │   └── transcript
+│   │       ├── entry presentation
+│   │       ├── response actions
+│   │       ├── applied-change disclosure
+│   │       ├── participant activity
+│   │       └── composer
+│   │           └── handle picker
+│   └── workspace banner
+├── reading
+└── open overlay
     ├── pieces
     ├── conversations
     ├── room
     └── settings
 ```
 
-Chrome belongs to the shell when it changes which feature occupies a half or which secondary surface arrives. Feature modules own the content and controls that act within their product responsibility.
+Chrome belongs to the shell when it changes which feature occupies a half or which overlay opens. Feature modules own the content and controls that act within their product responsibility.
 
 ## State ownership
 
 | State | Owner | Lifetime |
 |---|---|---|
-| Open piece, visible surfaces, arriving surface, writing/reading mode | shell | application session |
+| Open piece, active editing surface, open overlay, writing or reading | shell | application session |
 | Server-owned pieces, conversations, rosters, cast, settings, theme, activity resources | TanStack Query | observed resource cache |
 | Stream connection and connection state | open piece | open piece |
-| Current document text, autosave, save failure, leave blocking | piece session | open piece |
-| TipTap editor and undo history | manuscript | open piece |
+| Three editing-view states: document session and current conversation-pane state | piece session | open piece |
+| TipTap editor behavior and undo history | manuscript | open piece |
 | Draft rendered/source presentation | manuscript | open piece |
-| Transcript scroll and local disclosures | transcript | open conversation or presentation session as appropriate |
 | Dialog fields, selection highlight, armed deletion | owning feature | visible interaction |
 
-Conversation identity is a resource identity first. The architecture keeps one served conversation representation regardless of how local presentation state resets.
+The active editing surface selects one editing-view state for both workspace halves. Conversation identity selects the served conversation resource; only the selected conversation's local pane state is retained within that editing view.
 
 ## Failure presentation
 
-Feature modules own presentation of expected operation failures. The piece session makes save failure available to both manuscript and pieces.
+Feature modules own presentation of expected operation failures, using MUI's ordinary error treatment. The theme states its own `error` palette rather than leaving MUI's default in place, because `error` cannot be removed and components reach for it internally. The piece session makes save failure available to both manuscript and pieces.
+
+A persistent save failure is stated in the workspace's bottom banner, to the right of the word count, one statement per failing document. The banner is present across all three editing surfaces, so a failure on a document the author is not looking at stays visible, which is what naming the document is for.
 
 The application shell contains the error boundary for unexpected render or programming failures; feature modules retain expected request, save, dispatch, and apply failures.
 
@@ -198,13 +214,3 @@ TanStack Query exposes server-resource read states to feature modules, while the
 Pure document conversion, autosave control, event projection, and backend interpretation remain deep test seams. Resource definitions can be tested at their transport/schema interface where valuable. A lightweight assembled-client check should verify provider composition and application boot without asserting MUI's internal markup.
 
 Feature-level UI tests should be reserved for durable interaction behavior that cannot be established more cheaply through a pure module or integration seam.
-
-## Architecture decisions still requiring root-plan review
-
-- active-only or persistent mounting of writing surfaces;
-- router or shell-only navigation state;
-- explicit reset or remount of transcript presentation on conversation change;
-- theme persistence and the source of the initial color scheme;
-- failure palette treatment;
-- the transcript gutter and responsive pane measurements;
-- the placement of persistent save failure.

@@ -14,9 +14,9 @@ The result should feel like one deliberately composed writing environment rather
 
 ## Why a reboot
 
-The current client has accumulated local solutions to general problems: copied server state, manual invalidation, prop-threaded adapters, callback registries, repeated write coordination, hidden mounted surfaces used as state storage, shallow UI infrastructure, and a conversation module carrying many unrelated responsibilities.
+The retired client accumulated local solutions to general problems: copied server state, manual invalidation, prop-threaded adapters, callback registries, repeated write coordination, hidden mounted surfaces used as state storage, shallow UI infrastructure, and a conversation module carrying many unrelated responsibilities.
 
-The current client's local infrastructure makes ordinary UI changes expensive by forcing product work through machinery and documentary rules that grew around the implementation. Replacing the frontend creates an opportunity to remove that infrastructure instead of reproducing it in a new component library.
+That client's local infrastructure made ordinary UI changes expensive by forcing product work through machinery and documentary rules that grew around the implementation. Replacing the frontend creates an opportunity to leave that infrastructure behind instead of reproducing it in a new component library.
 
 ## Design posture
 
@@ -24,7 +24,7 @@ Product concepts are stable; their presentation is open. Existing interactions s
 
 The reboot should prefer established library behavior over locally owned machinery, cohesive modules over generic collections, and one representation of a concept over parallel feature-local models. These are design aims rather than a catalogue of prohibited syntax, directory names, or library options.
 
-The proposed canonical changes are collected in `frontend-reboot-spec.md`. The proposed system structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. There is no separate implementation order: the client is removed and rebuilt in the dependency order the architecture describes, so sequencing is a consequence of that structure rather than a document with decisions of its own.
+The proposed canonical changes are collected in `frontend-reboot-spec.md`. The proposed system structure is described in `frontend-reboot-architecture.md`. The boundary audit supplies supporting evidence in `frontend-reboot-boundary.md`. This proposal does not prescribe implementation order; work can follow discovered dependencies without making a schedule another source of design truth.
 
 ## Scope
 
@@ -32,10 +32,10 @@ The proposed scope is the browser client and the representation changes needed t
 
 ## Desired outcome
 
-The proposal succeeds when future work is mostly about the writing product rather than UI infrastructure; server-owned information has a clear client representation; manuscript and conversation compose as one studio; ordinary controls and responsive behavior follow familiar MUI conventions; specialist editing and semantic typography remain product-owned; and people or coding agents can locate a responsibility without first interpreting a thicket of exceptions.
+The proposal succeeds when future work is mostly about the writing product rather than UI infrastructure; server-owned information has a clear client representation; manuscript and conversation compose as one studio; ordinary controls and layout follow familiar MUI conventions; specialist editing and semantic typography remain product-owned; and people or coding agents can locate a responsibility without first interpreting a thicket of exceptions.
 
 The new frontend should be smaller in the places where the old one implemented general machinery and deeper in the places where the product has genuine behavior. Counts of wrappers, styling blocks, hooks, or module size may prompt inspection, but no count is a success criterion by itself.
 
-## Root-plan review
+## Next step
 
-The documents now separate intent, proposed canonical changes, architecture, evidence, and sequencing. The next discussion should evaluate whether the proposed architecture and implementation order are the best route to this outcome while treating choices already reached in conversation as established planning inputs.
+The design review is complete when the working specification and architecture agree on the client state model and every accepted change has a canonical owner. The accepted product, interaction, interface, and architecture decisions can then move to those owners before implementation begins.
