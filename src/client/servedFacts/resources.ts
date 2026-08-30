@@ -98,17 +98,24 @@ export type DispatchRequestBody =
   | Readonly<{ target: string; message: string; documents: DocumentSnapshot }>
   | Readonly<{ respondingTo: string; clarification?: string; documents: DocumentSnapshot }>
 
+export type DispatchResult = Readonly<{ conversationId: string; actionId: string }>
+
 const dispatchResultSchema = z.object({ conversationId: z.string(), actionId: z.string() }).readonly()
 
-export function useDispatch(
-  pieceId: string,
-  surface: SurfaceId,
-  conversationId: string,
-): UseMutationResult<{ conversationId: string; actionId: string }, RequestFailure, DispatchRequestBody> {
+export function dispatchTo(pieceId: string, surface: SurfaceId, conversationId: string, request: DispatchRequestBody): Promise<DispatchResult> {
+  return post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/dispatch`, dispatchResultSchema, request)
+}
+
+export function useDispatch(pieceId: string, surface: SurfaceId, conversationId: string): UseMutationResult<DispatchResult, RequestFailure, DispatchRequestBody> {
   return useMutation({
-    mutationFn: (request) =>
-      post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/dispatch`, dispatchResultSchema, request),
+    mutationFn: (request) => dispatchTo(pieceId, surface, conversationId, request),
   })
+}
+
+const mintedConversationSchema = z.object({ id: z.string() }).readonly()
+
+export function mintConversation(pieceId: string, surface: SurfaceId): Promise<{ id: string }> {
+  return post(`/pieces/${pieceId}/surfaces/${surface}/conversations`, mintedConversationSchema, null)
 }
 
 export type ApplyRequestBody = Readonly<{ responseId: string; constraint?: string; documents: DocumentSnapshot }>

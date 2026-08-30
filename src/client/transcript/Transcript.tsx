@@ -54,7 +54,7 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
 
   if (conversationId === null) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
         <Typography variant="machine">Nothing has been said here yet.</Typography>
       </Box>
     )
@@ -62,7 +62,7 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
 
   if (conversationRead.status === 'notArrived') {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
         <Typography variant="machine">Loading the conversation…</Typography>
       </Box>
     )
@@ -70,14 +70,14 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
 
   if (conversation === null) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
         <Alert severity="error">The conversation could not be read.</Alert>
       </Box>
     )
   }
 
   return (
-    <Box sx={{ height: '100%', width: '100%', overflowY: 'auto', p: 2 }}>
+    <Box sx={{ flex: 1, minHeight: 0, width: '100%', overflowY: 'auto', p: 2 }}>
       <Stack spacing={2}>
         {conversationRead.status === 'refreshFailed' && (
           <Typography variant="machine">the conversation could not be refreshed — showing what was last read</Typography>
