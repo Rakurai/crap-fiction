@@ -1,6 +1,6 @@
 import { skipToken, useMutation, useQuery, useQueryClient, type UseMutationResult, type UseQueryResult } from '@tanstack/react-query'
 import { z } from 'zod'
-import { applyOutcomeSchema, type ApplyOutcome } from '../../shared/applyViews.js'
+import { applyConfirmationSchema, applyOutcomeSchema, type ApplyConfirmation, type ApplyOutcome } from '../../shared/applyViews.js'
 import { callSiteAssignmentViewSchema, type CallSiteAssignmentView } from '../../shared/callSiteViews.js'
 import { entryConversationViewSchema, type EntryConversationView } from '../../shared/conversationEntryViews.js'
 import { modeSummarySchema, type ModeSummary } from '../../shared/modeViews.js'
@@ -129,6 +129,19 @@ export function useApplyRecommendation(
     mutationFn: (request) =>
       post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply`, applyOutcomeSchema, request),
   })
+}
+
+const pendingReplacementSchema = z.object({ replacement: z.string() }).readonly()
+
+export function fetchPendingReplacement(pieceId: string, surface: SurfaceId, conversationId: string, applicationId: string): Promise<string> {
+  return get(
+    `/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply/${applicationId}`,
+    pendingReplacementSchema,
+  ).then((body) => body.replacement)
+}
+
+export function confirmApply(pieceId: string, surface: SurfaceId, conversationId: string, applicationId: string): Promise<ApplyConfirmation> {
+  return post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply/${applicationId}/confirm`, applyConfirmationSchema, null)
 }
 
 export function useAbandonAction(

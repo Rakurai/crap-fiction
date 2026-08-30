@@ -44,3 +44,8 @@ export function useRoomConnectionStatus(): ConnectionStatus {
   const connection = useContext(RoomStreamContext)
   return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().connection ?? RETRYING_CONNECTION)
 }
+
+export function useSurfaceEditable(surface: SurfaceId): boolean {
+  const activity = useScopeActivity(surface)
+  return !(activity.status === 'busy' && activity.action.kind === 'apply')
+}

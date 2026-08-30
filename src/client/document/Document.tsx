@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Box } from '@mui/material'
 import { SURFACE_IDS, type SurfaceId } from '../../shared/surfaces.js'
+import { useSurfaceEditable } from '../eventStream/RoomStreamProvider.js'
 import { usePieceSession } from '../pieceSession/PieceSessionProvider.js'
 import type { DocumentPresentation } from '../shell/state.js'
 import { ContextEditor } from './ContextEditor.js'
@@ -17,6 +18,11 @@ function Panel({ active, children }: Readonly<{ active: boolean; children: React
 
 export function Document({ activeSurface, presentation }: DocumentProps) {
   const session = usePieceSession()
+  const editableBySurface: Readonly<Record<SurfaceId, boolean>> = {
+    draft: useSurfaceEditable('draft'),
+    storyContext: useSurfaceEditable('storyContext'),
+    authorContext: useSurfaceEditable('authorContext'),
+  }
   if (session === null) return null
 
   return (
@@ -24,9 +30,14 @@ export function Document({ activeSurface, presentation }: DocumentProps) {
       {SURFACE_IDS.map((surface) => (
         <Panel key={surface} active={activeSurface === surface}>
           {surface === 'draft' ? (
-            <Manuscript document={session.surfaces.draft.document} presentation={presentation} />
+            <Manuscript document={session.surfaces.draft.document} presentation={presentation} editable={editableBySurface.draft} />
           ) : (
-            <ContextEditor surface={surface} pieceId={session.pieceId} document={session.surfaces[surface].document} />
+            <ContextEditor
+              surface={surface}
+              pieceId={session.pieceId}
+              document={session.surfaces[surface].document}
+              editable={editableBySurface[surface]}
+            />
           )}
         </Panel>
       ))}

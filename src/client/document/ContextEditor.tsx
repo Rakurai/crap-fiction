@@ -12,15 +12,16 @@ export type ContextEditorProps = Readonly<{
   surface: ContextSurfaceId
   pieceId: string
   document: DocumentSession
+  editable: boolean
 }>
 
-export function ContextEditor({ surface, pieceId, document }: ContextEditorProps) {
+export function ContextEditor({ surface, pieceId, document, editable }: ContextEditorProps) {
   const detail = presentValue(readState(usePieceDetail(pieceId)))
   const surfaceDetail = detail?.surfaces[surface] ?? null
   const text = useSyncExternalStore(document.subscribeText, document.getText)
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflowY: 'auto', p: 2, gap: 1 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflowY: 'auto', p: 2, gap: 1, opacity: editable ? 1 : 0.6 }}>
       {surfaceDetail !== null && (
         <Typography variant="machine">
           {SURFACE_LABEL[surface]} — kept at {surfaceDetail.location}
@@ -31,6 +32,7 @@ export function ContextEditor({ surface, pieceId, document }: ContextEditorProps
         component="textarea"
         value={text}
         onChange={(event) => document.setText(event.target.value)}
+        readOnly={!editable}
         sx={{
           display: 'block',
           flexGrow: 1,

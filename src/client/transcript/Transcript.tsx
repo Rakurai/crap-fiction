@@ -2,9 +2,10 @@ import { useCallback } from 'react'
 import { Alert, Box, Stack, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { useScopeActivity } from '../eventStream/RoomStreamProvider.js'
-import { useConversationPane, useConversationPaneState, useDocumentSnapshot } from '../pieceSession/PieceSessionProvider.js'
+import { useConversationPane, useConversationPaneState, useDocumentSnapshot, usePieceSession } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
-import { useAbandonAction, useApplyRecommendation, useConversation, useDispatch } from '../servedFacts/resources.js'
+import { useConversation, useDispatch } from '../servedFacts/resources.js'
+import { useApplyOrchestration } from './applyOrchestration.js'
 import { useParticipantIdentities } from './identity.js'
 import { DispatchActivity } from './ParticipantActivity.js'
 import { TranscriptEntry, type ResponseActions } from './TranscriptEntry.js'
@@ -20,10 +21,10 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
   const conversation = presentValue(conversationRead)
   const scopeActivity = useScopeActivity(surface)
   const documents = useDocumentSnapshot()
+  const session = usePieceSession()
 
   const dispatchMutation = useDispatch(pieceId, surface, conversationId ?? '')
-  const applyMutation = useApplyRecommendation(pieceId, surface, conversationId ?? '')
-  const abandonMutation = useAbandonAction(pieceId, surface, conversationId ?? '')
+  const applyOrchestration = useApplyOrchestration(pieceId, surface, conversationId ?? '', session?.surfaces[surface].document ?? null)
 
   const toggleDisclosure = useCallback(
     (id: string) => {
@@ -43,11 +44,8 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
       dispatchMutation.mutate(
         clarification === undefined ? { respondingTo: response.id, documents } : { respondingTo: response.id, clarification, documents },
       ),
-    apply: (response, constraint) =>
-      applyMutation.mutate(
-        constraint === undefined ? { responseId: response.id, documents } : { responseId: response.id, constraint, documents },
-      ),
-    abandon: (actionId) => abandonMutation.mutate(actionId),
+    apply: (response, constraint) => applyOrchestration.apply(response, constraint, documents),
+    abandon: (actionId) => applyOrchestration.abandon(actionId),
   }
 
   const applyingAction = scopeActivity.status === 'busy' && scopeActivity.action.kind === 'apply' ? scopeActivity.action : null
@@ -94,6 +92,7 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
             busy={scopeActivity.status === 'busy'}
             applyingResponseId={applyingAction?.sourceEntryId ?? null}
             applyingActionId={applyingAction?.actionId ?? null}
+            holdReason={applyOrchestration.holdReason}
           />
         ))}
         {scopeActivity.status === 'busy' && scopeActivity.action.kind === 'dispatch' && (

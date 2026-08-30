@@ -5,12 +5,16 @@ export type DocumentWrite = (text: string, signal: AbortSignal) => Promise<void>
 
 export type DocumentSettleOutcome = 'settled' | 'failing'
 
+export type ReplacementInstaller = (text: string) => void
+
 export type DocumentSession = Readonly<{
   getText: () => string
   subscribeText: (onChange: () => void) => () => void
   getFailing: () => boolean
   subscribeFailing: (onChange: () => void) => () => void
   setText: (text: string) => void
+  installReplacement: (text: string) => void
+  registerInstaller: (installer: ReplacementInstaller) => () => void
   flush: () => void
   flushAndSettle: () => Promise<DocumentSettleOutcome>
   dispose: () => void
@@ -25,6 +29,7 @@ export function createDocumentSession(initialText: string, write: DocumentWrite,
   let currentAbort: AbortController | null = null
   let currentWrite: Promise<void> | null = null
   let disposed = false
+  let installer: ReplacementInstaller | null = null
 
   function clearDebounce(): void {
     if (debounceTimer === null) return
@@ -68,16 +73,31 @@ export function createDocumentSession(initialText: string, write: DocumentWrite,
     }
   }
 
+  const setText = (value: string): void => {
+    if (disposed) return
+    text.set(value)
+    apply({ type: 'textChanged', text: value })
+  }
+
   return {
     getText: text.get,
     subscribeText: text.subscribe,
     getFailing: failing.get,
     subscribeFailing: failing.subscribe,
 
-    setText: (value) => {
+    setText,
+
+    installReplacement: (value) => {
       if (disposed) return
-      text.set(value)
-      apply({ type: 'textChanged', text: value })
+      if (installer !== null) installer(value)
+      else setText(value)
+    },
+
+    registerInstaller: (candidate) => {
+      installer = candidate
+      return () => {
+        if (installer === candidate) installer = null
+      }
     },
 
     flush: () => apply({ type: 'flushRequested' }),

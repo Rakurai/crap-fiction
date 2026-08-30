@@ -192,6 +192,7 @@ export type ParticipantResponseCardProps = Readonly<{
   onToggleDisclosure: (id: string) => void
   busy: boolean
   applyingActionId: string | null
+  holdReason: string | null
 }>
 
 export function ParticipantResponseCard({
@@ -203,6 +204,7 @@ export function ParticipantResponseCard({
   onToggleDisclosure,
   busy,
   applyingActionId,
+  holdReason,
 }: ParticipantResponseCardProps) {
   const [text, setText] = useState('')
 
@@ -221,7 +223,9 @@ export function ParticipantResponseCard({
         )}
         {applyingActionId !== null ? (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Typography variant="machine">this document is being held while {identity.displayName} applies its recommendation</Typography>
+            <Typography variant="machine">
+              {holdReason ?? `this document is being held while ${identity.displayName} applies its recommendation`}
+            </Typography>
             <Button variant="quiet" size="small" onClick={() => actions.abandon(applyingActionId)}>
               Abandon
             </Button>
@@ -299,6 +303,7 @@ export type TranscriptEntryProps = Readonly<{
   busy: boolean
   applyingResponseId: string | null
   applyingActionId: string | null
+  holdReason: string | null
 }>
 
 export function TranscriptEntry({
@@ -311,6 +316,7 @@ export function TranscriptEntry({
   busy,
   applyingResponseId,
   applyingActionId,
+  holdReason,
 }: TranscriptEntryProps) {
   switch (entry.kind) {
     case 'authorMessage':
@@ -335,6 +341,7 @@ export function TranscriptEntry({
           onToggleDisclosure={onToggleDisclosure}
           busy={busy}
           applyingActionId={applyingResponseId === entry.id ? applyingActionId : null}
+          holdReason={holdReason}
         />
       )
     }
