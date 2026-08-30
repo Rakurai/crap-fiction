@@ -12,3 +12,12 @@ export function participantMarkColor(ordinal: number, scheme: Theme): string {
   const hue = (ordinal * HUE_STEP) % 360
   return `hsl(${hue.toFixed(2)} ${SATURATION}% ${LIGHTNESS[scheme]}%)`
 }
+
+/**
+ * A participant the roster gives no ordinal — the Story Editor — takes this instead: the same
+ * per-scheme lightness as every seeded mark, with no hue at all, so it never lands on a colour a
+ * specialist's own ordinal could have produced.
+ */
+export function unseededParticipantMarkColor(scheme: Theme): string {
+  return `hsl(0 0% ${LIGHTNESS[scheme]}%)`
+}

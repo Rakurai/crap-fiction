@@ -1,3 +1,4 @@
+import { RoomStreamProvider } from './eventStream/RoomStreamProvider.js'
 import { PieceSessionProvider } from './pieceSession/PieceSessionProvider.js'
 import { Shell } from './shell/Shell.js'
 import { useShellState } from './shell/state.js'
@@ -10,9 +11,11 @@ export function App() {
 
   return (
     <WorkspaceGate>
-      <PieceSessionProvider pieceId={shell.openPieceId}>
-        <Shell shell={shell} />
-      </PieceSessionProvider>
+      <RoomStreamProvider pieceId={shell.openPieceId}>
+        <PieceSessionProvider pieceId={shell.openPieceId}>
+          <Shell shell={shell} />
+        </PieceSessionProvider>
+      </RoomStreamProvider>
     </WorkspaceGate>
   )
 }
