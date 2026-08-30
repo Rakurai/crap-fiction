@@ -1,6 +1,6 @@
 # Frontend Reboot — Proposal
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative for the kinds of truth they own. This proposal explains the intent of the frontend rebuild; its accepted decisions are reflected in those canonical owners.
+**Noncanonical. This document governs nothing**, and the canonical documents remain authoritative for the kinds of truth they own. This proposal explains the intent of the frontend rebuild; its accepted decisions are reflected in those canonical owners.
 
 ## Proposal
 

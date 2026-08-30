@@ -88,12 +88,16 @@ one thing a piece switch may never discard.
 ## Dependency roster
 
 **A capability named here is supplied by its package rather than reimplemented by this repository.** A
-dependency earns its place by removing machinery the project would otherwise own and maintain.
+dependency earns its place by removing work the project would otherwise own, whether that is machinery
+it would have to write or boilerplate it would have to repeat.
 
 | Capability | Package |
 |---|---|
 | Language, client framework, client build | `typescript`, `react`, `vite` |
-| Interface components and theme | `@mui/material` |
+| Interface components and theme | `@mui/material`, styled by `@emotion/react` and `@emotion/styled` |
+| Interface icons | `@mui/icons-material` |
+| Menu, popover and popup open state | `material-ui-popup-state` |
+| Boundary for an unexpected render failure | `react-error-boundary` |
 | Client server-state lifecycle | `@tanstack/react-query` |
 | HTTP server and routing | `hono`, served by `@hono/vite-dev-server` |
 | Request body validation at a route | `@hono/zod-validator` |
@@ -139,7 +143,9 @@ general enough to cover them would arrive with a policy the product has not chos
 **Material UI supplies ordinary interface vocabulary and primitive appearance.** Its theme owns
 palette, color schemes, typography, density, spacing, radii and component defaults. Product styling
 remains for the editor content, workspace composition and the prose, author, participant and machine
-registers. The client does not build a parallel general-purpose design system over it.
+registers. The client does not build a parallel general-purpose design system over it. The four
+semantic registers are theme typography variants and the weights a control can carry are theme
+component variants, so each is a value in the theme rather than a wrapper component over it.
 
 **The typefaces are files in this repository**, subset and served by the app: a runtime network fetch
 is ruled out, and a font that fails to arrive leaves the author on a face nobody chose. Only the
@@ -209,6 +215,7 @@ composition root
 │   ├── story-context view state
 │   └── author-context view state
 └── shell
+    ├── workspace bar
     ├── document
     │   ├── manuscript
     │   └── context editor
@@ -237,7 +244,9 @@ context. Each holds current document text and save coordination together with th
 and that conversation's composer, transcript position and local disclosures. Switching surfaces keeps
 those three states; selecting another conversation replaces only that view's conversation-pane state.
 There is no presentation-state registry for conversations that are not selected. Opening another piece
-recreates the entire piece session.
+recreates the entire piece session. Document text is not a rendered context value: the session exposes
+it through a subscription, so typing re-renders neither the bar, the banner, nor the transcript beside
+it.
 
 **Feature modules own cohesive product responsibilities.** Document owns the workspace's editing half.
 Its manuscript implementation owns TipTap, Markdown conversion, rendered and source presentation,
@@ -247,6 +256,10 @@ activity, composer behavior, handle completion and Apply orchestration. Pieces, 
 settings each own the corresponding overlay behavior. The shell owns chrome that selects a surface or
 opens an overlay. Internal module decomposition follows behavior rather than entry variants or a
 required file shape.
+
+**The prose measure follows the width of the document's own region rather than the window's**, written
+as container queries rather than viewport breakpoints. The measure is then correct under any
+arrangement of the workspace, and a later arrangement is a change to composition alone.
 
 **Each server-owned resource has a stable Query key, transport operation and runtime schema.** Feature
 modules use Query results directly and project a smaller product result only where their presentation

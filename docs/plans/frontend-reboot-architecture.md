@@ -1,12 +1,10 @@
 # Frontend Reboot — Client Architecture
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This document is the implementation-facing map of the client system described by the canonical architecture.
+**Noncanonical. This document governs nothing**, and the canonical documents remain authoritative. It is the implementation-facing map of the client system described by the canonical architecture.
 
 ## Design objective
 
 The client should be a composition of deep product modules over Material UI, TipTap, and TanStack Query. Commodity dependencies should remain visible enough to use idiomatically while product-specific behavior is concentrated behind interfaces named in the language of the studio.
-
-The architecture addresses five structural pressures found in the retired client: server state forked into local models, presentation state with the wrong lifetime, feature coordination implemented through prop callbacks, generic UI infrastructure duplicating library behavior, and product modules combining several independent responsibilities.
 
 ## System shape
 
@@ -44,9 +42,11 @@ The composition root creates the MUI theme, transport, TanStack Query client, an
 
 The composition root does not define product resources or feature behavior. Providers make the chosen dependencies available without threading adapter bundles through the component tree.
 
-The server stores the author's interface-theme choice. MUI's browser persistence and system-derived choice are disabled so they do not create a second preference; the settings control writes the new value and installs the confirmed result. The theme starts dark, which is the specified meaning of an absent served choice, and applies a served light choice when it arrives.
+The server stores the author's interface-theme choice. The theme carries a colour scheme for each of light and dark selected through a CSS-variable class, with dark as the default scheme and the default mounted mode; the provider is given no storage manager, so the browser holds no second preference. The settings control writes the new value and installs the confirmed result.
 
 A failed theme read does not prevent the shell from painting. Dark remains the explicitly provisional boot presentation, and the read failure remains visible through the ordinary served-fact lifecycle rather than being presented as a confirmed preference.
+
+Scheme-dependent styling branches through the theme's own scheme-aware style helper, and the editor-content and register CSS reference theme CSS variables, so changing scheme restyles the editor without re-rendering it. The `@font-face` declarations belong to the theme's baseline overrides, and each participant mark's colours are augmented from its seed so both schemes get a contrasting pair without a hand-written list. Density is per-component default props together with the spacing scale.
 
 ## Shell
 
@@ -60,13 +60,15 @@ One value represents the mutually exclusive pieces, conversations, room, and set
 
 The shell owns whether the application is reading, and the document module supplies the rendered draft that reading presents.
 
-The desktop workspace keeps the conversation at a readable column width and gives the manuscript the remainder. No alternate small-screen product composition is specified. The implementation may use ordinary MUI layout behavior to preserve the two-pane composition, and the conversation width and prose measure remain theme values that can be calibrated against real responses.
+The shell places one bar across the top of the workspace and one banner across its bottom; the document and transcript halves exist only between them. The switcher at the bar's centre governs everything below it, which is why the bar spans rather than belonging to either half.
+
+The desktop workspace keeps the conversation at a readable column width and gives the manuscript the remainder. No alternate small-screen product composition is specified, and none is built. Two choices keep that path open at no cost: the conversation is a permanent right `Drawer`, whose variant a later arrangement changes, and the prose measure is written as a container query against the document's own region rather than a viewport breakpoint. The conversation width and prose measure remain theme values that can be calibrated against real responses.
 
 ## Served-fact architecture
 
 TanStack Query is the served-fact store; the application does not place a second owned cache or state machine around it.
 
-A resource definition is an ordinary TanStack Query options factory pairing a stable query key with the transport operation and runtime schema for one server-owned value. Feature modules use those definitions directly and project a smaller product-shaped result only where their presentation benefits from one. Leaf presentation components may receive typed values and callbacks without turning that separation into an application-wide wrapper layer.
+A resource definition is an ordinary TanStack Query options factory pairing a stable query key with the transport operation and runtime schema for one server-owned value, so the key and the function stay paired at every observation, invalidation and write-back site. Feature modules use those definitions directly and project a smaller product-shaped result through a per-observer projection only where their presentation benefits from one. A resource that needs an identity the client does not yet have is held by passing a skip token in place of the query function, so no query function asserts an identity it was not given. Leaf presentation components may receive typed values and callbacks without turning that separation into an application-wide wrapper layer.
 
 ```text
 feature module / query hook
@@ -81,9 +83,11 @@ write result / event stream
 
 Resource definitions provide one place for identity and validation without hiding TanStack Query's useful lifecycle or reproducing its reducer. Query keys carry the piece or conversation identity needed for targeted invalidation.
 
-The Query client disables automatic read retries at the composition root with `retry: false`. This application has no defined read-recovery strategy that benefits from repeating a failed request before exposing the failure, so it does not inherit TanStack Query's retry default. A resource that later needs retries requires an explicit reliability decision at the resource's owning module. Other refresh and revalidation settings follow the freshness needs of the resource rather than a blanket application policy. Query results supply the request lifecycle without a second client-owned state machine.
+The Query client disables automatic read retries at the composition root with `retry: false`, because no read here has a recovery strategy that benefits from repeating the request before exposing the failure. A resource that later needs retries requires an explicit reliability decision at the resource's owning module. Other refresh and revalidation settings follow the freshness needs of the resource rather than a blanket application policy. Query results supply the request lifecycle without a second client-owned state machine.
 
-Features use TanStack Query's result directly to distinguish not arrived, failed first read, present value, and a failed refresh that leaves a value available wherever those states affect presentation. There is no universal `Fact<T>` wrapper. Background fetching is presented only where it gains product meaning.
+Features use TanStack Query's result directly to distinguish not arrived, failed first read, present value, and a failed refresh that leaves a value available wherever those states affect presentation. The result already carries flags separating a failed first read from a failed refresh over a value still present, so nothing re-derives them. There is no universal `Fact<T>` wrapper. Background fetching is presented only where it gains product meaning.
+
+Queries do not throw their errors to a boundary. Expected request failures belong to the feature module that made the request, and the shell's boundary is for unexpected render failures.
 
 Resource freshness follows the channel that can change the fact. Conversation entries, activity, cast, and other facts changed through the running application refresh through confirmed writes, events, and reconnect snapshots rather than focus or mount revalidation. Piece listings, clean piece detail, theme, and model assignments may revalidate when observed because their routes reread author-editable files. Runtime model status revalidates when its settings view is observed. Workspace selection, modes, participant definitions, and call-site descriptions are server-startup state, so browser revalidation cannot discover external changes to them. A refreshed piece detail never replaces client-owned unsaved document text.
 
@@ -121,6 +125,8 @@ Selecting another conversation replaces the conversation-pane portion of that vi
 
 Piece-session document state is not a served-fact cache because it represents work the server has not yet accepted. Document and transcript behavior remains in those feature modules; the session supplies the shared lifetime needed to switch views without losing their state.
 
+Document text reaches its observers through a subscription rather than as a rendered context value. The mechanism is the editor itself: TipTap holds the text uncontrolled and the session exposes a getter and a change subscription, so the text is never a value the tree re-renders on and the banner's word count subscribes to a derived number.
+
 The document module's manuscript implementation owns TipTap and any editor state needed to preserve history across editing-surface switches. Those vendor values remain behind the document interface rather than becoming fields of the piece-session state object.
 
 Whether inactive editing surfaces remain mounted or the document module detaches and later reattaches an editor is an implementation choice. The architecture requires only that switching the active surface preserves the three views' state.
@@ -137,7 +143,11 @@ The document module owns the workspace's editing half. Its manuscript implementa
 
 The transcript module owns conversation-column composition, entry presentation, response actions, participant activity, composer behavior, handle completion, scroll and focus-return behavior, and apply orchestration. It reads and writes the active editing view's conversation-pane state from the piece session.
 
-The transcript may separate response actions, applied-change disclosure, participant flight, composer, and handle completion internally where doing so gives the transcript a clearer implementation. The architecture does not require one module per visual fragment or entry kind.
+The transcript may separate response actions, applied-change disclosure, participant flight, composer, and handle completion internally where doing so gives the transcript a clearer implementation.
+
+An applied change discloses through a plain collapsing region under the transcript's own affordance, because the line the author reads to decide is prose rather than a control header.
+
+The handle picker is a popper over a menu list, with the transcript owning caret detection, filtering and insertion. The list is chosen for the keyboard behaviour the author needs mid-sentence, which means the composer's Enter rules are written as explicit interception while the picker is open. Whether the composer becomes a minimal editor instance to reuse a suggestion plugin is a prototype question, not a decision; either way it sends plain text.
 
 Apply orchestration remains at the transcript seam because applying, installing the result, saving, confirming, and resuming a pending application form a client workflow broader than one button or entry.
 
@@ -161,25 +171,24 @@ The settings module owns general configuration and model assignment within one t
 
 The semantic-register module owns the presentation shared by prose, author, participant, and machine content and the presentation of participant identity. This is a product concept shared across features, not a general UI collection.
 
-Other cross-feature code should form a module when it has a similarly cohesive responsibility. A `shared`, `ui`, or `utils` directory is neither required nor prohibited; the relevant test is whether its contents present an intelligible interface.
+Other cross-feature code should form a module when it has a similarly cohesive responsibility, the test being whether its contents present an intelligible interface.
 
 ## Component relationships
 
 ```text
 application shell
 ├── primary workspace
-│   ├── document chrome
-│   │   └── document
-│   │       ├── manuscript
-│   │       └── context editor
-│   ├── conversation chrome
-│   │   └── transcript
-│   │       ├── entry presentation
-│   │       ├── response actions
-│   │       ├── applied-change disclosure
-│   │       ├── participant activity
-│   │       └── composer
-│   │           └── handle picker
+│   ├── workspace bar
+│   ├── document
+│   │   ├── manuscript
+│   │   └── context editor
+│   ├── transcript
+│   │   ├── entry presentation
+│   │   ├── response actions
+│   │   ├── applied-change disclosure
+│   │   ├── participant activity
+│   │   └── composer
+│   │       └── handle picker
 │   └── workspace banner
 ├── reading
 └── open overlay
@@ -189,7 +198,7 @@ application shell
     └── settings
 ```
 
-Chrome belongs to the shell when it changes which feature occupies a half or which overlay opens. Feature modules own the content and controls that act within their product responsibility.
+The bar and the banner belong to the shell because they span the workspace and because what the bar changes is which surface both halves present. Feature modules own the content and the controls that act within their own responsibility, including the presentations the document offers from the banner's document region.
 
 ## State ownership
 
@@ -214,8 +223,6 @@ A persistent save failure is stated in the workspace's bottom banner, to the rig
 Reading mode carries the same unresolved failures as a quiet fixed statement beside its exit affordance, without restoring the rest of the workspace banner.
 
 The application shell contains the error boundary for unexpected render or programming failures; feature modules retain expected request, save, dispatch, and apply failures.
-
-TanStack Query exposes server-resource read states to feature modules, while the open piece exposes stream connection state.
 
 ## Testing seams
 

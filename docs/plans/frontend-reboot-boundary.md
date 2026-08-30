@@ -1,6 +1,6 @@
 # Frontend Reboot — Boundary Audit
 
-**Noncanonical. This document governs nothing.** `docs/VISION.md`, `CONTEXT.md`, `docs/PRD.md`, `docs/UX_DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/INTERFACES.md`, `docs/CODING_STANDARDS.md`, and `docs/DOC_STANDARDS.md` remain authoritative. This audit records code evidence behind ownership corrections; it does not prescribe wire representation or client structure.
+**Noncanonical. This document governs nothing**, and the canonical documents remain authoritative. This audit records code evidence behind ownership corrections; it does not prescribe wire representation or client structure.
 
 ## Audit result
 

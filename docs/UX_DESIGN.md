@@ -12,8 +12,13 @@ Where this document describes a required interaction, it is settling its present
 
 Whichever editing surface the author is on, its document is where the work is and its transcript is where the work gets decided, so both halves are permanent and adjacent. The pair occupies the window. The transcript stays wide enough to read the room's sentences in and is capped there; the surplus goes to the document, whose prose measure is centred in the space it has. Everything else arrives as an overlay when the author reaches for it and leaves without disturbing the workspace.
 
-A quiet banner along the bottom of the workspace carries the story's word count and names any document
-whose save is failing. It remains the same across all three editing surfaces.
+One bar spans the top of the whole workspace: opening a piece or settings and entering reading at one
+end, the room and its conversations at the other, the surface switcher at the centre governing
+everything below it. The division into two halves begins beneath that bar.
+
+A quiet banner spans the bottom of the workspace. Beneath the document it names the open piece and its
+word count, and offers the rendered and source presentations at its trailing edge. It names any
+document whose save is failing, and it is present on all three editing surfaces.
 
 **One piece is open at a time.** Opening another replaces both halves with nothing to save
 and nothing to confirm, because everything the author has written is already on disk. The
@@ -64,8 +69,7 @@ because reading must not turn a persistent failure into silence.
 
 ## The story context surface
 
-**A short switcher, beside the manuscript's other one-action controls, moves between the draft,
-story context and author context.** One active editing surface selects both workspace halves.
+**The switcher at the centre of that bar moves between the draft, story context and author context.** One active editing surface selects both workspace halves.
 Switching preserves each surface's text, editor history, selected conversation, composer, transcript
 position, disclosures and ongoing work. It does not preserve separate presentation state for every
 conversation in a listing. Activity on one surface is never a reason another cannot start its own.

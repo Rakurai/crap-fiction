@@ -21,6 +21,19 @@ Specificity belongs in the document that owns the question. The specification ca
 
 Planning documents govern no durable product or engineering truth. Accepted decisions are reflected in the canonical document that owns them before code relies on them. Once their work is complete, spent planning documents are deleted rather than retained as parallel authority.
 
+Supporting evidence is not a staging area whose contents graduate. A finding moves into the specification when the author settles it, one at a time; everything else stays in the evidence document that produced it.
+
+## Failure modes
+
+These documents were rewritten once because every statement had come to read as a requirement. The mechanism that produced that is still available to anyone editing them, so it is named here as tests to apply to a change rather than as principles to agree with.
+
+- **A rejection nobody proposed.** If no one asked for the alternative, the sentence rejecting it is deleted. A rejection carrying a real constraint belongs beside the survey that produced it, not in the specification.
+- **A finding written as a decision.** A review or audit produces findings. Imperative voice in the specification means the author settled the question, not that a reviewer recommended an answer; an unsettled finding stays a question where it was found.
+- **A library mechanism standing in for a requirement.** The specification states what the studio must do. It names an API only where the requirement cannot be stated without one, and only where that API was verified rather than recalled.
+- **A hedge promoted to a ranking.** No adjective in the specification orders the work. Risk, difficulty and sequence belong to the implementation plan, which derives them from dependencies.
+- **A pass that only grows.** Each revision should be able to delete something. A pass that adds without removing is that mechanism running again, whatever its additions are worth individually.
+- **A sentence nobody needs.** Every statement should change what a reader does. Background nobody asked for, a version history behind a chosen version, a rationale for something obvious, or a restatement of a neighbouring document is deleted, however true it is.
+
 ## Frontend reboot roadmap
 
 ```text
