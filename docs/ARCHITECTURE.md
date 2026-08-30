@@ -87,10 +87,8 @@ one thing a piece switch may never discard.
 
 ## Dependency roster
 
-**A capability named here is not implemented in this repository.** A dependency earns its place by one
-test: it removes machinery this project would otherwise own and maintain. The roster is explicit
-because the alternative is not a smaller dependency list — it is the same capability written badly
-here, arrived at one plausible decision at a time.
+**A capability named here is supplied by its package rather than reimplemented by this repository.** A
+dependency earns its place by removing machinery the project would otherwise own and maintain.
 
 | Capability | Package |
 |---|---|
@@ -201,6 +199,29 @@ no marks for recommendations, no decorations tracking responses.
 
 ## Client composition
 
+```text
+composition root
+├── Material UI theme
+├── transport
+├── TanStack Query client
+├── piece session
+│   ├── draft view state
+│   ├── story-context view state
+│   └── author-context view state
+└── shell
+    ├── document
+    │   ├── manuscript
+    │   └── context editor
+    ├── transcript
+    ├── workspace banner
+    ├── reading
+    └── open overlay
+        ├── pieces
+        ├── conversations
+        ├── room
+        └── settings
+```
+
 **The composition root creates the Material UI theme, transport, TanStack Query client and piece
 session before mounting the shell.** It selects concrete dependencies and defines no product resource
 or feature behavior.
@@ -227,11 +248,13 @@ settings each own the corresponding overlay behavior. The shell owns chrome that
 opens an overlay. Internal module decomposition follows behavior rather than entry variants or a
 required file shape.
 
-**Resource definitions are ordinary TanStack Query options factories** pairing a stable key with a
-transport operation and runtime schema. Feature modules use Query results directly and project a
-smaller product result only where presentation benefits. Automatic read retry is disabled globally so
-a first failure is exposed immediately; a resource gains retry only through an explicit reliability
-decision. Confirmed writes install their authoritative result or invalidate the affected keys.
+**Each server-owned resource has a stable Query key, transport operation and runtime schema.** Feature
+modules use Query results directly and project a smaller product result only where their presentation
+benefits. Presentation can distinguish a value that has not arrived, a failed first read, a present
+value, and a failed refresh that leaves the prior value available; background fetching is not projected
+unless it has product meaning. Automatic read retry is disabled globally so a first failure is exposed
+immediately; a resource gains retry only through an explicit reliability decision. Confirmed writes
+install their authoritative result or invalidate the affected keys.
 
 **Resource freshness follows the channel that changes the fact.** Conversation entries, activity,
 cast and other values changed through the running application refresh through confirmed writes, events
@@ -242,8 +265,8 @@ participant definitions and call-site descriptions are server-startup state, so 
 cannot discover external changes to them. A refreshed piece detail never replaces unsaved client text.
 
 **The server stores the author's theme choice and the client does not create another persisted
-preference.** Dark is the boot presentation and the meaning of no saved choice; a served light choice
-replaces it. A failed theme read remains visible but does not prevent the shell from painting.
+preference.** The served resource distinguishes no saved choice from an explicit choice, and confirmed
+writes update that resource.
 
 ## Persistence
 
@@ -1146,7 +1169,7 @@ the author maintains.
 
 **The base image is pinned, and carries full ICU.** A pinned major and digest means the studio the author
 writes in tomorrow is the one they wrote in today, and a runtime built with a trimmed ICU would have the
-roster's segmenter count a story's length wrong in whatever language it was not built for. The lockfile is
+roster's segmenter count a story's words wrong in whatever language it was not built for. The lockfile is
 committed and is what the image installs from, so the build is the lockfile's and not the registry's mood.
 
 **Installed dependencies live in a named volume over the application directory**, so the tree the container

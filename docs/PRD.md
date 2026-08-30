@@ -186,6 +186,11 @@ what it finally said are three different things: the first is known when the act
 second only once the room has submitted the call and thereafter only as the model layer reports it,
 and the third only once a response is complete.
 
+**Know when the room's state is unknown** — *per session*
+*Done when:* the studio never presents an unconfirmed room as idle, response-triggering actions remain
+unavailable until trustworthy activity arrives, a temporary loss during recovery is not presented as a
+terminal failure, and a loss that cannot recover is stated rather than silently showing stale state.
+
 **Stop waiting** — *per session*
 *Done when:* abandoning is available for as long as any model operation is in flight — a dispatch or
 an application — targets the specific operation the author is looking at rather than whichever the
@@ -261,24 +266,28 @@ applying a recommendation made there.
 *Done when:* both contexts are human-readable and hand-editable on disk, and an external edit is read
 the next time that document is loaded without replacing unsaved text already held by the studio.
 
+**Move among the work without losing place** — *per session*
+*Done when:* switching among draft, story context and author context changes the document and
+conversation together while preserving each surface's text, editor history, selected conversation,
+composer state and work in flight, and one surface can begin room work while another surface's work
+remains in flight.
+
 **Work on the story context the way they work on the draft** — *per session*
 The author revises premise, intent, voice and established facts in a surface of its own, with
 the room's help, rather than only by hand-editing the file.
-*Done when:* story context has its own editing surface, conversations, cast and activity;
-switching between it and the draft changes nothing about either surface's own text, editor
-history, selected conversation, composer state or in-flight work; and a failed save on one surface's
-document is stated there and blocks leaving the piece without hiding or overriding whatever the
-other surface's own save state is.
+*Done when:* story context has its own editing surface, conversations, cast, activity and reference
+schema; and a failed save on one surface's document remains stated and blocks leaving the piece without
+hiding or overriding another surface's save state.
 
 **Work on author context from any piece** — *per session*
 Preferences that generalize across every story belong to the author, not to whichever piece
 happens to be open, so revising them reaches the same place and the same standing conversation
 no matter which piece the author started from.
 *Done when:* author context has its own editing surface, conversations, cast and activity, reached
-identically from every piece; its durable document and conversations remain global without requiring
-client presentation state to survive a piece switch or reload; and a call made there reads the currently
-open piece's draft, story context and mode, so leaving that piece is what ends work in progress there,
-the same as it ends work on the draft or the story context.
+identically from every piece and carries its own reference schema; its durable document and conversations
+remain global without requiring client presentation state to survive a piece switch or reload; and a
+call made there reads the currently open piece's draft, story context and mode, so leaving that piece is
+what ends work in progress there, the same as it ends work on the draft or the story context.
 
 ### Conversations
 
@@ -330,13 +339,17 @@ that model runs on the author's machine or is hosted, so weak differentiation is
 design problem rather than confounded with model capacity, and applying a recommendation is
 assigned a model the same way without entering the room.
 
+**Choose the studio's appearance** — *rare*
+*Done when:* the studio is dark until the author explicitly chooses light, the choice persists across
+sessions, and no third setting delegates the choice to the operating system.
+
 ## Out of scope
 
 Stated so they do not get built.
 
 **Volume metrics presented as content** — tokens, words, or any measure of how much a
 participant produced. Operational state is the opposite case and is required: elapsed time,
-participant state, how many participants have settled, model identity, story length. The line
+participant state, how many participants have settled, model identity, story word count. The line
 is whether the number describes the machine or the work.
 
 **Automatic changes to durable context.** No inference from discussion, no silent revision, no

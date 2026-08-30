@@ -12,13 +12,16 @@ Where this document describes a required interaction, it is settling its present
 
 Whichever editing surface the author is on, its document is where the work is and its transcript is where the work gets decided, so both halves are permanent and adjacent. The pair occupies the window. The transcript stays wide enough to read the room's sentences in and is capped there; the surplus goes to the document, whose prose measure is centred in the space it has. Everything else arrives as an overlay when the author reaches for it and leaves without disturbing the workspace.
 
-A quiet banner along the bottom of the workspace carries the story's length and names any document
+A quiet banner along the bottom of the workspace carries the story's word count and names any document
 whose save is failing. It remains the same across all three editing surfaces.
 
 **One piece is open at a time.** Opening another replaces both halves with nothing to save
 and nothing to confirm, because everything the author has written is already on disk. The
 exception is the one state where it isn't: while a save is failing, leaving is refused rather
 than confirmed, and the refusal names the document it is protecting.
+
+Opening a piece selects its draft. Where the draft has conversations, its most recent one is selected;
+otherwise the transcript is empty and ready for the author to begin the first.
 
 The interface's job, in priority order: get prose written and revised; make the room's
 readings legible and actionable; keep the cost of consulting the room low enough that the
@@ -80,8 +83,8 @@ which file it is holding makes that a guess.
 
 **The same durable material, reached identically from every piece.** The author-context document and
 conversations are global rather than belonging to the open piece. No presentation continuity is
-required across a piece switch or reload; the view may be recreated like the other editing surfaces.
-It is set as plain text with its own reference schema, exactly as story context is.
+required across a piece switch or reload. It is set as plain text with its own reference schema, exactly
+as story context is.
 
 **Only its cast and its evidence are the open piece's own.** Which specialists are enabled here is
 stored per piece, and a call made here reads the currently open piece's draft, story context and
@@ -267,11 +270,12 @@ was abandoned the document is unchanged, so applying remains exactly as it was.
 ## An operation in flight
 
 A conversation action — sending a message, replying to a response, or asking one for a concrete
-change — and an application each take real model time, and cannot overlap each other.
+change — and an application each take real model time, and cannot overlap within one editing surface.
+Another editing surface remains free to start its own operation.
 
-**Controls that would start a second conversation action or application are disabled while one
-runs.** Nothing queues, warns, or asks the author to choose between the operation they started and
-the one they are starting, because the state that would need explaining is unreachable.
+**Controls that would start a second conversation action or application in that editing surface are
+disabled while one runs.** Nothing queues, warns, or asks the author to choose between the operation
+they started and the one they are starting, because the state that would need explaining is unreachable.
 
 **Abandoning is available for as long as an operation is in flight**, and is not offered once it
 has produced its result — a response that landed is not one the author is abandoning.
@@ -359,7 +363,7 @@ already made, which is the opposite of what asking was for.
 Kinds of text are on screen and the author must feel which is which without thinking about it:
 **the prose**, which is the work; **what the room says about the work**; **the author's own words
 to the room**, which are neither the work nor the room's reading of it; and **facts about the
-machine** — participant state, elapsed time, counts, the story's length, model identity.
+machine** — participant state, elapsed time, counts, the story's word count, model identity.
 
 Keeping the last in its own register is what stops an operational number from reading as content,
 and is why a length the author glances at constantly does not read as a score. It is the quietest of
@@ -498,6 +502,9 @@ failure.
 is unavailable, and it says so where the author would otherwise address it. The ordinary cause is a
 program on this machine that is not running, which is recoverable in a way a network problem is not,
 so nothing about this state may compose as one.
+
+**Could not read the saved appearance.** The studio still opens in dark presentation, and Settings
+states that the saved choice could not be loaded rather than presenting dark as a confirmed preference.
 
 **One participant unavailable and the rest of the room fine.** Its failure is stated as its own and
 the conversation settles around it; nothing presents the room as down, because it isn't.

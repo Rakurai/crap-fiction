@@ -44,11 +44,11 @@ GET    /pieces                                     title, mode, length, modified
 POST   /pieces                                     title and the chosen mode; enables that mode's
                                                    default cast
 GET    /pieces/:id                                 metadata, the Story Editor and the interviewer with
-                                                   its invocation, plus each of the three surfaces'
-                                                   text, the file that text lives in, its reference
-                                                   schema where it has one, conversation index with
-                                                   server-derived opening words, current conversation,
-                                                   roster with enabled state, and addressable participants
+                                                   its invocation; for each editing surface, its text,
+                                                   file, conversation index with server-derived opening
+                                                   words, current conversation, roster with enabled
+                                                   state, and complete addressable participant set; the
+                                                   two context surfaces also carry a reference schema
 PATCH  /pieces/:id                                 title, one surface's enabled cast
 PUT    /pieces/:id/surfaces/:surface/document      the draft's, the story context's or the
                                                    author context's whole text
