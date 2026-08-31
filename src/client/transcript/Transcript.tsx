@@ -1,5 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Alert, Box, Button, Stack, Typography } from '@mui/material'
+import type { ApplicationEntryView, ConversationEntryView } from '../../shared/conversationEntryViews.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { useRoomHold, useScopeActivity, useScopeFailures, useScopeFinish } from '../eventStream/RoomStreamProvider.js'
 import type { ConversationPane } from '../pieceSession/conversationPane.js'
@@ -10,6 +11,14 @@ import { useApplyOrchestration } from './applyOrchestration.js'
 import { useParticipantIdentities } from './identity.js'
 import { ApplyStatement, DispatchActivity, RoomTrouble } from './ParticipantActivity.js'
 import { TranscriptEntry, type ResponseActions } from './TranscriptEntry.js'
+
+function applicationsByResponse(entries: readonly ConversationEntryView[]): ReadonlyMap<string, ApplicationEntryView> {
+  const byResponse = new Map<string, ApplicationEntryView>()
+  for (const entry of entries) {
+    if (entry.kind === 'application' && !byResponse.has(entry.responseId)) byResponse.set(entry.responseId, entry)
+  }
+  return byResponse
+}
 
 export type TranscriptProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
@@ -55,6 +64,8 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
     },
     [pane],
   )
+
+  const applicationByResponse = useMemo(() => applicationsByResponse(conversation?.entries ?? []), [conversation?.entries])
 
   const actions: ResponseActions = {
     focusComposerFor: (identity) => pane.setComposerText(identity === null ? '' : `@${identity.handle} `),
@@ -104,7 +115,7 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
           <TranscriptEntry
             key={entry.id}
             entry={entry}
-            entries={conversation.entries}
+            application={applicationByResponse.get(entry.id)}
             identities={identities}
             actions={actions}
             disclosed={paneState.disclosures}

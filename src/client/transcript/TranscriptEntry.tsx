@@ -300,7 +300,7 @@ export function ParticipantResponseCard({
 
 export type TranscriptEntryProps = Readonly<{
   entry: ConversationEntryView
-  entries: readonly ConversationEntryView[]
+  application: ApplicationEntryView | undefined
   identities: ReadonlyMap<string, ParticipantIdentity>
   actions: ResponseActions
   disclosed: ReadonlySet<string>
@@ -313,7 +313,7 @@ export type TranscriptEntryProps = Readonly<{
 
 export function TranscriptEntry({
   entry,
-  entries,
+  application,
   identities,
   actions,
   disclosed,
@@ -330,10 +330,7 @@ export function TranscriptEntry({
       return (
         <ConcreteChangeRequestLine target={entry.target} clarification={entry.clarification} atMs={entry.atMs} identities={identities} />
       )
-    case 'participantResponse': {
-      const application = entries.find(
-        (candidate): candidate is ApplicationEntryView => candidate.kind === 'application' && candidate.responseId === entry.id,
-      )
+    case 'participantResponse':
       return (
         <ParticipantResponseCard
           entry={entry}
@@ -347,7 +344,6 @@ export function TranscriptEntry({
           holdReason={holdReason}
         />
       )
-    }
     case 'participantNoComment':
       return <NoCommentLine identity={identities.get(entry.participantId) ?? null} />
     case 'participantFailure':
