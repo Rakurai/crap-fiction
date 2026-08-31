@@ -9,7 +9,8 @@ const ERROR_DARK = '#e5484d'
 const ERROR_LIGHT = '#c4262b'
 
 export const theme = createTheme({
-  cssVariables: true,
+  cssVariables: { colorSchemeSelector: 'data-mui-color-scheme' },
+  defaultColorScheme: 'dark',
   colorSchemes: {
     dark: {
       palette: {

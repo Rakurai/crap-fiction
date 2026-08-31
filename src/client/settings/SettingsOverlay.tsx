@@ -22,7 +22,7 @@ import type { RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { Theme } from '../../shared/theme.js'
 import { presentValue, readState, type ReadState } from '../servedFacts/readState.js'
 import { useAssignModel, useCallSites, useModels } from '../servedFacts/resources.js'
-import { useServerColorScheme } from '../theme/useServerColorScheme.js'
+import { useServerColorScheme, type ServerColorScheme } from '../theme/useServerColorScheme.js'
 
 type SettingsTab = 'general' | 'models'
 
@@ -42,6 +42,11 @@ export function SettingsOverlay() {
   )
 }
 
+function chosenTheme(scheme: ServerColorScheme): Theme | null {
+  if (scheme.save.status !== 'settled') return scheme.save.theme
+  return scheme.state.status === 'confirmed' ? scheme.state.theme : null
+}
+
 function GeneralSection() {
   const scheme = useServerColorScheme()
 
@@ -53,7 +58,7 @@ function GeneralSection() {
       )}
       {scheme.save.status === 'unsaved' && <Alert severity="error">{scheme.save.message}</Alert>}
       <ToggleButtonGroup
-        value={scheme.showing}
+        value={chosenTheme(scheme)}
         exclusive
         onChange={(_event, value: Theme | null) => {
           if (value !== null) scheme.choose(value)
