@@ -238,7 +238,7 @@ export function ParticipantResponseCard({
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder="Say more (optional)"
-              sx={{ flexGrow: 1, minWidth: (theme) => theme.spacing(20) }}
+              sx={{ minWidth: (theme) => theme.spacing(20), maxWidth: '100%' }}
             />
             {application === undefined && entry.outcome === 'applicableSuggestion' && (
               <Button
