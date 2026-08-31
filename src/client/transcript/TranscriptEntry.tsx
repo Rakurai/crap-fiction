@@ -235,7 +235,7 @@ export function ParticipantResponseCard({
             </Button>
           </Stack>
         ) : (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <TextField
               size="small"
               value={text}
