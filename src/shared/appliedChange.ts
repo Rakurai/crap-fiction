@@ -6,8 +6,6 @@ const changedPassageSchema = z
     message: 'a changed passage says something on at least one side',
   })
 
-export type ChangedPassage = z.infer<typeof changedPassageSchema>
-
 export const appliedChangeContentSchema = z.union([
   z.object({ kind: z.literal('passages'), passages: z.array(changedPassageSchema).min(1) }),
   z.object({ kind: z.literal('rewrittenWhole') }),

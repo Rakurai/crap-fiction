@@ -21,8 +21,6 @@ const applyStartedEventSchema = z.object({ ...startedFields, kind: z.literal('ap
 
 const actionStartedEventSchema = z.discriminatedUnion('kind', [dispatchStartedEventSchema, applyStartedEventSchema])
 
-export type ActionStartedEvent = z.infer<typeof actionStartedEventSchema>
-
 const applyPendingEventSchema = z.object({
   actionId: z.string().min(1),
   conversationId: z.string().min(1),
@@ -31,11 +29,7 @@ const applyPendingEventSchema = z.object({
   surface: surfaceIdSchema,
 })
 
-export type ApplyPendingEvent = z.infer<typeof applyPendingEventSchema>
-
 export const participantStageSchema = z.enum(['called', 'preparing', 'working'])
-
-export type ParticipantStage = z.infer<typeof participantStageSchema>
 
 const participantStateSchema = z.object({
   state: participantStageSchema,
@@ -59,8 +53,6 @@ const entryAppendedEventSchema = z.object({
   surface: surfaceIdSchema,
 })
 
-export type EntryAppendedEvent = z.infer<typeof entryAppendedEventSchema>
-
 const actionFinishedEventSchema = z.object({
   actionId: z.string().min(1),
   outcome: z.enum(['settled', 'abandoned', 'failed']),
@@ -75,8 +67,6 @@ export type ConversationFailureCode = z.infer<typeof conversationFailureCodeSche
 
 const conversationErrorEventSchema = z.object({ code: conversationFailureCodeSchema, message: z.string(), surface: surfaceIdSchema })
 
-export type ConversationErrorEvent = z.infer<typeof conversationErrorEventSchema>
-
 const dispatchActivitySnapshotSchema = z.object({
   actionId: z.string().min(1),
   conversationId: z.string().min(1),
@@ -87,8 +77,6 @@ const dispatchActivitySnapshotSchema = z.object({
   startedAt: z.number().int().positive(),
 })
 
-export type DispatchActivitySnapshot = z.infer<typeof dispatchActivitySnapshotSchema>
-
 const applyActivitySnapshotSchema = z.object({
   actionId: z.string().min(1),
   conversationId: z.string().min(1),
@@ -97,8 +85,6 @@ const applyActivitySnapshotSchema = z.object({
   startedAt: z.number().int().positive(),
   applicationId: z.string().min(1).optional(),
 })
-
-export type ApplyActivitySnapshot = z.infer<typeof applyActivitySnapshotSchema>
 
 const conversationActivitySnapshotSchema = z.discriminatedUnion('kind', [
   dispatchActivitySnapshotSchema,

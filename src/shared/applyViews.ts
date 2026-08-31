@@ -25,7 +25,3 @@ export const applyConfirmationSchema = z.object({
 })
 
 export type ApplyConfirmation = z.infer<typeof applyConfirmationSchema>
-
-const pendingApplySchema = z.object({ replacement: replacementSchema })
-
-export type PendingApply = z.infer<typeof pendingApplySchema>

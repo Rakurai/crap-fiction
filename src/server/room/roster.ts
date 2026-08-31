@@ -1,7 +1,7 @@
 import { INTERVIEWER_FUNCTION, markOrdinals, type RoleDefinition } from '../model/roles.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 
-export class GeneralistNotInRosterError extends Error {
+class GeneralistNotInRosterError extends Error {
   constructor() {
     super('no participant among the loaded roles declares itself the generalist')
     this.name = 'GeneralistNotInRosterError'

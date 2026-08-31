@@ -6,8 +6,6 @@ export const APPLY_CALL_SITE = 'apply'
 
 const OPERATION_CALL_SITES = [APPLY_CALL_SITE] as const
 
-export type OperationCallSite = (typeof OPERATION_CALL_SITES)[number]
-
 export class DuplicateCallSiteError extends Error {
   constructor(site: string) {
     super(`"${site}" names both a participant and an operation call site`)

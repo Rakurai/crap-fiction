@@ -35,7 +35,6 @@ const storyEditorViewSchema = z
     mark: z.string(),
   })
   .readonly()
-export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 
 const interviewerViewSchema = z
   .object({
@@ -45,7 +44,6 @@ const interviewerViewSchema = z
     invocation: z.string(),
   })
   .readonly()
-export type InterviewerView = z.infer<typeof interviewerViewSchema>
 
 const surfaceDetailSchema = z
   .object({
@@ -66,7 +64,6 @@ const pieceSurfacesSchema = z
     authorContext: surfaceDetailSchema,
   })
   .readonly()
-export type PieceSurfaces = z.infer<typeof pieceSurfacesSchema>
 
 export const pieceDetailSchema = pieceSummaryShape
   .extend({

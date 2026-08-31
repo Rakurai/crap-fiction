@@ -23,7 +23,7 @@ import {
 } from './store/index.js'
 import { WorkspaceRegistry } from './workspace.js'
 
-export type Studio = {
+type Studio = {
   readonly app: Hono
 }
 

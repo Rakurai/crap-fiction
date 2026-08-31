@@ -93,8 +93,6 @@ const castBySurfaceSchema = z.object({
   authorContext: z.array(z.string().min(1)),
 })
 
-export type CastBySurface = Readonly<z.infer<typeof castBySurfaceSchema>>
-
 const pieceMetadataSchema = z.object({
   title: z.string().min(1),
   mode: z.string().min(1),
