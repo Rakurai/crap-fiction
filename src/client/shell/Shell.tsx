@@ -47,18 +47,19 @@ export function Shell({ shell }: ShellProps) {
         )}
 
         <Box sx={{ display: 'flex', flexGrow: 1, minHeight: 0 }}>
-          <Document activeSurface={shell.activeSurface} presentation={isReading ? 'rendered' : shell.presentation} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 }}>
+            <Document activeSurface={shell.activeSurface} presentation={isReading ? 'rendered' : shell.presentation} />
+            {!isReading && pieceOpen && (
+              <WorkspaceBanner
+                title={pieceTitle}
+                presentation={shell.presentation}
+                onPresentationChange={shell.setPresentation}
+                showPresentationToggle={shell.activeSurface === 'draft'}
+              />
+            )}
+          </Box>
           {!isReading && pieceOpen && <TranscriptColumn activeSurface={shell.activeSurface} />}
         </Box>
-
-        {!isReading && pieceOpen && (
-          <WorkspaceBanner
-            title={pieceTitle}
-            presentation={shell.presentation}
-            onPresentationChange={shell.setPresentation}
-            showPresentationToggle={shell.activeSurface === 'draft'}
-          />
-        )}
 
         {isReading && <ReadingTitle title={pieceTitle} />}
         {isReading && <ReadingExit />}

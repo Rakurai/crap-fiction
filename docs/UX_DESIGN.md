@@ -16,9 +16,12 @@ One bar spans the top of the whole workspace: opening a piece or settings and en
 end, the room and its conversations at the other, the surface switcher at the centre governing
 everything below it. The division into two halves begins beneath that bar.
 
-A quiet banner spans the bottom of the workspace. Beneath the document it names the open piece and its
-word count, and offers the rendered and source presentations at its trailing edge. It names any
-document whose save is failing, and it is present on all three editing surfaces.
+A quiet banner sits along the bottom of the document half and ends where the transcript begins. It
+names the open piece and its word count, offers the rendered and source presentations at its trailing
+edge, and names any document whose save is failing. Everything the banner carries is a fact about the
+document above it, which is why it belongs to that half rather than to the whole workspace and why the
+presentations sit immediately below the prose they apply to. The transcript carries no band of its own.
+The banner is present on all three editing surfaces.
 
 **One piece is open at a time.** Opening another replaces both halves with nothing to save
 and nothing to confirm, because everything the author has written is already on disk. The
@@ -494,8 +497,8 @@ saved, or it means nothing. Not a modal, because interrupting the author to say 
 unhappy costs them more than the failure does. Leaving for another piece is the one thing
 unavailable while any of the piece's documents is in this state, and it is unavailable rather
 than confirmed: an author asked whether to discard their own prose has been asked the wrong
-question. The workspace states every failing document in its bottom banner; reading states the same
-failures beside its fixed exit.
+question. The banner states every failing document; reading, which does not carry the banner, states
+the same failures beside its fixed exit.
 
 **Leaving while a write is settling.** The control that leaves the piece disables the instant it
 is asked for and stays disabled until every document has durably saved. A write that fails during
