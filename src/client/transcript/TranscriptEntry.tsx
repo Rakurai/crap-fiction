@@ -156,22 +156,34 @@ export function ConcreteChangeRequestLine({
   )
 }
 
-export function NoCommentLine({ identity }: Readonly<{ identity: ParticipantIdentity }>) {
+function UnnamedParticipant() {
+  return <Typography variant="machine">from a participant this studio can no longer name</Typography>
+}
+
+function Attribution({ identity }: Readonly<{ identity: ParticipantIdentity | null }>) {
+  return identity === null ? <UnnamedParticipant /> : <ParticipantNameHandle identity={identity} />
+}
+
+function Gutter({ identity }: Readonly<{ identity: ParticipantIdentity | null }>) {
+  return identity === null ? null : <ParticipantMark identity={identity} />
+}
+
+export function NoCommentLine({ identity }: Readonly<{ identity: ParticipantIdentity | null }>) {
   return (
-    <TranscriptRow gutter={<ParticipantMark identity={identity} />}>
+    <TranscriptRow gutter={<Gutter identity={identity} />}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline' }}>
-        <ParticipantNameHandle identity={identity} />
+        <Attribution identity={identity} />
         <Typography variant="machine">had nothing to add</Typography>
       </Stack>
     </TranscriptRow>
   )
 }
 
-export function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFailureEntry; identity: ParticipantIdentity }>) {
+export function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFailureEntry; identity: ParticipantIdentity | null }>) {
   return (
-    <TranscriptRow gutter={<ParticipantMark identity={identity} />}>
+    <TranscriptRow gutter={<Gutter identity={identity} />}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <ParticipantNameHandle identity={identity} />
+        <Attribution identity={identity} />
         <Typography variant="machine">
           the call failed — {FAILURE_TEXT[entry.reason]}
           {entry.returned !== undefined ? `: ${entry.returned}` : ''}
@@ -183,7 +195,7 @@ export function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFa
 
 export type ParticipantResponseCardProps = Readonly<{
   entry: ParticipantResponseEntry
-  identity: ParticipantIdentity
+  identity: ParticipantIdentity | null
   application: ApplicationEntryView | undefined
   actions: ResponseActions
   disclosed: ReadonlySet<string>
@@ -207,9 +219,9 @@ export function ParticipantResponseCard({
   const [text, setText] = useState('')
 
   return (
-    <TranscriptRow gutter={<ParticipantMark identity={identity} />}>
+    <TranscriptRow gutter={<Gutter identity={identity} />}>
       <Stack spacing={0.75}>
-        <ParticipantNameHandle identity={identity} />
+        <Attribution identity={identity} />
         <ClampedClaim text={entry.claim} disclosed={disclosed.has(entry.id)} onToggle={() => onToggleDisclosure(entry.id)} />
         {entry.note !== undefined && <ResponseNote text={entry.note} />}
         {application?.change !== undefined && (
@@ -222,7 +234,10 @@ export function ParticipantResponseCard({
         {applyingActionId !== null ? (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <Typography variant="machine">
-              {holdReason ?? `this document is being held while ${identity.displayName} applies its recommendation`}
+              {holdReason ??
+                (identity === null
+                  ? 'this document is being held while the recommendation is applied'
+                  : `this document is being held while ${identity.displayName} applies its recommendation`)}
             </Typography>
             <Button variant="quiet" size="small" onClick={() => actions.abandon(applyingActionId)}>
               Abandon
@@ -250,7 +265,7 @@ export function ParticipantResponseCard({
                 Apply
               </Button>
             )}
-            {entry.outcome === 'commentary' && (
+            {entry.outcome === 'commentary' && identity !== null && (
               <Button
                 variant="affirm"
                 size="small"
@@ -268,21 +283,23 @@ export function ParticipantResponseCard({
                 Ask the room about this change
               </Button>
             )}
-            <Button
-              variant="affirm"
-              size="small"
-              disabled={withheld}
-              onClick={() => {
-                if (text.trim() === '') {
-                  actions.focusComposerFor(identity)
-                  return
-                }
-                actions.reply(identity, text.trim())
-                setText('')
-              }}
-            >
-              Reply
-            </Button>
+            {identity !== null && (
+              <Button
+                variant="affirm"
+                size="small"
+                disabled={withheld}
+                onClick={() => {
+                  if (text.trim() === '') {
+                    actions.focusComposerFor(identity)
+                    return
+                  }
+                  actions.reply(identity, text.trim())
+                  setText('')
+                }}
+              >
+                Reply
+              </Button>
+            )}
           </Stack>
         )}
       </Stack>
@@ -323,15 +340,13 @@ export function TranscriptEntry({
         <ConcreteChangeRequestLine target={entry.target} clarification={entry.clarification} atMs={entry.atMs} identities={identities} />
       )
     case 'participantResponse': {
-      const identity = identities.get(entry.participantId)
-      if (identity === undefined) return null
       const application = entries.find(
         (candidate): candidate is ApplicationEntryView => candidate.kind === 'application' && candidate.responseId === entry.id,
       )
       return (
         <ParticipantResponseCard
           entry={entry}
-          identity={identity}
+          identity={identities.get(entry.participantId) ?? null}
           application={application}
           actions={actions}
           disclosed={disclosed}
@@ -342,14 +357,10 @@ export function TranscriptEntry({
         />
       )
     }
-    case 'participantNoComment': {
-      const identity = identities.get(entry.participantId)
-      return identity === undefined ? null : <NoCommentLine identity={identity} />
-    }
-    case 'participantFailure': {
-      const identity = identities.get(entry.participantId)
-      return identity === undefined ? null : <FailureLine entry={entry} identity={identity} />
-    }
+    case 'participantNoComment':
+      return <NoCommentLine identity={identities.get(entry.participantId) ?? null} />
+    case 'participantFailure':
+      return <FailureLine entry={entry} identity={identities.get(entry.participantId) ?? null} />
     case 'application':
       return null
     default: {
