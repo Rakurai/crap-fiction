@@ -11,6 +11,7 @@ export type ConversationPane = Readonly<{
   getState: () => ConversationPaneState
   subscribe: (onChange: () => void) => () => void
   selectConversation: (conversationId: string | null) => void
+  adoptConversation: (conversationId: string) => void
   setComposerText: (composerText: string) => void
   setTranscriptPosition: (transcriptPosition: number) => void
   setDisclosures: (disclosures: ReadonlySet<string>) => void
@@ -29,6 +30,7 @@ export function createConversationPane(initialConversationId: string | null): Co
     getState: value.get,
     subscribe: value.subscribe,
     selectConversation: (conversationId) => value.set(freshPane(conversationId)),
+    adoptConversation: (conversationId) => value.set({ ...value.get(), conversationId }),
     setComposerText: (composerText) => value.set({ ...value.get(), composerText }),
     setTranscriptPosition: (transcriptPosition) => value.set({ ...value.get(), transcriptPosition }),
     setDisclosures: (disclosures) => value.set({ ...value.get(), disclosures }),

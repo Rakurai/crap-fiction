@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Alert, Box, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Stack, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { useRoomHold, useScopeActivity, useScopeFailures, useScopeFinish } from '../eventStream/RoomStreamProvider.js'
 import type { ConversationPane } from '../pieceSession/conversationPane.js'
@@ -33,7 +33,8 @@ type SelectedConversationProps = Readonly<{ pieceId: string; surface: SurfaceId;
 function SelectedConversation({ pieceId, surface, conversationId, pane }: SelectedConversationProps) {
   const identities = useParticipantIdentities(pieceId, surface)
   const paneState = useConversationPaneState(surface)
-  const conversationRead = readState(useConversation(pieceId, surface, conversationId))
+  const conversationQuery = useConversation(pieceId, surface, conversationId)
+  const conversationRead = readState(conversationQuery)
   const conversation = presentValue(conversationRead)
   const scopeActivity = useScopeActivity(surface)
   const held = useRoomHold(surface)
@@ -79,7 +80,16 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
   if (conversation === null) {
     return (
       <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
-        <Alert severity="error">The conversation could not be read.</Alert>
+        <Alert
+          severity="error"
+          action={
+            <Button variant="quiet" size="small" disabled={conversationQuery.isFetching} onClick={() => void conversationQuery.refetch()}>
+              Read it again
+            </Button>
+          }
+        >
+          The conversation could not be read.
+        </Alert>
       </Box>
     )
   }

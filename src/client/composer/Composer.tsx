@@ -45,8 +45,10 @@ export function Composer({ pieceId, surface }: ComposerProps) {
     mutationFn: async (text) => {
       const conversationId = pane?.getState().conversationId ?? null
       const resolvedId = conversationId ?? (await mintConversation(pieceId, surface)).id
-      if (conversationId === null) pane?.selectConversation(resolvedId)
       return dispatchTo(pieceId, surface, resolvedId, { message: text, documents })
+    },
+    onSuccess: ({ conversationId }) => {
+      if (pane?.getState().conversationId === null) pane.adoptConversation(conversationId)
     },
     onError: (_failure, sent) => {
       if (pane?.getState().composerText === '') pane.setComposerText(sent)
