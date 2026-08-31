@@ -1,46 +1,35 @@
-import { Box, Stack, Typography, useColorScheme } from '@mui/material'
+import { Box, Stack, Typography } from '@mui/material'
 import type { Theme } from '../../shared/theme.js'
-import {
-  MARK_DIAMETER,
-  MARK_GLYPH_SIZE,
-  MARK_GLYPH_WEIGHT,
-  participantMarkColor,
-  participantMarkGlyphColor,
-  unseededParticipantMarkColor,
-} from '../theme/participantMark.js'
+import { participantMarkColor, participantMarkGlyphColor, unseededParticipantMarkColor } from '../theme/participantMark.js'
 import type { ParticipantIdentity } from './identity.js'
 
-export function useMarkScheme(): Theme {
-  const { mode } = useColorScheme()
-  return mode === 'light' ? 'light' : 'dark'
-}
-
-function markColor(identity: ParticipantIdentity, scheme: Theme): string {
-  return identity.eligibility === 'generalist' ? unseededParticipantMarkColor(scheme) : participantMarkColor(identity.ordinal, scheme)
+function markColors(identity: ParticipantIdentity, scheme: Theme) {
+  return {
+    bgcolor: identity.eligibility === 'generalist' ? unseededParticipantMarkColor(scheme) : participantMarkColor(identity.ordinal, scheme),
+    color: participantMarkGlyphColor(scheme),
+  }
 }
 
 export type ParticipantMarkProps = Readonly<{ identity: ParticipantIdentity }>
 
 export function ParticipantMark({ identity }: ParticipantMarkProps) {
-  const scheme = useMarkScheme()
-
   return (
     <Box
       aria-hidden
-      sx={{
-        width: MARK_DIAMETER,
-        height: MARK_DIAMETER,
+      sx={(theme) => ({
+        width: theme.participantMark.diameter,
+        height: theme.participantMark.diameter,
         flexShrink: 0,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: markColor(identity, scheme),
-        color: participantMarkGlyphColor(scheme),
-        fontSize: MARK_GLYPH_SIZE,
-        fontWeight: MARK_GLYPH_WEIGHT,
+        ...markColors(identity, 'dark'),
+        ...theme.applyStyles('light', markColors(identity, 'light')),
+        fontSize: theme.participantMark.glyphSize,
+        fontWeight: theme.participantMark.glyphWeight,
         lineHeight: 1,
-      }}
+      })}
     >
       {identity.mark}
     </Box>

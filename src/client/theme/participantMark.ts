@@ -1,23 +1,58 @@
 import type { Theme } from '../../shared/theme.js'
 
-const HUE_STEP = 137.508
-const SATURATION = 62
-const LIGHTNESS: Readonly<Record<Theme, number>> = { dark: 68, light: 34 }
-const GLYPH_LIGHTNESS: Readonly<Record<Theme, number>> = { dark: 0, light: 100 }
+export type ParticipantMarkTreatment = Readonly<{
+  hueStep: number
+  saturation: string
+  diameter: number
+  glyphSize: string
+  glyphWeight: number
+}>
 
-export const MARK_DIAMETER = 28
-export const MARK_GLYPH_SIZE = '0.6875rem'
-export const MARK_GLYPH_WEIGHT = 600
+export type ParticipantMarkColors = Readonly<{
+  lightness: string
+  glyphLightness: string
+}>
+
+declare module '@mui/material/styles' {
+  interface Theme {
+    participantMark: ParticipantMarkTreatment
+  }
+
+  interface ThemeOptions {
+    participantMark?: ParticipantMarkTreatment
+  }
+
+  interface Palette {
+    participantMark: ParticipantMarkColors
+  }
+
+  interface PaletteOptions {
+    participantMark?: ParticipantMarkColors
+  }
+}
+
+export const participantMarkTreatment: ParticipantMarkTreatment = {
+  hueStep: 137.508,
+  saturation: '62%',
+  diameter: 28,
+  glyphSize: '0.6875rem',
+  glyphWeight: 600,
+}
+
+export const participantMarkColors: Readonly<Record<Theme, ParticipantMarkColors>> = {
+  dark: { lightness: '68%', glyphLightness: '0%' },
+  light: { lightness: '34%', glyphLightness: '100%' },
+}
 
 export function participantMarkColor(ordinal: number, scheme: Theme): string {
-  const hue = (ordinal * HUE_STEP) % 360
-  return `hsl(${hue.toFixed(2)} ${SATURATION}% ${LIGHTNESS[scheme]}%)`
+  const hue = (ordinal * participantMarkTreatment.hueStep) % 360
+  return `hsl(${hue.toFixed(2)} ${participantMarkTreatment.saturation} ${participantMarkColors[scheme].lightness})`
 }
 
 export function unseededParticipantMarkColor(scheme: Theme): string {
-  return `hsl(0 0% ${LIGHTNESS[scheme]}%)`
+  return `hsl(0 0% ${participantMarkColors[scheme].lightness})`
 }
 
 export function participantMarkGlyphColor(scheme: Theme): string {
-  return `hsl(0 0% ${GLYPH_LIGHTNESS[scheme]}%)`
+  return `hsl(0 0% ${participantMarkColors[scheme].glyphLightness})`
 }

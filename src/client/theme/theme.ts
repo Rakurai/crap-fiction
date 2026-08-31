@@ -1,6 +1,7 @@
 import { createTheme } from '@mui/material/styles'
 import { buttonWeights } from './controlWeights.js'
 import { fontFaceStyleOverrides, INTERFACE_FONT_STACK } from './fonts.js'
+import { participantMarkColors, participantMarkTreatment } from './participantMark.js'
 import { authorRegister, machineRegister, proseRegister, REGISTER_VARIANT_MAPPING, roomRegister } from './registers.js'
 
 const ACCENT_DARK = { main: '#e0a458', dark: '#b5762a', light: '#f0c68a' }
@@ -16,15 +17,18 @@ export const theme = createTheme({
       palette: {
         primary: ACCENT_DARK,
         error: { main: ERROR_DARK },
+        participantMark: participantMarkColors.dark,
       },
     },
     light: {
       palette: {
         primary: ACCENT_LIGHT,
         error: { main: ERROR_LIGHT },
+        participantMark: participantMarkColors.light,
       },
     },
   },
+  participantMark: participantMarkTreatment,
   typography: {
     fontFamily: INTERFACE_FONT_STACK,
     prose: proseRegister,
