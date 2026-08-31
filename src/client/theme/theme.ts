@@ -18,6 +18,8 @@ const ACCENT_DARK = { main: '#e0a458', dark: '#b5762a', light: '#f0c68a' }
 const ACCENT_LIGHT = { main: '#9c5a17', dark: '#7a4512', light: '#c97a2b' }
 const ERROR_DARK = '#e5484d'
 const ERROR_LIGHT = '#c4262b'
+const SURFACES_DARK = { default: '#121212', paper: '#1e1e1e' }
+const SURFACES_LIGHT = { default: '#f5f3f0', paper: '#ffffff' }
 
 export const theme = createTheme({
   cssVariables: { colorSchemeSelector: 'data-mui-color-scheme' },
@@ -27,6 +29,7 @@ export const theme = createTheme({
       palette: {
         primary: ACCENT_DARK,
         error: { main: ERROR_DARK },
+        background: SURFACES_DARK,
         participantMark: participantMarkColors.dark,
       },
     },
@@ -34,6 +37,7 @@ export const theme = createTheme({
       palette: {
         primary: ACCENT_LIGHT,
         error: { main: ERROR_LIGHT },
+        background: SURFACES_LIGHT,
         participantMark: participantMarkColors.light,
       },
     },
