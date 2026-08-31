@@ -6,6 +6,8 @@ implementation.
 
 Where this document describes a required interaction, it is settling its presentation.
 
+**A word on screen is settled here and is not required to be the vocabulary's own**: the author reads *team* where the domain says room and *chat* where it says conversation, and the domain keeps both of its words. A control's label is uppercased by the theme, so a label is chosen for its words and not for its case.
+
 ## Design thesis
 
 > **Two halves are always present: the document being worked on, and the conversation about it.**
@@ -65,22 +67,18 @@ manuscript with the application gone, not as a separate place.
 **Reading takes the whole window and holds the prose exactly where it was.** The measure and the
 type size are the editing surface's own, so entering and leaving re-wraps no line and the author's
 eye lands on the sentence it left. **Reading carries no title** — not at the head of the prose, not in
-a corner, and not as a fixed label over the scroll. The way out is stated as a fact about the machine that stays put
-while the prose scrolls, and it names the keystroke that already does it rather than adding a
-second way. An unresolved save failure remains stated quietly beside that exit, naming its document,
-because reading must not turn a persistent failure into silence.
+a corner, and not as a fixed label over the scroll. The way out is stated as a fact about the machine in the trailing bottom corner, staying put while the prose scrolls, and it names the keystroke that already does it. That statement also takes a click, which adds a means rather than a control: reading grows no button, and nothing else on the surface offers to leave. An unresolved save failure remains stated quietly beside that exit, naming its document, because reading must not turn a persistent failure into silence.
 
 ## The story context surface
 
-**The switcher at the centre of that bar moves between the draft, story context and author context.** One active editing surface selects both workspace halves.
+**The switcher at the centre of that bar moves between the draft, story context and author context.** One active editing surface selects both workspace halves. It names each of them in a single word — draft, context, author — while a sentence about a surface elsewhere in the studio uses that surface's whole name, because a failure stated about *author* alone is not a sentence.
 Switching preserves each surface's text, editor history, selected conversation, composer, transcript
 position, disclosures and ongoing work. It does not preserve separate presentation state for every
 conversation in a listing. Activity on one surface is never a reason another cannot start its own.
 
 **Story context is set as plain text, not as prose.** It carries no rendered view, no Markdown
 source toggle and no reading view — one surface, one way of seeing it, because it is notes
-rather than the story itself. Its reference schema is offered below the notes, closed, as guidance
-the author can consult and dismiss rather than a form asking to be filled in.
+rather than the story itself. Its reference schema is reached from the control that names it on the surface's own band of facts, closed, and opens between that band and the notes as guidance the author can consult and dismiss rather than a form asking to be filled in.
 
 **It says which document it is and where that document is kept**, as a fact about the machine. These
 are files the author edits outside the studio as readily as in it, and a surface that will not say
@@ -166,8 +164,7 @@ complete.
 completion order rather than a fixed one, which makes this guardrail load-bearing: no connective
 framing, visual thread, or arrangement may imply that one reading answered another.
 
-**Participant identity occupies a fixed gutter beside the transcript.** The repeated marks form a
-scannable edge, and responses align as independent readings rather than as branches of a thread.
+**Participant identity heads its response, on one line above what was said.** The mark, the name and the handle begin at the same left edge as the response's own text and everything else the response carries, so the repeated marks form a scannable edge down the transcript's leading side and responses align as independent readings rather than as branches of a thread. No part of a response is indented under another.
 
 ### Once responses land
 
@@ -223,9 +220,7 @@ them. Its content is carried verbatim as the author's words.
 recommendation as written; with text, it applies the recommendation under that additional
 constraint.
 
-**Ask for a concrete change** — on a response that offered a reading without an action. Empty,
-it asks that participant to show what it would change; with text, it asks the same with the
-author's clarification.
+**Show me** — on a response that offered a reading without an action, standing where applying stands on a response that recommends one, since no response ever carries both. Empty, it asks that participant to show what it would change; with text, it asks the same with the author's clarification.
 
 **Reply** — on any response. Empty, it addresses that participant in the main input and
 focuses it, leaving the author composing; with text, it sends that text to that participant
@@ -403,8 +398,8 @@ and its primitive values come from the Material UI theme.
 
 **Every measure the studio holds a surface to is named for the surface it governs**, and the set of
 those names is closed the way the registers are. A measure is the studio's own decision about how wide
-a thing is read or reached in — the prose measure, the transcript's cap, the identity gutter's track, a
-side overlay's width, the width a list needs beside its detail, the width a control offers a value in —
+a thing is read or reached in — the prose measure, the transcript's cap, a side overlay's width, the
+width a list needs beside its detail, the width a control offers a value in —
 and each stands on why that surface needs it. Two surfaces share a name only where they are held to one
 measure on purpose; two that happen to want the same number today are two names, so that either can
 change without dragging the other. Arrangement is not a measure: how a surface flows, what it is spaced
@@ -450,10 +445,7 @@ model from — because one undifferentiated sequence asks the author to hold in 
 are collaborators and which are machinery. Every entry says what the model there is for, the operations
 most of all, since the author has no other place to learn what they are.
 
-**Whether the models are reachable is stated where they are assigned**, as a fact beside that place's
-name, and stands nowhere else. It is the one moment the author needs it: a count of what is available
-is what makes an assignment possible, and the same words occupying the studio while the author writes
-tell them something they cannot use about a program they are not looking at.
+**Whether the models are reachable is stated at the controls that assign them**, and stands nowhere else — not as a count beside the surface's name and not anywhere in the workspace. A control offering the models is what tells the author they are there, and one that cannot offer them says so where the author is choosing, which is the one moment the fact is worth anything: the same words standing in the studio while the author writes tell them something they cannot use about a program they are not looking at.
 
 **A control's weight says what kind of act it is**, so the interface carries one weight per kind of act
 rather than one treatment for every control. Some of those weights are load-bearing.
