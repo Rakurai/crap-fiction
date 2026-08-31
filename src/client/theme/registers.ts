@@ -5,6 +5,8 @@ declare module '@mui/material/styles' {
   interface TypographyVariants {
     prose: CSSProperties
     room: CSSProperties
+    speaker: CSSProperties
+    note: CSSProperties
     author: CSSProperties
     machine: CSSProperties
   }
@@ -12,6 +14,8 @@ declare module '@mui/material/styles' {
   interface TypographyVariantsOptions {
     prose?: CSSProperties
     room?: CSSProperties
+    speaker?: CSSProperties
+    note?: CSSProperties
     author?: CSSProperties
     machine?: CSSProperties
   }
@@ -21,6 +25,8 @@ declare module '@mui/material/Typography' {
   interface TypographyPropsVariantOverrides {
     prose: true
     room: true
+    speaker: true
+    note: true
     author: true
     machine: true
   }
@@ -29,6 +35,8 @@ declare module '@mui/material/Typography' {
 export const REGISTER_VARIANT_MAPPING = {
   prose: 'p',
   room: 'p',
+  speaker: 'span',
+  note: 'p',
   author: 'p',
   machine: 'span',
 } as const
@@ -47,11 +55,26 @@ export const roomRegister: CSSProperties = {
   lineHeight: 1.6,
 }
 
-export const authorRegister: CSSProperties = {
+export const speakerRegister: CSSProperties = {
   fontFamily: INTERFACE_FONT_STACK,
   fontWeight: 600,
   fontSize: '0.9375rem',
   lineHeight: 1.6,
+}
+
+export const noteRegister: CSSProperties = {
+  fontFamily: INTERFACE_FONT_STACK,
+  fontWeight: 400,
+  fontSize: '0.875rem',
+  lineHeight: 1.55,
+  color: 'var(--mui-palette-text-secondary)',
+}
+
+export const authorRegister: CSSProperties = {
+  fontFamily: PROSE_FONT_STACK,
+  fontWeight: 400,
+  fontSize: '1rem',
+  lineHeight: 1.65,
 }
 
 export const machineRegister: CSSProperties = {

@@ -52,9 +52,7 @@ function ClampedClaim({ text, disclosed, onToggle }: Readonly<{ text: string; di
 
 function ResponseNote({ text }: Readonly<{ text: string }>) {
   return (
-    <Typography variant="room" sx={{ color: 'text.secondary' }}>
-      {text}
-    </Typography>
+    <Typography variant="note">{text}</Typography>
   )
 }
 
@@ -75,12 +73,8 @@ function AppliedChangeDisclosure({
           {content.passages.map((passage, index) => (
             <Typography key={index} variant="room" component="p" sx={{ m: 0 }}>
               {passage.leading}
-              {passage.before !== '' && (
-                <Box component="span" sx={{ textDecoration: 'line-through', color: 'text.disabled' }}>
-                  {passage.before}
-                </Box>
-              )}
-              {passage.after !== '' && <Box component="span" sx={{ fontWeight: 600 }}>{passage.after}</Box>}
+              {passage.before !== '' && <Box component="del" sx={{ color: 'text.disabled' }}>{passage.before}</Box>}
+              {passage.after !== '' && <Box component="strong">{passage.after}</Box>}
               {passage.trailing}
             </Typography>
           ))}

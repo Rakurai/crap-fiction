@@ -3,7 +3,15 @@ import { buttonWeights } from './controlWeights.js'
 import { fontFaceStyleOverrides, INTERFACE_FONT_STACK } from './fonts.js'
 import { surfaceMeasures } from './measures.js'
 import { participantMarkColors, participantMarkTreatment } from './participantMark.js'
-import { authorRegister, machineRegister, proseRegister, REGISTER_VARIANT_MAPPING, roomRegister } from './registers.js'
+import {
+  authorRegister,
+  machineRegister,
+  noteRegister,
+  proseRegister,
+  REGISTER_VARIANT_MAPPING,
+  roomRegister,
+  speakerRegister,
+} from './registers.js'
 
 const ACCENT_DARK = { main: '#e0a458', dark: '#b5762a', light: '#f0c68a' }
 const ACCENT_LIGHT = { main: '#9c5a17', dark: '#7a4512', light: '#c97a2b' }
@@ -35,6 +43,8 @@ export const theme = createTheme({
     fontFamily: INTERFACE_FONT_STACK,
     prose: proseRegister,
     room: roomRegister,
+    speaker: speakerRegister,
+    note: noteRegister,
     author: authorRegister,
     machine: machineRegister,
   },

@@ -41,9 +41,7 @@ export type ParticipantNameHandleProps = Readonly<{ identity: ParticipantIdentit
 export function ParticipantNameHandle({ identity }: ParticipantNameHandleProps) {
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
-      <Typography variant="room" sx={{ fontWeight: 600 }}>
-        {identity.displayName}
-      </Typography>
+      <Typography variant="speaker">{identity.displayName}</Typography>
       <Typography variant="machine">{identity.handle}</Typography>
     </Stack>
   )
