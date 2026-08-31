@@ -170,7 +170,40 @@ const failureCodeTaxonomy: Rule = {
   },
 }
 
-const RULES: readonly Rule[] = [importBoundaries, shippedIdentities, unresolvedEditLanguage, errorClassification, failureCodeTaxonomy]
+const THEME_AREA = path.join(REPO_ROOT, 'src', 'client', 'theme')
+
+const SURFACE_MEASURE_KEYS = ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']
+
+const AUTHORED_APPEARANCE: readonly Readonly<{ what: string; pattern: RegExp }>[] = [
+  { what: 'a colour literal', pattern: /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/g },
+  { what: 'a type size in px or rem', pattern: /\bfontSize:\s*['"`]?\s*\d+(?:\.\d+)?(?:px|rem)/g },
+  {
+    what: 'a surface measure in px or rem',
+    pattern: new RegExp(`\\b(?:${SURFACE_MEASURE_KEYS.join('|')}):\\s*(?:['"\`]\\s*\\d+(?:\\.\\d+)?(?:px|rem)|(?!0\\b)\\d+(?:\\.\\d+)?)`, 'g'),
+  },
+]
+
+const appearanceAuthoredOutsideTheme: Rule = {
+  rule: 'no client surface authors an appearance value the theme owns',
+  check: () =>
+    sourcesUnder('src', 'client')
+      .filter((file) => !file.startsWith(THEME_AREA))
+      .flatMap((file) => {
+        const source = readFileSync(file, 'utf8')
+        return AUTHORED_APPEARANCE.flatMap(({ what, pattern }) =>
+          [...source.matchAll(pattern)].map(([match]) => `${named(file)} authors ${what}: ${match.trim()}`),
+        )
+      }),
+}
+
+const RULES: readonly Rule[] = [
+  importBoundaries,
+  shippedIdentities,
+  unresolvedEditLanguage,
+  errorClassification,
+  failureCodeTaxonomy,
+  appearanceAuthoredOutsideTheme,
+]
 
 let broken = false
 

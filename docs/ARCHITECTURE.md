@@ -142,10 +142,19 @@ general enough to cover them would arrive with a policy the product has not chos
 
 **Material UI supplies ordinary interface vocabulary and primitive appearance.** Its theme owns
 palette, color schemes, typography, density, spacing, radii and component defaults. Product styling
-remains for the editor content, workspace composition and the prose, author, participant and machine
-registers. The client does not build a parallel general-purpose design system over it. The four
-semantic registers are theme typography variants and the weights a control can carry are theme
-component variants, so each is a value in the theme rather than a wrapper component over it.
+remains for the editor content, workspace composition and the semantic registers. The client does not
+build a parallel general-purpose design system over it. The registers are theme typography variants,
+the weights a control can carry are theme component variants, and the measures surfaces are held to are
+a theme key of their own, so each is a value in the theme rather than a wrapper component over it.
+
+**What the product authors itself is declared in the theme as a closed set and read from there by
+name.** A call site that needs a member the set does not carry adds the member; it does not write the
+value where it is needed, and it does not reach the appearance by tinting or resizing a member that is
+close. A value hardcoded at a call site looks correct as long as it happens to match the theme and
+diverges silently afterwards, which no amount of looking at the studio catches, so `lint` fails a colour
+literal and a type size or surface measure written as a raw pixel or rem value in client styling, with
+no per-site exemption. Composition is not an authored value and is not subject to that rule: arrangement,
+flow, spacing steps, alignment and a component's own padding are decided where a surface is composed.
 
 **The typefaces are files in this repository**, subset and served by the app: a runtime network fetch
 is ruled out, and a font that fails to arrive leaves the author on a face nobody chose. Only the

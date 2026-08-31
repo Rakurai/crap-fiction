@@ -369,13 +369,22 @@ already made, which is the opposite of what asking was for.
 ## Registers
 
 Kinds of text are on screen and the author must feel which is which without thinking about it:
-**the prose**, which is the work; **what the room says about the work**; **the author's own words
+**the prose**, which is the work; **what the room says about the work**; **the note a response
+qualifies its claim with**; **the name of whoever is speaking**; **the author's own words
 to the room**, which are neither the work nor the room's reading of it; and **facts about the
 machine** — participant state, elapsed time, counts, the story's word count, model identity.
 
-Keeping the last in its own register is what stops an operational number from reading as content,
-and is why a length the author glances at constantly does not read as a score. It is the quietest of
-the four, because a fact about the machine is the least of what is on screen.
+Keeping facts about the machine in a register of their own is what stops an operational number from
+reading as content, and is why a length the author glances at constantly does not read as a score. It
+is the quietest register the studio has, because a fact about the machine is the least of what is on
+screen.
+
+**The set of registers is closed, and every kind of text on screen is one of its members.** A kind
+that appears and belongs to none of them is a register the set is missing, never an existing register
+worn differently: a member tinted, resized or emboldened for the occasion tells the author that two
+different things are the same thing dressed up, which is the one distinction registers exist to buy.
+A distinction between two members is carried by more than colour, so that neither is merely the other
+turned down.
 
 Keeping the author's own words in one is what lets them scan a transcript for what they asked. What
 sets them apart is being set apart rather than being quieter: they are the author's own sentences and
@@ -389,6 +398,17 @@ way left to tell whose sentence they are reading, which is the whole of what the
 
 The visual language carrying these distinctions is typography and colour rather than composition,
 and its primitive values come from the Material UI theme.
+
+## Surface measures
+
+**Every measure the studio holds a surface to is named for the surface it governs**, and the set of
+those names is closed the way the registers are. A measure is the studio's own decision about how wide
+a thing is read or reached in — the prose measure, the transcript's cap, the identity gutter's track, a
+side overlay's width, the width a list needs beside its detail, the width a control offers a value in —
+and each stands on why that surface needs it. Two surfaces share a name only where they are held to one
+measure on purpose; two that happen to want the same number today are two names, so that either can
+change without dragging the other. Arrangement is not a measure: how a surface flows, what it is spaced
+by and how its contents align are composition, decided where the surface is composed.
 
 ## Prominence
 
@@ -409,6 +429,11 @@ selecting workspace content. Settings opens on general configuration and keeps m
 second section of the same overlay. Each overlay has a surface distinct from the workspace it covers.
 Pieces and centred configuration set that workspace back; conversations leave the backdrop visually
 clear so the transcript remains legible behind its selector.
+
+**Inside the workspace every edge is a one-pixel divider, and nothing casts a shadow.** The workspace
+is one plane the author is working on, so lifting a surface off it is reserved for the surfaces that
+genuinely arrive over the studio and leave again. A bar or a band that lifts instead of dividing reads
+as an overlay that will not go away.
 
 **Configuration of the author's machine is one settings overlay, and it is where models are assigned:**
 which model serves which participant, and which theme the interface is in. The studio starts dark
@@ -432,6 +457,11 @@ tell them something they cannot use about a program they are not looking at.
 
 **A control's weight says what kind of act it is**, so the interface carries one weight per kind of act
 rather than one treatment for every control. Some of those weights are load-bearing.
+
+**The weights are a closed set**: one for the affirmative act, one for the acts that merely select,
+switch, reveal or dismiss, and one for destroying something. A control takes the weight its act belongs
+to, never a heavier one bought for its position or a lighter one to keep a surface calm, and a kind of
+act that none of the three fits is a weight the set is missing.
 
 **The accent is the affirmative act** — the control that says do this thing, as against selecting,
 switching, revealing or dismissing. No count limits it per screen: what governs is that a control
