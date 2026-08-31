@@ -15,8 +15,8 @@ type SideOverlay = Readonly<{ anchor: 'left' | 'right'; paperSx: SxProps<Theme> 
 const AS_A_COLUMN = { display: 'flex', flexDirection: 'column' } as const
 
 const SIDE_OVERLAYS: Readonly<Record<'pieces' | 'conversations', SideOverlay>> = {
-  pieces: { anchor: 'left', paperSx: { ...AS_A_COLUMN, width: (theme) => theme.spacing(80), maxWidth: '100vw' } },
-  conversations: { anchor: 'right', paperSx: { ...AS_A_COLUMN, minWidth: (theme) => theme.spacing(45) } },
+  pieces: { anchor: 'left', paperSx: { ...AS_A_COLUMN, width: (theme) => theme.measures.listDetailOverlay, maxWidth: '100vw' } },
+  conversations: { anchor: 'right', paperSx: { ...AS_A_COLUMN, minWidth: (theme) => theme.measures.sideOverlay } },
 }
 
 export function OverlayHost({ overlay, dismissable, onDismiss, children }: OverlayHostProps) {
@@ -47,7 +47,7 @@ export function OverlayHost({ overlay, dismissable, onDismiss, children }: Overl
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
-        slotProps={{ paper: { sx: { minHeight: (theme) => theme.spacing(30), pb: 1 } } }}
+        slotProps={{ paper: { sx: { minHeight: (theme) => theme.measures.centredOverlayHeight, pb: 1 } } }}
       >
         {children}
       </Dialog>

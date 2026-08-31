@@ -5,7 +5,14 @@ export type TranscriptRowProps = Readonly<{ gutter: ReactNode; children: ReactNo
 
 export function TranscriptRow({ gutter, children }: TranscriptRowProps) {
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '28px 1fr', columnGap: 1.5, alignItems: 'start' }}>
+    <Box
+      sx={(theme) => ({
+        display: 'grid',
+        gridTemplateColumns: `${theme.measures.identityGutter}px 1fr`,
+        columnGap: 1.5,
+        alignItems: 'start',
+      })}
+    >
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>{gutter}</Box>
       <Box sx={{ minWidth: 0 }}>{children}</Box>
     </Box>

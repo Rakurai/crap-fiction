@@ -40,8 +40,6 @@ export const proseRegister: CSSProperties = {
   lineHeight: 1.7,
 }
 
-export const PROSE_MEASURE = '68ch'
-
 export const roomRegister: CSSProperties = {
   fontFamily: INTERFACE_FONT_STACK,
   fontWeight: 400,

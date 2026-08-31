@@ -161,7 +161,7 @@ function CallSiteRow({ site, options, pending, onAssign }: CallSiteRowProps) {
         <Typography variant="body2">{site.displayName}</Typography>
         <Typography variant="machine">{site.description}</Typography>
       </Box>
-      <FormControl size="small" sx={{ width: (theme) => theme.spacing(28), flexShrink: 0 }}>
+      <FormControl size="small" sx={{ width: (theme) => theme.measures.modelChoice, flexShrink: 0 }}>
         <Select
           value={site.assignment ?? ''}
           onChange={(event) => onAssign(site.site, event.target.value)}

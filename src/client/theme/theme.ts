@@ -1,6 +1,7 @@
 import { createTheme } from '@mui/material/styles'
 import { buttonWeights } from './controlWeights.js'
 import { fontFaceStyleOverrides, INTERFACE_FONT_STACK } from './fonts.js'
+import { surfaceMeasures } from './measures.js'
 import { participantMarkColors, participantMarkTreatment } from './participantMark.js'
 import { authorRegister, machineRegister, proseRegister, REGISTER_VARIANT_MAPPING, roomRegister } from './registers.js'
 
@@ -29,6 +30,7 @@ export const theme = createTheme({
     },
   },
   participantMark: participantMarkTreatment,
+  measures: surfaceMeasures,
   typography: {
     fontFamily: INTERFACE_FONT_STACK,
     prose: proseRegister,

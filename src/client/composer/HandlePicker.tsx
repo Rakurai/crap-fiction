@@ -14,7 +14,7 @@ export function HandlePicker({ anchorEl, matches, activeIndex, onPick }: HandleP
 
   return (
     <Popper open anchorEl={anchorEl} placement="top-start" sx={{ zIndex: (theme) => theme.zIndex.modal }}>
-      <Paper elevation={8} sx={{ minWidth: (theme) => theme.spacing(35), mb: 1 }}>
+      <Paper elevation={8} sx={{ minWidth: (theme) => theme.measures.handlePicker, mb: 1 }}>
         <MenuList dense>
           {matches.map((identity, index) => (
             <MenuItem

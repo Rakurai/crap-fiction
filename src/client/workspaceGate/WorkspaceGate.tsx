@@ -83,7 +83,7 @@ function DirectoryAsk() {
 function GateSurface({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <Box component="main" sx={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-      <Box sx={{ width: '100%', maxWidth: (theme) => theme.spacing(60) }}>{children}</Box>
+      <Box sx={{ width: '100%', maxWidth: (theme) => theme.measures.workspaceGate }}>{children}</Box>
     </Box>
   )
 }

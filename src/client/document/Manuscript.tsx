@@ -7,7 +7,6 @@ import { editorContentToMarkdown, markdownToEditorContent } from '../../document
 import { documentExtensions } from '../../document/schema.js'
 import type { DocumentSession } from '../pieceSession/documentSession.js'
 import type { DocumentPresentation } from '../shell/state.js'
-import { PROSE_MEASURE, proseRegister } from '../theme/registers.js'
 
 const MANUSCRIPT_EXTENSIONS = [...documentExtensions, History]
 
@@ -61,13 +60,13 @@ export function Manuscript({ document, presentation, editable }: ManuscriptProps
     <Box sx={{ height: '100%', width: '100%', overflowY: 'auto', containerType: 'inline-size' }}>
       <Box
         sx={(theme) => ({
-          maxWidth: PROSE_MEASURE,
+          maxWidth: theme.measures.prose,
           width: '100%',
           mx: 'auto',
           px: 2,
           py: 4,
           [theme.containerQueries.up('sm')]: { px: 6 },
-          ...proseRegister,
+          ...theme.typography.prose,
           '& .tiptap': { outline: 'none' },
         })}
       >

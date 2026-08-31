@@ -18,7 +18,7 @@ export function TranscriptColumn({ activeSurface }: TranscriptColumnProps) {
   return (
     <Box
       key={session.pieceId}
-      sx={{ width: (theme) => theme.spacing(45), flexShrink: 0, height: '100%', borderLeft: '1px solid', borderColor: 'divider' }}
+      sx={{ width: (theme) => theme.measures.transcript, flexShrink: 0, height: '100%', borderLeft: '1px solid', borderColor: 'divider' }}
     >
       {SURFACE_IDS.map((surface) => (
         <Panel key={surface} active={activeSurface === surface}>
