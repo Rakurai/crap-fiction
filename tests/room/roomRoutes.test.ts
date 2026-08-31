@@ -84,7 +84,16 @@ describe('the room over HTTP', () => {
   }
 
   async function untilIdle(room: Room): Promise<void> {
-    await room.settlement(draftScope)
+    await new Promise<void>((resolve) => {
+      const unsubscribe = room.subscribe(draftScope.pieceId, (event) => {
+        if (event.type !== 'action.finished' || event.data.surface !== draftScope.surface) return
+        unsubscribe()
+        resolve()
+      })
+      if (room.activitySnapshot(draftScope) !== undefined) return
+      unsubscribe()
+      resolve()
+    })
     const inFlight = room.activitySnapshot(draftScope)
     if (inFlight !== undefined) throw new Error(`the room still reports a ${inFlight.kind} in flight`)
   }

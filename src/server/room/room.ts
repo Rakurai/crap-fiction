@@ -119,10 +119,6 @@ type ActiveDispatch = {
   readonly startedAt: number
 }
 
-type RunningDispatch = ActiveDispatch & {
-  readonly settlement: Promise<void>
-}
-
 type PendingReplacement = Readonly<{
   applicationId: string
   responseId: string
@@ -143,7 +139,7 @@ type ActiveApply = {
   readonly pending?: PendingReplacement
 }
 
-type ActiveOperation = RunningDispatch | ActiveApply
+type ActiveOperation = ActiveDispatch | ActiveApply
 
 export type ApplyingConfig = Readonly<{ rounds: number }>
 
@@ -305,11 +301,6 @@ export class Room {
     }
   }
 
-  settlement(scope: RoomScope): Promise<void> | undefined {
-    const operation = this.#operationFor(scope)
-    return operation?.kind === 'dispatch' ? operation.settlement : undefined
-  }
-
   abandon(scope: RoomScope, actionId: string): void {
     const operation = this.#operationFor(scope)
     if (operation === undefined || operation.actionId !== actionId) return
@@ -421,11 +412,7 @@ export class Room {
     }
     const cause = causeEntry
 
-    let settled!: () => void
-    const settlement = new Promise<void>((resolve) => {
-      settled = resolve
-    })
-    this.#operations.set(roomScopeKey(roomScope), { ...dispatchState, settlement })
+    this.#operations.set(roomScopeKey(roomScope), dispatchState)
 
     const written = (async () => {
       if (!this.#owns(roomScope, actionId)) return
@@ -459,7 +446,6 @@ export class Room {
       )
       .finally(() => {
         this.#release(roomScope, actionId)
-        settled()
       })
 
     await written
