@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Box, Typography } from '@mui/material'
+import { Stack, Typography } from '@mui/material'
 import { FailingDocuments } from './FailingDocuments.js'
 
 export function useReadingEscape(active: boolean, onExit: () => void): void {
@@ -16,9 +16,12 @@ export function useReadingEscape(active: boolean, onExit: () => void): void {
 
 export function ReadingExit() {
   return (
-    <Box sx={{ position: 'fixed', insetInlineStart: (theme) => theme.spacing(2), insetBlockEnd: (theme) => theme.spacing(2) }}>
+    <Stack
+      spacing={0.5}
+      sx={{ position: 'fixed', insetInlineStart: (theme) => theme.spacing(2), insetBlockEnd: (theme) => theme.spacing(2), alignItems: 'flex-start' }}
+    >
       <Typography variant="machine">Esc to leave reading</Typography>
       <FailingDocuments />
-    </Box>
+    </Stack>
   )
 }
