@@ -1,4 +1,4 @@
-import { initialAutosaveState, transitionAutosave, type AutosaveState } from './autosave.js'
+import { initialAutosaveState, transitionAutosave, type AutosaveEvent, type AutosaveState } from './autosave.js'
 import { createSubscribableValue } from './subscribableValue.js'
 
 export type DocumentWrite = (text: string, signal: AbortSignal) => Promise<void>
@@ -41,42 +41,52 @@ export function createDocumentSession(initialText: string, write: DocumentWrite,
     clearDebounce()
     debounceTimer = setTimeout(() => {
       debounceTimer = null
-      apply({ type: 'debounceElapsed' })
+      dispatch({ type: 'debounceElapsed' })
     }, debounceMs)
   }
 
   async function runWrite(writeText: string): Promise<void> {
     const controller = new AbortController()
     currentAbort = controller
-    let succeeded: boolean
+    let reported: AutosaveEvent
     try {
       await write(writeText, controller.signal)
-      succeeded = true
+      reported = { type: 'writeSucceeded', text: writeText }
     } catch {
-      if (controller.signal.aborted) return
-      succeeded = false
+      reported = controller.signal.aborted ? { type: 'writeCancelled' } : { type: 'writeFailed', text: writeText }
     }
     currentAbort = null
-    apply(succeeded ? { type: 'writeSucceeded', text: writeText } : { type: 'writeFailed', text: writeText })
-    if (!autosave.writeInFlight) currentWrite = null
+    const followOn = apply(reported)
+    if (followOn !== null) await followOn
   }
 
-  function apply(event: Parameters<typeof transitionAutosave>[1]): void {
+  function apply(event: AutosaveEvent): Promise<void> | null {
     const transition = transitionAutosave(autosave, event)
     const failingChanged = transition.state.failing !== autosave.failing
     autosave = transition.state
     if (failingChanged) failing.set(autosave.failing)
+    let started: Promise<void> | null = null
     for (const effect of transition.effects) {
       if (effect.type === 'cancelDebounce') clearDebounce()
       else if (effect.type === 'scheduleDebounce') armDebounce()
-      else if (effect.type === 'startWrite') currentWrite = runWrite(effect.text)
+      else if (effect.type === 'startWrite') started = runWrite(effect.text)
     }
+    return started
+  }
+
+  function dispatch(event: AutosaveEvent): void {
+    const started = apply(event)
+    if (started === null) return
+    currentWrite = started
+    void started.then(() => {
+      if (currentWrite === started) currentWrite = null
+    })
   }
 
   const setText = (value: string): void => {
     if (disposed) return
     text.set(value)
-    apply({ type: 'textChanged', text: value })
+    dispatch({ type: 'textChanged', text: value })
   }
 
   return {
@@ -100,14 +110,11 @@ export function createDocumentSession(initialText: string, write: DocumentWrite,
       }
     },
 
-    flush: () => apply({ type: 'flushRequested' }),
+    flush: () => dispatch({ type: 'flushRequested' }),
 
     flushAndSettle: async () => {
-      apply({ type: 'flushRequested' })
-      while (currentWrite !== null) {
-        const pending = currentWrite
-        await pending
-      }
+      dispatch({ type: 'flushRequested' })
+      while (currentWrite !== null) await currentWrite
       return autosave.failing ? 'failing' : 'settled'
     },
 

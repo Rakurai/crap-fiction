@@ -4,6 +4,7 @@ export type AutosaveEvent =
   | Readonly<{ type: 'flushRequested' }>
   | Readonly<{ type: 'writeSucceeded'; text: string }>
   | Readonly<{ type: 'writeFailed'; text: string }>
+  | Readonly<{ type: 'writeCancelled' }>
 
 export type AutosaveEffect =
   | Readonly<{ type: 'scheduleDebounce' }>
@@ -26,7 +27,7 @@ export function initialAutosaveState(initialText: string): AutosaveState {
 function attemptStart(state: AutosaveState, cancelDebounce: boolean): AutosaveTransition {
   if (state.writeInFlight) return { state, effects: [] }
   const cancelEffect: readonly AutosaveEffect[] = cancelDebounce ? [{ type: 'cancelDebounce' }] : []
-  if (state.latestText === state.savedText) return { state, effects: cancelEffect }
+  if (state.latestText === state.savedText) return { state: { ...state, failing: false }, effects: cancelEffect }
   return { state: { ...state, writeInFlight: true }, effects: [...cancelEffect, { type: 'startWrite', text: state.latestText }] }
 }
 
@@ -56,6 +57,8 @@ export function transitionAutosave(state: AutosaveState, event: AutosaveEvent): 
       return settle(state, event.text, false)
     case 'writeFailed':
       return settle(state, event.text, true)
+    case 'writeCancelled':
+      return { state: { ...state, writeInFlight: false }, effects: [] }
     default: {
       const exhaustive: never = event
       return exhaustive

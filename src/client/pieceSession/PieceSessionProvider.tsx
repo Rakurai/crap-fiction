@@ -20,6 +20,7 @@ export type PieceSessionProviderProps = Readonly<{ pieceId: string | null; child
 export function PieceSessionProvider({ pieceId, children }: PieceSessionProviderProps) {
   const detail = presentValue(readState(usePieceDetail(pieceId)))
   const [session, setSession] = useState<PieceSession | null>(null)
+  const detailArrived = detail !== null
 
   useEffect(() => {
     if (pieceId === null || detail === null) {
@@ -36,7 +37,7 @@ export function PieceSessionProvider({ pieceId, children }: PieceSessionProvider
     return () => created.dispose()
     // The dependency on `detail` is deliberately just its arrival, not its content: a later
     // refresh of the served piece must never replace the client text this session already owns.
-  }, [pieceId, detail !== null])
+  }, [pieceId, detailArrived])
 
   return <PieceSessionContext.Provider value={session}>{children}</PieceSessionContext.Provider>
 }
@@ -89,10 +90,12 @@ export function useFailingSurfaceIds(): readonly SurfaceId[] {
   const draftFailing = useDocumentFailing('draft')
   const storyContextFailing = useDocumentFailing('storyContext')
   const authorContextFailing = useDocumentFailing('authorContext')
-  const failingBySurface: Readonly<Record<SurfaceId, boolean>> = {
-    draft: draftFailing,
-    storyContext: storyContextFailing,
-    authorContext: authorContextFailing,
-  }
-  return SURFACE_IDS.filter((surface) => failingBySurface[surface])
+  return useMemo(() => {
+    const failingBySurface: Readonly<Record<SurfaceId, boolean>> = {
+      draft: draftFailing,
+      storyContext: storyContextFailing,
+      authorContext: authorContextFailing,
+    }
+    return SURFACE_IDS.filter((surface) => failingBySurface[surface])
+  }, [draftFailing, storyContextFailing, authorContextFailing])
 }
