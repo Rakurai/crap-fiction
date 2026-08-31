@@ -55,6 +55,18 @@ export function RoomTrouble({ failures, finished, requestFailure }: RoomTroubleP
   )
 }
 
+export type ApplyStatementProps = Readonly<{ statement: string | null }>
+
+export function ApplyStatement({ statement }: ApplyStatementProps) {
+  if (statement === null) return null
+
+  return (
+    <TranscriptRow gutter={null}>
+      <Typography variant="machine">{statement}</Typography>
+    </TranscriptRow>
+  )
+}
+
 export type DispatchActivityProps = Readonly<{
   action: BusyAction
   entries: readonly ConversationEntryView[]

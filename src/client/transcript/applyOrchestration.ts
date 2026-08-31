@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ApplyOutcome } from '../../shared/applyViews.js'
 import type { ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
 import { useScopeActivity } from '../eventStream/RoomStreamProvider.js'
 import type { DocumentSession } from '../pieceSession/documentSession.js'
 import { confirmApply, fetchPendingReplacement, useAbandonAction, useApplyRecommendation } from '../servedFacts/resources.js'
+import { APPLY_FAILURE_TEXT } from './failureText.js'
 
 export type ApplyOrchestration = Readonly<{
   apply: (response: ParticipantResponseEntry, constraint: string | undefined, documents: DocumentSnapshot) => void
   abandon: (actionId: string) => void
-  holdReason: string | null
+  statement: string | null
 }>
+
+function failureStatement(outcome: Extract<ApplyOutcome, { outcome: 'failed' }>): string {
+  const returned = 'returned' in outcome ? outcome.returned : undefined
+  const detail = returned === undefined ? '' : `: ${returned}`
+  return `the change could not be applied — ${APPLY_FAILURE_TEXT[outcome.reason]}${detail}`
+}
 
 export function useApplyOrchestration(
   pieceId: string,
@@ -20,12 +28,13 @@ export function useApplyOrchestration(
   const { mutate: applyMutate } = useApplyRecommendation(pieceId, surface, conversationId)
   const { mutate: abandonMutate } = useAbandonAction(pieceId, surface)
   const scopeActivity = useScopeActivity(surface)
-  const [holdReason, setHoldReason] = useState<string | null>(null)
+  const [statement, setStatement] = useState<string | null>(null)
   const settledApplicationIds = useRef<Set<string>>(new Set())
 
   const claimApplication = useCallback((applicationId: string) => {
     if (settledApplicationIds.current.has(applicationId)) return false
     settledApplicationIds.current.add(applicationId)
+    setStatement(null)
     return true
   }, [])
 
@@ -33,7 +42,7 @@ export function useApplyOrchestration(
 
   const abandonWithReason = useCallback(
     (actionId: string, reason: string) => {
-      setHoldReason(reason)
+      setStatement(reason)
       abandonMutate({ conversationId, actionId })
     },
     [abandonMutate, conversationId],
@@ -78,19 +87,31 @@ export function useApplyOrchestration(
     }
   }, [scopeActivity, document, pieceId, surface, conversationId, settle, abandonWithReason, claimApplication])
 
-  useEffect(() => {
-    if (scopeActivity.status !== 'busy') setHoldReason(null)
-  }, [scopeActivity.status])
-
   const apply = useCallback(
     (response: ParticipantResponseEntry, constraint: string | undefined, documents: DocumentSnapshot) => {
+      setStatement(null)
       applyMutate(
         constraint === undefined ? { responseId: response.id, documents } : { responseId: response.id, constraint, documents },
         {
           onSuccess: (outcome) => {
-            if (outcome.outcome !== 'pending') return
-            if (!claimApplication(outcome.applicationId)) return
-            void settle(outcome.actionId, outcome.applicationId, outcome.replacement)
+            switch (outcome.outcome) {
+              case 'pending':
+                if (claimApplication(outcome.applicationId)) void settle(outcome.actionId, outcome.applicationId, outcome.replacement)
+                return
+              case 'noChange':
+                setStatement('the recommendation was applied and nothing changed')
+                return
+              case 'failed':
+                setStatement(failureStatement(outcome))
+                return
+              case 'abandoned':
+                setStatement('the application was abandoned')
+                return
+              default: {
+                const exhaustive: never = outcome
+                return exhaustive
+              }
+            }
           },
         },
       )
@@ -98,5 +119,5 @@ export function useApplyOrchestration(
     [applyMutate, settle, claimApplication],
   )
 
-  return { apply, abandon, holdReason }
+  return { apply, abandon, statement }
 }

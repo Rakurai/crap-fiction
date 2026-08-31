@@ -3,19 +3,10 @@ import { Box, Button, Collapse, Stack, TextField, Typography } from '@mui/materi
 import type { AppliedChangeContent } from '../../shared/appliedChange.js'
 import type { ParticipantFailureEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../../shared/conversationEntryViews.js'
-import type { FailureReason } from '../../shared/modelResult.js'
+import { FAILURE_TEXT } from './failureText.js'
 import { ParticipantMark, ParticipantNameHandle } from './ParticipantBadge.js'
 import type { ParticipantIdentity } from './identity.js'
 import { TranscriptRow } from './TranscriptRow.js'
-
-const FAILURE_TEXT: Readonly<Record<FailureReason, string>> = {
-  unconfigured: 'no model is assigned to this call',
-  unreachable: 'the model could not be reached',
-  timeout: 'the model did not answer in time',
-  malformed: "the model's answer could not be read",
-  nonconforming: "the model's answer did not fit what was asked",
-  internal: 'something went wrong on this end',
-}
 
 function formatTimestamp(atMs: number): string {
   return new Date(atMs).toLocaleString()

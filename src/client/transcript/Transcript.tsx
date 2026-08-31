@@ -8,7 +8,7 @@ import { presentValue, readState } from '../servedFacts/readState.js'
 import { useConversation, useDispatch } from '../servedFacts/resources.js'
 import { useApplyOrchestration } from './applyOrchestration.js'
 import { useParticipantIdentities } from './identity.js'
-import { DispatchActivity, RoomTrouble } from './ParticipantActivity.js'
+import { ApplyStatement, DispatchActivity, RoomTrouble } from './ParticipantActivity.js'
 import { TranscriptEntry, type ResponseActions } from './TranscriptEntry.js'
 
 export type TranscriptProps = Readonly<{ pieceId: string; surface: SurfaceId }>
@@ -101,12 +101,13 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
             withheld={scopeActivity.status !== 'idle'}
             applyingResponseId={applyingAction?.sourceEntryId ?? null}
             applyingActionId={applyingAction?.actionId ?? null}
-            holdReason={applyOrchestration.holdReason}
+            holdReason={applyOrchestration.statement}
           />
         ))}
         {scopeActivity.status === 'busy' && scopeActivity.action.kind === 'dispatch' && (
           <DispatchActivity action={scopeActivity.action} entries={conversation.entries} identities={identities} />
         )}
+        {applyingAction === null && <ApplyStatement statement={applyOrchestration.statement} />}
         <RoomTrouble failures={scopeFailures} finished={scopeFinish} requestFailure={dispatchMutation.error?.message ?? null} />
       </Stack>
     </Box>
