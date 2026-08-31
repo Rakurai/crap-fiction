@@ -5,7 +5,7 @@ import type { Hono } from 'hono'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { STUDIO_VARIABLES } from '../../src/server/env.js'
 
-describe('the fixture studio', () => {
+describe('the studio its composition root stands up', () => {
   let dataRoot: string
   let app: Hono
   let restoreEnv: Readonly<Record<string, string | undefined>>
