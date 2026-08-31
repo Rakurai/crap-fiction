@@ -9,6 +9,7 @@ import type { SurfaceId } from '../../shared/surfaces.js'
 import { useConversationPane, useConversationPaneState } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { useDeleteConversation, usePieceDetail } from '../servedFacts/resources.js'
+import { formatStamp } from '../stamp.js'
 
 export type ConversationsOverlayProps = Readonly<{
   pieceId: string
@@ -110,7 +111,7 @@ function revealedAtTheRow(theme: Theme) {
 }
 
 function RowTime({ conversation }: Readonly<{ conversation: ConversationSummary }>) {
-  const when = new Date(conversation.lastActivity).toLocaleString()
+  const when = formatStamp(conversation.lastActivity)
   if (conversation.opening !== undefined) return <>{when}</>
   return (
     <>

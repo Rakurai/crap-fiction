@@ -3,14 +3,11 @@ import { Box, Button, Collapse, Stack, TextField, Typography } from '@mui/materi
 import type { AppliedChangeContent } from '../../shared/appliedChange.js'
 import type { ParticipantFailureEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { ApplicationEntryView, ConversationEntryView } from '../../shared/conversationEntryViews.js'
+import { formatStamp } from '../stamp.js'
 import { FAILURE_TEXT } from './failureText.js'
 import { ParticipantMark, ParticipantNameHandle } from './ParticipantBadge.js'
 import type { ParticipantIdentity } from './identity.js'
 import { TranscriptRow } from './TranscriptRow.js'
-
-function formatTimestamp(atMs: number): string {
-  return new Date(atMs).toLocaleString()
-}
 
 export type ResponseActions = Readonly<{
   focusComposerFor: (identity: ParticipantIdentity | null) => void
@@ -113,7 +110,7 @@ export function AuthorMessageLine({
           <Typography variant="author" sx={{ flexGrow: 1 }}>
             {text}
           </Typography>
-          {atMs !== undefined && <Typography variant="machine">{formatTimestamp(atMs)}</Typography>}
+          {atMs !== undefined && <Typography variant="machine">{formatStamp(atMs)}</Typography>}
         </Stack>
         {brought.length > 0 && (
           <Typography variant="machine">
@@ -140,7 +137,7 @@ export function ConcreteChangeRequestLine({
         {clarification !== undefined && <Typography variant="author">{clarification}</Typography>}
         <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
           <Typography variant="machine">asked {targetIdentity?.displayName ?? target} to get concrete</Typography>
-          {atMs !== undefined && <Typography variant="machine">{formatTimestamp(atMs)}</Typography>}
+          {atMs !== undefined && <Typography variant="machine">{formatStamp(atMs)}</Typography>}
         </Stack>
       </Stack>
     </TranscriptRow>
