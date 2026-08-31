@@ -1362,6 +1362,39 @@ describe('Room.apply', () => {
     expect(retried.outcome.outcome).toBe('pending')
   })
 
+  it('refuses to confirm an emptying application against a document that is not there, rather than reading absence as an empty document that matches it', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: '' }] } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+    expect(outcome.replacement).toBe('')
+    expect(readPiece(workspaceDir, pieceId)?.draft).toBeUndefined()
+
+    await expect(room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)).rejects.toThrowError(
+      ApplicationDocumentNotSavedError,
+    )
+    expect(entries(dataRoot, workspaceDir, pieceId, 'c1').filter((entry) => entry.kind === 'application')).toEqual([])
+    expect(readAppliedChanges(dataRoot, draftScope(workspaceDir, pieceId), appliedChangeSchema)).toEqual([])
+  })
+
+  it('confirms an emptying application once the empty document is actually there, so an empty document is not an absent one', async () => {
+    const { pieceId } = await pieceWithRecommendation()
+    const { room } = buildRoom(dataRoot, {
+      apply: { result: { outcome: 'value', value: { edits: [{ find: 'draft text', replace: '' }] } } },
+    })
+
+    const { outcome } = await room.apply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), responseId(pieceId), undefined, documents('draft text'))
+    if (outcome.outcome !== 'pending') throw new Error('expected the application to be pending')
+    await new DraftStore().write(workspaceDir, pieceId, outcome.replacement)
+
+    await expect(room.confirmApply(workspaceDir, scope(pieceId), cid(scope(pieceId), 'c1'), outcome.applicationId)).resolves.toMatchObject({
+      entryId: outcome.applicationId,
+    })
+  })
+
   it('confirming an already-committed identity a second time is a no-op that answers with what it already committed', async () => {
     const { pieceId } = await pieceWithRecommendation()
     const { room } = buildRoom(dataRoot, {

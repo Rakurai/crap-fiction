@@ -809,9 +809,9 @@ export class Room {
   }
 
   /** The document Apply targets, read as it stands persisted — never the client's in-memory copy. */
-  #readTargetText(workspaceDir: string, pieceId: string, surface: RoomScope['surface']): string {
-    if (surface === 'draft') return readPiece(workspaceDir, pieceId)?.draft?.text ?? ''
-    if (surface === 'storyContext') return readStoryContext(workspaceDir, pieceId) ?? ''
-    return readAuthorContext(this.#dataRoot) ?? ''
+  #readTargetText(workspaceDir: string, pieceId: string, surface: RoomScope['surface']): string | undefined {
+    if (surface === 'draft') return readPiece(workspaceDir, pieceId)?.draft?.text
+    if (surface === 'storyContext') return readStoryContext(workspaceDir, pieceId)
+    return readAuthorContext(this.#dataRoot)
   }
 }
