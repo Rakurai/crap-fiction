@@ -4,6 +4,7 @@ import { Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { config } from '../config.js'
 import { useRoomConnectionStatus, useScopeActivity } from '../eventStream/RoomStreamProvider.js'
+import type { ConnectionStatus } from '../eventStream/roomProjection.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { dispatchTo, mintConversation, useAbandonAction, usePieceDetail, type DispatchResult } from '../servedFacts/resources.js'
@@ -13,6 +14,23 @@ import { HandlePicker } from './HandlePicker.js'
 import { detectMentionQuery, insertMention, matchingHandles, type MentionQuery } from './mentionQuery.js'
 
 export type ComposerProps = Readonly<{ pieceId: string; surface: SurfaceId }>
+
+function unrecoveredConnection(connection: ConnectionStatus): string | null {
+  switch (connection.status) {
+    case 'absent':
+      return null
+    case 'retrying':
+      return null
+    case 'open':
+      return null
+    case 'failed':
+      return "the room's connection could not be recovered — reload to try again"
+    default: {
+      const exhaustive: never = connection
+      return exhaustive
+    }
+  }
+}
 
 export function Composer({ pieceId, surface }: ComposerProps) {
   const identities = useParticipantIdentities(pieceId, surface)
@@ -27,7 +45,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
 
   const busyAction = activity.status === 'busy' ? activity.action : null
   const busyDispatch = busyAction !== null && busyAction.kind === 'dispatch' ? busyAction : null
-  const connectionFailed = connection.status === 'failed'
+  const unrecovered = unrecoveredConnection(connection)
 
   const abandonMutation = useAbandonAction(pieceId, surface)
 
@@ -60,7 +78,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
     fieldRef.current?.setSelectionRange(pos, pos)
   }, [paneState.composerText])
 
-  const disabled = activity.status !== 'idle' || connectionFailed || sendMutation.isPending
+  const disabled = activity.status !== 'idle' || unrecovered !== null || sendMutation.isPending
   const text = paneState.composerText
   const canSend = !disabled && text.trim() !== ''
 
@@ -142,9 +160,9 @@ export function Composer({ pieceId, surface }: ComposerProps) {
 
   return (
     <Paper elevation={0} square sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-      {connectionFailed && (
+      {unrecovered !== null && (
         <Typography variant="machine" sx={{ display: 'block', mb: 1 }}>
-          the room's connection could not be recovered — reload to try again
+          {unrecovered}
         </Typography>
       )}
       {sendMutation.error !== null && (

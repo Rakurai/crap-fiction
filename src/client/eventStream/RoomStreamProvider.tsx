@@ -30,7 +30,7 @@ function neverSubscribe(): () => void {
 }
 
 const UNKNOWN_ACTIVITY: ScopeActivity = { status: 'unknown' }
-const RETRYING_CONNECTION: ConnectionStatus = { status: 'retrying' }
+const ABSENT_CONNECTION: ConnectionStatus = { status: 'absent' }
 const NO_FAILURES: readonly StatedFailure[] = []
 
 export function useScopeActivity(surface: SurfaceId): ScopeActivity {
@@ -43,7 +43,7 @@ export function useScopeActivity(surface: SurfaceId): ScopeActivity {
 
 export function useRoomConnectionStatus(): ConnectionStatus {
   const connection = useContext(RoomStreamContext)
-  return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().connection ?? RETRYING_CONNECTION)
+  return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().connection ?? ABSENT_CONNECTION)
 }
 
 export function useScopeFailures(surface: SurfaceId): readonly StatedFailure[] {

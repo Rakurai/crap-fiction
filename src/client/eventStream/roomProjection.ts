@@ -27,6 +27,7 @@ export type ScopeActivity =
   | Readonly<{ status: 'busy'; action: BusyAction }>
 
 export type ConnectionStatus =
+  | Readonly<{ status: 'absent' }>
   | Readonly<{ status: 'retrying' }>
   | Readonly<{ status: 'open' }>
   | Readonly<{ status: 'failed'; reason: 'disconnected' | 'unreadable' }>
@@ -227,19 +228,18 @@ function drainBuffer(state: RoomProjectionState, frames: readonly RoomEvent[]): 
 }
 
 function applyFrame(state: RoomProjectionState, frame: Frame): RoomProjectionTransition {
-  const connection: ConnectionStatus = { status: 'open' }
   if (frame.type === 'activity.snapshot') {
     const snapshotState: RoomProjectionState = {
       ...state,
-      connection,
+      connection: { status: 'open' },
       awaitingSnapshot: false,
       buffered: [],
       scopes: scopesFromSnapshot(frame.data),
     }
     return drainBuffer(snapshotState, state.buffered)
   }
-  if (state.awaitingSnapshot) return noEffects({ ...state, connection, buffered: [...state.buffered, frame] })
-  return applyRoomEvent({ ...state, connection }, frame)
+  if (state.awaitingSnapshot) return noEffects({ ...state, buffered: [...state.buffered, frame] })
+  return applyRoomEvent(state, frame)
 }
 
 export function transitionRoomProjection(state: RoomProjectionState, event: StreamEvent): RoomProjectionTransition {
@@ -247,7 +247,7 @@ export function transitionRoomProjection(state: RoomProjectionState, event: Stre
     case 'connecting':
       return noEffects(reconnecting(state, { status: 'retrying' }))
     case 'opened':
-      return noEffects({ ...state, connection: { status: 'open' } })
+      return noEffects(state)
     case 'disconnected':
       return noEffects(reconnecting(state, { status: 'failed', reason: 'disconnected' }))
     case 'unreadable':
