@@ -1,6 +1,5 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import SettingsIcon from '@mui/icons-material/Settings'
 import { Alert, Box, Button, CircularProgress, Divider, IconButton, List, ListItemButton, ListItemText, MenuItem, Stack, TextField, Toolbar, Typography } from '@mui/material'
 import type { ModeSummary } from '../../shared/modeViews.js'
@@ -10,8 +9,9 @@ import type { LeaveRefusal } from '../pieceSession/pieceSession.js'
 import { presentValue, readState, type ReadState } from '../servedFacts/readState.js'
 import { useCreatePiece, useModes, usePieces, useWorkspace } from '../servedFacts/resources.js'
 import { FailingDocuments } from '../shell/FailingDocuments.js'
+import { formatStamp } from '../stamp.js'
 
-type View = Readonly<{ kind: 'list' }> | Readonly<{ kind: 'detail'; id: string }> | Readonly<{ kind: 'create' }>
+type Pane = Readonly<{ kind: 'piece'; id: string }> | Readonly<{ kind: 'create' }> | Readonly<{ kind: 'nothingChosen' }>
 
 type ModeChoice = Readonly<{ kind: 'sole'; mode: string }> | Readonly<{ kind: 'choose'; modes: readonly ModeSummary[] }>
 
@@ -49,7 +49,7 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
   const modesRead = readState(useModes())
   const createMutation = useCreatePiece()
 
-  const [view, setView] = useState<View>({ kind: 'list' })
+  const [pane, setPane] = useState<Pane>(openPieceId === null ? { kind: 'nothingChosen' } : { kind: 'piece', id: openPieceId })
   const [refusal, setRefusal] = useState<string | null>(null)
   const [leaving, setLeaving] = useState(false)
 
@@ -83,38 +83,44 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
   }
 
   async function closeOpenPiece(): Promise<void> {
-    await leaveThen(() => {
-      onClosePiece()
-      setView({ kind: 'list' })
-    })
+    await leaveThen(onClosePiece)
   }
 
   function handleCreate(title: string, mode: string): void {
     createMutation.mutate({ title, mode }, { onSuccess: (created) => goTo(created.id) })
   }
 
+  function choosePiece(id: string): void {
+    setRefusal(null)
+    setPane({ kind: 'piece', id })
+  }
+
   return (
     <>
       <Toolbar sx={{ gap: 1 }}>
-        {view.kind !== 'list' && (
-          <IconButton aria-label="Back to pieces" onClick={() => setView({ kind: 'list' })}>
-            <ArrowBackIcon />
-          </IconButton>
-        )}
         <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-          {view.kind === 'create' ? 'New piece' : 'Pieces'}
+          Pieces
         </Typography>
-        {view.kind === 'list' && (
-          <IconButton aria-label="New piece" onClick={() => setView({ kind: 'create' })} disabled={choice === null}>
-            <AddIcon />
-          </IconButton>
-        )}
-        {view.kind === 'list' && onOpenSettings !== null && (
+        <IconButton aria-label="New piece" onClick={() => setPane({ kind: 'create' })} disabled={choice === null || pane.kind === 'create'}>
+          <AddIcon />
+        </IconButton>
+        {onOpenSettings !== null && (
           <IconButton aria-label="Settings" onClick={onOpenSettings}>
             <SettingsIcon />
           </IconButton>
         )}
       </Toolbar>
+      <Divider />
+
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6">crap-fiction</Typography>
+        <Typography variant="body2" color="text.secondary">
+          A studio for writing fiction with a team of specialist collaborators.
+        </Typography>
+        <Typography variant="machine" component="p" sx={{ mt: 1 }}>
+          {workspaceStatement(workspaceRead)}
+        </Typography>
+      </Box>
       <Divider />
 
       {refusal !== null && (
@@ -123,50 +129,52 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
         </Alert>
       )}
 
-      <Box sx={{ flexGrow: 1, minHeight: 0, overflowY: 'auto' }}>
-        {view.kind === 'list' && (
-          <>
-            <Box sx={{ p: 2 }}>
-              <Typography variant="h6">crap-fiction</Typography>
-              <Typography variant="body2" color="text.secondary">
-                A studio for writing fiction with a team of specialist collaborators.
-              </Typography>
-              <Typography variant="machine" component="p" sx={{ mt: 1 }}>
-                {workspaceStatement(workspaceRead)}
-              </Typography>
-            </Box>
-            <Divider />
-            <PiecesList piecesRead={piecesRead} openPieceId={openPieceId} onSelect={(id) => setView({ kind: 'detail', id })} />
-          </>
-        )}
-
-        {view.kind === 'detail' && (
-          <PieceDetailPane
-            id={view.id}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flexGrow: 1, minHeight: 0 }}>
+        <Box sx={{ minWidth: 0, overflowY: 'auto', borderRight: 1, borderColor: 'divider' }}>
+          <PiecesList
             piecesRead={piecesRead}
-            modes={modes ?? []}
-            showMode={showMode}
-            isOpen={openPieceId === view.id}
-            leaving={leaving}
-            leaveHeld={failingSurfaces.length > 0}
-            onOpen={() => goTo(view.id)}
-            onClose={closeOpenPiece}
+            openPieceId={openPieceId}
+            chosenId={pane.kind === 'piece' ? pane.id : null}
+            onChoose={choosePiece}
           />
-        )}
+        </Box>
 
-        {view.kind === 'create' &&
-          (choice === null ? (
-            <Typography sx={{ p: 2 }} color="text.secondary">
-              No modes are loaded, so there is nothing to start a piece from.
-            </Typography>
-          ) : (
-            <CreatePieceForm
-              choice={choice}
-              pending={createMutation.isPending}
-              error={createMutation.error?.message ?? null}
-              onCreate={handleCreate}
+        <Box sx={{ minWidth: 0, overflowY: 'auto' }}>
+          {pane.kind === 'piece' && (
+            <PieceDetailPane
+              id={pane.id}
+              piecesRead={piecesRead}
+              modes={modes ?? []}
+              showMode={showMode}
+              isOpen={openPieceId === pane.id}
+              leaving={leaving}
+              leaveHeld={failingSurfaces.length > 0}
+              onOpen={() => goTo(pane.id)}
+              onClose={closeOpenPiece}
             />
-          ))}
+          )}
+
+          {pane.kind === 'nothingChosen' && (
+            <Typography variant="machine" component="p" sx={{ p: 2 }}>
+              Choose a piece to see what is in it.
+            </Typography>
+          )}
+
+          {pane.kind === 'create' &&
+            (choice === null ? (
+              <Typography sx={{ p: 2 }} color="text.secondary">
+                No modes are loaded, so there is nothing to start a piece from.
+              </Typography>
+            ) : (
+              <CreatePieceForm
+                choice={choice}
+                pending={createMutation.isPending}
+                error={createMutation.error?.message ?? null}
+                onCreate={handleCreate}
+                onAbandon={() => setPane(openPieceId === null ? { kind: 'nothingChosen' } : { kind: 'piece', id: openPieceId })}
+              />
+            ))}
+        </Box>
       </Box>
     </>
   )
@@ -177,13 +185,19 @@ function workspaceStatement(workspaceRead: ReadState<string | null>): string {
   return workspace === null || workspace === '' ? 'The workspace directory could not be read.' : `Kept in ${workspace}`
 }
 
+function pieceFacts(piece: PieceSummary, isOpen: boolean): string {
+  const facts = [`${piece.length} words`, `touched ${formatStamp(piece.modified)}`]
+  return (isOpen ? ['open', ...facts] : facts).join(' · ')
+}
+
 type PiecesListProps = Readonly<{
   piecesRead: ReadState<readonly PieceSummary[]>
   openPieceId: string | null
-  onSelect: (id: string) => void
+  chosenId: string | null
+  onChoose: (id: string) => void
 }>
 
-function PiecesList({ piecesRead, openPieceId, onSelect }: PiecesListProps) {
+function PiecesList({ piecesRead, openPieceId, chosenId, onChoose }: PiecesListProps) {
   const pieces = presentValue(piecesRead)
 
   if (pieces === null) {
@@ -201,8 +215,12 @@ function PiecesList({ piecesRead, openPieceId, onSelect }: PiecesListProps) {
       ) : (
         <List disablePadding>
           {pieces.map((piece) => (
-            <ListItemButton key={piece.id} onClick={() => onSelect(piece.id)} selected={piece.id === openPieceId}>
-              <ListItemText primary={piece.title} secondary={piece.id === openPieceId ? 'Currently open' : undefined} />
+            <ListItemButton key={piece.id} onClick={() => onChoose(piece.id)} selected={piece.id === chosenId}>
+              <ListItemText
+                primary={piece.title}
+                secondary={pieceFacts(piece, piece.id === openPieceId)}
+                slotProps={{ primary: { noWrap: true }, secondary: { variant: 'machine' } }}
+              />
             </ListItemButton>
           ))}
         </List>
@@ -233,7 +251,7 @@ function PieceDetailPane({ id, piecesRead, modes, showMode, isOpen, leaving, lea
     <Stack spacing={2} sx={{ p: 2 }}>
       <Typography variant="h6">{piece.title}</Typography>
       {showMode && <Typography variant="machine">{modeLabel}</Typography>}
-      <Typography variant="machine">{piece.length} words</Typography>
+      <Typography variant="machine">{pieceFacts(piece, isOpen)}</Typography>
       {isOpen ? (
         <Button variant="destructive" onClick={onClose} disabled={leaving || leaveHeld}>
           {leaving ? 'Leaving…' : 'Close piece'}
@@ -258,9 +276,10 @@ type CreatePieceFormProps = Readonly<{
   pending: boolean
   error: string | null
   onCreate: (title: string, mode: string) => void
+  onAbandon: () => void
 }>
 
-function CreatePieceForm({ choice, pending, error, onCreate }: CreatePieceFormProps) {
+function CreatePieceForm({ choice, pending, error, onCreate, onAbandon }: CreatePieceFormProps) {
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const trimmed = title.trim()
@@ -274,6 +293,7 @@ function CreatePieceForm({ choice, pending, error, onCreate }: CreatePieceFormPr
 
   return (
     <Stack component="form" onSubmit={handleSubmit} spacing={2} sx={{ p: 2 }}>
+      <Typography variant="h6">New piece</Typography>
       {error !== null && <Alert severity="error">{error}</Alert>}
       <TextField label="Title" value={title} onChange={(event) => setTitle(event.target.value)} autoFocus fullWidth disabled={pending} />
       {choice.kind === 'choose' && (
@@ -285,9 +305,14 @@ function CreatePieceForm({ choice, pending, error, onCreate }: CreatePieceFormPr
           ))}
         </TextField>
       )}
-      <Button type="submit" variant="affirm" disabled={pending || trimmed === '' || mode === null}>
-        {pending ? 'Creating…' : 'Create'}
-      </Button>
+      <Stack direction="row" spacing={1}>
+        <Button type="submit" variant="affirm" disabled={pending || trimmed === '' || mode === null}>
+          {pending ? 'Creating…' : 'Create'}
+        </Button>
+        <Button variant="quiet" onClick={onAbandon} disabled={pending}>
+          Cancel
+        </Button>
+      </Stack>
     </Stack>
   )
 }

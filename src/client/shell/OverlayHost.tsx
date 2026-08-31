@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Dialog, Drawer } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 import type { OverlayId } from './state.js'
 
 export type OverlayHostProps = Readonly<{
@@ -9,9 +10,13 @@ export type OverlayHostProps = Readonly<{
   children: ReactNode
 }>
 
-const SIDE_ANCHOR: Readonly<Record<'pieces' | 'conversations', 'left' | 'right'>> = {
-  pieces: 'left',
-  conversations: 'right',
+type SideOverlay = Readonly<{ anchor: 'left' | 'right'; paperSx: SxProps<Theme> }>
+
+const AS_A_COLUMN = { display: 'flex', flexDirection: 'column' } as const
+
+const SIDE_OVERLAYS: Readonly<Record<'pieces' | 'conversations', SideOverlay>> = {
+  pieces: { anchor: 'left', paperSx: { ...AS_A_COLUMN, width: (theme) => theme.spacing(80), maxWidth: '100vw' } },
+  conversations: { anchor: 'right', paperSx: { ...AS_A_COLUMN, minWidth: (theme) => theme.spacing(45) } },
 }
 
 export function OverlayHost({ overlay, dismissable, onDismiss, children }: OverlayHostProps) {
@@ -22,11 +27,11 @@ export function OverlayHost({ overlay, dismissable, onDismiss, children }: Overl
   if (overlay === 'pieces' || overlay === 'conversations') {
     return (
       <Drawer
-        anchor={SIDE_ANCHOR[overlay]}
+        anchor={SIDE_OVERLAYS[overlay].anchor}
         open
         onClose={handleClose}
         slotProps={{
-          paper: { sx: { minWidth: (theme) => theme.spacing(45), display: 'flex', flexDirection: 'column' } },
+          paper: { sx: SIDE_OVERLAYS[overlay].paperSx },
           ...(overlay === 'conversations' ? { backdrop: { invisible: true } } : {}),
         }}
       >
