@@ -60,7 +60,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
     fieldRef.current?.setSelectionRange(pos, pos)
   }, [paneState.composerText])
 
-  const disabled = busyAction !== null || connectionFailed || sendMutation.isPending
+  const disabled = activity.status !== 'idle' || connectionFailed || sendMutation.isPending
   const text = paneState.composerText
   const canSend = !disabled && text.trim() !== ''
 

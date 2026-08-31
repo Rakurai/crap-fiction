@@ -98,7 +98,7 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
             actions={actions}
             disclosed={paneState.disclosures}
             onToggleDisclosure={toggleDisclosure}
-            busy={scopeActivity.status === 'busy'}
+            withheld={scopeActivity.status !== 'idle'}
             applyingResponseId={applyingAction?.sourceEntryId ?? null}
             applyingActionId={applyingAction?.actionId ?? null}
             holdReason={applyOrchestration.holdReason}

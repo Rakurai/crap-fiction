@@ -188,7 +188,7 @@ export type ParticipantResponseCardProps = Readonly<{
   actions: ResponseActions
   disclosed: ReadonlySet<string>
   onToggleDisclosure: (id: string) => void
-  busy: boolean
+  withheld: boolean
   applyingActionId: string | null
   holdReason: string | null
 }>
@@ -200,7 +200,7 @@ export function ParticipantResponseCard({
   actions,
   disclosed,
   onToggleDisclosure,
-  busy,
+  withheld,
   applyingActionId,
   holdReason,
 }: ParticipantResponseCardProps) {
@@ -241,7 +241,7 @@ export function ParticipantResponseCard({
               <Button
                 variant="affirm"
                 size="small"
-                disabled={busy}
+                disabled={withheld}
                 onClick={() => {
                   actions.apply(entry, text.trim() === '' ? undefined : text.trim())
                   setText('')
@@ -254,7 +254,7 @@ export function ParticipantResponseCard({
               <Button
                 variant="affirm"
                 size="small"
-                disabled={busy}
+                disabled={withheld}
                 onClick={() => {
                   actions.askForConcreteChange(entry, text.trim() === '' ? undefined : text.trim())
                   setText('')
@@ -264,14 +264,14 @@ export function ParticipantResponseCard({
               </Button>
             )}
             {application !== undefined && (
-              <Button variant="quiet" size="small" disabled={busy} onClick={() => actions.focusComposerFor(null)}>
+              <Button variant="quiet" size="small" disabled={withheld} onClick={() => actions.focusComposerFor(null)}>
                 Ask the room about this change
               </Button>
             )}
             <Button
               variant="affirm"
               size="small"
-              disabled={busy}
+              disabled={withheld}
               onClick={() => {
                 if (text.trim() === '') {
                   actions.focusComposerFor(identity)
@@ -297,7 +297,7 @@ export type TranscriptEntryProps = Readonly<{
   actions: ResponseActions
   disclosed: ReadonlySet<string>
   onToggleDisclosure: (id: string) => void
-  busy: boolean
+  withheld: boolean
   applyingResponseId: string | null
   applyingActionId: string | null
   holdReason: string | null
@@ -310,7 +310,7 @@ export function TranscriptEntry({
   actions,
   disclosed,
   onToggleDisclosure,
-  busy,
+  withheld,
   applyingResponseId,
   applyingActionId,
   holdReason,
@@ -336,7 +336,7 @@ export function TranscriptEntry({
           actions={actions}
           disclosed={disclosed}
           onToggleDisclosure={onToggleDisclosure}
-          busy={busy}
+          withheld={withheld}
           applyingActionId={applyingResponseId === entry.id ? applyingActionId : null}
           holdReason={holdReason}
         />
