@@ -5,7 +5,6 @@ import {
   CircularProgress,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   MenuItem,
   Select,
@@ -35,8 +34,7 @@ export function SettingsOverlay() {
         <Tab value="general" label="General" />
         <Tab value="models" label="Models" />
       </Tabs>
-      <Divider />
-      <DialogContent>{tab === 'general' ? <GeneralSection /> : <ModelSection />}</DialogContent>
+      <DialogContent dividers>{tab === 'general' ? <GeneralSection /> : <ModelSection />}</DialogContent>
     </>
   )
 }

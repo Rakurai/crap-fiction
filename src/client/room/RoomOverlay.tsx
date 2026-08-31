@@ -46,7 +46,7 @@ export function RoomOverlay({ pieceId, surface }: RoomOverlayProps) {
   return (
     <>
       <DialogTitle>Room</DialogTitle>
-      <DialogContent>
+      <DialogContent dividers>
         {setCast.isError && <Alert severity="error" sx={{ mb: 2 }}>{setCast.error.message}</Alert>}
         <List disablePadding>
           {generalist !== undefined && (

@@ -47,7 +47,7 @@ export function OverlayHost({ overlay, dismissable, onDismiss, children }: Overl
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
-        slotProps={{ paper: { sx: { minHeight: (theme) => theme.spacing(30) } } }}
+        slotProps={{ paper: { sx: { minHeight: (theme) => theme.spacing(30), pb: 1 } } }}
       >
         {children}
       </Dialog>
