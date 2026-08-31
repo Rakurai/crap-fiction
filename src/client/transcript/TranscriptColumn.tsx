@@ -3,6 +3,7 @@ import { Box } from '@mui/material'
 import { SURFACE_IDS, type SurfaceId } from '../../shared/surfaces.js'
 import { Composer } from '../composer/Composer.js'
 import { usePieceSession } from '../pieceSession/PieceSessionProvider.js'
+import { transcriptColumnWidth } from '../shell/regions.js'
 import { Transcript } from './Transcript.js'
 
 function Panel({ active, children }: Readonly<{ active: boolean; children: ReactNode }>) {
@@ -18,7 +19,7 @@ export function TranscriptColumn({ activeSurface }: TranscriptColumnProps) {
   return (
     <Box
       key={session.pieceId}
-      sx={{ width: (theme) => theme.spacing(45), flexShrink: 0, height: '100%', borderLeft: '1px solid', borderColor: 'divider' }}
+      sx={{ width: transcriptColumnWidth, flexShrink: 0, height: '100%', borderLeft: '1px solid', borderColor: 'divider' }}
     >
       {SURFACE_IDS.map((surface) => (
         <Panel key={surface} active={activeSurface === surface}>

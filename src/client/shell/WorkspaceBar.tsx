@@ -20,8 +20,8 @@ export function WorkspaceBar({ pieceOpen, activeSurface, onSelectSurface, onOpen
 
   return (
     <AppBar position="static" color="default" enableColorOnDark>
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Toolbar sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
           {pieceOpen ? (
             <Tooltip title="Pieces">
               <IconButton onClick={() => onOpenOverlay('pieces')} aria-label="Open a piece">
@@ -52,15 +52,17 @@ export function WorkspaceBar({ pieceOpen, activeSurface, onSelectSurface, onOpen
           )}
         </Box>
 
-        {pieceOpen && (
-          <Tabs value={activeSurface} onChange={(_event, value: SurfaceId) => onSelectSurface(value)} aria-label="Editing surface">
-            {SURFACE_IDS.map((surface) => (
-              <Tab key={surface} value={surface} label={SURFACE_LABEL[surface]} />
-            ))}
-          </Tabs>
-        )}
+        <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {pieceOpen && (
+            <Tabs value={activeSurface} onChange={(_event, value: SurfaceId) => onSelectSurface(value)} aria-label="Editing surface">
+              {SURFACE_IDS.map((surface) => (
+                <Tab key={surface} value={surface} label={SURFACE_LABEL[surface]} />
+              ))}
+            </Tabs>
+          )}
+        </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
           {pieceOpen && (
             <>
               <Tooltip title="Room">
