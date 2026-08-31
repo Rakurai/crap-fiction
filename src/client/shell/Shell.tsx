@@ -1,8 +1,12 @@
 import { Alert, Box } from '@mui/material'
 import { ErrorBoundary } from 'react-error-boundary'
+import { ConversationsOverlay } from '../conversations/ConversationsOverlay.js'
 import { Document } from '../document/Document.js'
+import { PiecesOverlay } from '../pieces/PiecesOverlay.js'
+import { RoomOverlay } from '../room/RoomOverlay.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { usePieceDetail } from '../servedFacts/resources.js'
+import { SettingsOverlay } from '../settings/SettingsOverlay.js'
 import { TranscriptColumn } from '../transcript/TranscriptColumn.js'
 import { OverlayHost } from './OverlayHost.js'
 import { ReadingExit, useReadingEscape } from './Reading.js'
@@ -58,7 +62,16 @@ export function Shell({ shell }: ShellProps) {
 
         {isReading && <ReadingExit />}
 
-        <OverlayHost overlay={shell.overlay} dismissable={pieceOpen} onDismiss={() => shell.setOverlay(null)} />
+        <OverlayHost overlay={shell.overlay} dismissable={pieceOpen} onDismiss={() => shell.setOverlay(null)}>
+          {shell.overlay === 'pieces' && <PiecesOverlay shell={shell} />}
+          {shell.overlay === 'conversations' && pieceOpen && shell.openPieceId !== null && (
+            <ConversationsOverlay pieceId={shell.openPieceId} surface={shell.activeSurface} onDismiss={() => shell.setOverlay(null)} />
+          )}
+          {shell.overlay === 'room' && pieceOpen && shell.openPieceId !== null && (
+            <RoomOverlay pieceId={shell.openPieceId} surface={shell.activeSurface} />
+          )}
+          {shell.overlay === 'settings' && <SettingsOverlay />}
+        </OverlayHost>
       </Box>
     </ErrorBoundary>
   )

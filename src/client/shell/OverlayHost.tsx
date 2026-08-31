@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Dialog, Drawer } from '@mui/material'
 import type { OverlayId } from './state.js'
 
@@ -5,6 +6,7 @@ export type OverlayHostProps = Readonly<{
   overlay: OverlayId | null
   dismissable: boolean
   onDismiss: () => void
+  children?: ReactNode
 }>
 
 const SIDE_ANCHOR: Readonly<Record<'pieces' | 'conversations', 'left' | 'right'>> = {
@@ -12,7 +14,7 @@ const SIDE_ANCHOR: Readonly<Record<'pieces' | 'conversations', 'left' | 'right'>
   conversations: 'right',
 }
 
-export function OverlayHost({ overlay, dismissable, onDismiss }: OverlayHostProps) {
+export function OverlayHost({ overlay, dismissable, onDismiss, children }: OverlayHostProps) {
   const handleClose = () => {
     if (dismissable) onDismiss()
   }
@@ -24,10 +26,12 @@ export function OverlayHost({ overlay, dismissable, onDismiss }: OverlayHostProp
         open
         onClose={handleClose}
         slotProps={{
-          paper: { sx: { minWidth: (theme) => theme.spacing(45) } },
+          paper: { sx: { minWidth: (theme) => theme.spacing(45), display: 'flex', flexDirection: 'column' } },
           ...(overlay === 'conversations' ? { backdrop: { invisible: true } } : {}),
         }}
-      />
+      >
+        {children}
+      </Drawer>
     )
   }
 
@@ -39,7 +43,9 @@ export function OverlayHost({ overlay, dismissable, onDismiss }: OverlayHostProp
         maxWidth="sm"
         fullWidth
         slotProps={{ paper: { sx: { minHeight: (theme) => theme.spacing(30) } } }}
-      />
+      >
+        {children}
+      </Dialog>
     )
   }
 

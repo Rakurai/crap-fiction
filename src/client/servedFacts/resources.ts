@@ -7,7 +7,7 @@ import { modeSummarySchema, type ModeSummary } from '../../shared/modeViews.js'
 import { pieceDetailSchema, pieceSummarySchema, type PieceDetail, type PieceSummary } from '../../shared/pieceViews.js'
 import { runtimeStatusSchema, type RuntimeStatus } from '../../shared/runtimeStatus.js'
 import type { DocumentSnapshot, SurfaceId } from '../../shared/surfaces.js'
-import { get, post, put, type RequestFailure } from './transport.js'
+import { del, get, patch, post, put, type RequestFailure } from './transport.js'
 
 const workspaceReadSchema = z.object({ workspace: z.string().nullable() })
 const workspaceWriteSchema = z.object({ workspace: z.string() })
@@ -58,12 +58,45 @@ export function usePieceDetail(id: string | null): UseQueryResult<PieceDetail, R
   })
 }
 
+export function useCreatePiece(): UseMutationResult<PieceSummary, RequestFailure, Readonly<{ title: string; mode: string }>> {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => post('/pieces', pieceSummarySchema, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PIECES_KEY }),
+  })
+}
+
+export type SetCastRequest = Readonly<{ surface: SurfaceId; ids: readonly string[] }>
+
+export function useSetCast(pieceId: string): UseMutationResult<PieceDetail, RequestFailure, SetCastRequest> {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (cast) => patch(`/pieces/${pieceId}`, pieceDetailSchema, { cast }),
+    onSuccess: (detail) => queryClient.setQueryData(pieceDetailKey(pieceId), detail),
+  })
+}
+
 export const CALL_SITES_KEY = ['callSites'] as const
 
 export function useCallSites(): UseQueryResult<readonly CallSiteAssignmentView[], RequestFailure> {
   return useQuery({
     queryKey: CALL_SITES_KEY,
     queryFn: ({ signal }) => get('/call-sites', z.array(callSiteAssignmentViewSchema).readonly(), signal),
+  })
+}
+
+const assignmentWriteSchema = z.object({ site: z.string(), assignment: z.string() }).readonly()
+type AssignmentWrite = z.infer<typeof assignmentWriteSchema>
+
+export function useAssignModel(): UseMutationResult<AssignmentWrite, RequestFailure, Readonly<{ site: string; model: string }>> {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ site, model }) => put(`/call-sites/${site}/assignment`, assignmentWriteSchema, { model }),
+    onSuccess: ({ site, assignment }) => {
+      queryClient.setQueryData<readonly CallSiteAssignmentView[]>(CALL_SITES_KEY, (current) =>
+        current?.map((entry) => (entry.site === site ? { ...entry, assignment } : entry)),
+      )
+    },
   })
 }
 
@@ -116,6 +149,14 @@ const mintedConversationSchema = z.object({ id: z.string() }).readonly()
 
 export function mintConversation(pieceId: string, surface: SurfaceId): Promise<{ id: string }> {
   return post(`/pieces/${pieceId}/surfaces/${surface}/conversations`, mintedConversationSchema, null)
+}
+
+export function useDeleteConversation(pieceId: string, surface: SurfaceId): UseMutationResult<null, RequestFailure, string> {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (conversationId) => del(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}`, z.null()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: pieceDetailKey(pieceId) }),
+  })
 }
 
 export type ApplyRequestBody = Readonly<{ responseId: string; constraint?: string; documents: DocumentSnapshot }>
