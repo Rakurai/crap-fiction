@@ -7,7 +7,6 @@ import {
   DialogTitle,
   Divider,
   FormControl,
-  InputLabel,
   MenuItem,
   Select,
   Stack,
@@ -160,18 +159,21 @@ function CallSiteRow({ site, options, pending, onAssign }: CallSiteRowProps) {
 
   return (
     <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-      <Box sx={{ flexGrow: 1 }}>
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
         <Typography variant="body2">{site.displayName}</Typography>
         <Typography variant="machine">{site.description}</Typography>
       </Box>
-      <FormControl size="small" sx={{ minWidth: (theme) => theme.spacing(24) }}>
-        <InputLabel id={`${site.site}-model-label`}>Model</InputLabel>
+      <FormControl size="small" sx={{ width: (theme) => theme.spacing(28), flexShrink: 0 }}>
         <Select
-          labelId={`${site.site}-model-label`}
-          label="Model"
           value={site.assignment ?? ''}
           onChange={(event) => onAssign(site.site, event.target.value)}
           disabled={pending || offered.length === 0}
+          inputProps={{ 'aria-label': `Model for ${site.displayName}` }}
+          renderValue={(value) => (
+            <Box component="span" title={value} sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {value}
+            </Box>
+          )}
         >
           {offered.map((model) => (
             <MenuItem key={model} value={model}>
