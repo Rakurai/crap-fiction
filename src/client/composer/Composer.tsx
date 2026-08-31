@@ -169,7 +169,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
           {sendMutation.error.message}
         </Typography>
       )}
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
+      <Stack spacing={1}>
         <TextField
           inputRef={fieldRef}
           multiline
@@ -183,8 +183,8 @@ export function Composer({ pieceId, surface }: ComposerProps) {
           onKeyDown={handleKeyDown}
           onBlur={closePicker}
         />
-        <Stack spacing={0.5}>
-          <Button variant="quiet" size="small" disabled={disabled} onClick={handleAskMe}>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          <Button variant="quiet" size="small" disabled={disabled} onClick={handleAskMe} sx={{ whiteSpace: 'nowrap' }}>
             Ask me
           </Button>
           {busyDispatch !== null ? (
