@@ -498,7 +498,9 @@ unhappy costs them more than the failure does. Leaving for another piece is the 
 unavailable while any of the piece's documents is in this state, and it is unavailable rather
 than confirmed: an author asked whether to discard their own prose has been asked the wrong
 question. The banner states every failing document; reading, which does not carry the banner, states
-the same failures beside its fixed exit.
+the same failures beside its fixed exit. The surface that offers to leave states them at the
+unavailable control, because a door that is shut without a reason is a worse answer than the
+refusal it replaces.
 
 **Leaving while a write is settling.** The control that leaves the piece disables the instant it
 is asked for and stays disabled until every document has durably saved. A write that fails during

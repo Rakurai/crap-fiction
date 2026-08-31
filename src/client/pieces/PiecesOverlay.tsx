@@ -5,12 +5,11 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import { Alert, Box, Button, CircularProgress, Divider, IconButton, List, ListItemButton, ListItemText, MenuItem, Stack, TextField, Toolbar, Typography } from '@mui/material'
 import type { ModeSummary } from '../../shared/modeViews.js'
 import type { PieceSummary } from '../../shared/pieceViews.js'
-import { SURFACE_IDS } from '../../shared/surfaces.js'
-import { usePieceSession } from '../pieceSession/PieceSessionProvider.js'
-import type { LeaveRefusal, PieceSession } from '../pieceSession/pieceSession.js'
+import { useFailingSurfaceIds, usePieceSession } from '../pieceSession/PieceSessionProvider.js'
+import type { LeaveRefusal } from '../pieceSession/pieceSession.js'
 import { presentValue, readState, type ReadState } from '../servedFacts/readState.js'
 import { useCreatePiece, useModes, usePieces, useWorkspace } from '../servedFacts/resources.js'
-import { SURFACE_LABEL } from '../shell/state.js'
+import { FailingDocuments } from '../shell/FailingDocuments.js'
 
 type View = Readonly<{ kind: 'list' }> | Readonly<{ kind: 'detail'; id: string }> | Readonly<{ kind: 'create' }>
 
@@ -22,10 +21,8 @@ function modeChoice(modes: readonly ModeSummary[]): ModeChoice | null {
   return rest.length === 0 ? { kind: 'sole', mode: only.id } : { kind: 'choose', modes }
 }
 
-function refusalMessage(session: PieceSession, cause: LeaveRefusal): string {
-  if (cause === 'leaveUnderway') return 'Still leaving the piece that is open — wait for that to finish.'
-  const failing = SURFACE_IDS.filter((surface) => session.surfaces[surface].document.getFailing()).map((surface) => SURFACE_LABEL[surface])
-  return `Can't leave yet — ${failing.join(', ')} failed to save.`
+function refusalMessage(cause: LeaveRefusal): string | null {
+  return cause === 'leaveUnderway' ? 'Still leaving the piece that is open — wait for that to finish.' : null
 }
 
 function Centered({ children }: Readonly<{ children: ReactNode }>) {
@@ -46,6 +43,7 @@ export type PiecesOverlayProps = Readonly<{
 
 export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismiss, onOpenSettings }: PiecesOverlayProps) {
   const session = usePieceSession()
+  const failingSurfaces = useFailingSurfaceIds()
   const piecesRead = readState(usePieces())
   const workspaceRead = readState(useWorkspace())
   const modesRead = readState(useModes())
@@ -69,7 +67,7 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
     try {
       const outcome = await session.requestLeave()
       if (outcome.kind === 'left') onLeft()
-      else setRefusal(refusalMessage(session, outcome.cause))
+      else setRefusal(refusalMessage(outcome.cause))
     } finally {
       setLeaving(false)
     }
@@ -150,6 +148,7 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
             showMode={showMode}
             isOpen={openPieceId === view.id}
             leaving={leaving}
+            leaveHeld={failingSurfaces.length > 0}
             onOpen={() => goTo(view.id)}
             onClose={closeOpenPiece}
           />
@@ -219,11 +218,12 @@ type PieceDetailPaneProps = Readonly<{
   showMode: boolean
   isOpen: boolean
   leaving: boolean
+  leaveHeld: boolean
   onOpen: () => void
   onClose: () => void
 }>
 
-function PieceDetailPane({ id, piecesRead, modes, showMode, isOpen, leaving, onOpen, onClose }: PieceDetailPaneProps) {
+function PieceDetailPane({ id, piecesRead, modes, showMode, isOpen, leaving, leaveHeld, onOpen, onClose }: PieceDetailPaneProps) {
   const piece = (presentValue(piecesRead) ?? []).find((candidate) => candidate.id === id)
   if (piece === undefined) return <Alert severity="error" sx={{ m: 2 }}>This piece is no longer listed.</Alert>
 
@@ -235,13 +235,19 @@ function PieceDetailPane({ id, piecesRead, modes, showMode, isOpen, leaving, onO
       {showMode && <Typography variant="machine">{modeLabel}</Typography>}
       <Typography variant="machine">{piece.length} words</Typography>
       {isOpen ? (
-        <Button variant="destructive" onClick={onClose} disabled={leaving}>
+        <Button variant="destructive" onClick={onClose} disabled={leaving || leaveHeld}>
           {leaving ? 'Leaving…' : 'Close piece'}
         </Button>
       ) : (
-        <Button variant="affirm" onClick={onOpen} disabled={leaving}>
+        <Button variant="affirm" onClick={onOpen} disabled={leaving || leaveHeld}>
           {leaving ? 'Opening…' : 'Open'}
         </Button>
+      )}
+      {leaveHeld && (
+        <Stack spacing={0.5}>
+          <FailingDocuments />
+          <Typography variant="machine">Leaving becomes available the moment it saves.</Typography>
+        </Stack>
       )}
     </Stack>
   )
