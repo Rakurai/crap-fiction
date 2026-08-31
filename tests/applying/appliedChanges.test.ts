@@ -3,8 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ConversationScope } from '../../src/server/scope.js'
-import { deleteAppliedChange, PieceMetadataStore, readAppliedChanges, writeAppliedChange } from '../../src/server/store/index.js'
-import { TolerantReadError } from '../../src/server/store/yaml.js'
+import { deleteAppliedChange, PieceMetadataStore, readAppliedChanges, TolerantReadError, writeAppliedChange } from '../../src/server/store/index.js'
 import { appliedChangeSchema, type AppliedChange } from '../../src/shared/appliedChange.js'
 
 const CUT_SENTENCE: AppliedChange = {
