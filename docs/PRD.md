@@ -168,10 +168,10 @@ given the author something substantive, its response carries the same actions as
 and it is never presented as a verdict or as a summary of the others.
 
 **Trust that silence is real** — *per message*
-*Done when:* every eligible specialist is genuinely called, a no-comment response occupies no
-space in the settled discussion, no participant is re-run under an obligation to speak, a message
-where every specialist had nothing is a legible outcome that still answers the author, and
-failure is never presented as silence.
+*Done when:* every eligible specialist is genuinely called, a no-comment response leaves the author
+nothing to weigh and nothing to act on, no participant is re-run under an obligation to speak, a
+message where every specialist had nothing still answers the author, and a failed call is never
+indistinguishable from a specialist that had nothing to say.
 
 **Know the room is working** — *per message*
 A message takes real time and the author watches it progress.
