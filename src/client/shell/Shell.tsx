@@ -9,7 +9,7 @@ import { usePieceDetail } from '../servedFacts/resources.js'
 import { SettingsOverlay } from '../settings/SettingsOverlay.js'
 import { TranscriptColumn } from '../transcript/TranscriptColumn.js'
 import { OverlayHost } from './OverlayHost.js'
-import { ReadingExit, useReadingEscape } from './Reading.js'
+import { ReadingExit, ReadingTitle, useReadingEscape } from './Reading.js'
 import type { ShellState } from './state.js'
 import { WorkspaceBanner } from './WorkspaceBanner.js'
 import { WorkspaceBar } from './WorkspaceBar.js'
@@ -60,6 +60,7 @@ export function Shell({ shell }: ShellProps) {
           />
         )}
 
+        {isReading && <ReadingTitle title={pieceTitle} />}
         {isReading && <ReadingExit />}
 
         <OverlayHost

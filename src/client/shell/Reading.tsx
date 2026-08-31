@@ -14,6 +14,16 @@ export function useReadingEscape(active: boolean, onExit: () => void): void {
   }, [active, onExit])
 }
 
+export function ReadingTitle({ title }: Readonly<{ title: string | null }>) {
+  if (title === null) return null
+
+  return (
+    <Box sx={{ position: 'fixed', insetInlineStart: (theme) => theme.spacing(2), insetBlockStart: (theme) => theme.spacing(2) }}>
+      <Typography variant="machine">{title}</Typography>
+    </Box>
+  )
+}
+
 export function ReadingExit() {
   return (
     <Box sx={{ position: 'fixed', insetInlineStart: (theme) => theme.spacing(2), insetBlockEnd: (theme) => theme.spacing(2) }}>
