@@ -7,7 +7,7 @@ import { useRoomHold, useScopeActivity, useStreamFailure } from '../eventStream/
 import type { StreamFailureReason } from '../eventStream/roomProjection.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
-import { dispatchTo, mintConversation, useAbandonAction, usePieceDetail, type DispatchResult } from '../servedFacts/resources.js'
+import { dispatchTo, mintConversation, useAbandonAction, useModels, usePieceDetail, type DispatchResult } from '../servedFacts/resources.js'
 import type { RequestFailure } from '../servedFacts/transport.js'
 import { useParticipantIdentities, type ParticipantIdentity } from '../transcript/identity.js'
 import { HandlePicker } from './HandlePicker.js'
@@ -20,6 +20,8 @@ const STREAM_FAILURE_TEXT: Readonly<Record<StreamFailureReason, string>> = {
   unreadable: "the room sent an event the studio could not read — reload to see what it is doing",
 }
 
+const ROOM_UNAVAILABLE_TEXT = 'the room is unavailable — nothing here can run a model until one is running on this machine'
+
 export function Composer({ pieceId, surface }: ComposerProps) {
   const identities = useParticipantIdentities(pieceId, surface)
   const candidates = useMemo(() => [...identities.values()], [identities])
@@ -31,6 +33,8 @@ export function Composer({ pieceId, surface }: ComposerProps) {
   const activity = useScopeActivity(surface)
   const held = useRoomHold(surface)
   const streamFailure = useStreamFailure()
+  const runtime = presentValue(readState(useModels()))
+  const roomUnavailable = runtime !== null && !runtime.reachable
 
   const busyAction = activity.status === 'busy' ? activity.action : null
   const busyDispatch = busyAction !== null && busyAction.kind === 'dispatch' ? busyAction : null
@@ -151,6 +155,11 @@ export function Composer({ pieceId, surface }: ComposerProps) {
       {streamFailure !== null && (
         <Typography variant="machine" sx={{ display: 'block', mb: 1 }}>
           {STREAM_FAILURE_TEXT[streamFailure]}
+        </Typography>
+      )}
+      {roomUnavailable && (
+        <Typography variant="machine" sx={{ display: 'block', mb: 1 }}>
+          {ROOM_UNAVAILABLE_TEXT}
         </Typography>
       )}
       {sendMutation.error !== null && (
