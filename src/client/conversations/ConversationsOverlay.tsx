@@ -2,6 +2,8 @@ import { useState } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { Alert, Box, Button, CircularProgress, IconButton, List, ListItem, ListItemButton, ListItemText, Stack, Toolbar, Typography } from '@mui/material'
+import { iconButtonClasses } from '@mui/material/IconButton'
+import type { Theme } from '@mui/material/styles'
 import type { ConversationSummary } from '../../shared/conversationEntries.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { useConversationPane, useConversationPaneState } from '../pieceSession/PieceSessionProvider.js'
@@ -100,6 +102,13 @@ type ConversationRowProps = Readonly<{
   onConfirmDelete: () => void
 }>
 
+function revealedAtTheRow(theme: Theme) {
+  return {
+    [`& .${iconButtonClasses.root}`]: { opacity: 0, transition: theme.transitions.create('opacity') },
+    [`&:hover .${iconButtonClasses.root}, &:focus-within .${iconButtonClasses.root}`]: { opacity: 1 },
+  }
+}
+
 function RowTime({ conversation }: Readonly<{ conversation: ConversationSummary }>) {
   const when = new Date(conversation.lastActivity).toLocaleString()
   if (conversation.opening !== undefined) return <>{when}</>
@@ -117,6 +126,7 @@ function ConversationRow({ conversation, current, armed, deleting, onSelect, onA
   return (
     <ListItem
       disablePadding
+      sx={revealedAtTheRow}
       secondaryAction={
         armed ? (
           <Stack direction="row" spacing={0.5} sx={{ pr: 1 }}>
