@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useSyncExternalStore, t
 import { useQueryClient } from '@tanstack/react-query'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { connectToRoom, type RoomConnection } from './roomConnection.js'
-import type { ConnectionStatus, ScopeActivity } from './roomProjection.js'
+import type { ConnectionStatus, FinishedOutcome, ScopeActivity, StatedFailure } from './roomProjection.js'
 
 const RoomStreamContext = createContext<RoomConnection | null>(null)
 
@@ -31,6 +31,7 @@ function neverSubscribe(): () => void {
 
 const UNKNOWN_ACTIVITY: ScopeActivity = { status: 'unknown' }
 const RETRYING_CONNECTION: ConnectionStatus = { status: 'retrying' }
+const NO_FAILURES: readonly StatedFailure[] = []
 
 export function useScopeActivity(surface: SurfaceId): ScopeActivity {
   const connection = useContext(RoomStreamContext)
@@ -43,6 +44,16 @@ export function useScopeActivity(surface: SurfaceId): ScopeActivity {
 export function useRoomConnectionStatus(): ConnectionStatus {
   const connection = useContext(RoomStreamContext)
   return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().connection ?? RETRYING_CONNECTION)
+}
+
+export function useScopeFailures(surface: SurfaceId): readonly StatedFailure[] {
+  const connection = useContext(RoomStreamContext)
+  return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().failures[surface] ?? NO_FAILURES)
+}
+
+export function useScopeFinish(surface: SurfaceId): FinishedOutcome | null {
+  const connection = useContext(RoomStreamContext)
+  return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().finished[surface] ?? null)
 }
 
 export function useSurfaceEditable(surface: SurfaceId): boolean {

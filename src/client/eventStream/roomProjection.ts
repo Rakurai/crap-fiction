@@ -1,4 +1,12 @@
-import type { ActionKind, ConversationActivitySnapshot, ParticipantState, RoomActivitySnapshot, RoomEvent } from '../../shared/conversationEvents.js'
+import type {
+  ActionFinishedEvent,
+  ActionKind,
+  ConversationActivitySnapshot,
+  ConversationFailureCode,
+  ParticipantState,
+  RoomActivitySnapshot,
+  RoomEvent,
+} from '../../shared/conversationEvents.js'
 import type { ConversationEntryView } from '../../shared/conversationEntryViews.js'
 import type { SurfaceId } from '../../shared/surfaces.js'
 
@@ -23,11 +31,17 @@ export type ConnectionStatus =
   | Readonly<{ status: 'open' }>
   | Readonly<{ status: 'failed'; reason: 'disconnected' | 'unreadable' }>
 
+export type StatedFailure = Readonly<{ code: ConversationFailureCode; message: string }>
+
+export type FinishedOutcome = ActionFinishedEvent['outcome']
+
 export type RoomProjectionState = Readonly<{
   connection: ConnectionStatus
   awaitingSnapshot: boolean
   buffered: readonly RoomEvent[]
   scopes: Readonly<Record<SurfaceId, ScopeActivity>>
+  failures: Readonly<Record<SurfaceId, readonly StatedFailure[]>>
+  finished: Readonly<Record<SurfaceId, FinishedOutcome | null>>
 }>
 
 export type SnapshotFrame = Readonly<{ type: 'activity.snapshot'; data: RoomActivitySnapshot }>
@@ -54,12 +68,33 @@ function unknownScopes(): Readonly<Record<SurfaceId, ScopeActivity>> {
   return { draft: { status: 'unknown' }, storyContext: { status: 'unknown' }, authorContext: { status: 'unknown' } }
 }
 
+const NO_FAILURES: readonly StatedFailure[] = []
+
+function unstatedFailures(): Readonly<Record<SurfaceId, readonly StatedFailure[]>> {
+  return { draft: NO_FAILURES, storyContext: NO_FAILURES, authorContext: NO_FAILURES }
+}
+
+function unfinishedScopes(): Readonly<Record<SurfaceId, FinishedOutcome | null>> {
+  return { draft: null, storyContext: null, authorContext: null }
+}
+
 function freshState(connection: ConnectionStatus): RoomProjectionState {
-  return { connection, awaitingSnapshot: true, buffered: [], scopes: unknownScopes() }
+  return {
+    connection,
+    awaitingSnapshot: true,
+    buffered: [],
+    scopes: unknownScopes(),
+    failures: unstatedFailures(),
+    finished: unfinishedScopes(),
+  }
 }
 
 export function initialRoomProjection(): RoomProjectionState {
   return freshState({ status: 'retrying' })
+}
+
+function reconnecting(state: RoomProjectionState, connection: ConnectionStatus): RoomProjectionState {
+  return { ...freshState(connection), failures: state.failures, finished: state.finished }
 }
 
 function noEffects(state: RoomProjectionState): RoomProjectionTransition {
@@ -68,6 +103,22 @@ function noEffects(state: RoomProjectionState): RoomProjectionTransition {
 
 function withScope(state: RoomProjectionState, surface: SurfaceId, activity: ScopeActivity): RoomProjectionState {
   return { ...state, scopes: { ...state.scopes, [surface]: activity } }
+}
+
+function withStatedFailure(state: RoomProjectionState, surface: SurfaceId, failure: StatedFailure): RoomProjectionState {
+  return { ...state, failures: { ...state.failures, [surface]: [...state.failures[surface], failure] } }
+}
+
+function withFinish(state: RoomProjectionState, surface: SurfaceId, outcome: FinishedOutcome): RoomProjectionState {
+  return { ...state, finished: { ...state.finished, [surface]: outcome } }
+}
+
+function startingOver(state: RoomProjectionState, surface: SurfaceId): RoomProjectionState {
+  return {
+    ...state,
+    failures: { ...state.failures, [surface]: NO_FAILURES },
+    finished: { ...state.finished, [surface]: null },
+  }
 }
 
 function busyActionFor(state: RoomProjectionState, surface: SurfaceId, actionId: string): BusyAction | undefined {
@@ -120,7 +171,7 @@ function applyRoomEvent(state: RoomProjectionState, event: RoomEvent): RoomProje
         applicationId: undefined,
         participants: {},
       }
-      return noEffects(withScope(state, d.surface, { status: 'busy', action }))
+      return noEffects(withScope(startingOver(state, d.surface), d.surface, { status: 'busy', action }))
     }
     case 'apply.pending': {
       const d = event.data
@@ -151,10 +202,12 @@ function applyRoomEvent(state: RoomProjectionState, event: RoomEvent): RoomProje
       const d = event.data
       const current = busyActionFor(state, d.surface, d.actionId)
       if (current === undefined) return noEffects(state)
-      return noEffects(withScope(state, d.surface, { status: 'idle' }))
+      return noEffects(withScope(withFinish(state, d.surface, d.outcome), d.surface, { status: 'idle' }))
     }
-    case 'error':
-      return noEffects(state)
+    case 'error': {
+      const d = event.data
+      return noEffects(withStatedFailure(state, d.surface, { code: d.code, message: d.message }))
+    }
     default: {
       const exhaustive: never = event
       return exhaustive
@@ -176,7 +229,13 @@ function drainBuffer(state: RoomProjectionState, frames: readonly RoomEvent[]): 
 function applyFrame(state: RoomProjectionState, frame: Frame): RoomProjectionTransition {
   const connection: ConnectionStatus = { status: 'open' }
   if (frame.type === 'activity.snapshot') {
-    const snapshotState: RoomProjectionState = { connection, awaitingSnapshot: false, buffered: [], scopes: scopesFromSnapshot(frame.data) }
+    const snapshotState: RoomProjectionState = {
+      ...state,
+      connection,
+      awaitingSnapshot: false,
+      buffered: [],
+      scopes: scopesFromSnapshot(frame.data),
+    }
     return drainBuffer(snapshotState, state.buffered)
   }
   if (state.awaitingSnapshot) return noEffects({ ...state, connection, buffered: [...state.buffered, frame] })
@@ -186,13 +245,13 @@ function applyFrame(state: RoomProjectionState, frame: Frame): RoomProjectionTra
 export function transitionRoomProjection(state: RoomProjectionState, event: StreamEvent): RoomProjectionTransition {
   switch (event.type) {
     case 'connecting':
-      return noEffects(freshState({ status: 'retrying' }))
+      return noEffects(reconnecting(state, { status: 'retrying' }))
     case 'opened':
       return noEffects({ ...state, connection: { status: 'open' } })
     case 'disconnected':
-      return noEffects(freshState({ status: 'failed', reason: 'disconnected' }))
+      return noEffects(reconnecting(state, { status: 'failed', reason: 'disconnected' }))
     case 'unreadable':
-      return { state: freshState({ status: 'failed', reason: 'unreadable' }), effects: [CLOSE_CONNECTION] }
+      return { state: reconnecting(state, { status: 'failed', reason: 'unreadable' }), effects: [CLOSE_CONNECTION] }
     case 'frame':
       return applyFrame(state, event.frame)
     default: {

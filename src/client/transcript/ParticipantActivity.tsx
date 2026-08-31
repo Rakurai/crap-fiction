@@ -2,7 +2,7 @@ import { Stack, Typography } from '@mui/material'
 import type { ParticipantFailureEntry, ParticipantNoCommentEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { ConversationEntryView } from '../../shared/conversationEntryViews.js'
 import { config } from '../config.js'
-import type { BusyAction } from '../eventStream/roomProjection.js'
+import type { BusyAction, FinishedOutcome, StatedFailure } from '../eventStream/roomProjection.js'
 import { formatElapsed, useTick } from './elapsedTime.js'
 import { ParticipantMark, ParticipantNameHandle } from './ParticipantBadge.js'
 import type { ParticipantIdentity } from './identity.js'
@@ -23,6 +23,36 @@ function isAnswer(entry: ConversationEntryView): entry is AnswerEntry {
 function answeredParticipantIds(sourceEntryId: string, entries: readonly ConversationEntryView[]): ReadonlySet<string> {
   const answers = entries.filter(isAnswer).filter((entry) => entry.causeId === sourceEntryId)
   return new Set(answers.map((entry) => entry.participantId))
+}
+
+export type RoomTroubleProps = Readonly<{
+  failures: readonly StatedFailure[]
+  finished: FinishedOutcome | null
+  requestFailure: string | null
+}>
+
+export function RoomTrouble({ failures, finished, requestFailure }: RoomTroubleProps) {
+  if (failures.length === 0 && finished !== 'failed' && requestFailure === null) return null
+
+  return (
+    <Stack spacing={0.5}>
+      {failures.map((failure, index) => (
+        <TranscriptRow key={`${failure.code}-${index}`} gutter={null}>
+          <Typography variant="machine">the room ran into trouble — {failure.message}</Typography>
+        </TranscriptRow>
+      ))}
+      {finished === 'failed' && (
+        <TranscriptRow gutter={null}>
+          <Typography variant="machine">the room stopped before finishing this</Typography>
+        </TranscriptRow>
+      )}
+      {requestFailure !== null && (
+        <TranscriptRow gutter={null}>
+          <Typography variant="machine">{requestFailure}</Typography>
+        </TranscriptRow>
+      )}
+    </Stack>
+  )
 }
 
 export type DispatchActivityProps = Readonly<{
