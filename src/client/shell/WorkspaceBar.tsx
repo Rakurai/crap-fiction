@@ -23,32 +23,32 @@ export function WorkspaceBar({ pieceOpen, activeSurface, onSelectSurface, onOpen
       <Toolbar sx={{ display: 'flex', gap: 2 }}>
         <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
           {pieceOpen ? (
-            <Tooltip title="Pieces">
-              <IconButton onClick={() => onOpenOverlay('pieces')} aria-label="Open a piece">
-                <LibraryBooksIcon />
-              </IconButton>
-            </Tooltip>
+            <>
+              <Tooltip title="Pieces">
+                <IconButton onClick={() => onOpenOverlay('pieces')} aria-label="Open a piece">
+                  <LibraryBooksIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Settings">
+                <IconButton onClick={() => onOpenOverlay('settings')} aria-label="Settings">
+                  <SettingsIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Read">
+                <IconButton
+                  onClick={onEnterReading}
+                  aria-label="Enter reading"
+                  disabled={!onDraft}
+                  sx={{ visibility: onDraft ? 'visible' : 'hidden' }}
+                >
+                  <ChromeReaderModeIcon />
+                </IconButton>
+              </Tooltip>
+            </>
           ) : (
             <Typography variant="subtitle1">crap-fiction</Typography>
-          )}
-
-          <Tooltip title="Settings">
-            <IconButton onClick={() => onOpenOverlay('settings')} aria-label="Settings">
-              <SettingsIcon />
-            </IconButton>
-          </Tooltip>
-
-          {pieceOpen && (
-            <Tooltip title="Read">
-              <IconButton
-                onClick={onEnterReading}
-                aria-label="Enter reading"
-                disabled={!onDraft}
-                sx={{ visibility: onDraft ? 'visible' : 'hidden' }}
-              >
-                <ChromeReaderModeIcon />
-              </IconButton>
-            </Tooltip>
           )}
         </Box>
 

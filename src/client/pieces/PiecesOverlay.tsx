@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import SettingsIcon from '@mui/icons-material/Settings'
 import { Alert, Box, Button, CircularProgress, Divider, IconButton, List, ListItemButton, ListItemText, MenuItem, Stack, TextField, Toolbar, Typography } from '@mui/material'
 import type { ModeSummary } from '../../shared/modeViews.js'
 import type { PieceSummary } from '../../shared/pieceViews.js'
@@ -40,9 +41,10 @@ export type PiecesOverlayProps = Readonly<{
   onOpenPiece: (id: string) => void
   onClosePiece: () => void
   onDismiss: () => void
+  onOpenSettings: (() => void) | null
 }>
 
-export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismiss }: PiecesOverlayProps) {
+export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismiss, onOpenSettings }: PiecesOverlayProps) {
   const session = usePieceSession()
   const piecesRead = readState(usePieces())
   const workspaceRead = readState(useWorkspace())
@@ -107,6 +109,11 @@ export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismis
         {view.kind === 'list' && (
           <IconButton aria-label="New piece" onClick={() => setView({ kind: 'create' })} disabled={choice === null}>
             <AddIcon />
+          </IconButton>
+        )}
+        {view.kind === 'list' && onOpenSettings !== null && (
+          <IconButton aria-label="Settings" onClick={onOpenSettings}>
+            <SettingsIcon />
           </IconButton>
         )}
       </Toolbar>

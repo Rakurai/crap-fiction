@@ -62,13 +62,18 @@ export function Shell({ shell }: ShellProps) {
 
         {isReading && <ReadingExit />}
 
-        <OverlayHost overlay={shell.overlay} dismissable={pieceOpen} onDismiss={() => shell.setOverlay(null)}>
+        <OverlayHost
+          overlay={shell.overlay}
+          dismissable={pieceOpen || shell.overlay !== 'pieces'}
+          onDismiss={() => shell.setOverlay(null)}
+        >
           {shell.overlay === 'pieces' && (
             <PiecesOverlay
               openPieceId={shell.openPieceId}
               onOpenPiece={shell.openPiece}
               onClosePiece={shell.closePiece}
               onDismiss={() => shell.setOverlay(null)}
+              onOpenSettings={pieceOpen ? null : () => shell.setOverlay('settings')}
             />
           )}
           {shell.overlay === 'conversations' && shell.openPieceId !== null && (

@@ -54,7 +54,7 @@ export function useShellState(): ShellState {
   return {
     openPieceId,
     activeSurface,
-    overlay: openPieceId === null ? 'pieces' : overlay,
+    overlay: openPieceId === null ? (overlay ?? 'pieces') : overlay,
     reading,
     presentation,
     openPiece,
