@@ -24,7 +24,7 @@ Three commands answer for the code and none of them substitutes for another: `np
 
 Material UI's API is read rather than recalled. The `mui-mcp` server is configured in `.mcp.json` and is what answers a question about a component, a prop, a theme key or the shape of a provider — consult it before writing Material UI code, because the version this repository targets is newer than what recall reliably reaches.
 
-The frontend reboot removed the browser-level suite along with the client tests, and the rebuilt client does not restore it: no command answers for behaviour in a browser, and none is meant to. `npm test` covers the server, the domain and the document round trip and nothing above them. What answers for client behaviour is the author looking at it.
+The frontend reboot removed the browser-level suite, and the rebuilt client does not restore it: no command answers for behaviour in a browser, and none is meant to. The suite's ceiling is the browser and the DOM rather than a layer of the system — a module that needs neither is testable wherever it lives, the client included, which is why the room's event projection, autosave and the served-fact readings carry tests. Above that ceiling nothing is asserted: composition, focus, keyboard behaviour and every degraded state are looked at rather than tested, and no jsdom test or component test is added to satisfy a criterion. Running without a DOM is what makes a test possible here, never a reason to write one — that decision is `docs/CODING_STANDARDS.md`'s and is unchanged by which half of the system the module sits in. What answers for client behaviour is the author looking at it.
 
 ## Agent skills
 
