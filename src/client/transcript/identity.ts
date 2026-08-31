@@ -4,22 +4,21 @@ import type { SurfaceId } from '../../shared/surfaces.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { usePieceDetail } from '../servedFacts/resources.js'
 
-export type ParticipantIdentity = Readonly<{
-  id: string
-  handle: string
-  displayName: string
-  mark: string
-  ordinal: number | null
-}>
+type NamedParticipant = Readonly<{ id: string; handle: string; displayName: string; mark: string }>
+
+export type ParticipantIdentity = NamedParticipant &
+  (Readonly<{ eligibility: 'cast' | 'addressed-only'; ordinal: number }> | Readonly<{ eligibility: 'generalist' }>)
 
 function toIdentity(participant: AddressableParticipantView): ParticipantIdentity {
-  return {
+  const named: NamedParticipant = {
     id: participant.id,
     handle: participant.handle,
     displayName: participant.displayName,
     mark: participant.mark,
-    ordinal: participant.eligibility === 'generalist' ? null : participant.ordinal,
   }
+  return participant.eligibility === 'generalist'
+    ? { ...named, eligibility: 'generalist' }
+    : { ...named, eligibility: participant.eligibility, ordinal: participant.ordinal }
 }
 
 export function useParticipantIdentities(pieceId: string, surface: SurfaceId): ReadonlyMap<string, ParticipantIdentity> {

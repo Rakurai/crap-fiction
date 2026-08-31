@@ -144,13 +144,11 @@ export function confirmApply(pieceId: string, surface: SurfaceId, conversationId
   return post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply/${applicationId}/confirm`, applyConfirmationSchema, null)
 }
 
-export function useAbandonAction(
-  pieceId: string,
-  surface: SurfaceId,
-  conversationId: string,
-): UseMutationResult<null, RequestFailure, string> {
+export type AbandonRequest = Readonly<{ conversationId: string; actionId: string }>
+
+export function useAbandonAction(pieceId: string, surface: SurfaceId): UseMutationResult<null, RequestFailure, AbandonRequest> {
   return useMutation({
-    mutationFn: (actionId) =>
+    mutationFn: ({ conversationId, actionId }) =>
       post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/actions/${actionId}/abandon`, z.null(), null),
   })
 }

@@ -64,7 +64,7 @@ function ClampedClaim({ text, disclosed, onToggle }: Readonly<{ text: string; di
 
 function ResponseNote({ text }: Readonly<{ text: string }>) {
   return (
-    <Typography variant="room" sx={{ opacity: 0.72 }}>
+    <Typography variant="room" sx={{ color: 'text.secondary' }}>
       {text}
     </Typography>
   )
@@ -75,30 +75,28 @@ function AppliedChangeDisclosure({
   disclosed,
   onToggle,
 }: Readonly<{ content: AppliedChangeContent; disclosed: boolean; onToggle: () => void }>) {
-  const label = content.kind === 'rewrittenWhole' ? 'rewritten whole' : 'applied'
+  if (content.kind === 'rewrittenWhole') return <Typography variant="machine">rewritten whole</Typography>
 
   return (
     <Box>
       <Button variant="quiet" size="small" onClick={onToggle}>
-        {label}
+        applied
       </Button>
       <Collapse in={disclosed}>
-        {content.kind === 'passages' && (
-          <Stack spacing={1} sx={{ mt: 1 }}>
-            {content.passages.map((passage, index) => (
-              <Typography key={index} variant="room" component="p" sx={{ m: 0 }}>
-                {passage.leading}
-                {passage.before !== '' && (
-                  <Box component="span" sx={{ textDecoration: 'line-through', opacity: 0.6 }}>
-                    {passage.before}
-                  </Box>
-                )}
-                {passage.after !== '' && <Box component="span" sx={{ fontWeight: 600 }}>{passage.after}</Box>}
-                {passage.trailing}
-              </Typography>
-            ))}
-          </Stack>
-        )}
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          {content.passages.map((passage, index) => (
+            <Typography key={index} variant="room" component="p" sx={{ m: 0 }}>
+              {passage.leading}
+              {passage.before !== '' && (
+                <Box component="span" sx={{ textDecoration: 'line-through', color: 'text.disabled' }}>
+                  {passage.before}
+                </Box>
+              )}
+              {passage.after !== '' && <Box component="span" sx={{ fontWeight: 600 }}>{passage.after}</Box>}
+              {passage.trailing}
+            </Typography>
+          ))}
+        </Stack>
       </Collapse>
     </Box>
   )
@@ -237,8 +235,7 @@ export function ParticipantResponseCard({
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder="Say more (optional)"
-              disabled={busy}
-              sx={{ flexGrow: 1, minWidth: 160 }}
+              sx={{ flexGrow: 1, minWidth: (theme) => theme.spacing(20) }}
             />
             {application === undefined && entry.outcome === 'applicableSuggestion' && (
               <Button

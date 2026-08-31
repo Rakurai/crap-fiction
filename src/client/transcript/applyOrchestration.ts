@@ -18,19 +18,25 @@ export function useApplyOrchestration(
   document: DocumentSession | null,
 ): ApplyOrchestration {
   const { mutate: applyMutate } = useApplyRecommendation(pieceId, surface, conversationId)
-  const { mutate: abandonMutate } = useAbandonAction(pieceId, surface, conversationId)
+  const { mutate: abandonMutate } = useAbandonAction(pieceId, surface)
   const scopeActivity = useScopeActivity(surface)
   const [holdReason, setHoldReason] = useState<string | null>(null)
   const settledApplicationIds = useRef<Set<string>>(new Set())
 
-  const abandon = useCallback((actionId: string) => abandonMutate(actionId), [abandonMutate])
+  const claimApplication = useCallback((applicationId: string) => {
+    if (settledApplicationIds.current.has(applicationId)) return false
+    settledApplicationIds.current.add(applicationId)
+    return true
+  }, [])
+
+  const abandon = useCallback((actionId: string) => abandonMutate({ conversationId, actionId }), [abandonMutate, conversationId])
 
   const abandonWithReason = useCallback(
     (actionId: string, reason: string) => {
       setHoldReason(reason)
-      abandonMutate(actionId)
+      abandonMutate({ conversationId, actionId })
     },
-    [abandonMutate],
+    [abandonMutate, conversationId],
   )
 
   const settle = useCallback(
@@ -55,8 +61,7 @@ export function useApplyOrchestration(
     if (document === null) return
     if (scopeActivity.status !== 'busy' || scopeActivity.action.kind !== 'apply') return
     const { actionId, applicationId } = scopeActivity.action
-    if (applicationId === undefined || settledApplicationIds.current.has(applicationId)) return
-    settledApplicationIds.current.add(applicationId)
+    if (applicationId === undefined || !claimApplication(applicationId)) return
     let cancelled = false
     void (async () => {
       let replacement: string
@@ -71,7 +76,7 @@ export function useApplyOrchestration(
     return () => {
       cancelled = true
     }
-  }, [scopeActivity, document, pieceId, surface, conversationId, settle, abandonWithReason])
+  }, [scopeActivity, document, pieceId, surface, conversationId, settle, abandonWithReason, claimApplication])
 
   useEffect(() => {
     if (scopeActivity.status !== 'busy') setHoldReason(null)
@@ -84,13 +89,13 @@ export function useApplyOrchestration(
         {
           onSuccess: (outcome) => {
             if (outcome.outcome !== 'pending') return
-            settledApplicationIds.current.add(outcome.applicationId)
+            if (!claimApplication(outcome.applicationId)) return
             void settle(outcome.actionId, outcome.applicationId, outcome.replacement)
           },
         },
       )
     },
-    [applyMutate, settle],
+    [applyMutate, settle, claimApplication],
   )
 
   return { apply, abandon, holdReason }

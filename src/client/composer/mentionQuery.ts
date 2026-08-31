@@ -10,9 +10,9 @@ export function detectMentionQuery(text: string, caret: number): MentionQuery | 
   return { at: index, token: text.slice(index + 1, caret) }
 }
 
-export function matchingHandles<T extends { handle: string }>(token: string, candidates: readonly T[]): readonly T[] {
+export function matchingHandles<T extends { handle: string }>(token: string, candidates: readonly T[], limit: number): readonly T[] {
   const lowered = token.toLowerCase()
-  return candidates.filter((candidate) => candidate.handle.startsWith(lowered))
+  return candidates.filter((candidate) => candidate.handle.startsWith(lowered)).slice(0, limit)
 }
 
 export type MentionInsertion = Readonly<{ text: string; caret: number }>

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Alert, Box, Stack, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { useScopeActivity } from '../eventStream/RoomStreamProvider.js'
+import type { ConversationPane } from '../pieceSession/conversationPane.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot, usePieceSession } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { useConversation, useDispatch } from '../servedFacts/resources.js'
@@ -13,22 +14,36 @@ import { TranscriptEntry, type ResponseActions } from './TranscriptEntry.js'
 export type TranscriptProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
 export function Transcript({ pieceId, surface }: TranscriptProps) {
-  const identities = useParticipantIdentities(pieceId, surface)
   const pane = useConversationPane(surface)
+  const conversationId = useConversationPaneState(surface).conversationId
+
+  if (pane === null || conversationId === null) {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
+        <Typography variant="machine">Nothing has been said here yet.</Typography>
+      </Box>
+    )
+  }
+
+  return <SelectedConversation pieceId={pieceId} surface={surface} conversationId={conversationId} pane={pane} />
+}
+
+type SelectedConversationProps = Readonly<{ pieceId: string; surface: SurfaceId; conversationId: string; pane: ConversationPane }>
+
+function SelectedConversation({ pieceId, surface, conversationId, pane }: SelectedConversationProps) {
+  const identities = useParticipantIdentities(pieceId, surface)
   const paneState = useConversationPaneState(surface)
-  const conversationId = paneState.conversationId
   const conversationRead = readState(useConversation(pieceId, surface, conversationId))
   const conversation = presentValue(conversationRead)
   const scopeActivity = useScopeActivity(surface)
   const documents = useDocumentSnapshot()
   const session = usePieceSession()
 
-  const dispatchMutation = useDispatch(pieceId, surface, conversationId ?? '')
-  const applyOrchestration = useApplyOrchestration(pieceId, surface, conversationId ?? '', session?.surfaces[surface].document ?? null)
+  const dispatchMutation = useDispatch(pieceId, surface, conversationId)
+  const applyOrchestration = useApplyOrchestration(pieceId, surface, conversationId, session?.surfaces[surface].document ?? null)
 
   const toggleDisclosure = useCallback(
     (id: string) => {
-      if (pane === null) return
       const next = new Set(pane.getState().disclosures)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -38,7 +53,7 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
   )
 
   const actions: ResponseActions = {
-    focusComposerFor: (identity) => pane?.setComposerText(identity === null ? '' : `@${identity.handle} `),
+    focusComposerFor: (identity) => pane.setComposerText(identity === null ? '' : `@${identity.handle} `),
     reply: (identity, text) => dispatchMutation.mutate({ target: identity.id, message: text, documents }),
     askForConcreteChange: (response, clarification) =>
       dispatchMutation.mutate(
@@ -49,14 +64,6 @@ export function Transcript({ pieceId, surface }: TranscriptProps) {
   }
 
   const applyingAction = scopeActivity.status === 'busy' && scopeActivity.action.kind === 'apply' ? scopeActivity.action : null
-
-  if (conversationId === null) {
-    return (
-      <Box sx={{ flex: 1, minHeight: 0, p: 2 }}>
-        <Typography variant="machine">Nothing has been said here yet.</Typography>
-      </Box>
-    )
-  }
 
   if (conversationRead.status === 'notArrived') {
     return (

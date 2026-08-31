@@ -1,5 +1,7 @@
 import { Stack, Typography } from '@mui/material'
+import type { ParticipantFailureEntry, ParticipantNoCommentEntry, ParticipantResponseEntry } from '../../shared/conversationEntries.js'
 import type { ConversationEntryView } from '../../shared/conversationEntryViews.js'
+import { config } from '../config.js'
 import type { BusyAction } from '../eventStream/roomProjection.js'
 import { formatElapsed, useTick } from './elapsedTime.js'
 import { ParticipantMark, ParticipantNameHandle } from './ParticipantBadge.js'
@@ -12,12 +14,15 @@ const STAGE_LABEL: Readonly<Record<'called' | 'preparing' | 'working', string>> 
   working: 'working',
 }
 
+type AnswerEntry = ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry
+
+function isAnswer(entry: ConversationEntryView): entry is AnswerEntry {
+  return entry.kind === 'participantResponse' || entry.kind === 'participantNoComment' || entry.kind === 'participantFailure'
+}
+
 function answeredParticipantIds(sourceEntryId: string, entries: readonly ConversationEntryView[]): ReadonlySet<string> {
-  const ids = entries
-    .filter((entry) => entry.kind === 'participantResponse' || entry.kind === 'participantNoComment' || entry.kind === 'participantFailure')
-    .filter((entry) => 'causeId' in entry && entry.causeId === sourceEntryId)
-    .map((entry) => ('participantId' in entry ? entry.participantId : ''))
-  return new Set(ids)
+  const answers = entries.filter(isAnswer).filter((entry) => entry.causeId === sourceEntryId)
+  return new Set(answers.map((entry) => entry.participantId))
 }
 
 export type DispatchActivityProps = Readonly<{
@@ -27,7 +32,7 @@ export type DispatchActivityProps = Readonly<{
 }>
 
 export function DispatchActivity({ action, entries, identities }: DispatchActivityProps) {
-  const now = useTick(1000)
+  const now = useTick(config.elapsedTime.tickMs)
   const answered = answeredParticipantIds(action.sourceEntryId, entries)
   const outstanding = action.audience.filter((id) => !answered.has(id))
 

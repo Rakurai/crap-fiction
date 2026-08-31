@@ -1,6 +1,13 @@
 import { Box, Stack, Typography, useColorScheme } from '@mui/material'
 import type { Theme } from '../../shared/theme.js'
-import { participantMarkColor, unseededParticipantMarkColor } from '../theme/participantMark.js'
+import {
+  MARK_DIAMETER,
+  MARK_GLYPH_SIZE,
+  MARK_GLYPH_WEIGHT,
+  participantMarkColor,
+  participantMarkGlyphColor,
+  unseededParticipantMarkColor,
+} from '../theme/participantMark.js'
 import type { ParticipantIdentity } from './identity.js'
 
 export function useMarkScheme(): Theme {
@@ -9,7 +16,7 @@ export function useMarkScheme(): Theme {
 }
 
 function markColor(identity: ParticipantIdentity, scheme: Theme): string {
-  return identity.ordinal === null ? unseededParticipantMarkColor(scheme) : participantMarkColor(identity.ordinal, scheme)
+  return identity.eligibility === 'generalist' ? unseededParticipantMarkColor(scheme) : participantMarkColor(identity.ordinal, scheme)
 }
 
 export type ParticipantMarkProps = Readonly<{ identity: ParticipantIdentity }>
@@ -21,17 +28,17 @@ export function ParticipantMark({ identity }: ParticipantMarkProps) {
     <Box
       aria-hidden
       sx={{
-        width: 28,
-        height: 28,
+        width: MARK_DIAMETER,
+        height: MARK_DIAMETER,
         flexShrink: 0,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         bgcolor: markColor(identity, scheme),
-        color: scheme === 'dark' ? '#000' : '#fff',
-        fontSize: '0.6875rem',
-        fontWeight: 600,
+        color: participantMarkGlyphColor(scheme),
+        fontSize: MARK_GLYPH_SIZE,
+        fontWeight: MARK_GLYPH_WEIGHT,
         lineHeight: 1,
       }}
     >

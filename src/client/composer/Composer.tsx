@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
+import { config } from '../config.js'
 import { useRoomConnectionStatus, useScopeActivity } from '../eventStream/RoomStreamProvider.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
@@ -26,10 +27,9 @@ export function Composer({ pieceId, surface }: ComposerProps) {
 
   const busyAction = activity.status === 'busy' ? activity.action : null
   const busyDispatch = busyAction !== null && busyAction.kind === 'dispatch' ? busyAction : null
-  const idle = activity.status === 'idle'
-  const connectionFailed = activity.status === 'unknown' && connection.status === 'failed'
+  const connectionFailed = connection.status === 'failed'
 
-  const abandonMutation = useAbandonAction(pieceId, surface, busyDispatch?.conversationId ?? '')
+  const abandonMutation = useAbandonAction(pieceId, surface)
 
   const sendMutation = useMutation<DispatchResult, RequestFailure, string>({
     mutationFn: async (text) => {
@@ -38,6 +38,9 @@ export function Composer({ pieceId, surface }: ComposerProps) {
       if (conversationId === null) pane?.selectConversation(resolvedId)
       return dispatchTo(pieceId, surface, resolvedId, { message: text, documents })
     },
+    onError: (_failure, sent) => {
+      if (pane?.getState().composerText === '') pane.setComposerText(sent)
+    },
   })
 
   const fieldRef = useRef<HTMLTextAreaElement | null>(null)
@@ -45,7 +48,10 @@ export function Composer({ pieceId, surface }: ComposerProps) {
   const [query, setQuery] = useState<MentionQuery | undefined>(undefined)
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const matches = useMemo(() => (query === undefined ? [] : matchingHandles(query.token, candidates)), [query, candidates])
+  const matches = useMemo(
+    () => (query === undefined ? [] : matchingHandles(query.token, candidates, config.mentions.maxMatches)),
+    [query, candidates],
+  )
 
   useEffect(() => {
     const pos = pendingCaretRef.current
@@ -54,7 +60,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
     fieldRef.current?.setSelectionRange(pos, pos)
   }, [paneState.composerText])
 
-  const disabled = !idle || sendMutation.isPending
+  const disabled = busyAction !== null || connectionFailed || sendMutation.isPending
   const text = paneState.composerText
   const canSend = !disabled && text.trim() !== ''
 
@@ -98,7 +104,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
 
   function handleStop() {
     if (busyDispatch === null) return
-    abandonMutation.mutate(busyDispatch.actionId)
+    abandonMutation.mutate({ conversationId: busyDispatch.conversationId, actionId: busyDispatch.actionId })
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
