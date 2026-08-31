@@ -11,6 +11,8 @@ const themeWriteSchema = z.object({ theme: themeSchema })
 
 const THEME_KEY = ['theme'] as const
 
+const THEME_UNTIL_READ: Theme = 'dark'
+
 export type SchemeState =
   | Readonly<{ status: 'loading' }>
   | Readonly<{ status: 'unset' }>
@@ -25,6 +27,7 @@ export type SchemeSave =
 export type ServerColorScheme = Readonly<{
   state: SchemeState
   save: SchemeSave
+  showing: Theme
   choose: (theme: Theme) => void
 }>
 
@@ -59,9 +62,12 @@ export function useServerColorScheme(): ServerColorScheme {
     queryFn: async ({ signal }) => (await get('/theme', themeReadSchema, signal)).theme,
   })
 
+  const state = toSchemeState(readState(query))
+  const showing = state.status === 'confirmed' ? state.theme : THEME_UNTIL_READ
+
   useEffect(() => {
-    if (query.status !== 'pending') setMode(query.data ?? 'dark')
-  }, [query.status, query.data, setMode])
+    if (query.status !== 'pending') setMode(showing)
+  }, [query.status, showing, setMode])
 
   const mutation = useMutation<Theme, RequestFailure, Theme>({
     mutationFn: async (theme) => (await put('/theme', themeWriteSchema, { theme })).theme,
@@ -76,5 +82,5 @@ export function useServerColorScheme(): ServerColorScheme {
     [setMode, mutation.mutate],
   )
 
-  return { state: toSchemeState(readState(query)), save: saveState(mutation), choose }
+  return { state, save: saveState(mutation), showing, choose }
 }

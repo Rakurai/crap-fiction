@@ -6,16 +6,25 @@ import type { ModeSummary } from '../../shared/modeViews.js'
 import type { PieceSummary } from '../../shared/pieceViews.js'
 import { SURFACE_IDS } from '../../shared/surfaces.js'
 import { usePieceSession } from '../pieceSession/PieceSessionProvider.js'
-import type { PieceSession } from '../pieceSession/pieceSession.js'
+import type { LeaveRefusal, PieceSession } from '../pieceSession/pieceSession.js'
 import { presentValue, readState, type ReadState } from '../servedFacts/readState.js'
 import { useCreatePiece, useModes, usePieces, useWorkspace } from '../servedFacts/resources.js'
-import { SURFACE_LABEL, type ShellState } from '../shell/state.js'
+import { SURFACE_LABEL } from '../shell/state.js'
 
 type View = Readonly<{ kind: 'list' }> | Readonly<{ kind: 'detail'; id: string }> | Readonly<{ kind: 'create' }>
 
-function refusalMessage(session: PieceSession): string {
+type ModeChoice = Readonly<{ kind: 'sole'; mode: string }> | Readonly<{ kind: 'choose'; modes: readonly ModeSummary[] }>
+
+function modeChoice(modes: readonly ModeSummary[]): ModeChoice | null {
+  const [only, ...rest] = modes
+  if (only === undefined) return null
+  return rest.length === 0 ? { kind: 'sole', mode: only.id } : { kind: 'choose', modes }
+}
+
+function refusalMessage(session: PieceSession, cause: LeaveRefusal): string {
+  if (cause === 'leaveUnderway') return 'Still leaving the piece that is open — wait for that to finish.'
   const failing = SURFACE_IDS.filter((surface) => session.surfaces[surface].document.getFailing()).map((surface) => SURFACE_LABEL[surface])
-  return `Can't leave yet — ${failing.length > 0 ? failing.join(', ') : 'a document'} failed to save.`
+  return `Can't leave yet — ${failing.join(', ')} failed to save.`
 }
 
 function Centered({ children }: Readonly<{ children: ReactNode }>) {
@@ -26,9 +35,14 @@ function Centered({ children }: Readonly<{ children: ReactNode }>) {
   )
 }
 
-export type PiecesOverlayProps = Readonly<{ shell: ShellState }>
+export type PiecesOverlayProps = Readonly<{
+  openPieceId: string | null
+  onOpenPiece: (id: string) => void
+  onClosePiece: () => void
+  onDismiss: () => void
+}>
 
-export function PiecesOverlay({ shell }: PiecesOverlayProps) {
+export function PiecesOverlay({ openPieceId, onOpenPiece, onClosePiece, onDismiss }: PiecesOverlayProps) {
   const session = usePieceSession()
   const piecesRead = readState(usePieces())
   const workspaceRead = readState(useWorkspace())
@@ -40,53 +54,43 @@ export function PiecesOverlay({ shell }: PiecesOverlayProps) {
   const [leaving, setLeaving] = useState(false)
 
   const modes = presentValue(modesRead)
-  const showMode = (modes?.length ?? 0) > 1
+  const choice = modes === null ? null : modeChoice(modes)
+  const showMode = choice?.kind === 'choose'
 
-  async function goTo(id: string): Promise<void> {
+  async function leaveThen(onLeft: () => void): Promise<void> {
     setRefusal(null)
-    if (shell.openPieceId === id) {
-      shell.setOverlay(null)
-      return
-    }
     if (session === null) {
-      shell.openPiece(id)
-      shell.setOverlay(null)
+      onLeft()
       return
     }
     setLeaving(true)
     try {
       const outcome = await session.requestLeave()
-      if (outcome === 'left') {
-        shell.openPiece(id)
-        shell.setOverlay(null)
-      } else {
-        setRefusal(refusalMessage(session))
-      }
+      if (outcome.kind === 'left') onLeft()
+      else setRefusal(refusalMessage(session, outcome.cause))
     } finally {
       setLeaving(false)
     }
+  }
+
+  async function goTo(id: string): Promise<void> {
+    if (openPieceId === id) {
+      setRefusal(null)
+      onDismiss()
+      return
+    }
+    await leaveThen(() => onOpenPiece(id))
   }
 
   async function closeOpenPiece(): Promise<void> {
-    setRefusal(null)
-    if (session === null) return
-    setLeaving(true)
-    try {
-      const outcome = await session.requestLeave()
-      if (outcome === 'left') {
-        shell.closePiece()
-        setView({ kind: 'list' })
-      } else {
-        setRefusal(refusalMessage(session))
-      }
-    } finally {
-      setLeaving(false)
-    }
+    await leaveThen(() => {
+      onClosePiece()
+      setView({ kind: 'list' })
+    })
   }
 
-  async function handleCreate(title: string, mode: string): Promise<void> {
-    const created = await createMutation.mutateAsync({ title, mode })
-    await goTo(created.id)
+  function handleCreate(title: string, mode: string): void {
+    createMutation.mutate({ title, mode }, { onSuccess: (created) => goTo(created.id) })
   }
 
   return (
@@ -101,7 +105,7 @@ export function PiecesOverlay({ shell }: PiecesOverlayProps) {
           {view.kind === 'create' ? 'New piece' : 'Pieces'}
         </Typography>
         {view.kind === 'list' && (
-          <IconButton aria-label="New piece" onClick={() => setView({ kind: 'create' })} disabled={modes === null}>
+          <IconButton aria-label="New piece" onClick={() => setView({ kind: 'create' })} disabled={choice === null}>
             <AddIcon />
           </IconButton>
         )}
@@ -127,7 +131,7 @@ export function PiecesOverlay({ shell }: PiecesOverlayProps) {
               </Typography>
             </Box>
             <Divider />
-            <PiecesList piecesRead={piecesRead} openPieceId={shell.openPieceId} onSelect={(id) => setView({ kind: 'detail', id })} />
+            <PiecesList piecesRead={piecesRead} openPieceId={openPieceId} onSelect={(id) => setView({ kind: 'detail', id })} />
           </>
         )}
 
@@ -137,22 +141,26 @@ export function PiecesOverlay({ shell }: PiecesOverlayProps) {
             piecesRead={piecesRead}
             modes={modes ?? []}
             showMode={showMode}
-            isOpen={shell.openPieceId === view.id}
+            isOpen={openPieceId === view.id}
             leaving={leaving}
             onOpen={() => goTo(view.id)}
             onClose={closeOpenPiece}
           />
         )}
 
-        {view.kind === 'create' && modes !== null && (
-          <CreatePieceForm
-            modes={modes}
-            showMode={showMode}
-            pending={createMutation.isPending}
-            error={createMutation.error?.message ?? null}
-            onCreate={handleCreate}
-          />
-        )}
+        {view.kind === 'create' &&
+          (choice === null ? (
+            <Typography sx={{ p: 2 }} color="text.secondary">
+              No modes are loaded, so there is nothing to start a piece from.
+            </Typography>
+          ) : (
+            <CreatePieceForm
+              choice={choice}
+              pending={createMutation.isPending}
+              error={createMutation.error?.message ?? null}
+              onCreate={handleCreate}
+            />
+          ))}
       </Box>
     </>
   )
@@ -233,21 +241,21 @@ function PieceDetailPane({ id, piecesRead, modes, showMode, isOpen, leaving, onO
 }
 
 type CreatePieceFormProps = Readonly<{
-  modes: readonly ModeSummary[]
-  showMode: boolean
+  choice: ModeChoice
   pending: boolean
   error: string | null
   onCreate: (title: string, mode: string) => void
 }>
 
-function CreatePieceForm({ modes, showMode, pending, error, onCreate }: CreatePieceFormProps) {
+function CreatePieceForm({ choice, pending, error, onCreate }: CreatePieceFormProps) {
   const [title, setTitle] = useState('')
-  const [mode, setMode] = useState(modes[0]?.id ?? '')
+  const [picked, setPicked] = useState<string | null>(null)
   const trimmed = title.trim()
+  const mode = choice.kind === 'sole' ? choice.mode : picked
 
   const handleSubmit = (event: FormEvent): void => {
     event.preventDefault()
-    if (trimmed === '' || mode === '') return
+    if (trimmed === '' || mode === null) return
     onCreate(trimmed, mode)
   }
 
@@ -255,16 +263,16 @@ function CreatePieceForm({ modes, showMode, pending, error, onCreate }: CreatePi
     <Stack component="form" onSubmit={handleSubmit} spacing={2} sx={{ p: 2 }}>
       {error !== null && <Alert severity="error">{error}</Alert>}
       <TextField label="Title" value={title} onChange={(event) => setTitle(event.target.value)} autoFocus fullWidth disabled={pending} />
-      {showMode && (
-        <TextField select label="Mode" value={mode} onChange={(event) => setMode(event.target.value)} fullWidth disabled={pending}>
-          {modes.map((candidate) => (
+      {choice.kind === 'choose' && (
+        <TextField select label="Mode" value={picked ?? ''} onChange={(event) => setPicked(event.target.value)} fullWidth disabled={pending}>
+          {choice.modes.map((candidate) => (
             <MenuItem key={candidate.id} value={candidate.id}>
               {candidate.displayName}
             </MenuItem>
           ))}
         </TextField>
       )}
-      <Button type="submit" variant="affirm" disabled={pending || trimmed === '' || mode === ''}>
+      <Button type="submit" variant="affirm" disabled={pending || trimmed === '' || mode === null}>
         {pending ? 'Creating…' : 'Create'}
       </Button>
     </Stack>

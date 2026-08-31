@@ -6,7 +6,7 @@ export type OverlayHostProps = Readonly<{
   overlay: OverlayId | null
   dismissable: boolean
   onDismiss: () => void
-  children?: ReactNode
+  children: ReactNode
 }>
 
 const SIDE_ANCHOR: Readonly<Record<'pieces' | 'conversations', 'left' | 'right'>> = {

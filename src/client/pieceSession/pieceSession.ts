@@ -8,7 +8,9 @@ export type SurfaceSession = Readonly<{
   conversationPane: ConversationPane
 }>
 
-export type LeaveOutcome = 'left' | 'refused'
+export type LeaveRefusal = 'unsavedDocument' | 'leaveUnderway'
+
+export type LeaveOutcome = Readonly<{ kind: 'left' }> | Readonly<{ kind: 'refused'; cause: LeaveRefusal }>
 
 export type PieceSession = Readonly<{
   pieceId: string
@@ -43,11 +45,11 @@ export function createPieceSession(
     surfaces,
 
     requestLeave: async () => {
-      if (leaving) return 'refused'
+      if (leaving) return { kind: 'refused', cause: 'leaveUnderway' }
       leaving = true
       try {
         const outcomes = await Promise.all(SURFACE_IDS.map((surface) => surfaces[surface].document.flushAndSettle()))
-        return outcomes.every((outcome) => outcome === 'settled') ? 'left' : 'refused'
+        return outcomes.every((outcome) => outcome === 'settled') ? { kind: 'left' } : { kind: 'refused', cause: 'unsavedDocument' }
       } finally {
         leaving = false
       }

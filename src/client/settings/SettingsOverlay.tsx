@@ -44,7 +44,6 @@ export function SettingsOverlay() {
 
 function GeneralSection() {
   const scheme = useServerColorScheme()
-  const current: Theme = scheme.state.status === 'confirmed' ? scheme.state.theme : 'dark'
 
   return (
     <Stack spacing={2}>
@@ -54,7 +53,7 @@ function GeneralSection() {
       )}
       {scheme.save.status === 'unsaved' && <Alert severity="error">{scheme.save.message}</Alert>}
       <ToggleButtonGroup
-        value={current}
+        value={scheme.showing}
         exclusive
         onChange={(_event, value: Theme | null) => {
           if (value !== null) scheme.choose(value)
@@ -89,6 +88,8 @@ function ModelSection() {
         <Typography variant="subtitle2">Model assignment</Typography>
         <Typography variant="machine">{reachabilityStatement(modelsRead)}</Typography>
       </Stack>
+
+      {assign.isError && <Alert severity="error">{assign.error.message}</Alert>}
 
       {sites === null ? (
         sitesRead.status === 'failed' ? (

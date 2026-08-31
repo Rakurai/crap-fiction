@@ -34,10 +34,13 @@ export function ConversationsOverlay({ pieceId, surface, onDismiss }: Conversati
     onDismiss()
   }
 
-  async function confirmDelete(id: string): Promise<void> {
-    await deleteConversation.mutateAsync(id)
-    if (paneState.conversationId === id) pane?.selectConversation(null)
-    setArmedId(null)
+  function confirmDelete(id: string): void {
+    deleteConversation.mutate(id, {
+      onSuccess: () => {
+        if (paneState.conversationId === id) pane?.selectConversation(null)
+        setArmedId(null)
+      },
+    })
   }
 
   return (
@@ -50,6 +53,8 @@ export function ConversationsOverlay({ pieceId, surface, onDismiss }: Conversati
           <AddIcon />
         </IconButton>
       </Toolbar>
+
+      {deleteConversation.isError && <Alert severity="error" sx={{ m: 2 }}>{deleteConversation.error.message}</Alert>}
 
       {conversations === null ? (
         detailRead.status === 'failed' ? (
@@ -95,6 +100,19 @@ type ConversationRowProps = Readonly<{
   onConfirmDelete: () => void
 }>
 
+function RowTime({ conversation }: Readonly<{ conversation: ConversationSummary }>) {
+  const when = new Date(conversation.lastActivity).toLocaleString()
+  if (conversation.opening !== undefined) return <>{when}</>
+  return (
+    <>
+      <Typography variant="machine" component="span">
+        asked for a concrete change
+      </Typography>
+      {` · ${when}`}
+    </>
+  )
+}
+
 function ConversationRow({ conversation, current, armed, deleting, onSelect, onArm, onCancelArm, onConfirmDelete }: ConversationRowProps) {
   return (
     <ListItem
@@ -117,11 +135,7 @@ function ConversationRow({ conversation, current, armed, deleting, onSelect, onA
       }
     >
       <ListItemButton onClick={onSelect} selected={current} sx={{ pr: armed ? 22 : 6 }}>
-        <ListItemText
-          primary={conversation.opening ?? 'Asked for a concrete change'}
-          slotProps={{ primary: { noWrap: true } }}
-          secondary={new Date(conversation.lastActivity).toLocaleString()}
-        />
+        <ListItemText primary={conversation.opening} slotProps={{ primary: { noWrap: true } }} secondary={<RowTime conversation={conversation} />} />
       </ListItemButton>
     </ListItem>
   )

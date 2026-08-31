@@ -9,7 +9,7 @@ type NamedParticipant = Readonly<{ id: string; handle: string; displayName: stri
 export type ParticipantIdentity = NamedParticipant &
   (Readonly<{ eligibility: 'cast' | 'addressed-only'; ordinal: number }> | Readonly<{ eligibility: 'generalist' }>)
 
-function toIdentity(participant: AddressableParticipantView): ParticipantIdentity {
+export function participantIdentity(participant: AddressableParticipantView): ParticipantIdentity {
   const named: NamedParticipant = {
     id: participant.id,
     handle: participant.handle,
@@ -25,5 +25,5 @@ export function useParticipantIdentities(pieceId: string, surface: SurfaceId): R
   const detail = presentValue(readState(usePieceDetail(pieceId)))
   const addressable = detail?.surfaces[surface].addressable
 
-  return useMemo(() => new Map((addressable ?? []).map((participant) => [participant.id, toIdentity(participant)])), [addressable])
+  return useMemo(() => new Map((addressable ?? []).map((participant) => [participant.id, participantIdentity(participant)])), [addressable])
 }
