@@ -295,8 +295,9 @@ appears in a third place is one the author has to decide the meaning of.
 
 **A conversation action and an application do not share one register for work under way.** During a
 conversation action the document is fully editable and a live cursor stays in it. During an application
-the document is visibly read-only, and reads as it being held for a moment rather than as the
-application being busy. One undifferentiated *something is happening* treatment would tell the
+the document takes no edit, and the hold is stated beside the response applying it rather than painted
+onto the prose, so it reads as the document being held for a moment rather than as the application
+being busy. One undifferentiated *something is happening* treatment would tell the
 author to stop typing when they do not have to. That hold spans the model answering, the result being
 saved and that save being confirmed — one uninterrupted moment to the author, whatever the number of
 requests behind it. Only the surface being applied to is held; the other two stay writable.

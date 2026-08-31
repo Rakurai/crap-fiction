@@ -21,7 +21,7 @@ export function ContextEditor({ surface, pieceId, document, editable }: ContextE
   const text = useSyncExternalStore(document.subscribeText, document.getText)
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflowY: 'auto', p: 2, gap: 1, opacity: editable ? 1 : 0.6 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflowY: 'auto', p: 2, gap: 1 }}>
       {surfaceDetail !== null && (
         <Typography variant="machine">
           {SURFACE_LABEL[surface]} — kept at {surfaceDetail.location}

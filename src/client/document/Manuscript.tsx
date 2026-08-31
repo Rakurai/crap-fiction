@@ -66,7 +66,6 @@ export function Manuscript({ document, presentation, editable }: ManuscriptProps
           mx: 'auto',
           px: 2,
           py: 4,
-          opacity: editable ? 1 : 0.6,
           [theme.containerQueries.up('sm')]: { px: 6 },
           ...proseRegister,
           '& .tiptap': { outline: 'none' },
