@@ -2,7 +2,7 @@ import { MenuItem, MenuList, Paper, Popper, Stack } from '@mui/material'
 import { ParticipantMark, ParticipantNameHandle } from '../transcript/ParticipantBadge.js'
 import type { ParticipantIdentity } from '../transcript/identity.js'
 
-export type HandlePickerProps = Readonly<{
+type HandlePickerProps = Readonly<{
   anchorEl: HTMLElement | null
   matches: readonly ParticipantIdentity[]
   activeIndex: number

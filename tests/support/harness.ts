@@ -19,7 +19,7 @@ import { FixtureModelAdapter } from './modelAdapter.js'
 import { PROMPT_FRAGMENTS_FIXTURE, ROLES_FIXTURE } from './roomFixtures.js'
 import { buildTestRoom } from './room.js'
 
-export type AppSpec = Readonly<{
+type AppSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   runtimeStatus: RuntimeStatus | undefined
@@ -27,7 +27,7 @@ export type AppSpec = Readonly<{
   authorContextReference: string
 }>
 
-export type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
+type TestApp = Readonly<{ app: Hono; workspace: WorkspaceRegistry }>
 
 const UNREACHED = 'unreached: no prompt is rendered in this scenario'
 

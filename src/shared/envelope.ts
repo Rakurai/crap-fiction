@@ -26,18 +26,18 @@ export const failureCodeSchema = z.enum([
 
 export type FailureCode = z.infer<typeof failureCodeSchema>
 
-export const responseFailureSchema = z.object({
+const responseFailureSchema = z.object({
   success: z.literal(false),
   error: z.object({ code: failureCodeSchema, message: z.string() }),
 })
 
-export type ResponseFailure = z.infer<typeof responseFailureSchema>
+type ResponseFailure = z.infer<typeof responseFailureSchema>
 
 export function responseEnvelopeSchema<T extends z.ZodType>(data: T) {
   return z.discriminatedUnion('success', [z.object({ success: z.literal(true), data }), responseFailureSchema])
 }
 
-export type ResponseEnvelope<T> = z.infer<ReturnType<typeof responseEnvelopeSchema<z.ZodType<T>>>>
+type ResponseEnvelope<T> = z.infer<ReturnType<typeof responseEnvelopeSchema<z.ZodType<T>>>>
 
 export function ok<T>(data: T): ResponseEnvelope<T> {
   return { success: true, data }

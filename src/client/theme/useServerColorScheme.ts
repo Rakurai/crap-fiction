@@ -13,13 +13,13 @@ const THEME_KEY = ['theme'] as const
 
 const THEME_UNTIL_READ: Theme = 'dark'
 
-export type SchemeState =
+type SchemeState =
   | Readonly<{ status: 'loading' }>
   | Readonly<{ status: 'unset' }>
   | Readonly<{ status: 'confirmed'; theme: Theme }>
   | Readonly<{ status: 'unavailable' }>
 
-export type SchemeSave =
+type SchemeSave =
   | Readonly<{ status: 'settled' }>
   | Readonly<{ status: 'saving'; theme: Theme }>
   | Readonly<{ status: 'unsaved'; theme: Theme; message: string }>

@@ -47,7 +47,7 @@ export type RoomProjectionState = Readonly<{
   finished: Readonly<Record<SurfaceId, FinishedOutcome | null>>
 }>
 
-export type SnapshotFrame = Readonly<{ type: 'activity.snapshot'; data: RoomActivitySnapshot }>
+type SnapshotFrame = Readonly<{ type: 'activity.snapshot'; data: RoomActivitySnapshot }>
 export type Frame = SnapshotFrame | RoomEvent
 
 export type StreamEvent =
@@ -62,7 +62,7 @@ export type RoomProjectionEffect =
   | Readonly<{ type: 'invalidatePieceDetail' }>
   | Readonly<{ type: 'appendEntry'; surface: SurfaceId; conversationId: string; entry: ConversationEntryView }>
 
-export type RoomProjectionTransition = Readonly<{ state: RoomProjectionState; effects: readonly RoomProjectionEffect[] }>
+type RoomProjectionTransition = Readonly<{ state: RoomProjectionState; effects: readonly RoomProjectionEffect[] }>
 
 const INVALIDATE_PIECE_DETAIL: RoomProjectionEffect = { type: 'invalidatePieceDetail' }
 const CLOSE_CONNECTION: RoomProjectionEffect = { type: 'closeConnection' }

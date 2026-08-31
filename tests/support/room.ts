@@ -11,7 +11,7 @@ import { Room, type ApplyingConfig } from '../../src/server/room/room.js'
 import { ShippedContentCatalog } from '../../src/server/shippedContent.js'
 import { ConversationEntryStore, PieceMetadataStore } from '../../src/server/store/index.js'
 
-export type RoomSpec = Readonly<{
+type RoomSpec = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   charter: Charter

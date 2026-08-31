@@ -3,9 +3,9 @@ import { createSubscribableValue } from './subscribableValue.js'
 
 export type DocumentWrite = (text: string, signal: AbortSignal) => Promise<void>
 
-export type DocumentSettleOutcome = 'settled' | 'failing'
+type DocumentSettleOutcome = 'settled' | 'failing'
 
-export type ReplacementInstaller = (text: string) => void
+type ReplacementInstaller = (text: string) => void
 
 export type DocumentSession = Readonly<{
   getText: () => string

@@ -3,7 +3,7 @@ import { Dialog, Drawer } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import type { OverlayId } from './state.js'
 
-export type OverlayHostProps = Readonly<{
+type OverlayHostProps = Readonly<{
   overlay: OverlayId | null
   dismissable: boolean
   onDismiss: () => void

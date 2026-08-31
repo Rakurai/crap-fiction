@@ -33,7 +33,7 @@ function Centered({ children }: Readonly<{ children: ReactNode }>) {
   )
 }
 
-export type PiecesOverlayProps = Readonly<{
+type PiecesOverlayProps = Readonly<{
   openPieceId: string | null
   onOpenPiece: (id: string) => void
   onClosePiece: () => void

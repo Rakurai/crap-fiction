@@ -7,7 +7,7 @@ import { AppBar, Box, IconButton, Tab, Tabs, Toolbar, Tooltip, Typography } from
 import { SURFACE_IDS, type SurfaceId } from '../../shared/surfaces.js'
 import { SURFACE_LABEL, type OverlayId } from './state.js'
 
-export type WorkspaceBarProps = Readonly<{
+type WorkspaceBarProps = Readonly<{
   pieceOpen: boolean
   activeSurface: SurfaceId
   onSelectSurface: (surface: SurfaceId) => void

@@ -9,7 +9,7 @@ function Panel({ active, children }: Readonly<{ active: boolean; children: React
   return <Box sx={{ display: active ? 'flex' : 'none', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0 }}>{children}</Box>
 }
 
-export type TranscriptColumnProps = Readonly<{ activeSurface: SurfaceId }>
+type TranscriptColumnProps = Readonly<{ activeSurface: SurfaceId }>
 
 export function TranscriptColumn({ activeSurface }: TranscriptColumnProps) {
   const session = usePieceSession()

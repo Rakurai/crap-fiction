@@ -5,8 +5,8 @@ import spectral500 from '../fonts/spectral-latin-500.woff2'
 import spectral600 from '../fonts/spectral-latin-600.woff2'
 import spectralItalic400 from '../fonts/spectral-latin-italic-400.woff2'
 
-export const PUBLIC_SANS = 'Public Sans'
-export const SPECTRAL = 'Spectral'
+const PUBLIC_SANS = 'Public Sans'
+const SPECTRAL = 'Spectral'
 
 export const INTERFACE_FONT_STACK = `"${PUBLIC_SANS}", "Helvetica Neue", Arial, sans-serif`
 export const PROSE_FONT_STACK = `"${SPECTRAL}", Georgia, "Times New Roman", serif`

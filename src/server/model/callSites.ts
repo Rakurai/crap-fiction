@@ -4,7 +4,7 @@ import { markOrdinals, type RoleDefinition } from './roles.js'
 
 export const APPLY_CALL_SITE = 'apply'
 
-export const OPERATION_CALL_SITES = [APPLY_CALL_SITE] as const
+const OPERATION_CALL_SITES = [APPLY_CALL_SITE] as const
 
 export type OperationCallSite = (typeof OPERATION_CALL_SITES)[number]
 

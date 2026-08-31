@@ -10,13 +10,13 @@ export type CallResult<T> =
   | { readonly outcome: 'abandoned' }
   | { readonly outcome: 'failed'; readonly reason: FailureReason; readonly returned?: string }
 
-export const callStateSchema = participantStageSchema.exclude(['called'])
+const callStateSchema = participantStageSchema.exclude(['called'])
 
 export type CallState = z.infer<typeof callStateSchema>
 
 export type TurnRole = 'system' | 'user' | 'assistant'
 
-export type Turn = Readonly<{ role: TurnRole; content: string }>
+type Turn = Readonly<{ role: TurnRole; content: string }>
 
 export type CallTurns = readonly Turn[]
 

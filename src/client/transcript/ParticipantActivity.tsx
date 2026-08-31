@@ -25,7 +25,7 @@ function answeredParticipantIds(sourceEntryId: string, entries: readonly Convers
   return new Set(answers.map((entry) => entry.participantId))
 }
 
-export type RoomTroubleProps = Readonly<{
+type RoomTroubleProps = Readonly<{
   failures: readonly StatedFailure[]
   finished: FinishedOutcome | null
   requestFailure: string | null
@@ -55,7 +55,7 @@ export function RoomTrouble({ failures, finished, requestFailure }: RoomTroubleP
   )
 }
 
-export type ApplyStatementProps = Readonly<{ statement: string | null }>
+type ApplyStatementProps = Readonly<{ statement: string | null }>
 
 export function ApplyStatement({ statement }: ApplyStatementProps) {
   if (statement === null) return null
@@ -67,7 +67,7 @@ export function ApplyStatement({ statement }: ApplyStatementProps) {
   )
 }
 
-export type DispatchActivityProps = Readonly<{
+type DispatchActivityProps = Readonly<{
   action: BusyAction
   entries: readonly ConversationEntryView[]
   identities: ReadonlyMap<string, ParticipantIdentity>

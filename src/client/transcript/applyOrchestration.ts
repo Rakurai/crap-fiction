@@ -7,7 +7,7 @@ import type { DocumentSession } from '../pieceSession/documentSession.js'
 import { confirmApply, fetchPendingReplacement, useAbandonAction, useApplyRecommendation } from '../servedFacts/resources.js'
 import { APPLY_FAILURE_TEXT } from './failureText.js'
 
-export type ApplyOrchestration = Readonly<{
+type ApplyOrchestration = Readonly<{
   apply: (response: ParticipantResponseEntry, constraint: string | undefined, documents: DocumentSnapshot) => void
   abandon: (actionId: string) => void
   statement: string | null

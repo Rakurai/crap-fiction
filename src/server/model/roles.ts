@@ -9,7 +9,7 @@ const availabilityEntrySchema = z.object({
   enabledByDefault: z.boolean(),
 })
 
-export type AvailabilityEntry = Readonly<{
+type AvailabilityEntry = Readonly<{
   mode: string
   surface: SurfaceId
   enabledByDefault: boolean
@@ -24,16 +24,16 @@ const identity = {
 
 export const INTERVIEWER_FUNCTION = 'interviewer' as const
 
-export const PARTICIPANT_FUNCTIONS = [INTERVIEWER_FUNCTION] as const
+const PARTICIPANT_FUNCTIONS = [INTERVIEWER_FUNCTION] as const
 
-export type ParticipantFunction = (typeof PARTICIPANT_FUNCTIONS)[number]
+type ParticipantFunction = (typeof PARTICIPANT_FUNCTIONS)[number]
 
 const declaredFunctionSchema = z.strictObject({
   name: z.enum(PARTICIPANT_FUNCTIONS),
   invocation: z.string().min(1),
 })
 
-export type DeclaredFunction = Readonly<z.infer<typeof declaredFunctionSchema>>
+type DeclaredFunction = Readonly<z.infer<typeof declaredFunctionSchema>>
 
 const participantFrontmatterSchema = z.discriminatedUnion('eligibility', [
   z.strictObject({ ...identity, eligibility: z.literal('cast'), availability: z.array(availabilityEntrySchema) }),
@@ -41,7 +41,7 @@ const participantFrontmatterSchema = z.discriminatedUnion('eligibility', [
   z.strictObject({ ...identity, eligibility: z.literal('addressed-only'), function: declaredFunctionSchema.optional() }),
 ])
 
-export type Eligibility = z.infer<typeof participantFrontmatterSchema>['eligibility']
+type Eligibility = z.infer<typeof participantFrontmatterSchema>['eligibility']
 
 export type RoleDefinition = Readonly<{
   id: string

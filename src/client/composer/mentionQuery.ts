@@ -15,7 +15,7 @@ export function matchingHandles<T extends { handle: string }>(token: string, can
   return candidates.filter((candidate) => candidate.handle.startsWith(lowered)).slice(0, limit)
 }
 
-export type MentionInsertion = Readonly<{ text: string; caret: number }>
+type MentionInsertion = Readonly<{ text: string; caret: number }>
 
 export function insertMention(text: string, query: MentionQuery, handle: string): MentionInsertion {
   const before = text.slice(0, query.at)

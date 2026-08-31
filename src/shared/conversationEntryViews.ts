@@ -9,7 +9,7 @@ import {
   participantResponseEntrySchema,
 } from './conversationEntries.js'
 
-export const applicationEntryViewSchema = applicationEntrySchema.extend({
+const applicationEntryViewSchema = applicationEntrySchema.extend({
   change: appliedChangeContentSchema.optional(),
 })
 

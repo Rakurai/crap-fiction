@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const responseOutcomeSchema = z.enum(['noComment', 'commentary', 'applicableSuggestion'])
+const responseOutcomeSchema = z.enum(['noComment', 'commentary', 'applicableSuggestion'])
 
 export type ResponseOutcome = z.infer<typeof responseOutcomeSchema>
 
@@ -8,7 +8,7 @@ export const substantiveOutcomeSchema = responseOutcomeSchema.exclude(['noCommen
 
 export type SubstantiveOutcome = z.infer<typeof substantiveOutcomeSchema>
 
-export const noCommentOutcomeSchema = responseOutcomeSchema.extract(['noComment'])
+const noCommentOutcomeSchema = responseOutcomeSchema.extract(['noComment'])
 
 const substantiveValueSchema = z.object({
   outcome: substantiveOutcomeSchema,
@@ -24,7 +24,7 @@ export const owedResponseValueSchema = substantiveValueSchema
 
 export type ResponseValue = z.infer<typeof eligibleResponseValueSchema>
 
-export type ResponseValueSchema = typeof owedResponseValueSchema | typeof eligibleResponseValueSchema
+type ResponseValueSchema = typeof owedResponseValueSchema | typeof eligibleResponseValueSchema
 
 export function responseValueSchema(owesAnswer: boolean): ResponseValueSchema {
   return owesAnswer ? owedResponseValueSchema : eligibleResponseValueSchema

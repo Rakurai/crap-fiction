@@ -7,7 +7,7 @@ import type { DocumentPresentation } from '../shell/state.js'
 import { ContextEditor } from './ContextEditor.js'
 import { Manuscript } from './Manuscript.js'
 
-export type DocumentProps = Readonly<{
+type DocumentProps = Readonly<{
   activeSurface: SurfaceId
   presentation: DocumentPresentation
 }>

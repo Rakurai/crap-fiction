@@ -12,7 +12,7 @@ import { del, get, patch, post, put, type RequestFailure } from './transport.js'
 const workspaceReadSchema = z.object({ workspace: z.string().nullable() })
 const workspaceWriteSchema = z.object({ workspace: z.string() })
 
-export const WORKSPACE_KEY = ['workspace'] as const
+const WORKSPACE_KEY = ['workspace'] as const
 
 export function useWorkspace(): UseQueryResult<string | null, RequestFailure> {
   return useQuery({
@@ -30,7 +30,7 @@ export function useSetWorkspace(): UseMutationResult<string, RequestFailure, str
   })
 }
 
-export const MODES_KEY = ['modes'] as const
+const MODES_KEY = ['modes'] as const
 
 export function useModes(): UseQueryResult<readonly ModeSummary[], RequestFailure> {
   return useQuery({
@@ -40,7 +40,7 @@ export function useModes(): UseQueryResult<readonly ModeSummary[], RequestFailur
   })
 }
 
-export const PIECES_KEY = ['pieces'] as const
+const PIECES_KEY = ['pieces'] as const
 
 export function usePieces(): UseQueryResult<readonly PieceSummary[], RequestFailure> {
   return useQuery({
@@ -66,7 +66,7 @@ export function useCreatePiece(): UseMutationResult<PieceSummary, RequestFailure
   })
 }
 
-export type SetCastRequest = Readonly<{ surface: SurfaceId; ids: readonly string[] }>
+type SetCastRequest = Readonly<{ surface: SurfaceId; ids: readonly string[] }>
 
 export function useSetCast(pieceId: string): UseMutationResult<PieceDetail, RequestFailure, SetCastRequest> {
   const queryClient = useQueryClient()
@@ -76,7 +76,7 @@ export function useSetCast(pieceId: string): UseMutationResult<PieceDetail, Requ
   })
 }
 
-export const CALL_SITES_KEY = ['callSites'] as const
+const CALL_SITES_KEY = ['callSites'] as const
 
 export function useCallSites(): UseQueryResult<readonly CallSiteAssignmentView[], RequestFailure> {
   return useQuery({
@@ -100,7 +100,7 @@ export function useAssignModel(): UseMutationResult<AssignmentWrite, RequestFail
   })
 }
 
-export const MODELS_KEY = ['models'] as const
+const MODELS_KEY = ['models'] as const
 
 export function useModels(): UseQueryResult<RuntimeStatus, RequestFailure> {
   return useQuery({
@@ -126,7 +126,7 @@ export function useConversation(
   })
 }
 
-export type DispatchRequestBody =
+type DispatchRequestBody =
   | Readonly<{ message: string; documents: DocumentSnapshot }>
   | Readonly<{ target: string; message: string; documents: DocumentSnapshot }>
   | Readonly<{ respondingTo: string; clarification?: string; documents: DocumentSnapshot }>
@@ -159,7 +159,7 @@ export function useDeleteConversation(pieceId: string, surface: SurfaceId): UseM
   })
 }
 
-export type ApplyRequestBody = Readonly<{ responseId: string; constraint?: string; documents: DocumentSnapshot }>
+type ApplyRequestBody = Readonly<{ responseId: string; constraint?: string; documents: DocumentSnapshot }>
 
 export function useApplyRecommendation(
   pieceId: string,
@@ -185,7 +185,7 @@ export function confirmApply(pieceId: string, surface: SurfaceId, conversationId
   return post(`/pieces/${pieceId}/surfaces/${surface}/conversations/${conversationId}/apply/${applicationId}/confirm`, applyConfirmationSchema, null)
 }
 
-export type AbandonRequest = Readonly<{ conversationId: string; actionId: string }>
+type AbandonRequest = Readonly<{ conversationId: string; actionId: string }>
 
 export function useAbandonAction(pieceId: string, surface: SurfaceId): UseMutationResult<null, RequestFailure, AbandonRequest> {
   return useMutation({

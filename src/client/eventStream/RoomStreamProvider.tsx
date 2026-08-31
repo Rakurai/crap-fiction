@@ -6,7 +6,7 @@ import type { ConnectionStatus, FinishedOutcome, ScopeActivity, StatedFailure, S
 
 const RoomStreamContext = createContext<RoomConnection | null>(null)
 
-export type RoomStreamProviderProps = Readonly<{ pieceId: string | null; children: ReactNode }>
+type RoomStreamProviderProps = Readonly<{ pieceId: string | null; children: ReactNode }>
 
 export function RoomStreamProvider({ pieceId, children }: RoomStreamProviderProps) {
   const queryClient = useQueryClient()

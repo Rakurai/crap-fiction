@@ -6,7 +6,7 @@ export type AutosaveEvent =
   | Readonly<{ type: 'writeFailed'; text: string }>
   | Readonly<{ type: 'writeCancelled' }>
 
-export type AutosaveEffect =
+type AutosaveEffect =
   | Readonly<{ type: 'scheduleDebounce' }>
   | Readonly<{ type: 'cancelDebounce' }>
   | Readonly<{ type: 'startWrite'; text: string }>
@@ -18,7 +18,7 @@ export type AutosaveState = Readonly<{
   failing: boolean
 }>
 
-export type AutosaveTransition = Readonly<{ state: AutosaveState; effects: readonly AutosaveEffect[] }>
+type AutosaveTransition = Readonly<{ state: AutosaveState; effects: readonly AutosaveEffect[] }>
 
 export function initialAutosaveState(initialText: string): AutosaveState {
   return { latestText: initialText, savedText: initialText, writeInFlight: false, failing: false }

@@ -8,7 +8,7 @@ import { SURFACE_LABEL } from '../shell/state.js'
 
 type ContextSurfaceId = 'storyContext' | 'authorContext'
 
-export type ContextEditorProps = Readonly<{
+type ContextEditorProps = Readonly<{
   surface: ContextSurfaceId
   pieceId: string
   document: DocumentSession

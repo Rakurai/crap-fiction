@@ -223,12 +223,12 @@ export async function updatePieceDetails(
   return summarize(id, requirePiece(workspaceDir, id))
 }
 
-export type PieceChanges = Readonly<{
+type PieceChanges = Readonly<{
   title?: string | undefined
   cast?: Readonly<{ surface: SurfaceId; ids: readonly string[] }> | undefined
 }>
 
-export async function updatePiece(
+async function updatePiece(
   pieceMetadata: PieceMetadataStore,
   workspaceDir: string,
   id: string,

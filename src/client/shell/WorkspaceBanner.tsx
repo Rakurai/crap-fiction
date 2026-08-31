@@ -3,7 +3,7 @@ import { FailingDocuments } from './FailingDocuments.js'
 import type { DocumentPresentation } from './state.js'
 import { WordCount } from './WordCount.js'
 
-export type WorkspaceBannerProps = Readonly<{
+type WorkspaceBannerProps = Readonly<{
   title: string | null
   presentation: DocumentPresentation
   onPresentationChange: (presentation: DocumentPresentation) => void

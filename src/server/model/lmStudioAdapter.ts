@@ -7,7 +7,7 @@ import type { Logger } from '../logger.js'
 import { APPLY_CALL_SITE } from './callSites.js'
 import type { CallResult, CallState, CallTurns, ModelAccess, ModelTrace, ModelTraceRecord } from './types.js'
 
-export type GetAssignment = (site: string) => string | undefined
+type GetAssignment = (site: string) => string | undefined
 
 export class ModelRuntimeUrlError extends Error {
   constructor(value: string, reason: string) {

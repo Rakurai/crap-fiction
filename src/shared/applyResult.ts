@@ -4,7 +4,7 @@ export const replacementSchema = z.string()
 
 export type Replacement = z.infer<typeof replacementSchema>
 
-export const editSchema = z.object({
+const editSchema = z.object({
   find: z.string(),
   replace: replacementSchema,
   occurrence: z.number().int().nonnegative().optional(),

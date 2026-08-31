@@ -18,7 +18,7 @@ export class UnknownModeError extends RouteFailure {
   }
 }
 
-export type ShippedContentParts = Readonly<{
+type ShippedContentParts = Readonly<{
   modes: readonly ModeDescriptor[]
   roles: readonly RoleDefinition[]
   charter: Charter

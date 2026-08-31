@@ -13,7 +13,7 @@ export type HistoryPolicy = 'shared' | 'stricter'
 
 export const SHIPPED_HISTORY_POLICY: HistoryPolicy = 'shared'
 
-export type HistoryEntry =
+type HistoryEntry =
   | Readonly<{ kind: 'message'; text: string }>
   | Readonly<{ kind: 'request'; participant: string; clarification: string | undefined }>
   | Readonly<{ kind: 'response'; participant: string; claim: string; note: string | undefined }>
@@ -21,7 +21,7 @@ export type HistoryEntry =
 
 export type ParticipantEvidence = Readonly<{ participant: string; claim: string; note: string | undefined }>
 
-export type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
+type AskContextInput = Readonly<{ claim: string; note: string | undefined; clarification: string | undefined }>
 
 export type ContextInput = Readonly<{
   role: RoleDefinition
@@ -39,7 +39,7 @@ export type ContextInput = Readonly<{
   participants: ReadonlyMap<string, string>
 }>
 
-export type Context = Readonly<{
+type Context = Readonly<{
   role: RoleDefinition
   modeDescription: string
   owesAnswer: boolean

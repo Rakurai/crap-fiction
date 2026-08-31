@@ -1,6 +1,6 @@
 import type { Edit } from '../../shared/applyResult.js'
 
-export type EditDiagnosis = 'unmatched' | 'ambiguous' | 'occurrenceOutOfRange' | 'overlapping' | 'emptyAnchor'
+type EditDiagnosis = 'unmatched' | 'ambiguous' | 'occurrenceOutOfRange' | 'overlapping' | 'emptyAnchor'
 
 export type EditVerdict =
   | Readonly<{ outcome: 'resolved'; find: string }>
@@ -8,7 +8,7 @@ export type EditVerdict =
 
 export type DiagnosisCounts = Readonly<Partial<Record<EditDiagnosis, number>>>
 
-export type EditResolution =
+type EditResolution =
   | Readonly<{ outcome: 'resolved'; text: string }>
   | Readonly<{ outcome: 'defective'; verdicts: readonly EditVerdict[] }>
 

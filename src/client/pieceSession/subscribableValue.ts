@@ -1,4 +1,4 @@
-export type SubscribableValue<T> = Readonly<{
+type SubscribableValue<T> = Readonly<{
   get: () => T
   set: (value: T) => void
   subscribe: (onChange: () => void) => () => void

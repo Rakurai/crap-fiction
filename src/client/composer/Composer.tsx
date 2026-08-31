@@ -13,7 +13,7 @@ import { useParticipantIdentities, type ParticipantIdentity } from '../transcrip
 import { HandlePicker } from './HandlePicker.js'
 import { detectMentionQuery, insertMention, matchingHandles, type MentionQuery } from './mentionQuery.js'
 
-export type ComposerProps = Readonly<{ pieceId: string; surface: SurfaceId }>
+type ComposerProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
 const STREAM_FAILURE_TEXT: Readonly<Record<StreamFailureReason, string>> = {
   disconnected: "the studio has stopped trying to reach the room's events — reload to see what it is doing",

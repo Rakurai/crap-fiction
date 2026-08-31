@@ -22,7 +22,7 @@ function ShellCrashed() {
   )
 }
 
-export type ShellProps = Readonly<{ shell: ShellState }>
+type ShellProps = Readonly<{ shell: ShellState }>
 
 export function Shell({ shell }: ShellProps) {
   const pieceOpen = shell.openPieceId !== null

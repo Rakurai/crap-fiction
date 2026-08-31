@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Box } from '@mui/material'
 
-export type TranscriptRowProps = Readonly<{ gutter: ReactNode; children: ReactNode }>
+type TranscriptRowProps = Readonly<{ gutter: ReactNode; children: ReactNode }>
 
 export function TranscriptRow({ gutter, children }: TranscriptRowProps) {
   return (

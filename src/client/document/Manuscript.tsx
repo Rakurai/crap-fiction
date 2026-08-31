@@ -10,7 +10,7 @@ import type { DocumentPresentation } from '../shell/state.js'
 
 const MANUSCRIPT_EXTENSIONS = [...documentExtensions, History]
 
-export type ManuscriptProps = Readonly<{
+type ManuscriptProps = Readonly<{
   document: DocumentSession
   presentation: DocumentPresentation
   editable: boolean

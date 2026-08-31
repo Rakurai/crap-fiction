@@ -56,7 +56,7 @@ export type SectionName =
   | 'referenceSchema'
   | 'rejectedAttempt'
 
-export type LineName =
+type LineName =
   | 'historyMessage'
   | 'historyRequest'
   | 'historyRequestClarified'
@@ -70,8 +70,8 @@ export type LineName =
   | 'editOverlapping'
   | 'editEmptyAnchor'
 
-export type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
-export type OperationRoleName = 'apply'
+type TaskName = 'specialist' | 'generalist' | 'concreteChange' | 'apply'
+type OperationRoleName = 'apply'
 
 const SECTION_NAMES: readonly SectionName[] = [
   'charter',

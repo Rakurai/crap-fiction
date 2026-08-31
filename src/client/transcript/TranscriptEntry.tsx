@@ -84,7 +84,7 @@ function AppliedChangeDisclosure({
   )
 }
 
-export function AuthorMessageLine({
+function AuthorMessageLine({
   text,
   atMs,
   brought,
@@ -117,7 +117,7 @@ export function AuthorMessageLine({
   )
 }
 
-export function ConcreteChangeRequestLine({
+function ConcreteChangeRequestLine({
   target,
   clarification,
   atMs,
@@ -150,7 +150,7 @@ function Gutter({ identity }: Readonly<{ identity: ParticipantIdentity | null }>
   return identity === null ? null : <ParticipantMark identity={identity} />
 }
 
-export function NoCommentLine({ identity }: Readonly<{ identity: ParticipantIdentity | null }>) {
+function NoCommentLine({ identity }: Readonly<{ identity: ParticipantIdentity | null }>) {
   return (
     <TranscriptRow gutter={<Gutter identity={identity} />}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline' }}>
@@ -161,7 +161,7 @@ export function NoCommentLine({ identity }: Readonly<{ identity: ParticipantIden
   )
 }
 
-export function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFailureEntry; identity: ParticipantIdentity | null }>) {
+function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFailureEntry; identity: ParticipantIdentity | null }>) {
   return (
     <TranscriptRow gutter={<Gutter identity={identity} />}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -175,7 +175,7 @@ export function FailureLine({ entry, identity }: Readonly<{ entry: ParticipantFa
   )
 }
 
-export type ParticipantResponseCardProps = Readonly<{
+type ParticipantResponseCardProps = Readonly<{
   entry: ParticipantResponseEntry
   identity: ParticipantIdentity | null
   application: ApplicationEntryView | undefined
@@ -187,7 +187,7 @@ export type ParticipantResponseCardProps = Readonly<{
   holdReason: string | null
 }>
 
-export function ParticipantResponseCard({
+function ParticipantResponseCard({
   entry,
   identity,
   application,
@@ -289,7 +289,7 @@ export function ParticipantResponseCard({
   )
 }
 
-export type TranscriptEntryProps = Readonly<{
+type TranscriptEntryProps = Readonly<{
   entry: ConversationEntryView
   application: ApplicationEntryView | undefined
   identities: ReadonlyMap<string, ParticipantIdentity>

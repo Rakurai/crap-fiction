@@ -1,6 +1,6 @@
 import type { FailureCode } from '../shared/envelope.js'
 
-export type RefusalKind = 'invalid' | 'not_found' | 'conflict' | 'internal'
+type RefusalKind = 'invalid' | 'not_found' | 'conflict' | 'internal'
 
 export class RouteFailure extends Error {
   readonly code: FailureCode

@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 
-export type SchemaIssue = Readonly<{ entry: string; message: string }>
+type SchemaIssue = Readonly<{ entry: string; message: string }>
 
 export function firstSchemaIssue(error: z.core.$ZodError): SchemaIssue {
   const [issue] = error.issues

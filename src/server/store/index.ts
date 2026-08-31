@@ -43,7 +43,7 @@ export function settingsFile(dataRoot: string): string {
   return path.join(dataRoot, 'config', 'settings.yaml')
 }
 
-export type SettingsSection = 'workspace' | 'interfacePreferences' | 'modelAssignments'
+type SettingsSection = 'workspace' | 'interfacePreferences' | 'modelAssignments'
 
 export function readSettingsSection<T>(dataRoot: string, section: SettingsSection, schema: z.ZodType<T>): T | undefined {
   const settings = readYamlArtifact(settingsFile(dataRoot), z.object({ [section]: schema.optional() }))
@@ -101,7 +101,7 @@ const pieceMetadataSchema = z.object({
   cast: castBySurfaceSchema,
 })
 
-export type PieceMetadata = Readonly<z.infer<typeof pieceMetadataSchema>>
+type PieceMetadata = Readonly<z.infer<typeof pieceMetadataSchema>>
 
 export type StoredPiece = {
   readonly metadata: PieceMetadata

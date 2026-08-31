@@ -3,14 +3,14 @@ import type { PieceDetail } from '../../shared/pieceViews.js'
 import { createConversationPane, type ConversationPane } from './conversationPane.js'
 import { createDocumentSession, type DocumentSession, type DocumentWrite } from './documentSession.js'
 
-export type SurfaceSession = Readonly<{
+type SurfaceSession = Readonly<{
   document: DocumentSession
   conversationPane: ConversationPane
 }>
 
 export type LeaveRefusal = 'unsavedDocument' | 'leaveUnderway'
 
-export type LeaveOutcome = Readonly<{ kind: 'left' }> | Readonly<{ kind: 'refused'; cause: LeaveRefusal }>
+type LeaveOutcome = Readonly<{ kind: 'left' }> | Readonly<{ kind: 'refused'; cause: LeaveRefusal }>
 
 export type PieceSession = Readonly<{
   pieceId: string

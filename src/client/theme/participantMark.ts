@@ -1,6 +1,6 @@
 import type { Theme } from '../../shared/theme.js'
 
-export type ParticipantMarkTreatment = Readonly<{
+type ParticipantMarkTreatment = Readonly<{
   hueStep: number
   saturation: string
   diameter: number
@@ -8,7 +8,7 @@ export type ParticipantMarkTreatment = Readonly<{
   glyphWeight: number
 }>
 
-export type ParticipantMarkColors = Readonly<{
+type ParticipantMarkColors = Readonly<{
   lightness: string
   glyphLightness: string
 }>

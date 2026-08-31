@@ -1,6 +1,6 @@
 import { participantMarkTreatment } from './participantMark.js'
 
-export type SurfaceMeasures = Readonly<{
+type SurfaceMeasures = Readonly<{
   prose: string
   transcript: number
   identityGutter: number

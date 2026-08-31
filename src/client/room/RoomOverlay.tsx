@@ -12,7 +12,7 @@ function isCast(participant: AddressableParticipantView): participant is CastPar
   return participant.eligibility === 'cast'
 }
 
-export type RoomOverlayProps = Readonly<{ pieceId: string; surface: SurfaceId }>
+type RoomOverlayProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
 export function RoomOverlay({ pieceId, surface }: RoomOverlayProps) {
   const detailRead = readState(usePieceDetail(pieceId))

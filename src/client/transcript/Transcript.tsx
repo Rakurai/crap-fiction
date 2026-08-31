@@ -20,7 +20,7 @@ function applicationsByResponse(entries: readonly ConversationEntryView[]): Read
   return byResponse
 }
 
-export type TranscriptProps = Readonly<{ pieceId: string; surface: SurfaceId }>
+type TranscriptProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
 export function Transcript({ pieceId, surface }: TranscriptProps) {
   const pane = useConversationPane(surface)

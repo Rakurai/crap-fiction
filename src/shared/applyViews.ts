@@ -5,7 +5,7 @@ import { failureReasonSchema } from './modelResult.js'
 
 export const INAPPLICABLE = 'inapplicable'
 
-export const applyFailureReasonSchema = z.enum([...failureReasonSchema.options, INAPPLICABLE] as const)
+const applyFailureReasonSchema = z.enum([...failureReasonSchema.options, INAPPLICABLE] as const)
 
 export type ApplyFailureReason = z.infer<typeof applyFailureReasonSchema>
 
@@ -26,6 +26,6 @@ export const applyConfirmationSchema = z.object({
 
 export type ApplyConfirmation = z.infer<typeof applyConfirmationSchema>
 
-export const pendingApplySchema = z.object({ replacement: replacementSchema })
+const pendingApplySchema = z.object({ replacement: replacementSchema })
 
 export type PendingApply = z.infer<typeof pendingApplySchema>

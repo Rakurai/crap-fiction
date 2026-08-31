@@ -11,7 +11,7 @@ import { presentValue, readState } from '../servedFacts/readState.js'
 import { useDeleteConversation, usePieceDetail } from '../servedFacts/resources.js'
 import { formatStamp } from '../stamp.js'
 
-export type ConversationsOverlayProps = Readonly<{
+type ConversationsOverlayProps = Readonly<{
   pieceId: string
   surface: SurfaceId
   onDismiss: () => void

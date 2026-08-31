@@ -12,7 +12,7 @@ export const dispatchRequestSchema = z.union([
   }),
 ])
 
-export type DispatchRequest = z.infer<typeof dispatchRequestSchema>
+type DispatchRequest = z.infer<typeof dispatchRequestSchema>
 
 export function dispatchOpening(request: DispatchRequest): DispatchOpening {
   if ('respondingTo' in request) {

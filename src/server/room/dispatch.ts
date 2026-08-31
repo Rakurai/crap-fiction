@@ -9,7 +9,7 @@ import type { CallState, CallTurns, ModelAccess } from '../model/types.js'
 import { responseValueSchema } from '../../shared/participantResponse.js'
 import type { ParticipantEvidence } from './context.js'
 
-export type ParticipantOutcome =
+type ParticipantOutcome =
   | Readonly<{ kind: 'entry'; entry: ParticipantResponseEntry | ParticipantNoCommentEntry | ParticipantFailureEntry }>
   | Readonly<{ kind: 'abandoned' }>
 

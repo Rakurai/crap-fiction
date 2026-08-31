@@ -3,7 +3,7 @@ import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { useSetWorkspace, useWorkspace } from '../servedFacts/resources.js'
 
-export type WorkspaceGateProps = Readonly<{ children: ReactNode }>
+type WorkspaceGateProps = Readonly<{ children: ReactNode }>
 
 export function WorkspaceGate({ children }: WorkspaceGateProps) {
   const query = useWorkspace()

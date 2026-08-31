@@ -20,14 +20,14 @@ const addressableIdentity = z.object({
   mark: z.string(),
 })
 
-export const addressableParticipantViewSchema = z.discriminatedUnion('eligibility', [
+const addressableParticipantViewSchema = z.discriminatedUnion('eligibility', [
   addressableIdentity.extend({ eligibility: z.literal('cast'), ordinal: z.number(), enabled: z.boolean() }).readonly(),
   addressableIdentity.extend({ eligibility: z.literal('generalist') }).readonly(),
   addressableIdentity.extend({ eligibility: z.literal('addressed-only'), ordinal: z.number() }).readonly(),
 ])
 export type AddressableParticipantView = z.infer<typeof addressableParticipantViewSchema>
 
-export const storyEditorViewSchema = z
+const storyEditorViewSchema = z
   .object({
     handle: z.string(),
     displayName: z.string(),
@@ -37,7 +37,7 @@ export const storyEditorViewSchema = z
   .readonly()
 export type StoryEditorView = z.infer<typeof storyEditorViewSchema>
 
-export const interviewerViewSchema = z
+const interviewerViewSchema = z
   .object({
     handle: z.string(),
     displayName: z.string(),
@@ -47,7 +47,7 @@ export const interviewerViewSchema = z
   .readonly()
 export type InterviewerView = z.infer<typeof interviewerViewSchema>
 
-export const surfaceDetailSchema = z
+const surfaceDetailSchema = z
   .object({
     text: z.string(),
     location: z.string().min(1),
@@ -59,7 +59,7 @@ export const surfaceDetailSchema = z
   .readonly()
 export type SurfaceDetail = z.infer<typeof surfaceDetailSchema>
 
-export const pieceSurfacesSchema = z
+const pieceSurfacesSchema = z
   .object({
     draft: surfaceDetailSchema,
     storyContext: surfaceDetailSchema,

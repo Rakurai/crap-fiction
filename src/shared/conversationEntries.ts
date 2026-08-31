@@ -67,7 +67,7 @@ export const applicationEntrySchema = z.object({
 
 export type ApplicationEntry = z.infer<typeof applicationEntrySchema>
 
-export const conversationEntrySchema = z.discriminatedUnion('kind', [
+const conversationEntrySchema = z.discriminatedUnion('kind', [
   authorMessageEntrySchema,
   concreteChangeRequestEntrySchema,
   participantResponseEntrySchema,

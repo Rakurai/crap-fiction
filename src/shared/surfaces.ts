@@ -4,7 +4,7 @@ export const surfaceIdSchema = z.enum(['draft', 'storyContext', 'authorContext']
 
 export type SurfaceId = z.infer<typeof surfaceIdSchema>
 
-export const pieceSurfaceIdSchema = surfaceIdSchema.exclude(['authorContext'])
+const pieceSurfaceIdSchema = surfaceIdSchema.exclude(['authorContext'])
 
 export type PieceSurfaceId = z.infer<typeof pieceSurfaceIdSchema>
 

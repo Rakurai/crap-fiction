@@ -15,7 +15,7 @@ async function writeDocument(pieceId: string, surface: SurfaceId, text: string, 
   await put(`/pieces/${pieceId}/surfaces/${surface}/document`, z.null(), { text }, signal)
 }
 
-export type PieceSessionProviderProps = Readonly<{ pieceId: string | null; children: ReactNode }>
+type PieceSessionProviderProps = Readonly<{ pieceId: string | null; children: ReactNode }>
 
 export function PieceSessionProvider({ pieceId, children }: PieceSessionProviderProps) {
   const detail = presentValue(readState(usePieceDetail(pieceId)))
@@ -50,13 +50,13 @@ function neverSubscribe(): () => void {
   return () => {}
 }
 
-export function useDocumentText(surface: SurfaceId): string {
+function useDocumentText(surface: SurfaceId): string {
   const session = usePieceSession()
   const document = session?.surfaces[surface].document
   return useSyncExternalStore(document?.subscribeText ?? neverSubscribe, () => document?.getText() ?? '')
 }
 
-export function useDocumentFailing(surface: SurfaceId): boolean {
+function useDocumentFailing(surface: SurfaceId): boolean {
   const session = usePieceSession()
   const document = session?.surfaces[surface].document
   return useSyncExternalStore(document?.subscribeFailing ?? neverSubscribe, () => document?.getFailing() ?? false)

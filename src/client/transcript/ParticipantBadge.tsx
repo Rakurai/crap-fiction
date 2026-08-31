@@ -10,7 +10,7 @@ function markColors(identity: ParticipantIdentity, scheme: Theme) {
   }
 }
 
-export type ParticipantMarkProps = Readonly<{ identity: ParticipantIdentity }>
+type ParticipantMarkProps = Readonly<{ identity: ParticipantIdentity }>
 
 export function ParticipantMark({ identity }: ParticipantMarkProps) {
   return (
@@ -36,7 +36,7 @@ export function ParticipantMark({ identity }: ParticipantMarkProps) {
   )
 }
 
-export type ParticipantNameHandleProps = Readonly<{ identity: ParticipantIdentity }>
+type ParticipantNameHandleProps = Readonly<{ identity: ParticipantIdentity }>
 
 export function ParticipantNameHandle({ identity }: ParticipantNameHandleProps) {
   return (

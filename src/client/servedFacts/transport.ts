@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { responseEnvelopeSchema, type FailureCode } from '../../shared/envelope.js'
 
-export type RequestFailureReason =
+type RequestFailureReason =
   | Readonly<{ kind: 'refused'; code: FailureCode }>
   | Readonly<{ kind: 'unreachable' }>
   | Readonly<{ kind: 'unreadable' }>
