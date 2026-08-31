@@ -26,11 +26,13 @@ export type ScopeActivity =
   | Readonly<{ status: 'idle' }>
   | Readonly<{ status: 'busy'; action: BusyAction }>
 
+export type StreamFailureReason = 'disconnected' | 'unreadable'
+
 export type ConnectionStatus =
   | Readonly<{ status: 'absent' }>
   | Readonly<{ status: 'retrying' }>
   | Readonly<{ status: 'open' }>
-  | Readonly<{ status: 'failed'; reason: 'disconnected' | 'unreadable' }>
+  | Readonly<{ status: 'failed'; reason: StreamFailureReason }>
 
 export type StatedFailure = Readonly<{ code: ConversationFailureCode; message: string }>
 

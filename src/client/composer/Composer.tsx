@@ -3,8 +3,8 @@ import { useMutation } from '@tanstack/react-query'
 import { Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { config } from '../config.js'
-import { useRoomConnectionStatus, useScopeActivity } from '../eventStream/RoomStreamProvider.js'
-import type { ConnectionStatus } from '../eventStream/roomProjection.js'
+import { useRoomHold, useScopeActivity, useStreamFailure } from '../eventStream/RoomStreamProvider.js'
+import type { StreamFailureReason } from '../eventStream/roomProjection.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
 import { dispatchTo, mintConversation, useAbandonAction, usePieceDetail, type DispatchResult } from '../servedFacts/resources.js'
@@ -15,21 +15,9 @@ import { detectMentionQuery, insertMention, matchingHandles, type MentionQuery }
 
 export type ComposerProps = Readonly<{ pieceId: string; surface: SurfaceId }>
 
-function unrecoveredConnection(connection: ConnectionStatus): string | null {
-  switch (connection.status) {
-    case 'absent':
-      return null
-    case 'retrying':
-      return null
-    case 'open':
-      return null
-    case 'failed':
-      return "the room's connection could not be recovered — reload to try again"
-    default: {
-      const exhaustive: never = connection
-      return exhaustive
-    }
-  }
+const STREAM_FAILURE_TEXT: Readonly<Record<StreamFailureReason, string>> = {
+  disconnected: "the studio has stopped trying to reach the room's events — reload to see what it is doing",
+  unreadable: "the room sent an event the studio could not read — reload to see what it is doing",
 }
 
 export function Composer({ pieceId, surface }: ComposerProps) {
@@ -41,11 +29,11 @@ export function Composer({ pieceId, surface }: ComposerProps) {
   const paneState = useConversationPaneState(surface)
   const documents = useDocumentSnapshot()
   const activity = useScopeActivity(surface)
-  const connection = useRoomConnectionStatus()
+  const held = useRoomHold(surface)
+  const streamFailure = useStreamFailure()
 
   const busyAction = activity.status === 'busy' ? activity.action : null
   const busyDispatch = busyAction !== null && busyAction.kind === 'dispatch' ? busyAction : null
-  const unrecovered = unrecoveredConnection(connection)
 
   const abandonMutation = useAbandonAction(pieceId, surface)
 
@@ -78,7 +66,7 @@ export function Composer({ pieceId, surface }: ComposerProps) {
     fieldRef.current?.setSelectionRange(pos, pos)
   }, [paneState.composerText])
 
-  const disabled = activity.status !== 'idle' || unrecovered !== null || sendMutation.isPending
+  const disabled = held || sendMutation.isPending
   const text = paneState.composerText
   const canSend = !disabled && text.trim() !== ''
 
@@ -160,9 +148,9 @@ export function Composer({ pieceId, surface }: ComposerProps) {
 
   return (
     <Paper elevation={0} square sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-      {unrecovered !== null && (
+      {streamFailure !== null && (
         <Typography variant="machine" sx={{ display: 'block', mb: 1 }}>
-          {unrecovered}
+          {STREAM_FAILURE_TEXT[streamFailure]}
         </Typography>
       )}
       {sendMutation.error !== null && (

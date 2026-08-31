@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useSyncExternalStore, t
 import { useQueryClient } from '@tanstack/react-query'
 import type { SurfaceId } from '../../shared/surfaces.js'
 import { connectToRoom, type RoomConnection } from './roomConnection.js'
-import type { ConnectionStatus, FinishedOutcome, ScopeActivity, StatedFailure } from './roomProjection.js'
+import type { ConnectionStatus, FinishedOutcome, ScopeActivity, StatedFailure, StreamFailureReason } from './roomProjection.js'
 
 const RoomStreamContext = createContext<RoomConnection | null>(null)
 
@@ -41,9 +41,20 @@ export function useScopeActivity(surface: SurfaceId): ScopeActivity {
   )
 }
 
-export function useRoomConnectionStatus(): ConnectionStatus {
+function useRoomConnectionStatus(): ConnectionStatus {
   const connection = useContext(RoomStreamContext)
   return useSyncExternalStore(connection?.subscribe ?? neverSubscribe, () => connection?.getState().connection ?? ABSENT_CONNECTION)
+}
+
+export function useRoomHold(surface: SurfaceId): boolean {
+  const activity = useScopeActivity(surface)
+  const connection = useRoomConnectionStatus()
+  return activity.status !== 'idle' || connection.status !== 'open'
+}
+
+export function useStreamFailure(): StreamFailureReason | null {
+  const connection = useRoomConnectionStatus()
+  return connection.status === 'failed' ? connection.reason : null
 }
 
 export function useScopeFailures(surface: SurfaceId): readonly StatedFailure[] {

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { Alert, Box, Stack, Typography } from '@mui/material'
 import type { SurfaceId } from '../../shared/surfaces.js'
-import { useScopeActivity, useScopeFailures, useScopeFinish } from '../eventStream/RoomStreamProvider.js'
+import { useRoomHold, useScopeActivity, useScopeFailures, useScopeFinish } from '../eventStream/RoomStreamProvider.js'
 import type { ConversationPane } from '../pieceSession/conversationPane.js'
 import { useConversationPane, useConversationPaneState, useDocumentSnapshot, usePieceSession } from '../pieceSession/PieceSessionProvider.js'
 import { presentValue, readState } from '../servedFacts/readState.js'
@@ -36,6 +36,7 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
   const conversationRead = readState(useConversation(pieceId, surface, conversationId))
   const conversation = presentValue(conversationRead)
   const scopeActivity = useScopeActivity(surface)
+  const held = useRoomHold(surface)
   const scopeFailures = useScopeFailures(surface)
   const scopeFinish = useScopeFinish(surface)
   const documents = useDocumentSnapshot()
@@ -98,7 +99,7 @@ function SelectedConversation({ pieceId, surface, conversationId, pane }: Select
             actions={actions}
             disclosed={paneState.disclosures}
             onToggleDisclosure={toggleDisclosure}
-            withheld={scopeActivity.status !== 'idle'}
+            withheld={held}
             applyingResponseId={applyingAction?.sourceEntryId ?? null}
             applyingActionId={applyingAction?.actionId ?? null}
             holdReason={applyOrchestration.statement}
