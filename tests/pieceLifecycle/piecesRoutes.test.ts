@@ -191,10 +191,10 @@ describe('the piece routes', () => {
     expect(await outsideCast.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.CAST_MEMBER_UNKNOWN } })
 
     mkdirSync(path.join(dir, 'broken'), { recursive: true })
-    writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\nstatus: not-a-status\n', 'utf8')
-    const corrupted = await app.request('/pieces/broken')
-    expect(corrupted.status).toBe(500)
-    expect(await corrupted.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ARTIFACT_INVALID } })
+    writeFileSync(path.join(dir, 'broken', 'piece.yaml'), 'title: Broken\nmode: flash\n', 'utf8')
+    const withoutItsCast = await app.request('/pieces/broken')
+    expect(withoutItsCast.status).toBe(500)
+    expect(await withoutItsCast.json()).toMatchObject({ success: false, error: { code: failureCodeSchema.enum.ARTIFACT_INVALID } })
 
     const unknownMode = await app.request('/pieces', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ title: 'Nope', mode: 'novella' }) })
     expect(unknownMode.status).toBe(400)

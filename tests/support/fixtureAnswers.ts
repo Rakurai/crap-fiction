@@ -19,11 +19,11 @@ export const EDITOR_SUGGESTION_CLAIM = 'the piece keeps returning to the harbour
 export const INTERVIEWER_QUESTION = 'what does the harbour cost her to leave?'
 
 function commentary(claim: string, delayMs: number): FixtureBehavior {
-  return { result: { outcome: 'value', value: { kind: 'response', outcome: 'commentary', claim } }, delayMs }
+  return { result: { outcome: 'value', value: { outcome: 'commentary', claim } }, delayMs }
 }
 
 function applicableSuggestion(claim: string, note: string, delayMs: number): FixtureBehavior {
-  return { result: { outcome: 'value', value: { kind: 'response', outcome: 'applicableSuggestion', claim, note } }, delayMs }
+  return { result: { outcome: 'value', value: { outcome: 'applicableSuggestion', claim, note } }, delayMs }
 }
 
 export const FIXTURE_ANSWERS: Readonly<Record<string, FixtureBehavior>> = {
