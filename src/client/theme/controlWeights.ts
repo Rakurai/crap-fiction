@@ -8,6 +8,20 @@ declare module '@mui/material/Button' {
   }
 }
 
+export const toggleWeight: Components<Theme>['MuiToggleButton'] = {
+  styleOverrides: {
+    root: {
+      border: 'none',
+      color: 'var(--mui-palette-text-secondary)',
+      '&.Mui-selected': {
+        backgroundColor: 'transparent',
+        color: 'var(--mui-palette-text-primary)',
+      },
+      '&.Mui-selected:hover': { backgroundColor: 'var(--mui-palette-action-hover)' },
+    },
+  },
+}
+
 export const buttonWeights: Components<Theme>['MuiButton'] = {
   styleOverrides: {
     root: {

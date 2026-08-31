@@ -267,7 +267,7 @@ export function ParticipantResponseCard({
             )}
             {identity !== null && (
               <Button
-                variant="affirm"
+                variant="quiet"
                 size="small"
                 disabled={withheld}
                 onClick={() => {

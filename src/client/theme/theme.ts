@@ -1,5 +1,6 @@
 import { createTheme } from '@mui/material/styles'
-import { buttonWeights } from './controlWeights.js'
+import { buttonWeights, toggleWeight } from './controlWeights.js'
+import { appBarEdge } from './edges.js'
 import { fontFaceStyleOverrides, INTERFACE_FONT_STACK } from './fonts.js'
 import { surfaceMeasures } from './measures.js'
 import { participantMarkColors, participantMarkTreatment } from './participantMark.js'
@@ -58,5 +59,7 @@ export const theme = createTheme({
       },
     },
     MuiButton: buttonWeights,
+    MuiToggleButton: toggleWeight,
+    MuiAppBar: appBarEdge,
   },
 })
