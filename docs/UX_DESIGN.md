@@ -64,8 +64,8 @@ manuscript with the application gone, not as a separate place.
 
 **Reading takes the whole window and holds the prose exactly where it was.** The measure and the
 type size are the editing surface's own, so entering and leaving re-wraps no line and the author's
-eye lands on the sentence it left. The piece's title stands at its head and is not editable there,
-because reading is for reading. The way out is stated as a fact about the machine that stays put
+eye lands on the sentence it left. **Reading carries no title** — not at the head of the prose, not in
+a corner, and not as a fixed label over the scroll. The way out is stated as a fact about the machine that stays put
 while the prose scrolls, and it names the keystroke that already does it rather than adding a
 second way. An unresolved save failure remains stated quietly beside that exit, naming its document,
 because reading must not turn a persistent failure into silence.
